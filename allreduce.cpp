@@ -20,7 +20,7 @@ void Finalize() {
   internal::mpi::finalize();
   progress_engine->stop();
   delete progress_engine;
-  progress_engine->stop();
+  progress_engine = nullptr;
   is_initialized = false;
 }
 
