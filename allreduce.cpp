@@ -50,6 +50,9 @@ void ProgressEngine::run() {
 }
 
 void ProgressEngine::stop() {
+  if (stop_flag.load()) {
+    throw allreduce_exception("Stop called twice on progress engine");
+  }
   stop_flag = true;
 #if ALLREDUCE_PE_SLEEPS
   enqueue_cv.notify_one();  // Wake up the engine if needed.
