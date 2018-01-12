@@ -34,7 +34,7 @@ void Allreduce(const T* sendbuf, T* recvbuf, size_t count,
     internal::mpi::pe_ring_allreduce(sendbuf, recvbuf, count, op, comm);
     break;
   default:
-    throw allreduce_exception("invalid algo");
+    throw_allreduce_exception("Invalid algorithm for Allreduce");
   }
 }
 
@@ -75,7 +75,7 @@ void NonblockingAllreduce(
     internal::mpi::nb_pe_ring_allreduce(sendbuf, recvbuf, count, op, comm, req);
     break;*/
   default:
-    throw allreduce_exception("invalid non-blocking algo");
+    throw_allreduce_exception("Invalid algorithm for NonblockingAllreduce");
   }
 }
 

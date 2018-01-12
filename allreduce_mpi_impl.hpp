@@ -22,7 +22,7 @@ inline bool check_count_fits_mpi(size_t count) {
 /** Throw an exception if count elements cannot be sent by MPI. */
 inline void assert_count_fits_mpi(size_t count) {
   if (!check_count_fits_mpi(count)) {
-    throw allreduce_exception("count too large for MPI");
+    throw_allreduce_exception("Message count too large for MPI");
   }
 }
 
@@ -97,7 +97,7 @@ inline std::function<void(const T*, T*, size_t)> ReductionMap(
   case ReductionOperator::max:
     return max_reduction<T>;
   default:
-    throw allreduce_exception("op not supported");
+    throw_allreduce_exception("Reduction operator not supported");
   }
 }
 
@@ -202,7 +202,7 @@ void passthrough_allreduce(const T* sendbuf, T* recvbuf, size_t count,
     mpi_op = MPI_MAX;
     break;
   default:
-    throw allreduce_exception("op not supported");
+    throw_allreduce_exception("Reduction operator not supported");
   }
   if (sendbuf == IN_PLACE<T>()) {
     MPI_Allreduce(MPI_IN_PLACE, recvbuf, count, type, mpi_op, mpi_comm);
@@ -232,7 +232,7 @@ class MPIPassthroughAllreduceState : public MPIAllreduceState<T> {
       mpi_op = MPI_MAX;
       break;
     default:
-      throw allreduce_exception("op not supported");
+      throw_allreduce_exception("Reduction operator not supported");
     }
   }
   bool setup() override {
@@ -283,7 +283,7 @@ void recursive_doubling_allreduce(const T* sendbuf, T* recvbuf, size_t count,
   // Currently only supports a power-of-2 number of processes.
   // TODO: Support any number of processors.
   if (nprocs & (nprocs - 1)) {
-    throw allreduce_exception("recursive doubling requires a power-of-2 number"
+    throw_allreduce_exception("Recursive doubling requires a power-of-2 number"
                               " of processes");
   }
   if (sendbuf != IN_PLACE<T>()) {
@@ -341,6 +341,10 @@ template <typename T>
 void nb_recursive_doubling_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                                      ReductionOperator op, Communicator& comm,
                                      AllreduceRequest& req) {
+  if (comm.size() & (comm.size() - 1)) {
+    throw_allreduce_exception("Recursive doubling requires a power-of-2 number"
+                              " of processes");
+  }
   req = get_free_request();
   MPIRecursiveDoublingAllreduceState<T>* state =
     new MPIRecursiveDoublingAllreduceState<T>(
@@ -530,7 +534,7 @@ void rabenseifner_allreduce(const T* sendbuf, T* recvbuf, size_t count,
   // Currently only supports a power-of-2 number of processes.
   // TODO: Support any number of processors.
   if (nprocs & (nprocs - 1)) {
-    throw allreduce_exception("rabenseifner requires a power-of-2 number"
+    throw_allreduce_exception("Rabenseifner requires a power-of-2 number"
                               " of processes");
   }
   if (sendbuf != IN_PLACE<T>()) {
@@ -761,6 +765,10 @@ template <typename T>
 void nb_rabenseifner_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                                ReductionOperator op, Communicator& comm,
                                AllreduceRequest& req) {
+  if (comm.size() & (comm.size() - 1)) {
+    throw_allreduce_exception("Rabenseifner doubling requires a power-of-2 number"
+                              " of processes");
+  }
   req = get_free_request();
   MPIRabenseifnerAllreduceState<T>* state =
     new MPIRabenseifnerAllreduceState<T>(

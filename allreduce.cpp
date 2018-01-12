@@ -51,7 +51,7 @@ void ProgressEngine::run() {
 
 void ProgressEngine::stop() {
   if (stop_flag.load()) {
-    throw allreduce_exception("Stop called twice on progress engine");
+    throw_allreduce_exception("Stop called twice on progress engine");
   }
   stop_flag = true;
 #if ALLREDUCE_PE_SLEEPS
