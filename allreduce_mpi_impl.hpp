@@ -101,6 +101,22 @@ inline std::function<void(const T*, T*, size_t)> ReductionMap(
   }
 }
 
+/** Convert a ReductionOperator to the corresponding MPI_Op. */
+inline MPI_Op ReductionOperator2MPI_Op(ReductionOperator op) {
+  switch (op) {
+  case ReductionOperator::sum:
+    return MPI_SUM;
+  case ReductionOperator::prod:
+    return MPI_PROD;
+  case ReductionOperator::min:
+    return MPI_MIN;
+  case ReductionOperator::max:
+    return MPI_MAX;
+  default:
+    throw_allreduce_exception("Reduction operator not supported");
+  }
+}
+
 /** Base state class for MPI allreduces. */
 template <typename T>
 class MPIAllreduceState : public AllreduceState {
@@ -187,23 +203,7 @@ void passthrough_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                            ReductionOperator op, Communicator& comm) {
   MPI_Comm mpi_comm = dynamic_cast<MPICommunicator&>(comm).get_comm();
   MPI_Datatype type = TypeMap<T>();
-  MPI_Op mpi_op;
-  switch (op) {
-  case ReductionOperator::sum:
-    mpi_op = MPI_SUM;
-    break;
-  case ReductionOperator::prod:
-    mpi_op = MPI_PROD;
-    break;
-  case ReductionOperator::min:
-    mpi_op = MPI_MIN;
-    break;
-  case ReductionOperator::max:
-    mpi_op = MPI_MAX;
-    break;
-  default:
-    throw_allreduce_exception("Reduction operator not supported");
-  }
+  MPI_Op mpi_op = ReductionOperator2MPI_Op(op);
   if (sendbuf == IN_PLACE<T>()) {
     MPI_Allreduce(MPI_IN_PLACE, recvbuf, count, type, mpi_op, mpi_comm);
   } else {
@@ -218,22 +218,7 @@ class MPIPassthroughAllreduceState : public MPIAllreduceState<T> {
     const T* sendbuf_, T* recvbuf_, size_t count_,
     ReductionOperator op_, Communicator& comm_, AllreduceRequest req_) :
     MPIAllreduceState<T>(sendbuf_, recvbuf_, count_, op_, comm_, req_) {
-    switch (op_) {
-    case ReductionOperator::sum:
-      mpi_op = MPI_SUM;
-      break;
-    case ReductionOperator::prod:
-      mpi_op = MPI_PROD;
-      break;
-    case ReductionOperator::min:
-      mpi_op = MPI_MIN;
-      break;
-    case ReductionOperator::max:
-      mpi_op = MPI_MAX;
-      break;
-    default:
-      throw_allreduce_exception("Reduction operator not supported");
-    }
+    mpi_op = ReductionOperator2MPI_Op(op_);
   }
   bool setup() override {
     // Don't need to call the parent. Just start the MPI allreduce.
