@@ -97,8 +97,10 @@ void ProgressEngine::wait_for_completion(AllreduceRequest& req) {
   std::unique_lock<std::mutex> lock(completed_mutex);
   auto i = completed_reqs.find(req);
   if (i != completed_reqs.end()) {
-    delete i->second;
+    AllreduceState* state = i->second;
     completed_reqs.erase(i);
+    lock.unlock();
+    delete state;
     req = NULL_REQUEST;
     return;
   }
@@ -108,8 +110,10 @@ void ProgressEngine::wait_for_completion(AllreduceRequest& req) {
     completion_cv.wait(lock);
     i = completed_reqs.find(req);
     if (i != completed_reqs.end()) {
-      delete i->second;
+      AllreduceState* state = i->second;
       completed_reqs.erase(i);
+      lock.unlock();
+      delete state;
       req = NULL_REQUEST;
       return;
     }
