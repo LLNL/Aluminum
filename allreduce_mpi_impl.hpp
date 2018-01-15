@@ -307,19 +307,28 @@ class MPIRecursiveDoublingAllreduceState : public MPIAllreduceState<T> {
     return r;
   }
   bool step() override {
-    const int partner = this->rank ^ mask;
-    MPI_Sendrecv(this->recvbuf, this->count, this->type, partner, this->tag,
-                 this->recv_to, this->count, this->type, partner, this->tag,
-                 this->comm, MPI_STATUS_IGNORE);
-    this->reduction_op(this->recv_to, this->recvbuf, this->count);
-    mask <<= 1;
-    if (mask >= static_cast<unsigned int>(this->nprocs)) {
-      return true;  // Done.
+    bool test = this->test_send_recv();
+    if (started && test) {
+      // Send completed, reduce and update state.
+      this->reduction_op(this->recv_to, this->recvbuf, this->count);
+      mask <<= 1;
+      if (mask >= static_cast<unsigned int>(this->nprocs)) {
+        return true;
+      }
+    }
+    if (test) {
+      const int partner = this->rank ^ mask;
+      this->start_send_recv(this->recvbuf, this->count, partner,
+                            this->recv_to, this->count, partner);
+      started = true;
     }
     return false;
   }
  private:
+  /** Mask for computing partners in each step. */
   unsigned int mask = 1;
+  /** Whether communication has started. */
+  bool started = false;
 };
 
 template <typename T>
@@ -434,6 +443,7 @@ class MPIRingAllreduceState : public MPIAllreduceState<T> {
       if (rs_step()) {
         // Switch to allgather for next step.
         phase = 1;
+        started = false;
         cur_step = 0;
       }
       return false;
@@ -444,6 +454,8 @@ class MPIRingAllreduceState : public MPIAllreduceState<T> {
  private:
   /** 0 == reduce-scatter, 1 == allgather. */
   int phase = 0;
+  /** Whether communication has started. */
+  bool started = false;
   /** Current step in either reduce-scatter or all-gather. */
   int cur_step = 0;
   /** Left partner/source for the ring. */
@@ -457,36 +469,54 @@ class MPIRingAllreduceState : public MPIAllreduceState<T> {
   /** End of each slice of data to be send. */
   std::vector<size_t> slice_ends;
   bool rs_step() {
-    const int send_idx = (this->rank - cur_step + this->nprocs) % this->nprocs;
-    const int recv_idx = (this->rank - cur_step - 1 + this->nprocs) % this->nprocs;
-    const T* to_send = this->recvbuf +
-      (slice_ends[send_idx] - slice_lengths[send_idx]);
-    MPI_Sendrecv(to_send, slice_lengths[send_idx], this->type, dst, this->tag,
-                 this->recv_to, slice_lengths[recv_idx], this->type, src,
-                 this->tag, this->comm, MPI_STATUS_IGNORE);
-    this->reduction_op(
-      this->recv_to,
-      this->recvbuf + (slice_ends[recv_idx] - slice_lengths[recv_idx]),
-      slice_lengths[recv_idx]);
-    ++cur_step;
-    if (cur_step >= this->nprocs - 1) {
-      return true;  // Done.
+    bool test = this->test_send_recv();
+    if (started && test) {
+      // Send completed, reduce and update state.
+      const int old_recv_idx = (this->rank - cur_step - 1 + this->nprocs) %
+        this->nprocs;
+      this->reduction_op(
+        this->recv_to,
+        this->recvbuf +
+          (slice_ends[old_recv_idx] - slice_lengths[old_recv_idx]),
+        slice_lengths[old_recv_idx]);
+      ++cur_step;
+      if (cur_step >= this->nprocs - 1) {
+        return true;
+      }
+    }
+    if (test) {
+      const int send_idx = (this->rank - cur_step + this->nprocs) %
+        this->nprocs;
+      const int recv_idx = (this->rank - cur_step - 1 + this->nprocs) %
+        this->nprocs;
+      const T* to_send = this->recvbuf +
+        (slice_ends[send_idx] - slice_lengths[send_idx]);
+      this->start_send_recv(to_send, slice_lengths[send_idx], dst,
+                            this->recv_to, slice_lengths[recv_idx], src);
+      started = true;
     }
     return false;
   }
   bool ag_step() {
-    const int recv_idx = (this->rank - cur_step + this->nprocs) % this->nprocs;
-    const T* to_send =
-      this->recvbuf + (slice_ends[ag_send_idx] - slice_lengths[ag_send_idx]);
-    MPI_Sendrecv(to_send, slice_lengths[ag_send_idx], this->type, dst,
-                 this->tag, this->recvbuf +
-                 (slice_ends[recv_idx] - slice_lengths[recv_idx]),
-                 slice_lengths[recv_idx], this->type, src, this->tag,
-                 this->comm, MPI_STATUS_IGNORE);
-    ag_send_idx = recv_idx;  // Forward data received.
-    ++cur_step;
-    if (cur_step >= this->nprocs - 1) {
-      return true;  // Done.
+    bool test = this->test_send_recv();
+    if (started && test) {
+      // Update state.
+      const int old_recv_idx = (this->rank - cur_step + this->nprocs) % this->nprocs;
+      ag_send_idx = old_recv_idx;
+      ++cur_step;
+      if (cur_step >= this->nprocs - 1) {
+        return true;
+      }
+    }
+    if (test) {
+      const int recv_idx = (this->rank - cur_step + this->nprocs) % this->nprocs;
+      const T* to_send =
+        this->recvbuf + (slice_ends[ag_send_idx] - slice_lengths[ag_send_idx]);
+      this->start_send_recv(
+        to_send, slice_lengths[ag_send_idx], dst,
+        this->recvbuf + (slice_ends[recv_idx] - slice_lengths[recv_idx]),
+        slice_lengths[recv_idx], src);
+      started = true;
     }
     return false;
   }
@@ -650,6 +680,7 @@ class MPIRabenseifnerAllreduceState : public MPIAllreduceState<T> {
       if (rs_step()) {
         // Switch to allgather for next step.
         phase = 1;
+        started = false;
         slice_mask >>= 1;
         partner_mask = 1;
       }
@@ -661,6 +692,8 @@ class MPIRabenseifnerAllreduceState : public MPIAllreduceState<T> {
  private:
   /** 0 == reduce-scatter, 1 == allgather. */
   int phase = 0;
+  /** Whether communication has started. */
+  bool started = false;
   /** Mask for computing the partner. */
   unsigned int partner_mask;
   /** Mask for computing the data slices to send. */
@@ -676,7 +709,51 @@ class MPIRabenseifnerAllreduceState : public MPIAllreduceState<T> {
   /** End of each slice of data to be send. */
   std::vector<size_t> slice_ends;
   bool rs_step() {
-    const int partner = this->rank ^ partner_mask;
+    bool test = this->test_send_recv();
+    if (started && test) {
+      const int old_partner = this->rank ^ partner_mask;
+      size_t old_recv_start = slice_ends[recv_idx] - slice_lengths[recv_idx];
+      size_t old_recv_end;
+      if (this->rank < old_partner) {
+        old_recv_end = slice_ends[send_idx - 1];
+      } else {
+        old_recv_end = slice_ends[last_idx - 1];
+      }
+      this->reduction_op(this->recv_to, this->recvbuf + old_recv_start,
+                         old_recv_end - old_recv_start);
+      send_idx = recv_idx;
+      partner_mask >>= 1;
+      slice_mask <<= 1;
+      if (partner_mask == 0) {
+        return true;
+      }
+      // This isn't updated on the last iteration.
+      last_idx = recv_idx + this->nprocs / slice_mask;
+    }
+    if (test) {
+      const int partner = this->rank ^ partner_mask;
+      // Compute the range of data to send/receive.
+      size_t send_start, send_end, recv_start, recv_end;
+      if (this->rank < partner) {
+        send_idx = recv_idx + this->nprocs / (slice_mask*2);
+        send_start = slice_ends[send_idx] - slice_lengths[send_idx];
+        send_end = slice_ends[last_idx - 1];
+        recv_start = slice_ends[recv_idx] - slice_lengths[recv_idx];
+        recv_end = slice_ends[send_idx - 1];
+      } else {
+        recv_idx = send_idx + this->nprocs / (slice_mask*2);
+        send_start = slice_ends[send_idx] - slice_lengths[send_idx];
+        send_end = slice_ends[recv_idx - 1];
+        recv_start = slice_ends[recv_idx] - slice_lengths[recv_idx];
+        recv_end = slice_ends[last_idx - 1];
+      }
+      this->start_send_recv(
+        this->recvbuf + send_start, send_end - send_start, partner,
+        this->recv_to, recv_end - recv_start, partner);
+      started = true;
+    }
+    return false;
+    /*const int partner = this->rank ^ partner_mask;
     // Compute the range of data to send/receive.
     size_t send_start, send_end, recv_start, recv_end;
     if (this->rank < partner) {
@@ -706,10 +783,50 @@ class MPIRabenseifnerAllreduceState : public MPIAllreduceState<T> {
     }
     // This isn't updated on the last iteration.
     last_idx = recv_idx + this->nprocs / slice_mask;
-    return false;
+    return false;*/
   }
   bool ag_step() {
-    const int partner = this->rank ^ partner_mask;
+    bool test = this->test_send_recv();
+    if (started && test) {
+      // Update state.
+      const int old_partner = this->rank ^ partner_mask;
+      if (this->rank > old_partner) {
+        send_idx = recv_idx;
+      }
+      partner_mask <<= 1;
+      slice_mask >>= 1;
+      if (partner_mask >= static_cast<unsigned int>(this->nprocs)) {
+        return true;
+      }
+    }
+    if (test) {
+      const int partner = this->rank ^ partner_mask;
+      // The send/recv ranges are computed similarly to above.
+      size_t send_start, send_end, recv_start, recv_end;
+      if (this->rank < partner) {
+        // Except on the first iteration, update last_idx.
+        if (slice_mask != static_cast<unsigned int>(this->nprocs) / 2) {
+          last_idx += this->nprocs / (slice_mask*2);
+        }
+        recv_idx = send_idx + this->nprocs / (slice_mask*2);
+        send_start = slice_ends[send_idx] - slice_lengths[send_idx];
+        send_end = slice_ends[recv_idx - 1];
+        recv_start = slice_ends[recv_idx] - slice_lengths[recv_idx];
+        recv_end = slice_ends[last_idx - 1];
+      } else {
+        recv_idx = send_idx - this->nprocs / (slice_mask*2);
+        send_start = slice_ends[send_idx] - slice_lengths[send_idx];
+        send_end = slice_ends[last_idx - 1];
+        recv_start = slice_ends[recv_idx] - slice_lengths[recv_idx];
+        recv_end = slice_ends[send_idx - 1];
+      }
+      this->start_send_recv(
+        this->recvbuf + send_start, send_end - send_start, partner,
+        this->recvbuf + recv_start, recv_end - recv_start, partner);
+      started = true;
+    }
+    return false;
+    /*const int partner = this->rank ^ partner_mask;
     // The send/recv ranges are computed similarly to above.
     size_t send_start, send_end, recv_start, recv_end;
     if (this->rank < partner) {
@@ -742,7 +859,7 @@ class MPIRabenseifnerAllreduceState : public MPIAllreduceState<T> {
     if (partner_mask >= static_cast<unsigned int>(this->nprocs)) {
       return true;  // Done.
     }
-    return false;
+    return false;*/
   }
 };
 

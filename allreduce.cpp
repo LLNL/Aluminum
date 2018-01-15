@@ -129,7 +129,7 @@ void ProgressEngine::engine() {
   while (!stop_flag.load()) {
     // Check for newly-submitted requests. Grab one per iteration.
     // Don't block if someone else has the lock.
-    if (in_progress_reqs.empty() && enqueue_mutex.try_lock()) {
+    if (enqueue_mutex.try_lock()) {
 #if ALLREDUCE_PE_SLEEPS
       if (in_progress_reqs.empty() && enqueued_reqs.empty()) {
         // No work to do, so instead of spinning, wait.
