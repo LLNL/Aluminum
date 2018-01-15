@@ -5,6 +5,8 @@
  */
 #pragma once
 
+/** Whether to use OpenMP for reduction operators. */
+#define ALLREDUCE_MPI_USE_OPENMP 0
 /** Use multiple threads for sum reductions this size or larger. */
 #define ALLREDUCE_MPI_MULTITHREAD_SUM_THRESH 262144
 /** Use multiple threads for prod reductions this size or larger. */

@@ -29,6 +29,7 @@ inline void assert_count_fits_mpi(size_t count) {
 /** Basic sum reduction. */
 template <typename T>
 void sum_reduction(const T* src, T* dest, size_t count) {
+#if ALLREDUCE_MPI_USE_OPENMP
   if (count >= ALLREDUCE_MPI_MULTITHREAD_SUM_THRESH) {
     #pragma omp parallel for
     for (size_t i = 0; i < count; ++i) {
@@ -39,10 +40,16 @@ void sum_reduction(const T* src, T* dest, size_t count) {
       dest[i] += src[i];
     }
   }
+#else
+  for (size_t i = 0; i < count; ++i) {
+    dest[i] += src[i];
+  }
+#endif
 }
 /** Basic prod reduction. */
 template <typename T>
 void prod_reduction(const T* src, T* dest, size_t count) {
+#if ALLREDUCE_MPI_USE_OPENMP
   if (count >= ALLREDUCE_MPI_MULTITHREAD_PROD_THRESH) {
     #pragma omp parallel for
     for (size_t i = 0; i < count; ++i) {
@@ -53,10 +60,16 @@ void prod_reduction(const T* src, T* dest, size_t count) {
       dest[i] *= src[i];
     }
   }
+#else
+  for (size_t i = 0; i < count; ++i) {
+    dest[i] *= src[i];
+  }
+#endif
 }
 /** Basic min reduction. */
 template <typename T>
 void min_reduction(const T* src, T* dest, size_t count) {
+#if ALLREDUCE_MPI_USE_OPENMP
   if (count >= ALLREDUCE_MPI_MULTITHREAD_MINMAX_THRESH) {
     #pragma omp parallel for
     for (size_t i = 0; i < count; ++i) {
@@ -67,10 +80,16 @@ void min_reduction(const T* src, T* dest, size_t count) {
       dest[i] = std::min(dest[i], src[i]);
     }
   }
+#else
+  for (size_t i = 0; i < count; ++i) {
+    dest[i] = std::min(dest[i], src[i]);
+  }
+#endif
 }
 /** Basic max reduction. */
 template <typename T>
 void max_reduction(const T* src, T* dest, size_t count) {
+#if ALLREDUCE_MPI_USE_OPENMP
   if (count >= ALLREDUCE_MPI_MULTITHREAD_MINMAX_THRESH) {
     #pragma omp parallel for
     for (size_t i = 0; i < count; ++i) {
@@ -81,6 +100,11 @@ void max_reduction(const T* src, T* dest, size_t count) {
       dest[i] = std::max(dest[i], src[i]);
     }
   }
+#else
+  for (size_t i = 0; i < count; ++i) {
+    dest[i] = std::max(dest[i], src[i]);
+  }
+#endif
 }
 
 /** Return the associated reduction function for an operator. */
