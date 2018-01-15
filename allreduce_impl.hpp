@@ -52,8 +52,14 @@ void NonblockingAllreduce(
   AllreduceRequest& req,
   AllreduceAlgorithm algo) {
   if (algo == AllreduceAlgorithm::automatic) {
-    // TODO: Algorithm selection/performance model.
-    algo = AllreduceAlgorithm::mpi_recursive_doubling;
+    // TODO: Better algorithm selection/performance model.
+    // TODO: Make tuneable.
+    algo = AllreduceAlgorithm::mpi_passthrough;
+    if (count <= 1<<9) {
+      algo = AllreduceAlgorithm::mpi_recursive_doubling;
+    } else {
+      algo = AllreduceAlgorithm::mpi_rabenseifner;
+    }
   }
   switch (algo) {
   case AllreduceAlgorithm::mpi_passthrough:
