@@ -293,9 +293,10 @@ class AllreduceState {
  */
 class ProgressEngine {
  public:
-  ProgressEngine() {}
+  ProgressEngine();
   ProgressEngine(const ProgressEngine&) = delete;
   ProgressEngine& operator=(const ProgressEngine) = delete;
+  ~ProgressEngine();
   /** Start the progress engine. */
   void run();
   /** Stop the progress engine. */
@@ -351,7 +352,17 @@ class ProgressEngine {
   std::mutex completed_mutex;
   /** Used to notify any thread waiting for completion. */
   std::condition_variable completion_cv;
-  /** Bind the progress engine to a core. TODO */
+  /**
+   * World communicator.
+   * Note: This means we require MPI, which may be something to change later,
+   * but it simplifies things.
+   */
+  MPICommunicator* world_comm;
+  /**
+   * Bind the progress engine to a core.
+   * This binds to the last core in the NUMA node the process is in.
+   * If there are multiple ranks per NUMA node, they get the last-1, etc. core.
+   */
   void bind();
   /** This is the main progress engine loop. */
   void engine();

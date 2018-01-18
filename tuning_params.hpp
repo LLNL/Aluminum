@@ -22,3 +22,10 @@
  * compute on the same core) but probably increases latency a little bit.
  */
 #define ALLREDUCE_PE_SLEEPS 1
+
+/**
+ * This controls how many allreduces the progress engine will allow to be in
+ * progress at one time.
+ * Set to 0 to have no limit.
+ */
+#define ALLREDUCE_PE_NUM_CONCURRENT_ALLREDUCES 3
