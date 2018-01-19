@@ -1,6 +1,21 @@
 #include <hwloc.h>
 #include "allreduce.hpp"
 
+// For ancient versions of hwloc.
+#if HWLOC_API_VERSION < 0x00010b00
+#define HWLOC_OBJ_NUMANODE HWLOC_OBJ_NODE
+// Ported from more recent hwloc versions.
+hwloc_obj_t hwloc_get_numanode_obj_by_os_index(hwloc_topology_t topology, unsigned os_index) {
+  hwloc_obj_t obj = NULL;
+  while ((obj = hwloc_get_next_obj_by_type(topology, HWLOC_OBJ_NUMANODE, obj)) != NULL) {
+    if (obj->os_index == os_index) {
+      return obj;
+    }
+  }
+  return NULL;
+}
+#endif
+
 namespace allreduces {
 
 namespace {
