@@ -153,7 +153,8 @@ void ProgressEngine::bind() {
     topo, numa_node->cpuset, HWLOC_OBJ_CORE);
   // Determine which core on this NUMA node to map us to.
   // Note: This doesn't handle the case where things aren't evenly divisible.
-  int ranks_per_numa_node = world_comm->local_size() / num_numa_nodes;
+  int ranks_per_numa_node = std::max(
+    1, world_comm->local_size() / num_numa_nodes);
   int numa_rank = world_comm->local_rank() % ranks_per_numa_node;
   // Pin to the last - numa_rank core.
   hwloc_obj_t core = hwloc_get_obj_inside_cpuset_by_type(
@@ -178,6 +179,18 @@ void ProgressEngine::engine() {
       // Don't block if someone else has the lock.
       std::unique_lock<std::mutex> lock(enqueue_mutex, std::try_to_lock);
       if (lock) {
+#if ALLREDUCE_PE_SLEEPS
+        // If there's no work, we sleep.
+        if (in_progress_reqs.empty() && enqueued_reqs.empty()) {
+          enqueue_cv.wait(
+            lock, [this] {
+              return (!enqueued_reqs.empty() &&
+                      (ALLREDUCE_PE_NUM_CONCURRENT_ALLREDUCES == 0 ||
+                       in_progress_reqs.size() < ALLREDUCE_PE_NUM_CONCURRENT_ALLREDUCES)) ||
+                stop_flag.load();
+            });
+        }
+#endif
         while (!enqueued_reqs.empty() &&
                (ALLREDUCE_PE_NUM_CONCURRENT_ALLREDUCES == 0 ||
                 in_progress_reqs.size() < ALLREDUCE_PE_NUM_CONCURRENT_ALLREDUCES)) {
@@ -186,26 +199,6 @@ void ProgressEngine::engine() {
         }
       }
     }
-#if ALLREDUCE_PE_SLEEPS
-    else if (in_progress_reqs.empty()) {
-      // There does not appear to be any work, so confirm that and sleep.
-      // Once we wake up here, there should be work.
-      std::unique_lock<std::mutex> lock(enqueue_mutex);
-      enqueue_cv.wait(
-        lock, [this] {
-          return (!enqueued_reqs.empty() &&
-                  (ALLREDUCE_PE_NUM_CONCURRENT_ALLREDUCES == 0 ||
-                   in_progress_reqs.size() < ALLREDUCE_PE_NUM_CONCURRENT_ALLREDUCES)) ||
-            stop_flag.load();
-        });
-      while (!enqueued_reqs.empty() &&
-             (ALLREDUCE_PE_NUM_CONCURRENT_ALLREDUCES == 0 ||
-              in_progress_reqs.size() < ALLREDUCE_PE_NUM_CONCURRENT_ALLREDUCES)) {
-        in_progress_reqs.push_back(enqueued_reqs.front());
-        enqueued_reqs.pop();
-      }
-    }
-#endif
     std::vector<AllreduceState*> completed;
     // Process one step of each in-progress request.
     for (auto i = in_progress_reqs.begin(); i != in_progress_reqs.end();) {
