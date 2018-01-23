@@ -22,6 +22,9 @@
 
 #include "tuning_params.hpp"
 
+#include "nccl.h"
+#include "common.h"
+
 namespace allreduces {
 
 /**
@@ -430,6 +433,118 @@ void pe_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
 
 }  // namespace internal
 
+
+/// We assume NCCL version 2.0 or higher for allreduce to work
+class NCCLCommunicator : MPICommunicator {
+ public:
+
+  /// NCCL communicator MUST operate in conjunction with an MPI_Comm 
+  /// Default constructor; use MPI_COMM_WORLD
+  NCCLCommunicator() : NCCLCommunicator(MPI_COMM_WORLD) {}
+
+  /// NCCLCommunicator with an MPI communicator given
+  NCCLCommunicator(MPI_Comm comm_) : MPICommunicator(comm_) {
+
+    m_nccl_used = true;
+
+    /// Set up GPU-related informatiton
+    gpu_setup();
+
+    /// NCCL set up here
+    nccl_setup();
+  }
+
+  ~NCCLCommunicator() override {
+    /// NCCL destroy here
+    nccl_destroy();
+  }
+
+  /// for NCCL sendbuf and recvbuf can be identical; in-place operation will be performed
+  template <typename T>
+  void Allreduce(const T* sendbuf, T* recvbuf, size_t count,
+               ReductionOperator op) {
+               //ReductionOperator op, Communicator& comm) {
+
+
+    MPI_Comm comm_ = get_comm();
+
+    int num_gpus_assigned = m_gpus.size();
+
+    /// Convert type T to corresponding NCCL data type.
+    ncclDataType_t nccl_type;
+    switch(sizeof(T)) {
+    case 8:
+      nccl_type = ncclDouble;
+       break;
+     case 4:
+       nccl_type = ncclFloat;
+       break;
+     case 2:
+       nccl_type = ncclHalf;
+       break;
+     default:
+       std::cerr << "NCCLCommunicator: rank " << rank_in_comm << ": invalid data type for NCCL\n";
+       MPI_Abort(comm_, -4);
+    }
+
+    /// Convert ReductionOperator to corresponding NCCL reduction operation
+    ncclRedOp_t nccl_redop;
+    switch(op) {
+    case ReductionOperator::sum:
+      nccl_redop = ncclSum;
+      break;
+    case ReductionOperator::prod:
+      nccl_redop = ncclProd;
+      break;
+    case ReductionOperator::min:
+      nccl_redop = ncclMin;
+      break;
+    case ReductionOperator::max:
+      nccl_redop = ncclMax;
+      break;
+    default:
+      std::cerr << "NCCLCommunicator: rank " << rank_in_comm << ": invalid NCCL reduction operator\n";
+      MPI_Abort(comm_, -5);
+    }
+
+    int total_len = (int) count;
+
+    if(num_gpus_assigned > 1) ncclGroupStart();
+    for(int i = 0; i < num_gpus_assigned; ++i) {
+      CHECK_CUDA(cudaSetDevice(m_gpus[i]));
+      NCCLCHECK(ncclAllReduce(sendbuf, recvbuf, total_len, nccl_type, nccl_redop, m_nccl_comm[i], m_streams[i]));
+    }
+    if(num_gpus_assigned > 1) ncclGroupEnd();
+
+  }
+
+
+  bool is_nccl_used() { return m_nccl_used; }
+
+  void gpu_setup();
+
+  void nccl_setup();
+  void nccl_destroy();
+
+ private:
+
+
+  /** List of GPU related variables. */
+  /// List of GPUs to be used
+  std::vector<int> m_gpus;
+  /// List of CUDA streams
+  std::vector<cudaStream_t> m_streams;
+  /// Number of GPUs allocated to the current rank
+  int m_num_gpus;
+  /// Number of visible GPUs on this compute node
+  int m_num_visible_gpus;
+
+
+  /** List of NCCL 2 related variables. */
+  /// NOTE: It is assumed that ONLY ONE GPU is allocated to one MPI rank
+  bool m_nccl_used;
+  std::vector<ncclComm_t> m_nccl_comm;
+};
 }  // namespace allreduces
 
 #include "allreduce_impl.hpp"

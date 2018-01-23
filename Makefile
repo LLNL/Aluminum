@@ -1,4 +1,4 @@
-CXXFLAGS += -Wall -Wextra -pedantic -Wshadow -O3 -std=c++11 -fopenmp -g -fPIC -lhwloc
+CXXFLAGS += -Wall -Wextra -pedantic -Wshadow -O3 -std=c++11 -fopenmp -g -fPIC -lhwloc  -fpermissive -I/opt/cudatoolkit-8.0/include
 cur_dir = $(shell pwd)
 LIB = -L$(cur_dir) -lallreduce -Wl,-rpath=$(cur_dir)
 
