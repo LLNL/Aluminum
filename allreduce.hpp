@@ -435,7 +435,7 @@ void pe_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
 
 
 /// We assume NCCL version 2.0 or higher for allreduce to work
-class NCCLCommunicator : MPICommunicator {
+class NCCLCommunicator : public MPICommunicator {
  public:
 
   /// NCCL communicator MUST operate in conjunction with an MPI_Comm 
@@ -444,6 +444,8 @@ class NCCLCommunicator : MPICommunicator {
 
   /// NCCLCommunicator with an MPI communicator given
   NCCLCommunicator(MPI_Comm comm_) : MPICommunicator(comm_) {
+
+    comm = get_comm();
 
     m_nccl_used = true;
 
@@ -483,7 +485,7 @@ class NCCLCommunicator : MPICommunicator {
        nccl_type = ncclHalf;
        break;
      default:
-       std::cerr << "NCCLCommunicator: rank " << rank_in_comm << ": invalid data type for NCCL\n";
+       std::cerr << "NCCLCommunicator: rank " << rank() << ": invalid data type for NCCL\n";
        MPI_Abort(comm_, -4);
     }
 
@@ -503,7 +505,7 @@ class NCCLCommunicator : MPICommunicator {
       nccl_redop = ncclMax;
       break;
     default:
-      std::cerr << "NCCLCommunicator: rank " << rank_in_comm << ": invalid NCCL reduction operator\n";
+      std::cerr << "NCCLCommunicator: rank " << rank() << ": invalid NCCL reduction operator\n";
       MPI_Abort(comm_, -5);
     }
 
@@ -511,7 +513,7 @@ class NCCLCommunicator : MPICommunicator {
 
     if(num_gpus_assigned > 1) ncclGroupStart();
     for(int i = 0; i < num_gpus_assigned; ++i) {
-      CHECK_CUDA(cudaSetDevice(m_gpus[i]));
+      CUDACHECK(cudaSetDevice(m_gpus[i]));
       NCCLCHECK(ncclAllReduce(sendbuf, recvbuf, total_len, nccl_type, nccl_redop, m_nccl_comm[i], m_streams[i]));
     }
     if(num_gpus_assigned > 1) ncclGroupEnd();
@@ -521,13 +523,116 @@ class NCCLCommunicator : MPICommunicator {
 
   bool is_nccl_used() { return m_nccl_used; }
 
-  void gpu_setup();
+  void gpu_setup() {
 
-  void nccl_setup();
-  void nccl_destroy();
+    const int rank_in_node = local_rank();
+    const int procs_per_node = local_size();
+
+    /// Determine number of visible GPUs on the current node
+    CUDACHECK(cudaGetDeviceCount(&m_num_visible_gpus));
+
+    if(m_num_visible_gpus < 1) {
+      std::cerr << "NCCLCommunicator: rank " << rank() << ": has no GPUs found on the node\n";
+      MPI_Abort(comm, -1);
+    }
+    if(m_num_visible_gpus < procs_per_node) {
+      std::cerr << "NCCLCommunicator: rank " << rank() << ": has not enough GPUs available for given ranks\n";
+      MPI_Abort(comm, -2);
+    }
+    else{
+      /// The number of GPUs on this node is greater than or equal to that of ranks assigned to this node;
+      /// ensure that the right number of GPUs are used
+      m_num_visible_gpus = procs_per_node;
+    }
+
+    // Assign GPUs to process
+    int gpu_start, gpu_end;
+    
+    const int gpus_per_proc = m_num_visible_gpus / procs_per_node;
+    const int num_leftover_gpus = m_num_visible_gpus % procs_per_node;
+    gpu_start = rank_in_node * gpus_per_proc;
+    gpu_end = (rank_in_node + 1) * gpus_per_proc;
+    if(rank_in_node < num_leftover_gpus) {
+      gpu_start += rank_in_node;
+      gpu_end += rank_in_node + 1;
+    }
+    else {
+      gpu_start += num_leftover_gpus;
+      gpu_end += num_leftover_gpus;
+    }
+
+    // Construct GPU objects
+    for(int gpu = gpu_start; gpu < gpu_end; ++gpu) {
+      CUDACHECK(cudaSetDevice(gpu));
+      m_gpus.push_back(gpu);
+      m_streams.push_back(nullptr);
+/*
+      m_handles.push_back(nullptr);
+    m_cublas_handles.push_back(nullptr);
+*/
+
+      CUDACHECK(cudaStreamCreate(&m_streams.back()));
+
+/*
+    FORCE_CHECK_CUDNN(cudnnCreate(&m_handles.back()));
+    FORCE_CHECK_CUDNN(cudnnSetStream(m_handles.back(), m_streams.back()));
+    FORCE_CHECK_CUBLAS(cublasCreate(&m_cublas_handles.back()));
+*/
+    }
+
+
+    // Get number of GPUs for current MPI rank
+    m_num_gpus = m_gpus.size();
+  }
+
+
+  void nccl_setup() {
+
+    if(m_num_gpus != 1){
+      std::cerr << "NCCLCommunicator: rank " << rank() << ": the number of GPUs assigned to process is " << m_num_gpus << "; should be 1\n";
+      MPI_Abort(comm, -3);
+    }
+
+    /// Create nccl communicators
+    int num_gpus_assigned = m_num_gpus;
+    m_nccl_comm.resize(num_gpus_assigned);
+
+    int nProcs = size();
+    int myid = rank();
+    int total_num_comms = nProcs*num_gpus_assigned;
+
+    ncclUniqueId ncclId;
+    if (myid == 0) {
+      NCCLCHECK(ncclGetUniqueId(&ncclId));
+    }
+
+    MPI_Bcast(&ncclId, sizeof(ncclId), MPI_BYTE, 0, comm);
+
+    if (nProcs == 1) {
+      int gpuArray = 0;
+      NCCLCHECK(ncclCommInitAll(&(m_nccl_comm[0]), 1, &gpuArray));
+    }
+    else {
+      if(num_gpus_assigned > 1) NCCLCHECK(ncclGroupStart());
+      for(int i=0; i<num_gpus_assigned; i++){
+        CUDACHECK(cudaSetDevice(m_gpus[i]));
+        NCCLCHECK(ncclCommInitRank(&(m_nccl_comm[i]), total_num_comms, ncclId, num_gpus_assigned*myid+i));
+      }
+      if(num_gpus_assigned > 1) NCCLCHECK(ncclGroupEnd());
+    }
+  } // nccl_setup
+
+  void nccl_destroy() {
+    int num_gpus_assigned = m_gpus.size();
+    for(int i=0; i<num_gpus_assigned; i++){
+      ncclCommDestroy(m_nccl_comm[i]);
+    }
+  }
+
 
  private:
 
+  MPI_Comm comm;
 
   /** List of GPU related variables. */
   /// List of GPUs to be used
@@ -550,3 +655,5 @@ class NCCLCommunicator : MPICommunicator {
 #include "allreduce_impl.hpp"
 #include "allreduce_mempool.hpp"
 #include "allreduce_mpi_impl.hpp"
+
+
