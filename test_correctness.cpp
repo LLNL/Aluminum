@@ -3,8 +3,11 @@
 #include "test_utils.hpp"
 
 #include <stdlib.h>
+#include <math.h>
 #include "common.h"
 
+
+#define NCCL_THRESHOLD	1e-05
 
 void test_nccl_allreduce(const std::vector<float>& expected,
                          std::vector<float> input,
@@ -80,11 +83,15 @@ int main(int argc, char** argv) {
   allreduces::Initialize(argc, argv);
 
   int code = 0;
-  if(argc == 1)
+  if(argc == 1){
     code = 0;
-
-  if(argc == 2 && atoi(argv[1]) == 1){
-    code = 1;
+  }
+  else if(argc == 2) {
+    code = atoi(argv[1]);
+    if(code != 0 && code != 1){
+      std::cerr << "usage: " << argv[0] << " [0(MPI) | 1(NCCL)]\n";
+      return -1;
+    }
   }
   else{
     std::cerr << "usage: " << argv[0] << " [0(MPI) | 1(NCCL)]\n";
@@ -158,6 +165,7 @@ int main(int argc, char** argv) {
     }
 
     for (const auto& size : sizes) {
+
       if (nccl_comm.rank() == 0) {
         std::cout << "Testing size " << human_readable_size(size) << std::endl;
       }
@@ -170,7 +178,6 @@ int main(int argc, char** argv) {
       MPI_Barrier(MPI_COMM_WORLD);
       test_nccl_allreduce(expected, data, nccl_comm);
     }
-
   }
     
   allreduces::Finalize();
@@ -187,23 +194,48 @@ int main(int argc, char** argv) {
 void test_nccl_allreduce(const std::vector<float>& expected,
                          std::vector<float> input,
                          allreduces::NCCLCommunicator& nccl_comm) {
-  std::vector<float> recv(input.size());
+  /// create and copy input to device memory
+  /// create a receive buffer in device
+  
+  void *sbuffer;
+  void *rbuffer;
+  size_t len = input.size() * sizeof(float);
+
+  CUDACHECK(cudaMalloc(&sbuffer, len));
+  CUDACHECK(cudaMemcpy(sbuffer, &input[0], len, cudaMemcpyHostToDevice));
+
+  CUDACHECK(cudaMalloc(&rbuffer, len));
+
+  //std::vector<float> recv(input.size());
   // Test regular allreduce.
-  nccl_comm.Allreduce(input.data(), recv.data(), input.size(),
+
+  int vsize = input.size();
+  std::vector<float> recv(input.size());
+
+  nccl_comm.Allreduce(sbuffer, rbuffer, input.size(), ncclFloat,
                         allreduces::ReductionOperator::sum);
-  if (!check_vector(expected, recv)) {
-    std::cout << nccl_comm.rank() << ": regular allreduce does not match" <<
-    std::endl;
+  CUDACHECK(cudaMemcpy(&recv[0], rbuffer, len, cudaMemcpyDeviceToHost));
+
+
+  /// Since some numerical errors are expected when running on GPU, 
+  /// we need to measure the error between the two
+
+  float sum_exp = 0.0;
+  float sum_recv = 0.0;
+
+  for(int i=0; i<vsize; i++){
+    sum_exp += expected[i];
+    sum_recv += recv[i];
   }
-  /*
-  // Test in-place allreduce.
-  allreduces::Allreduce(input.data(), input.size(),
-                        allreduces::ReductionOperator::sum, comm, algo);
-  if (!check_vector(expected, input)) {
-    std::cout << comm.rank() << ": in-place allreduce does not match" <<
-      std::endl;
+
+  int myid = nccl_comm.rank();
+  if(myid == 0) {
+    if(fabsf(sum_exp-sum_recv > NCCL_THRESHOLD)){
+      std::cout << nccl_comm.rank() << ": NCCL allreduce does not match" << std::endl;
+    }
   }
-*/
+
+  CUDACHECK(cudaFree(sbuffer));
+  CUDACHECK(cudaFree(rbuffer));
+
 }
-
-

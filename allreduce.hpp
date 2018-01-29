@@ -445,7 +445,7 @@ class NCCLCommunicator : public MPICommunicator {
   /// NCCLCommunicator with an MPI communicator given
   NCCLCommunicator(MPI_Comm comm_) : MPICommunicator(comm_) {
 
-    comm = get_comm();
+    mpicomm = get_comm();
 
     m_nccl_used = true;
 
@@ -454,6 +454,8 @@ class NCCLCommunicator : public MPICommunicator {
 
     /// NCCL set up here
     nccl_setup();
+
+    test_code();
   }
 
   ~NCCLCommunicator() override {
@@ -461,32 +463,36 @@ class NCCLCommunicator : public MPICommunicator {
     nccl_destroy();
   }
 
+  void test_code(){
+
+  }
+
+  /// It is assumed that both sendbuf and recvbuf are in device memory
   /// for NCCL sendbuf and recvbuf can be identical; in-place operation will be performed
-  template <typename T>
-  void Allreduce(const T* sendbuf, T* recvbuf, size_t count,
+  void Allreduce(void* sendbuf, void* recvbuf, size_t count, ncclDataType_t nccl_type,
                ReductionOperator op) {
                //ReductionOperator op, Communicator& comm) {
 
+    if(count == 0) return;
 
     MPI_Comm comm_ = get_comm();
 
     int num_gpus_assigned = m_gpus.size();
 
     /// Convert type T to corresponding NCCL data type.
-    ncclDataType_t nccl_type;
-    switch(sizeof(T)) {
+    switch(sizeof(nccl_type)) {
     case 8:
       nccl_type = ncclDouble;
-       break;
-     case 4:
-       nccl_type = ncclFloat;
-       break;
-     case 2:
-       nccl_type = ncclHalf;
-       break;
-     default:
-       std::cerr << "NCCLCommunicator: rank " << rank() << ": invalid data type for NCCL\n";
-       MPI_Abort(comm_, -4);
+      break;
+    case 4:
+      nccl_type = ncclFloat;
+      break;
+    case 2:
+      nccl_type = ncclHalf;
+      break;
+    default:
+      std::cerr << "NCCLCommunicator: rank " << rank() << ": invalid data type for NCCL\n";
+      MPI_Abort(comm_, -4);
     }
 
     /// Convert ReductionOperator to corresponding NCCL reduction operation
@@ -509,12 +515,10 @@ class NCCLCommunicator : public MPICommunicator {
       MPI_Abort(comm_, -5);
     }
 
-    int total_len = (int) count;
-
     if(num_gpus_assigned > 1) ncclGroupStart();
     for(int i = 0; i < num_gpus_assigned; ++i) {
       CUDACHECK(cudaSetDevice(m_gpus[i]));
-      NCCLCHECK(ncclAllReduce(sendbuf, recvbuf, total_len, nccl_type, nccl_redop, m_nccl_comm[i], m_streams[i]));
+      NCCLCHECK(ncclAllReduce(sendbuf, recvbuf, count, nccl_type, nccl_redop, m_nccl_comm[i], m_streams[i]));
     }
     if(num_gpus_assigned > 1) ncclGroupEnd();
 
@@ -530,14 +534,13 @@ class NCCLCommunicator : public MPICommunicator {
 
     /// Determine number of visible GPUs on the current node
     CUDACHECK(cudaGetDeviceCount(&m_num_visible_gpus));
-
     if(m_num_visible_gpus < 1) {
       std::cerr << "NCCLCommunicator: rank " << rank() << ": has no GPUs found on the node\n";
-      MPI_Abort(comm, -1);
+      MPI_Abort(mpicomm, -1);
     }
     if(m_num_visible_gpus < procs_per_node) {
       std::cerr << "NCCLCommunicator: rank " << rank() << ": has not enough GPUs available for given ranks\n";
-      MPI_Abort(comm, -2);
+      MPI_Abort(mpicomm, -2);
     }
     else{
       /// The number of GPUs on this node is greater than or equal to that of ranks assigned to this node;
@@ -566,20 +569,9 @@ class NCCLCommunicator : public MPICommunicator {
       CUDACHECK(cudaSetDevice(gpu));
       m_gpus.push_back(gpu);
       m_streams.push_back(nullptr);
-/*
-      m_handles.push_back(nullptr);
-    m_cublas_handles.push_back(nullptr);
-*/
 
       CUDACHECK(cudaStreamCreate(&m_streams.back()));
-
-/*
-    FORCE_CHECK_CUDNN(cudnnCreate(&m_handles.back()));
-    FORCE_CHECK_CUDNN(cudnnSetStream(m_handles.back(), m_streams.back()));
-    FORCE_CHECK_CUBLAS(cublasCreate(&m_cublas_handles.back()));
-*/
     }
-
 
     // Get number of GPUs for current MPI rank
     m_num_gpus = m_gpus.size();
@@ -590,7 +582,7 @@ class NCCLCommunicator : public MPICommunicator {
 
     if(m_num_gpus != 1){
       std::cerr << "NCCLCommunicator: rank " << rank() << ": the number of GPUs assigned to process is " << m_num_gpus << "; should be 1\n";
-      MPI_Abort(comm, -3);
+      MPI_Abort(mpicomm, -3);
     }
 
     /// Create nccl communicators
@@ -606,7 +598,7 @@ class NCCLCommunicator : public MPICommunicator {
       NCCLCHECK(ncclGetUniqueId(&ncclId));
     }
 
-    MPI_Bcast(&ncclId, sizeof(ncclId), MPI_BYTE, 0, comm);
+    MPI_Bcast(&ncclId, sizeof(ncclId), MPI_BYTE, 0, mpicomm);
 
     if (nProcs == 1) {
       int gpuArray = 0;
@@ -632,7 +624,7 @@ class NCCLCommunicator : public MPICommunicator {
 
  private:
 
-  MPI_Comm comm;
+  MPI_Comm mpicomm;
 
   /** List of GPU related variables. */
   /// List of GPUs to be used
