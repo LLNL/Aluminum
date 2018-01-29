@@ -198,23 +198,18 @@ void test_nccl_allreduce(const std::vector<float>& expected,
   /// create a receive buffer in device
   
   void *sbuffer;
-  void *rbuffer;
   size_t len = input.size() * sizeof(float);
 
   CUDACHECK(cudaMalloc(&sbuffer, len));
   CUDACHECK(cudaMemcpy(sbuffer, &input[0], len, cudaMemcpyHostToDevice));
 
-  CUDACHECK(cudaMalloc(&rbuffer, len));
-
-  //std::vector<float> recv(input.size());
-  // Test regular allreduce.
-
   int vsize = input.size();
   std::vector<float> recv(input.size());
 
-  nccl_comm.Allreduce(sbuffer, rbuffer, input.size(), ncclFloat,
+  /// Use in-place allreduce
+  nccl_comm.Allreduce(sbuffer, sbuffer, input.size(), ncclFloat,
                         allreduces::ReductionOperator::sum);
-  CUDACHECK(cudaMemcpy(&recv[0], rbuffer, len, cudaMemcpyDeviceToHost));
+  CUDACHECK(cudaMemcpy(&input[0], sbuffer, len, cudaMemcpyDeviceToHost));
 
 
   /// Since some numerical errors are expected when running on GPU, 
@@ -225,7 +220,7 @@ void test_nccl_allreduce(const std::vector<float>& expected,
 
   for(int i=0; i<vsize; i++){
     sum_exp += expected[i];
-    sum_recv += recv[i];
+    sum_recv += input[i];
   }
 
   int myid = nccl_comm.rank();
@@ -236,6 +231,4 @@ void test_nccl_allreduce(const std::vector<float>& expected,
   }
 
   CUDACHECK(cudaFree(sbuffer));
-  CUDACHECK(cudaFree(rbuffer));
-
 }
