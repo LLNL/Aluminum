@@ -153,7 +153,7 @@ int main(int argc, char** argv) {
     }
   }
   else{
-    allreduces::NCCLCommunicator nccl_comm;  // Use MPI_COMM_WORLD
+    allreduces::NCCLCommunicator nccl_comm; 
     // Compute sizes to test.
     std::vector<size_t> sizes = {0};
     for (size_t size = 1; size <= max_size; size *= 2) {
@@ -189,7 +189,7 @@ int main(int argc, char** argv) {
 
 ///================
 /**
- * Test allreduce algo on input, check with expected.
+ * Test NCCL allreduce algo on input, check with expected.
  */
 void test_nccl_allreduce(const std::vector<float>& expected,
                          std::vector<float> input,
@@ -203,10 +203,11 @@ void test_nccl_allreduce(const std::vector<float>& expected,
 
   CUDACHECK(cudaMalloc((void **)&sbuffer, len));
   CUDACHECK(cudaMalloc((void **)&rbuffer, len));
-  CUDACHECK(cudaMemcpy(sbuffer, &input[0], len, cudaMemcpyHostToDevice));
+  CUDACHECK(cudaMemcpy(sbuffer, input.data(), len, cudaMemcpyHostToDevice));
 
 
-  allreduces::NCCLAllreduce(sbuffer, rbuffer, input.size(), allreduces::ReductionOperator::sum, nccl_comm);
+  allreduces::Allreduce(sbuffer, rbuffer, input.size(), allreduces::ReductionOperator::sum, nccl_comm);
+  //allreduces::NCCLAllreduce(sbuffer, rbuffer, input.size(), allreduces::ReductionOperator::sum, nccl_comm);
 
   std::vector<float> recv(input.size());
   CUDACHECK(cudaMemcpy(&recv[0], rbuffer, len, cudaMemcpyDeviceToHost));

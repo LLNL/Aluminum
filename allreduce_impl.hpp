@@ -3,6 +3,18 @@
 namespace allreduces {
 
 template <typename T>
+void Allreduce(const T* sendbuf, T* recvbuf, size_t count,
+               ReductionOperator op, Communicator& comm,
+               AllreduceAlgorithm algo) {
+  if(comm.is_nccl_used()){
+    NCCLAllreduce(sendbuf, recvbuf, count, op, comm);
+  }
+  else{
+    MPIAllreduce(sendbuf, recvbuf, count, op, comm, algo);
+  }
+}
+
+template <typename T>
 void NCCLAllreduce(const T* sendbuf, T* recvbuf, size_t count, ReductionOperator op, Communicator& comm){
 
   allreduces::NCCLCommunicator& xcomm = dynamic_cast<NCCLCommunicator&>(comm);
@@ -45,8 +57,9 @@ void NCCLAllreduce(const T* sendbuf, T* recvbuf, size_t count, ReductionOperator
 
 }
 
+
 template <typename T>
-void Allreduce(const T* sendbuf, T* recvbuf, size_t count,
+void MPIAllreduce(const T* sendbuf, T* recvbuf, size_t count,
                ReductionOperator op, Communicator& comm,
                AllreduceAlgorithm algo) {
 

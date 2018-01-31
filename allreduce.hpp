@@ -193,6 +193,16 @@ void Finalize();
 bool Initialized();
 
 /**
+ * Top-level Allreduce API that works as a wrapper.
+ * It calls appropriate allreduce implementation depending on the type
+ * of the communicator it receives.
+ */
+template <typename T>
+void Allreduce(const T* sendbuf, T* recvbuf, size_t count,
+               ReductionOperator op, Communicator& comm,
+               AllreduceAlgorithm algo = AllreduceAlgorithm::automatic);
+
+/**
  * Perform more general allreduce.
  * Basically this Allreduce is to run an allreduce operation with default 
  * reduction algorithm, NCCL-based allreduce for example.
@@ -214,7 +224,7 @@ void NCCLAllreduce(const T* sendbuf, T* recvbuf, size_t count, ReductionOperator
  * @param algo Request a particular allreduce algorithm.
  */
 template <typename T>
-void Allreduce(const T* sendbuf, T* recvbuf, size_t count,
+void MPIAllreduce(const T* sendbuf, T* recvbuf, size_t count,
                ReductionOperator op, Communicator& comm,
                AllreduceAlgorithm algo = AllreduceAlgorithm::automatic);
 /**
