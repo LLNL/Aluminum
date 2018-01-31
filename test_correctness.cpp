@@ -197,19 +197,19 @@ void test_nccl_allreduce(const std::vector<float>& expected,
   /// create and copy input to device memory
   /// create a receive buffer in device
   
-  void *sbuffer;
+  float *sbuffer;
+  float *rbuffer;
   size_t len = input.size() * sizeof(float);
 
-  CUDACHECK(cudaMalloc(&sbuffer, len));
+  CUDACHECK(cudaMalloc((void **)&sbuffer, len));
+  CUDACHECK(cudaMalloc((void **)&rbuffer, len));
   CUDACHECK(cudaMemcpy(sbuffer, &input[0], len, cudaMemcpyHostToDevice));
 
-  int vsize = input.size();
-  std::vector<float> recv(input.size());
 
-  /// Use in-place allreduce
-  nccl_comm.Allreduce(sbuffer, sbuffer, input.size(), ncclFloat,
-                        allreduces::ReductionOperator::sum);
-  CUDACHECK(cudaMemcpy(&input[0], sbuffer, len, cudaMemcpyDeviceToHost));
+  allreduces::NCCLAllreduce(sbuffer, rbuffer, input.size(), allreduces::ReductionOperator::sum, nccl_comm);
+
+  std::vector<float> recv(input.size());
+  CUDACHECK(cudaMemcpy(&recv[0], rbuffer, len, cudaMemcpyDeviceToHost));
 
 
   /// Since some numerical errors are expected when running on GPU, 
@@ -218,17 +218,19 @@ void test_nccl_allreduce(const std::vector<float>& expected,
   float sum_exp = 0.0;
   float sum_recv = 0.0;
 
-  for(int i=0; i<vsize; i++){
+  for(size_t i=0; i<input.size(); i++){
     sum_exp += expected[i];
-    sum_recv += input[i];
+    sum_recv += recv[i];
   }
 
   int myid = nccl_comm.rank();
   if(myid == 0) {
+      
+    //std::cout << "sum_exp= " << sum_exp << " sum_recv= " << sum_recv << std::endl;
     if(fabsf(sum_exp-sum_recv > NCCL_THRESHOLD)){
-      std::cout << nccl_comm.rank() << ": NCCL allreduce does not match" << std::endl;
+      std::cout << ": NCCL allreduce does not match" << std::endl;
     }
   }
-
   CUDACHECK(cudaFree(sbuffer));
+  CUDACHECK(cudaFree(rbuffer));
 }

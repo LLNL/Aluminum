@@ -69,6 +69,13 @@ class Communicator {
   Communicator& operator=(const Communicator& other) noexcept = default;
   /** Default move assignment operator. */
   Communicator& operator=(Communicator&& other) = default;
+  /** set nccl usage indicator */
+  void set_use_nccl() {m_nccl_used = true;}
+  /** clear nccl usage indicator */
+  void unset_use_nccl() {m_nccl_used = false;}
+  /** get nccl usage indicator */
+  bool is_nccl_used() {return m_nccl_used;}
+
   /** Empty destructor. */
   virtual ~Communicator() noexcept {}
   /** Returns a copy of the concrete class. */
@@ -77,6 +84,10 @@ class Communicator {
   virtual int rank() const = 0;
   /** Return the number of processes in the communicator. */
   virtual int size() const = 0;
+
+ private:
+  bool m_nccl_used = false;
+
 };
 
 /**
@@ -180,6 +191,18 @@ void Initialize(int& argc, char**& argv);
 void Finalize();
 /** Return true if the library has been initialized. */
 bool Initialized();
+
+/**
+ * Perform more general allreduce.
+ * Basically this Allreduce is to run an allreduce operation with default 
+ * reduction algorithm, NCCL-based allreduce for example.
+template <typename T>
+void ncclAllreduce(const T* sendbuf, const T* recvbuf, size_t count, ReductionOperator op);
+
+*/
+
+template <typename T>
+void NCCLAllreduce(const T* sendbuf, T* recvbuf, size_t count, ReductionOperator op, Communicator& comm);
 
 /**
  * Perform an allreduce.
@@ -447,7 +470,7 @@ class NCCLCommunicator : public MPICommunicator {
 
     mpicomm = get_comm();
 
-    m_nccl_used = true;
+    set_use_nccl();
 
     /// Set up GPU-related informatiton
     gpu_setup();
@@ -470,50 +493,10 @@ class NCCLCommunicator : public MPICommunicator {
   /// It is assumed that both sendbuf and recvbuf are in device memory
   /// for NCCL sendbuf and recvbuf can be identical; in-place operation will be performed
   void Allreduce(void* sendbuf, void* recvbuf, size_t count, ncclDataType_t nccl_type,
-               ReductionOperator op) {
-               //ReductionOperator op, Communicator& comm) {
+               ncclRedOp_t nccl_redop) {
 
     if(count == 0) return;
-
-    MPI_Comm comm_ = get_comm();
-
     int num_gpus_assigned = m_gpus.size();
-
-    /// Convert type T to corresponding NCCL data type.
-    switch(sizeof(nccl_type)) {
-    case 8:
-      nccl_type = ncclDouble;
-      break;
-    case 4:
-      nccl_type = ncclFloat;
-      break;
-    case 2:
-      nccl_type = ncclHalf;
-      break;
-    default:
-      std::cerr << "NCCLCommunicator: rank " << rank() << ": invalid data type for NCCL\n";
-      MPI_Abort(comm_, -4);
-    }
-
-    /// Convert ReductionOperator to corresponding NCCL reduction operation
-    ncclRedOp_t nccl_redop;
-    switch(op) {
-    case ReductionOperator::sum:
-      nccl_redop = ncclSum;
-      break;
-    case ReductionOperator::prod:
-      nccl_redop = ncclProd;
-      break;
-    case ReductionOperator::min:
-      nccl_redop = ncclMin;
-      break;
-    case ReductionOperator::max:
-      nccl_redop = ncclMax;
-      break;
-    default:
-      std::cerr << "NCCLCommunicator: rank " << rank() << ": invalid NCCL reduction operator\n";
-      MPI_Abort(comm_, -5);
-    }
 
     if(num_gpus_assigned > 1) ncclGroupStart();
     for(int i = 0; i < num_gpus_assigned; ++i) {
@@ -525,7 +508,6 @@ class NCCLCommunicator : public MPICommunicator {
   }
 
 
-  bool is_nccl_used() { return m_nccl_used; }
 
   void gpu_setup() {
 
@@ -639,7 +621,6 @@ class NCCLCommunicator : public MPICommunicator {
 
   /** List of NCCL 2 related variables. */
   /// NOTE: It is assumed that ONLY ONE GPU is allocated to one MPI rank
-  bool m_nccl_used;
   std::vector<ncclComm_t> m_nccl_comm;
 };
 }  // namespace allreduces
