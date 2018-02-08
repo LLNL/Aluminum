@@ -192,6 +192,8 @@ void Finalize();
 /** Return true if the library has been initialized. */
 bool Initialized();
 
+class MPIBackend;
+
 /**
  * Top-level Allreduce API that works as a wrapper.
  * It calls appropriate allreduce implementation depending on the type
@@ -223,10 +225,13 @@ void NCCLAllreduce(const T* sendbuf, T* recvbuf, size_t count, ReductionOperator
  * @param comm The communicator to reduce over.
  * @param algo Request a particular allreduce algorithm.
  */
-template <typename T>
-void MPIAllreduce(const T* sendbuf, T* recvbuf, size_t count,
-               ReductionOperator op, Communicator& comm,
-               AllreduceAlgorithm algo = AllreduceAlgorithm::automatic);
+template <typename T, typename Backend=MPIBackend>
+void Allreduce(const T* sendbuf, T* recvbuf, size_t count,
+               ReductionOperator op, typename Backend::comm_type& comm,
+               typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  Backend::template Allreduce<T>(sendbuf, recvbuf, count, op, comm, algo);
+}
+
 /**
  * Perform an in-place allreduce.
  * @param recvbuf Input and output data; input will be overwritten.
@@ -235,10 +240,12 @@ void MPIAllreduce(const T* sendbuf, T* recvbuf, size_t count,
  * @param comm The communicator to reduce over.
  * @param algo Request a particular allreduce algorithm.
  */
-template <typename T>
+template <typename T, typename Backend=MPIBackend>
 void Allreduce(T* recvbuf, size_t count,
-               ReductionOperator op, Communicator& comm,
-               AllreduceAlgorithm algo = AllreduceAlgorithm::automatic);
+               ReductionOperator op, typename Backend::comm_type& comm,
+               typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  Backend::template Allreduce<T>(recvbuf, count, op, comm, algo);  
+}
 
 /**
  * Non-blocking version of Allreduce.

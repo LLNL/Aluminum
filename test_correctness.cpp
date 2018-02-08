@@ -29,21 +29,22 @@ bool check_vector(const std::vector<float>& expected,
 /**
  * Test allreduce algo on input, check with expected.
  */
+template <typename Backend>
 void test_allreduce_algo(const std::vector<float>& expected,
                          std::vector<float> input,
-                         allreduces::Communicator& comm,
-                         allreduces::AllreduceAlgorithm algo) {
+                         typename Backend::comm_type& comm,
+                         typename Backend::algo_type algo) {
   std::vector<float> recv(input.size());
   // Test regular allreduce.
-  allreduces::Allreduce(input.data(), recv.data(), input.size(),
-                        allreduces::ReductionOperator::sum, comm, algo);
+  allreduces::Allreduce<float, Backend>(input.data(), recv.data(), input.size(),
+                                        allreduces::ReductionOperator::sum, comm, algo);
   if (!check_vector(expected, recv)) {
     std::cout << comm.rank() << ": regular allreduce does not match" <<
       std::endl;
   }
   // Test in-place allreduce.
-  allreduces::Allreduce(input.data(), input.size(),
-                        allreduces::ReductionOperator::sum, comm, algo);
+  allreduces::Allreduce<float, Backend>(input.data(), input.size(),
+                                        allreduces::ReductionOperator::sum, comm, algo);
   if (!check_vector(expected, input)) {
     std::cout << comm.rank() << ": in-place allreduce does not match" <<
       std::endl;
@@ -141,7 +142,7 @@ int main(int argc, char** argv) {
         if (comm.rank() == 0) {
           std::cout << " Algo: " << allreduces::allreduce_name(algo) << std::endl;
         }
-        test_allreduce_algo(expected, data, comm, algo);
+        test_allreduce_algo<allreduces::MPIBackend>(expected, data, comm, algo);
       }
       for (auto&& algo : nb_algos) {
         MPI_Barrier(MPI_COMM_WORLD);

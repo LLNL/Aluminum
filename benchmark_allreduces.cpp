@@ -17,22 +17,23 @@ void print_stats(std::vector<double>& times) {
     " max=" << max << std::endl;
 }
 
+template <typename Backend>
 void time_allreduce_algo(std::vector<float> input,
-                         allreduces::Communicator& comm,
-                         allreduces::AllreduceAlgorithm algo) {
+                         typename Backend::comm_type& comm,
+                         typename Backend::algo_type algo) {
   std::vector<double> times, in_place_times;
   for (size_t trial = 0; trial < num_trials + 1; ++trial) {
     std::vector<float> recv(input.size());
     std::vector<float> in_place_input(input);
     MPI_Barrier(MPI_COMM_WORLD);
     double start = get_time();
-    allreduces::Allreduce(input.data(), recv.data(), input.size(),
-                          allreduces::ReductionOperator::sum, comm, algo);
+    allreduces::Allreduce<float, Backend>(input.data(), recv.data(), input.size(),
+                                          allreduces::ReductionOperator::sum, comm, algo);
     times.push_back(get_time() - start);
     MPI_Barrier(MPI_COMM_WORLD);
     start = get_time();
-    allreduces::Allreduce(in_place_input.data(), input.size(),
-                          allreduces::ReductionOperator::sum, comm, algo);
+    allreduces::Allreduce<float, Backend>(in_place_input.data(), input.size(),
+                                          allreduces::ReductionOperator::sum, comm, algo);
     in_place_times.push_back(get_time() - start);
   }
   // Delete warmup trial.
@@ -126,7 +127,7 @@ int main(int argc, char** argv) {
       // Benchmark algorithms.
       for (auto&& algo : algos) {
         MPI_Barrier(MPI_COMM_WORLD);
-        time_allreduce_algo(data, comm, algo);
+        time_allreduce_algo<allreduces::MPIBackend>(data, comm, algo);        
       }
     }
   }
