@@ -1,12 +1,18 @@
 #include <iostream>
+#include <string>
 #include "allreduce.hpp"
 #include "test_utils.hpp"
 
-const size_t max_size = 1<<20;
+size_t max_size = 1<<20;
 
 int main(int argc, char** argv) {
   allreduces::Initialize(argc, argv);
   allreduces::MPICommunicator comm;  // Use COMM_WORLD.
+
+  if (argc == 2) {
+    max_size = std::stoul(argv[1]);
+  }
+
   // Compute sizes to test.
   std::vector<size_t> sizes;
   for (size_t size = 1; size <= max_size; size *= 2) {
@@ -37,7 +43,7 @@ int main(int argc, char** argv) {
       reqs[i], allreduces::AllreduceAlgorithm::mpi_recursive_doubling);
   }
   for (size_t i = 0; i < sizes.size(); ++i) {
-    size_t size = sizes[i];
+    //size_t size = sizes[i];
     allreduces::Wait(reqs[i]);
     //if (comm.rank() == 0) std::cout << comm.rank() << ": size=" << size << std::endl;
     if (!check_vector(expected_data[i], input_data[i])) {

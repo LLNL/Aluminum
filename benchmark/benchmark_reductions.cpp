@@ -125,7 +125,7 @@ void time_reduction(
   print_stats(multi_times);
 }
 
-int main(int argc, char** argv) {
+int main(int, char*[]) {
   for (size_t size = 1; size <= max_size; size *= 2) {
     time_reduction(size, sum_reduction<float>, mt_sum_reduction<float>, "sum");
     time_reduction(size, prod_reduction<float>, mt_prod_reduction<float>, "prod");
