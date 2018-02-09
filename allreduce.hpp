@@ -192,8 +192,6 @@ void Finalize();
 /** Return true if the library has been initialized. */
 bool Initialized();
 
-class MPIBackend;
-
 /**
  * Top-level Allreduce API that works as a wrapper.
  * It calls appropriate allreduce implementation depending on the type
@@ -225,7 +223,7 @@ void NCCLAllreduce(const T* sendbuf, T* recvbuf, size_t count, ReductionOperator
  * @param comm The communicator to reduce over.
  * @param algo Request a particular allreduce algorithm.
  */
-template <typename T, typename Backend=MPIBackend>
+template <typename Backend, typename T>
 void Allreduce(const T* sendbuf, T* recvbuf, size_t count,
                ReductionOperator op, typename Backend::comm_type& comm,
                typename Backend::algo_type algo = Backend::algo_type::automatic) {
@@ -240,7 +238,7 @@ void Allreduce(const T* sendbuf, T* recvbuf, size_t count,
  * @param comm The communicator to reduce over.
  * @param algo Request a particular allreduce algorithm.
  */
-template <typename T, typename Backend=MPIBackend>
+template <typename Backend, typename T>
 void Allreduce(T* recvbuf, size_t count,
                ReductionOperator op, typename Backend::comm_type& comm,
                typename Backend::algo_type algo = Backend::algo_type::automatic) {
@@ -255,7 +253,7 @@ void Allreduce(T* recvbuf, size_t count,
  * It is not safe to modify sendbuf or recvbuf until the request indicates that
  * the operation has completed.
  */
-template <typename T, typename Backend=MPIBackend>
+template <typename Backend, typename T>
 void NonblockingAllreduce(
   const T* sendbuf, T* recvbuf, size_t count,
   ReductionOperator op,
@@ -266,7 +264,7 @@ void NonblockingAllreduce(
                                             comm, req, algo);
 }
 /** In-place version of NonblockingAllreduce; same semantics apply. */
-template <typename T, typename Backend=MPIBackend>
+template <typename Backend, typename T>
 void NonblockingAllreduce(
   T* recvbuf, size_t count,
   ReductionOperator op,

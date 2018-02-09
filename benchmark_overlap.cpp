@@ -35,7 +35,7 @@ void time_allreduce_algo(std::vector<float> input,
     allreduces::AllreduceRequest req;
     MPI_Barrier(MPI_COMM_WORLD);
     double start = get_time();
-    allreduces::NonblockingAllreduce<float, Backend>(
+    allreduces::NonblockingAllreduce<Backend>(
         input.data(), recv.data(), input.size(),
         allreduces::ReductionOperator::sum, comm, req, algo);
     double init_time = get_time();
@@ -49,7 +49,7 @@ void time_allreduce_algo(std::vector<float> input,
     times.push_back(std::max(end_time - start - actual_sleep_time, 0.0));
     MPI_Barrier(MPI_COMM_WORLD);
     start = get_time();
-    allreduces::NonblockingAllreduce<float, Backend>(
+    allreduces::NonblockingAllreduce<Backend>(
         in_place_input.data(), input.size(),
         allreduces::ReductionOperator::sum, comm, req, algo);
     init_time = get_time();

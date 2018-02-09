@@ -27,13 +27,13 @@ void time_allreduce_algo(std::vector<float> input,
     std::vector<float> in_place_input(input);
     MPI_Barrier(MPI_COMM_WORLD);
     double start = get_time();
-    allreduces::Allreduce<float, Backend>(input.data(), recv.data(), input.size(),
-                                          allreduces::ReductionOperator::sum, comm, algo);
+    allreduces::Allreduce<Backend>(input.data(), recv.data(), input.size(),
+                                   allreduces::ReductionOperator::sum, comm, algo);
     times.push_back(get_time() - start);
     MPI_Barrier(MPI_COMM_WORLD);
     start = get_time();
-    allreduces::Allreduce<float, Backend>(in_place_input.data(), input.size(),
-                                          allreduces::ReductionOperator::sum, comm, algo);
+    allreduces::Allreduce<Backend>(in_place_input.data(), input.size(),
+                                   allreduces::ReductionOperator::sum, comm, algo);
     in_place_times.push_back(get_time() - start);
   }
   // Delete warmup trial.

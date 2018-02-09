@@ -28,14 +28,14 @@ void time_allreduce_algo(std::vector<float> input,
     allreduces::AllreduceRequest req;
     MPI_Barrier(MPI_COMM_WORLD);
     double start = get_time();
-    allreduces::NonblockingAllreduce<float, Backend>(
+    allreduces::NonblockingAllreduce<Backend>(
         input.data(), recv.data(), input.size(),
         allreduces::ReductionOperator::sum, comm, req, algo);
     allreduces::Wait(req);
     times.push_back(get_time() - start);
     MPI_Barrier(MPI_COMM_WORLD);
     start = get_time();
-    allreduces::NonblockingAllreduce<float, Backend>(
+    allreduces::NonblockingAllreduce<Backend>(
         in_place_input.data(), input.size(),
         allreduces::ReductionOperator::sum, comm, req, algo);
     allreduces::Wait(req);

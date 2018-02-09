@@ -36,15 +36,15 @@ void test_allreduce_algo(const std::vector<float>& expected,
                          typename Backend::algo_type algo) {
   std::vector<float> recv(input.size());
   // Test regular allreduce.
-  allreduces::Allreduce<float, Backend>(input.data(), recv.data(), input.size(),
-                                        allreduces::ReductionOperator::sum, comm, algo);
+  allreduces::Allreduce<Backend>(input.data(), recv.data(), input.size(),
+                                 allreduces::ReductionOperator::sum, comm, algo);
   if (!check_vector(expected, recv)) {
     std::cout << comm.rank() << ": regular allreduce does not match" <<
       std::endl;
   }
   // Test in-place allreduce.
-  allreduces::Allreduce<float, Backend>(input.data(), input.size(),
-                                        allreduces::ReductionOperator::sum, comm, algo);
+  allreduces::Allreduce<Backend>(input.data(), input.size(),
+                                 allreduces::ReductionOperator::sum, comm, algo);
   if (!check_vector(expected, input)) {
     std::cout << comm.rank() << ": in-place allreduce does not match" <<
       std::endl;
@@ -62,18 +62,18 @@ void test_nb_allreduce_algo(const std::vector<float>& expected,
   allreduces::AllreduceRequest req;
   std::vector<float> recv(input.size());
   // Test regular allreduce.
-  allreduces::NonblockingAllreduce<float, Backend>(input.data(), recv.data(), input.size(),
-                                                   allreduces::ReductionOperator::sum, comm,
-                                                   req, algo);
+  allreduces::NonblockingAllreduce<Backend>(input.data(), recv.data(), input.size(),
+                                            allreduces::ReductionOperator::sum, comm,
+                                            req, algo);
   allreduces::Wait(req);
   if (!check_vector(expected, recv)) {
     std::cout << comm.rank() << ": regular allreduce does not match" <<
       std::endl;
   }
   // Test in-place allreduce.
-  allreduces::NonblockingAllreduce<float, Backend>(input.data(), input.size(),
-                                                   allreduces::ReductionOperator::sum, comm,
-                                                   req, algo);
+  allreduces::NonblockingAllreduce<Backend>(input.data(), input.size(),
+                                            allreduces::ReductionOperator::sum, comm,
+                                            req, algo);
   allreduces::Wait(req);
   if (!check_vector(expected, input)) {
     std::cout << comm.rank() << ": in-place allreduce does not match" <<

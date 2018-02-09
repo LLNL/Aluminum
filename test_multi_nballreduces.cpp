@@ -43,7 +43,7 @@ int main(int argc, char** argv) {
   }
   for (size_t i = 0; i < sizes.size(); ++i) {
     size_t size = sizes[i];
-    allreduces::NonblockingAllreduce(
+    allreduces::NonblockingAllreduce<allreduces::MPIBackend>(
       input_data[i].data(), size, allreduces::ReductionOperator::sum, comm,
       reqs[i], allreduces::AllreduceAlgorithm::mpi_recursive_doubling);
   }
