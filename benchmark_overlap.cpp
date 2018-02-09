@@ -24,9 +24,10 @@ void print_stats(std::vector<double>& times) {
  * non-overlapped communication time.
  * This is only approximate, since the "computation" is done by sleeping.
  */
+template <typename Backend>
 void time_allreduce_algo(std::vector<float> input,
-                         allreduces::Communicator& comm,
-                         allreduces::AllreduceAlgorithm algo) {
+                         typename Backend::comm_type& comm,
+                         typename Backend::algo_type algo) {
   std::vector<double> times, in_place_times;
   for (size_t trial = 0; trial < num_trials + 1; ++trial) {
     std::vector<float> recv(input.size());
@@ -34,8 +35,9 @@ void time_allreduce_algo(std::vector<float> input,
     allreduces::AllreduceRequest req;
     MPI_Barrier(MPI_COMM_WORLD);
     double start = get_time();
-    allreduces::NonblockingAllreduce(input.data(), recv.data(), input.size(),
-                          allreduces::ReductionOperator::sum, comm, req, algo);
+    allreduces::NonblockingAllreduce<float, Backend>(
+        input.data(), recv.data(), input.size(),
+        allreduces::ReductionOperator::sum, comm, req, algo);
     double init_time = get_time();
     std::this_thread::sleep_for(std::chrono::duration<double>(sleep_time));
     double asleep_time = get_time();
@@ -47,8 +49,9 @@ void time_allreduce_algo(std::vector<float> input,
     times.push_back(std::max(end_time - start - actual_sleep_time, 0.0));
     MPI_Barrier(MPI_COMM_WORLD);
     start = get_time();
-    allreduces::NonblockingAllreduce(in_place_input.data(), input.size(),
-                          allreduces::ReductionOperator::sum, comm, req, algo);
+    allreduces::NonblockingAllreduce<float, Backend>(
+        in_place_input.data(), input.size(),
+        allreduces::ReductionOperator::sum, comm, req, algo);
     init_time = get_time();
     std::this_thread::sleep_for(std::chrono::duration<double>(sleep_time));
     asleep_time = get_time();
@@ -135,7 +138,7 @@ int main(int argc, char** argv) {
     time_mpi_baseline(data, comm);
     for (auto&& algo : algos) {
       MPI_Barrier(MPI_COMM_WORLD);
-      time_allreduce_algo(data, comm, algo);
+      time_allreduce_algo<allreduces::MPIBackend>(data, comm, algo);
     }
   }
   allreduces::Finalize();

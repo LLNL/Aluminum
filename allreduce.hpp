@@ -255,19 +255,27 @@ void Allreduce(T* recvbuf, size_t count,
  * It is not safe to modify sendbuf or recvbuf until the request indicates that
  * the operation has completed.
  */
-template <typename T>
+template <typename T, typename Backend=MPIBackend>
 void NonblockingAllreduce(
   const T* sendbuf, T* recvbuf, size_t count,
-  ReductionOperator op, Communicator& comm,
+  ReductionOperator op,
+  typename Backend::comm_type& comm,
   AllreduceRequest& req,
-  AllreduceAlgorithm algo = AllreduceAlgorithm::automatic);
+  typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  Backend::template NonblockingAllreduce<T>(sendbuf, recvbuf, count, op,
+                                            comm, req, algo);
+}
 /** In-place version of NonblockingAllreduce; same semantics apply. */
-template <typename T>
+template <typename T, typename Backend=MPIBackend>
 void NonblockingAllreduce(
   T* recvbuf, size_t count,
-  ReductionOperator op, Communicator& comm,
+  ReductionOperator op,
+  typename Backend::comm_type& comm,
   AllreduceRequest& req,
-  AllreduceAlgorithm algo = AllreduceAlgorithm::automatic);
+  typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  Backend::template NonblockingAllreduce<T>(recvbuf, count, op,
+                                            comm, req, algo);
+}
 
 /**
  * Test whether req has completed or not, returning true if it has.

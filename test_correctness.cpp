@@ -54,25 +54,26 @@ void test_allreduce_algo(const std::vector<float>& expected,
 /**
  * Test non-blocking allreduce algo on input, check with expected.
  */
+template <typename Backend>
 void test_nb_allreduce_algo(const std::vector<float>& expected,
                             std::vector<float> input,
-                            allreduces::Communicator& comm,
-                            allreduces::AllreduceAlgorithm algo) {
+                            typename Backend::comm_type& comm,
+                            typename Backend::algo_type algo) {
   allreduces::AllreduceRequest req;
   std::vector<float> recv(input.size());
   // Test regular allreduce.
-  allreduces::NonblockingAllreduce(input.data(), recv.data(), input.size(),
-                                   allreduces::ReductionOperator::sum, comm,
-                                   req, algo);
+  allreduces::NonblockingAllreduce<float, Backend>(input.data(), recv.data(), input.size(),
+                                                   allreduces::ReductionOperator::sum, comm,
+                                                   req, algo);
   allreduces::Wait(req);
   if (!check_vector(expected, recv)) {
     std::cout << comm.rank() << ": regular allreduce does not match" <<
       std::endl;
   }
   // Test in-place allreduce.
-  allreduces::NonblockingAllreduce(input.data(), input.size(),
-                                   allreduces::ReductionOperator::sum, comm,
-                                   req, algo);
+  allreduces::NonblockingAllreduce<float, Backend>(input.data(), input.size(),
+                                                   allreduces::ReductionOperator::sum, comm,
+                                                   req, algo);
   allreduces::Wait(req);
   if (!check_vector(expected, input)) {
     std::cout << comm.rank() << ": in-place allreduce does not match" <<
@@ -149,7 +150,7 @@ int main(int argc, char** argv) {
         if (comm.rank() == 0) {
           std::cout << " Algo: NB " << allreduces::allreduce_name(algo) << std::endl;
         }
-        test_nb_allreduce_algo(expected, data, comm, algo);
+        test_nb_allreduce_algo<allreduces::MPIBackend>(expected, data, comm, algo);        
       }
     }
   }

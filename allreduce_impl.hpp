@@ -2,7 +2,6 @@
 
 namespace allreduces {
 
-#if 0
 template <typename T>
 void Allreduce(const T* sendbuf, T* recvbuf, size_t count,
                ReductionOperator op, Communicator& comm,
@@ -14,8 +13,6 @@ void Allreduce(const T* sendbuf, T* recvbuf, size_t count,
     MPIAllreduce(sendbuf, recvbuf, count, op, comm, algo);
   }
 }
-
-#endif
 
 template <typename T>
 void NCCLAllreduce(const T* sendbuf, T* recvbuf, size_t count, ReductionOperator op, Communicator& comm){
@@ -107,56 +104,58 @@ class MPIBackend {
                         algo_type algo) {
     Allreduce(internal::IN_PLACE<T>(), recvbuf, count, op, comm, algo);
   }
-};
 
-template <typename T>
-void NonblockingAllreduce(
-  const T* sendbuf, T* recvbuf, size_t count,
-  ReductionOperator op, Communicator& comm,
-  AllreduceRequest& req,
-  AllreduceAlgorithm algo) {
-  if (algo == AllreduceAlgorithm::automatic) {
-    // TODO: Better algorithm selection/performance model.
-    // TODO: Make tuneable.
-    if (count <= 1<<9) {
-      algo = AllreduceAlgorithm::mpi_recursive_doubling;
-    } else {
-      algo = AllreduceAlgorithm::mpi_rabenseifner;
+  template <typename T>
+  static void NonblockingAllreduce(
+      const T* sendbuf, T* recvbuf, size_t count,
+      ReductionOperator op,
+      comm_type& comm,
+      AllreduceRequest& req,
+      algo_type algo) {
+    if (algo == AllreduceAlgorithm::automatic) {
+      // TODO: Better algorithm selection/performance model.
+      // TODO: Make tuneable.
+      if (count <= 1<<9) {
+        algo = AllreduceAlgorithm::mpi_recursive_doubling;
+      } else {
+        algo = AllreduceAlgorithm::mpi_rabenseifner;
+      }
+    }
+    switch (algo) {
+      case AllreduceAlgorithm::mpi_passthrough:
+        internal::mpi::nb_passthrough_allreduce(sendbuf, recvbuf, count, op, comm,
+                                                req);
+        break;
+      case AllreduceAlgorithm::mpi_recursive_doubling:
+        internal::mpi::nb_recursive_doubling_allreduce(
+            sendbuf, recvbuf, count, op, comm, req);
+        break;
+      case AllreduceAlgorithm::mpi_ring:
+        internal::mpi::nb_ring_allreduce(sendbuf, recvbuf, count, op, comm, req);
+        break;
+      case AllreduceAlgorithm::mpi_rabenseifner:
+        internal::mpi::nb_rabenseifner_allreduce(sendbuf, recvbuf, count, op, comm,
+                                                 req);
+        break;
+        /*case AllreduceAlgorithm::mpi_pe_ring:
+          internal::mpi::nb_pe_ring_allreduce(sendbuf, recvbuf, count, op, comm, req);
+          break;*/
+      default:
+        throw_allreduce_exception("Invalid algorithm for NonblockingAllreduce");
     }
   }
-  switch (algo) {
-  case AllreduceAlgorithm::mpi_passthrough:
-    internal::mpi::nb_passthrough_allreduce(sendbuf, recvbuf, count, op, comm,
-                                            req);
-    break;
-  case AllreduceAlgorithm::mpi_recursive_doubling:
-    internal::mpi::nb_recursive_doubling_allreduce(
-      sendbuf, recvbuf, count, op, comm, req);
-    break;
-  case AllreduceAlgorithm::mpi_ring:
-    internal::mpi::nb_ring_allreduce(sendbuf, recvbuf, count, op, comm, req);
-    break;
-  case AllreduceAlgorithm::mpi_rabenseifner:
-    internal::mpi::nb_rabenseifner_allreduce(sendbuf, recvbuf, count, op, comm,
-                                             req);
-    break;
-    /*case AllreduceAlgorithm::mpi_pe_ring:
-    internal::mpi::nb_pe_ring_allreduce(sendbuf, recvbuf, count, op, comm, req);
-    break;*/
-  default:
-    throw_allreduce_exception("Invalid algorithm for NonblockingAllreduce");
-  }
-}
 
-template <typename T>
-void NonblockingAllreduce(
-  T* recvbuf, size_t count,
-  ReductionOperator op, Communicator& comm,
-  AllreduceRequest& req,
-  AllreduceAlgorithm algo) {
-  NonblockingAllreduce(internal::IN_PLACE<T>(), recvbuf, count, op, comm,
-                       req, algo);
-}
+  template <typename T>
+  static void NonblockingAllreduce(
+      T* recvbuf, size_t count,
+      ReductionOperator op, comm_type& comm,
+      AllreduceRequest& req,
+      algo_type algo) {
+    NonblockingAllreduce(internal::IN_PLACE<T>(), recvbuf, count, op, comm,
+                         req, algo);
+  }
+};
+
 }  // namespace allreduces
 
 
