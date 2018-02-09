@@ -7,8 +7,9 @@
 
 #include <stdlib.h>
 #include <math.h>
+#include <string>
 
-const size_t max_size = 1<<30;
+size_t max_size = 1<<30;
 
 void get_expected_result(std::vector<float>& expected) {
   MPI_Allreduce(MPI_IN_PLACE, expected.data(), expected.size(),
@@ -49,7 +50,7 @@ void test_nb_allreduce_algo(const typename VectorType<Backend>::type& expected,
                             typename Backend::comm_type& comm,
                             typename Backend::algo_type algo) {
   allreduces::AllreduceRequest req;
-  auto recv = get_vector<Backend>(input.size());  
+  auto recv = get_vector<Backend>(input.size());
   // Test regular allreduce.
   allreduces::NonblockingAllreduce<Backend>(input.data(), recv.data(), input.size(),
                                             allreduces::ReductionOperator::sum, comm,
@@ -72,7 +73,7 @@ void test_nb_allreduce_algo(const typename VectorType<Backend>::type& expected,
 
 template <typename Backend>
 void test_correctness() {
-  auto algos = get_allreduce_algorithms<Backend>();  
+  auto algos = get_allreduce_algorithms<Backend>();
   auto nb_algos = get_nb_allreduce_algorithms<Backend>();
   typename Backend::comm_type comm;  // Use COMM_WORLD.
   // Compute sizes to test.
@@ -105,7 +106,7 @@ void test_correctness() {
       if (comm.rank() == 0) {
         std::cout << " Algo: NB " << allreduces::allreduce_name(algo) << std::endl;
       }
-      test_nb_allreduce_algo<Backend>(expected, data, comm, algo);        
+      test_nb_allreduce_algo<Backend>(expected, data, comm, algo);
     }
   }
 }
@@ -114,22 +115,25 @@ int main(int argc, char** argv) {
   allreduces::Initialize(argc, argv);
 
   std::string backend = "MPI";
-  if (argc == 2) {
+  if (argc >= 2) {
     backend = argv[1];
   }
-  
+  if (argc == 3) {
+    max_size = std::stoul(argv[2]);
+  }
+
   if (backend == "MPI") {
     test_correctness<allreduces::MPIBackend>();
-#ifdef ALUMINUM_HAS_NCCL    
+#ifdef ALUMINUM_HAS_NCCL
   } else if (backend == "NCCL") {
     test_correctness<allreduces::NCCLBackend>();
-#endif    
+#endif
   } else {
     std::cerr << "usage: " << argv[0] << " [MPI | NCCL]\n";
     return -1;
   }
 
-    
+
   allreduces::Finalize();
   return 0;
 }
