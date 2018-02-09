@@ -16,8 +16,8 @@ endif
 ifeq ($(ENABLE_MPI_CUDA), YES)
 	ENABLE_CUDA = YES
 	CXXFLAGS += -DALUMINUM_HAS_MPI_CUDA -DALUMINUM_MPI_CUDA_DEBUG
-	CUDA_OBJ = mpi_cuda/cuda_kernels.o
-	MPI_CUDA_HEADERS = allreduce_mpi_cuda_impl.hpp test_utils_mpi_cuda.hpp mpi_cuda/allreduce.hpp mpi_cuda/allreduce_ring.hpp
+	CUDA_OBJ = src/mpi_cuda/cuda_kernels.o
+	MPI_CUDA_HEADERS = src/allreduce_mpi_cuda_impl.hpp test/test_utils_mpi_cuda.hpp src/mpi_cuda/allreduce.hpp src/mpi_cuda/allreduce_ring.hpp
 endif
 
 ifeq ($(ENABLE_CUDA), YES)
@@ -40,7 +40,7 @@ benchmark_nballreduces: liballreduce.so benchmark/benchmark_nballreduces.cpp
 benchmark_overlap: liballreduce.so benchmark/benchmark_overlap.cpp
 	mpicxx $(CXXFLAGS) $(LIB) -o benchmark_overlap benchmark/benchmark_overlap.cpp
 
-test_correctness: liballreduce.so test/test_correctness.cpp src/allreduce_nccl_impl.hpp test_utils.hpp $(CUDA_OBJ) $(MPI_CUDA_HEADERS)
+test_correctness: liballreduce.so test/test_correctness.cpp src/allreduce_nccl_impl.hpp test/test_utils.hpp $(CUDA_OBJ) $(MPI_CUDA_HEADERS)
 	mpicxx $(CXXFLAGS) $(LIB) -o test_correctness test/test_correctness.cpp $(CUDA_OBJ)
 
 test_multi_nballreduces: liballreduce.so test/test_multi_nballreduces.cpp
@@ -49,7 +49,7 @@ test_multi_nballreduces: liballreduce.so test/test_multi_nballreduces.cpp
 benchmark_reductions: benchmark/benchmark_reductions.cpp
 	mpicxx $(CXXFLAGS) -o benchmark_reductions benchmark/benchmark_reductions.cpp
 
-mpi_cuda/cuda_kernels.o: mpi_cuda/cuda_kernels.cu
+src/mpi_cuda/cuda_kernels.o: src/mpi_cuda/cuda_kernels.cu
 	nvcc $(NVCCFLAGS) -c $< -o $@
 
 clean:
