@@ -78,8 +78,6 @@ class CUDAVector {
     return m_ptr;
   }
 
-  // Returns a pointer to host memory with the content copied from
-  // device. the returned memocy chunk is owned by the caller.
   std::vector<T> copyout() const {
     std::vector<T> hv(size());
     cudaMemcpy(hv.data(), m_ptr, get_bytes(), cudaMemcpyDeviceToHost);
