@@ -4,6 +4,7 @@ set(ALUMINUM_HEADERS
   allreduce_mempool.hpp
   allreduce_mpi_impl.hpp
   allreduce_nccl_impl.hpp
+  common.h
   tuning_params.hpp
   )
 set(ALUMINUM_SOURCES
@@ -17,7 +18,10 @@ target_include_directories(aluminum PUBLIC
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/aluminum>)
 target_link_libraries(aluminum PUBLIC
   MPI::MPI_CXX HWLOC::hwloc OpenMP::OpenMP_CXX
-  $<$<BOOL:${ALUMINUM_ENABLE_CUDA}>:cuda::cuda>)
+  $<$<BOOL:${ALUMINUM_HAS_CUDA}>:cuda::cuda>)
+target_compile_definitions(aluminum PUBLIC
+  $<$<BOOL:${ALUMINUM_HAS_CUDA}>:ALUMINUM_HAS_CUDA>
+  $<$<BOOL:${ALUMINUM_HAS_NCCL}>:ALUMINUM_HAS_NCCL>)
 target_compile_features(aluminum PUBLIC cxx_std_11)
 
 install(TARGETS aluminum

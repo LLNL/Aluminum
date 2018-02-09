@@ -35,7 +35,7 @@ set(_NCCL_VERSION_TEST_SRC "
 int main()
 {
     std::cout << NCCL_MAJOR << \".\" << NCCL_MINOR << \".\" << NCCL_PATCH << std::endl;
-    return EXIT_SUCCESS;
+    return 0;
 }
 ")
 file(WRITE "${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/src.cxx"
