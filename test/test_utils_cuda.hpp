@@ -6,6 +6,62 @@
 
 #define NCCL_THRESHOLD	1e-05
 
+#define CHECK_CUDA(cuda_call)                                           \
+  do {                                                                  \
+    const cudaError_t cuda_status = cuda_call;                          \
+    if (cuda_status != cudaSuccess) {                                   \
+      std::cerr << "CUDA error: " << cudaGetErrorString(cuda_status) << "\n"; \
+      std::cerr << "Error at " << __FILE__ << ":" << __LINE__ << "\n";  \
+      cudaDeviceReset();                                                \
+      abort();                                                          \
+    }                                                                   \
+  } while (0)
+
+int get_number_of_gpus() {
+  int num_gpus = 0;
+  char *env = getenv("ALUMINUM_NUM_GPUS");
+  if (env) {
+    std::cout << "Number of GPUs set by ALUMINUM_NUM_GPUS\n";
+    num_gpus = atoi(env);
+  } else {
+    CHECK_CUDA(cudaGetDeviceCount(&num_gpus));    
+  }
+  return num_gpus;
+}
+
+int get_local_rank() {
+  char *env = getenv("MV2_COMM_WORLD_LOCAL_RANK");
+  if (!env) env = getenv("OMPI_COMM_WORLD_LOCAL_RANK");
+  if (!env) {
+    std::cerr << "Can't determine local rank\n";
+    abort();
+  }
+  return atoi(env);
+}
+
+int get_local_size() {
+  char *env = getenv("MV2_COMM_WORLD_LOCAL_SIZE");
+  if (!env) env = getenv("OMPI_COMM_WORLD_LOCAL_SIZE");
+  if (!env) {
+    std::cerr << "Can't determine local size\n";
+    abort();
+  }
+  return atoi(env);
+}
+
+inline int set_device() {
+  int num_gpus = get_number_of_gpus();
+  int local_rank = get_local_rank();
+  int local_size = get_local_size();
+  if (num_gpus < local_size) {
+    std::cerr << "Number of available GPUs is smaller than the number of local MPI ranks\n";
+    abort();
+  }    
+  int device = local_rank;
+  CHECK_CUDA(cudaSetDevice(device));
+  return device;
+}
+
 template <typename T>
 class CUDAVector {
  public:
@@ -105,10 +161,6 @@ struct VectorType<allreduces::NCCLBackend> {
   using type = CUDAVector<float>;
 };
 
-template <>
-struct VectorType<allreduces::MPICUDABackend> {
-  using type = CUDAVector<float>;
-};
 
 template <>
 typename VectorType<allreduces::NCCLBackend>::type
@@ -118,13 +170,6 @@ gen_data<allreduces::NCCLBackend>(size_t count) {
   return data;
 }
 
-template <>
-typename VectorType<allreduces::MPICUDABackend>::type
-gen_data<allreduces::MPICUDABackend>(size_t count) {
-  auto &&host_data = gen_data<allreduces::MPIBackend>(count);
-  CUDAVector<float> data(host_data);
-  return data;
-}
 
 bool check_vector(const CUDAVector<float>& expected,
                   const CUDAVector<float>& actual) {
@@ -146,27 +191,5 @@ std::vector<typename allreduces::NCCLBackend::algo_type>
 get_nb_allreduce_algorithms<allreduces::NCCLBackend>() {
   // NCCLBackend does not have non-blocking interface implemented
   std::vector<typename allreduces::NCCLBackend::algo_type> algos = {};
-  return algos;
-}
-
-template <>
-std::vector<typename allreduces::MPICUDABackend::algo_type>
-get_allreduce_algorithms<allreduces::MPICUDABackend>() {
-  std::vector<typename allreduces::MPICUDABackend::algo_type> algos = {
-    allreduces::MPICUDABackend::algo_type::automatic,
-    allreduces::MPICUDABackend::algo_type::ring,
-    allreduces::MPICUDABackend::algo_type::bi_ring
-  };
-  return algos;
-}
-
-template <>
-std::vector<typename allreduces::MPICUDABackend::algo_type>
-get_nb_allreduce_algorithms<allreduces::MPICUDABackend>() {
-  std::vector<typename allreduces::MPICUDABackend::algo_type> algos = {
-    allreduces::MPICUDABackend::algo_type::automatic,
-    allreduces::MPICUDABackend::algo_type::ring,
-    allreduces::MPICUDABackend::algo_type::bi_ring
-  };
   return algos;
 }

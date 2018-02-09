@@ -1,10 +1,13 @@
 #pragma once
 
+#include "mpi_cuda/allreduce.hpp"
+
 namespace allreduces {
 
 enum class MPICUDAAllreduceAlgorithm {
   automatic,
-  ring,
+  // TODO: unidirectional ring does not work; will fix
+  //ring, 
   bi_ring
 };
 
@@ -12,8 +15,10 @@ inline std::string allreduce_name(MPICUDAAllreduceAlgorithm algo) {
   switch (algo) {
   case MPICUDAAllreduceAlgorithm::automatic:
     return "automatic";
+#if 0    
   case MPICUDAAllreduceAlgorithm::ring:
     return "ring";
+#endif    
   case MPICUDAAllreduceAlgorithm::bi_ring:
     return "bi-ring";
   default:
@@ -21,48 +26,23 @@ inline std::string allreduce_name(MPICUDAAllreduceAlgorithm algo) {
   }
 }
 
-namespace internal {
-namespace mpi_cuda {
-
-template <typename T>
-void ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
-                    ReductionOperator op, MPICommunicator& comm) {
-}
-
-template <typename T>
-void bi_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
-                       ReductionOperator op, MPICommunicator& comm) {
-}
-
-template <typename T>
-void nb_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
-                       ReductionOperator op, MPICommunicator& comm,
-                       AllreduceRequest& req) {
-}
-
-template <typename T>
-void nb_bi_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
-                          ReductionOperator op, MPICommunicator& comm,
-                          AllreduceRequest& req) {
-}
-
-} // namespace mpi_cuda
-} // namespace internal
-
 class MPICUDABackend {
  public:
   using algo_type = MPICUDAAllreduceAlgorithm;
-  using comm_type = MPICommunicator;
+  using comm_type = internal::mpi_cuda::MPICUDACommunicator;
 
   template <typename T>
   static void Allreduce(const T* sendbuf, T* recvbuf, size_t count,
                         ReductionOperator op, comm_type& comm,
                         algo_type algo) {
     switch (algo) {
+#if 0      
       case MPICUDAAllreduceAlgorithm::ring:
         internal::mpi_cuda::ring_allreduce(sendbuf, recvbuf, count,
                                            op, comm);
         break;
+#endif        
+      case MPICUDAAllreduceAlgorithm::automatic:
       case MPICUDAAllreduceAlgorithm::bi_ring:
         internal::mpi_cuda::bi_ring_allreduce(sendbuf, recvbuf, count,
                                               op, comm);
@@ -75,7 +55,7 @@ class MPICUDABackend {
   static void Allreduce(T* recvbuf, size_t count,
                         ReductionOperator op, comm_type& comm,
                         algo_type algo) {
-    Allreduce(internal::IN_PLACE<T>(), recvbuf, count, op, comm, algo);
+    Allreduce(recvbuf, recvbuf, count, op, comm, algo);
   }
 
   template <typename T>
@@ -86,10 +66,12 @@ class MPICUDABackend {
       AllreduceRequest& req,
       algo_type algo) {
     switch (algo) {
+#if 0
       case MPICUDAAllreduceAlgorithm::ring:
         internal::mpi_cuda::nb_ring_allreduce(sendbuf, recvbuf, count,
                                               op, comm, req);
         break;
+#endif        
       case MPICUDAAllreduceAlgorithm::bi_ring:
         internal::mpi_cuda::nb_bi_ring_allreduce(sendbuf, recvbuf, count,
                                                  op, comm, req);
