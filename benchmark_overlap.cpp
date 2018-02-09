@@ -117,8 +117,8 @@ void time_mpi_baseline(std::vector<float> input,
   }
 }
 
-int main(int argc, char** argv) {
-  allreduces::Initialize(argc, argv);
+template <typename Backend>
+void do_benchmark() {
   // Add algorithms to test here.
   std::vector<allreduces::AllreduceAlgorithm> algos = {
     allreduces::AllreduceAlgorithm::mpi_passthrough,
@@ -133,14 +133,30 @@ int main(int argc, char** argv) {
   }
   //std::vector<size_t> sizes = {64, 128};
   for (const auto& size : sizes) {
-    std::vector<float> data = gen_data(size);
+    auto data = gen_data<Backend>(size);
     // Benchmark algorithms.
     time_mpi_baseline(data, comm);
     for (auto&& algo : algos) {
       MPI_Barrier(MPI_COMM_WORLD);
-      time_allreduce_algo<allreduces::MPIBackend>(data, comm, algo);
+      time_allreduce_algo<Backend>(data, comm, algo);
     }
   }
+}
+
+int main(int argc, char *argv[]) {
+  allreduces::Initialize(argc, argv);
+  std::string backend = "MPI";
+  if (argc == 2) {
+    backend = argv[1];
+  }
+  
+  if (backend == "MPI") {
+    do_benchmark<allreduces::MPIBackend>();
+  } else {
+    std::cerr << "usage: " << argv[0] << " [MPI | NCCL]\n";
+    return -1;
+  }
+
   allreduces::Finalize();
   return 0;
 }

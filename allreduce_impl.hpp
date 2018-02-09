@@ -2,60 +2,6 @@
 
 namespace allreduces {
 
-template <typename T>
-void Allreduce(const T* sendbuf, T* recvbuf, size_t count,
-               ReductionOperator op, Communicator& comm,
-               AllreduceAlgorithm algo) {
-  if(comm.is_nccl_used()){
-    NCCLAllreduce(sendbuf, recvbuf, count, op, comm);
-  }
-  else{
-    MPIAllreduce(sendbuf, recvbuf, count, op, comm, algo);
-  }
-}
-
-template <typename T>
-void NCCLAllreduce(const T* sendbuf, T* recvbuf, size_t count, ReductionOperator op, Communicator& comm){
-
-  allreduces::NCCLCommunicator& xcomm = dynamic_cast<NCCLCommunicator&>(comm);
-
-  ncclDataType_t nccl_type;
-  switch(sizeof(T)) {
-  case 8:
-    nccl_type = ncclDouble;
-     break;
-  case 4:
-    nccl_type = ncclFloat;
-    break;
-  case 2:
-    nccl_type = ncclHalf;
-    break;
-  default:
-    throw_allreduce_exception("unsupported NCCL data type");
-  }
-
-  ncclRedOp_t nccl_redop;
-  switch(op) {
-  case ReductionOperator::sum:
-    nccl_redop = ncclSum;
-    break;
-  case ReductionOperator::prod:
-    nccl_redop = ncclProd;
-    break;
-  case ReductionOperator::min:
-    nccl_redop = ncclMin;
-    break;
-   case ReductionOperator::max:
-    nccl_redop = ncclMax;
-    break;
-   default:
-    throw_allreduce_exception("unsupported NCCL reduction operator");
-  }
-
-  xcomm.Allreduce((void*) sendbuf, (void*) recvbuf, count, nccl_type, nccl_redop);
-
-
-}
 
 class MPIBackend {
  public:

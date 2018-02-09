@@ -3,17 +3,6 @@
 #include "test_utils.hpp"
 
 const size_t max_size = 1<<20;
-const float eps = 1e-4;
-
-bool check_vector(const std::vector<float>& expected,
-                  const std::vector<float>& actual) {
-  for (size_t i = 0; i < expected.size(); ++i) {
-    if (std::abs(expected[i] - actual[i]) > eps) {
-      return false;
-    }
-  }
-  return true;
-}
 
 int main(int argc, char** argv) {
   allreduces::Initialize(argc, argv);
