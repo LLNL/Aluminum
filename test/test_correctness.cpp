@@ -1,8 +1,8 @@
 #include <iostream>
 #include "allreduce.hpp"
 #include "test_utils.hpp"
-#ifdef ALUMINUM_HAS_CUDA
-#include "test_utils_cuda.hpp"
+#ifdef ALUMINUM_HAS_NCCL
+#include "test_utils_nccl.hpp"
 #endif
 #ifdef ALUMINUM_HAS_MPI_CUDA
 #include "test_utils_mpi_cuda.hpp"
@@ -82,7 +82,7 @@ void test_correctness() {
   typename Backend::comm_type comm;  // Use COMM_WORLD.
   // Compute sizes to test.
   std::vector<size_t> sizes = {0};
-  for (size_t size = 1; size <= max_size; size *= 2) {
+  for (size_t size = 1 << 20; size <= max_size; size *= 2) {
     sizes.push_back(size);
     // Avoid duplicating 2.
     if (size > 1) {

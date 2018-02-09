@@ -156,20 +156,6 @@ class CUDAVector {
   T *m_ptr;
 };
 
-template <>
-struct VectorType<allreduces::NCCLBackend> {
-  using type = CUDAVector<float>;
-};
-
-
-template <>
-typename VectorType<allreduces::NCCLBackend>::type
-gen_data<allreduces::NCCLBackend>(size_t count) {
-  auto &&host_data = gen_data<allreduces::MPIBackend>(count);
-  CUDAVector<float> data(host_data);
-  return data;
-}
-
 
 bool check_vector(const CUDAVector<float>& expected,
                   const CUDAVector<float>& actual) {
@@ -186,10 +172,3 @@ void get_expected_result(CUDAVector<float>& expected) {
 }
 
 
-template <>
-std::vector<typename allreduces::NCCLBackend::algo_type>
-get_nb_allreduce_algorithms<allreduces::NCCLBackend>() {
-  // NCCLBackend does not have non-blocking interface implemented
-  std::vector<typename allreduces::NCCLBackend::algo_type> algos = {};
-  return algos;
-}

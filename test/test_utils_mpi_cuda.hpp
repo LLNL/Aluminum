@@ -2,7 +2,7 @@
 
 #include <memory>
 #include <cuda_runtime.h>
-#include "test_utils.hpp"
+#include "test_utils_cuda.hpp"
 
 template <>
 struct VectorType<allreduces::MPICUDABackend> {
