@@ -1,6 +1,25 @@
-CXXFLAGS += -Wall -Wextra -pedantic -Wshadow -O3 -std=c++11 -fopenmp -g -fPIC -lhwloc -I/opt/cudatoolkit-8.0/include
+CXXFLAGS += -Wall -Wextra -pedantic -Wshadow -O3 -std=c++11 -fopenmp -g -fPIC -lhwloc 
 cur_dir = $(shell pwd)
-LIB = -L$(cur_dir) -lallreduce -Wl,-rpath=$(cur_dir) -L/usr/workspace/wsb/brain/nccl2/nccl-2.0.5+cuda8.0/lib -lnccl -L/opt/cudatoolkit-8.0/lib64 -lcudart -lrt
+LIB = -L$(cur_dir) -lallreduce -Wl,-rpath=$(cur_dir) -lrt
+
+# NCCL2 is available at:
+# - ray: /usr/workspace/wsb/brain/nccl2/nccl-2.0.5-3+cuda8.0_ppc64el
+# - surface: /usr/workspace/wsb/brain/nccl2/nccl-2.0.5+cuda8.0
+NCCL_DIR = 
+ifeq ($(ENABLE_NCCL), YES)
+	ENABLE_CUDA = YES
+	CXXFLAGS += -I$(NCCL_DIR)/include
+	LIB += -L$(NCCL_DIR)/lib -lnccl
+endif
+
+ifeq ($(ENABLE_CUDA), YES)
+	CUDA_HOME = $(patsubst %/,%,$(dir $(patsubst %/,%,$(dir $(shell which nvcc)))))
+	CXXFLAGS += -I$(CUDA_HOME)/include
+	LIB += -L$(CUDA_HOME)/lib64 -lcudart
+endif
+
+test:
+	echo $(CXXFLAGS)
 
 all: liballreduce.so benchmark_allreduces benchmark_nballreduces benchmark_overlap benchmark_reductions test_correctness test_multi_nballreduces
 
