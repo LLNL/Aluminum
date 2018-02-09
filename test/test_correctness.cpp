@@ -128,8 +128,12 @@ int main(int argc, char** argv) {
   } else if (backend == "NCCL") {
     test_correctness<allreduces::NCCLBackend>();
 #endif
+#ifdef ALUMINUM_HAS_MPI_CUDA
+  } else if (backend == "MPI-CUDA") {
+    test_correctness<allreduces::MPICUDABackend>();
+#endif    
   } else {
-    std::cerr << "usage: " << argv[0] << " [MPI | NCCL]\n";
+    std::cerr << "usage: " << argv[0] << " [MPI | NCCL | MPI-CUDA]\n";
     return -1;
   }
 

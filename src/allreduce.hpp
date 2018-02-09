@@ -454,3 +454,6 @@ void pe_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
 #ifdef ALUMINUM_HAS_NCCL
 #include "allreduce_nccl_impl.hpp"
 #endif
+#ifdef ALUMINUM_HAS_MPI_CUDA
+#include "allreduce_mpi_cuda_impl.hpp"
+#endif

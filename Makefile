@@ -12,6 +12,11 @@ ifeq ($(ENABLE_NCCL), YES)
 	LIB += -L$(NCCL_DIR)/lib -lnccl -Wl,-rpath=$(NCCL_DIR)/lib
 endif
 
+ifeq ($(ENABLE_MPI_CUDA), YES)
+	ENABLE_CUDA = YES
+	CXXFLAGS += -DALUMINUM_HAS_MPI_CUDA
+endif
+
 ifeq ($(ENABLE_CUDA), YES)
 	CUDA_HOME = $(patsubst %/,%,$(dir $(patsubst %/,%,$(dir $(shell which nvcc)))))
 	CXXFLAGS += -I$(CUDA_HOME)/include -DALUMINUM_HAS_CUDA
