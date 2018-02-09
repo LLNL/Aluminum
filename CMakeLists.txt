@@ -7,6 +7,11 @@ project(ALUMINUM VERSION 0.1 LANGUAGES CXX)
 # Not "CUDA" because no CUDA sources being compiled, so don't need
 # NVCC, just cuda runtime.
 
+if (${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_BUILD_DIR})
+  message(FATAL_ERROR "In-source builds are prohibited. "
+    "Create a new directory and build there.")
+endif ()
+
 include(GNUInstallDirs)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
