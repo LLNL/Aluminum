@@ -82,7 +82,7 @@ void test_correctness() {
   typename Backend::comm_type comm;  // Use COMM_WORLD.
   // Compute sizes to test.
   std::vector<size_t> sizes = {0};
-  for (size_t size = 1 << 20; size <= max_size; size *= 2) {
+  for (size_t size = 1; size <= max_size; size *= 2) {
     sizes.push_back(size);
     // Avoid duplicating 2.
     if (size > 1) {
