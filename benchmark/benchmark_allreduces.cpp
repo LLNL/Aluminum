@@ -87,6 +87,7 @@ int main(int argc, char** argv) {
     do_benchmark<allreduces::MPIBackend>();
 #ifdef ALUMINUM_HAS_NCCL    
   } else if (backend == "NCCL") {
+    set_device();        
     do_benchmark<allreduces::NCCLBackend>();
 #endif    
 #ifdef ALUMINUM_HAS_MPI_CUDA    
