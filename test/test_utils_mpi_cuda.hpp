@@ -21,9 +21,8 @@ template <>
 std::vector<typename allreduces::MPICUDABackend::algo_type>
 get_allreduce_algorithms<allreduces::MPICUDABackend>() {
   std::vector<typename allreduces::MPICUDABackend::algo_type> algos = {
+    allreduces::MPICUDABackend::algo_type::ring,    
     allreduces::MPICUDABackend::algo_type::bi_ring
-    //    allreduces::MPICUDABackend::algo_type::ring,
-    //    allreduces::MPICUDABackend::algo_type::bi_ring
   };
   return algos;
 }

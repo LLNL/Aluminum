@@ -7,7 +7,7 @@ namespace allreduces {
 enum class MPICUDAAllreduceAlgorithm {
   automatic,
   // TODO: unidirectional ring does not work; will fix
-  //ring, 
+  ring, 
   bi_ring
 };
 
@@ -15,10 +15,8 @@ inline std::string allreduce_name(MPICUDAAllreduceAlgorithm algo) {
   switch (algo) {
   case MPICUDAAllreduceAlgorithm::automatic:
     return "automatic";
-#if 0    
   case MPICUDAAllreduceAlgorithm::ring:
     return "ring";
-#endif    
   case MPICUDAAllreduceAlgorithm::bi_ring:
     return "bi-ring";
   default:
@@ -36,12 +34,10 @@ class MPICUDABackend {
                         ReductionOperator op, comm_type& comm,
                         algo_type algo) {
     switch (algo) {
-#if 0      
       case MPICUDAAllreduceAlgorithm::ring:
         internal::mpi_cuda::ring_allreduce(sendbuf, recvbuf, count,
                                            op, comm);
         break;
-#endif        
       case MPICUDAAllreduceAlgorithm::automatic:
       case MPICUDAAllreduceAlgorithm::bi_ring:
         internal::mpi_cuda::bi_ring_allreduce(sendbuf, recvbuf, count,
@@ -66,12 +62,10 @@ class MPICUDABackend {
       AllreduceRequest& req,
       algo_type algo) {
     switch (algo) {
-#if 0
       case MPICUDAAllreduceAlgorithm::ring:
         internal::mpi_cuda::nb_ring_allreduce(sendbuf, recvbuf, count,
                                               op, comm, req);
         break;
-#endif        
       case MPICUDAAllreduceAlgorithm::bi_ring:
         internal::mpi_cuda::nb_bi_ring_allreduce(sendbuf, recvbuf, count,
                                                  op, comm, req);

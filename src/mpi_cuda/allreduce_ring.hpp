@@ -679,6 +679,9 @@ class RingMPICUDA {
                 std::vector<cudaStream_t> *streams=nullptr,
                 bool bidirectional=true) {
     if (count == 0) return 0;
+
+    // Set whether the second direction is used
+    m_trans_dir[R2L] = bidirectional;
     
     int num_total_gpus = m_np * m_num_gpus;
     std::vector<size_t> pe_counts[2];
@@ -705,9 +708,6 @@ class RingMPICUDA {
     // Map the base addresses as IPC handles can be taken only for
     // base addresses.  
     setup_remote_buffer_mapping_with_caching<T>(&bufs, &bufs);
-
-    // Set whether the second direction is used
-    m_trans_dir[R2L] = bidirectional;
 
     // Push is faster than pull on P8+GPU.
     // Step 1: Reduce-scatter
