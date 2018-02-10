@@ -782,8 +782,16 @@ class RingMPICUDA {
       m_recv_idx[i] = recv_idx_ref[i];
     }
     
-    if (!stream_passed) destroy_streams(*streams, m_gpus);
+    if (!stream_passed) {
+      for (int g = 0; g < m_num_gpus; ++g) {
+        COLL_CHECK_CUDA(cudaSetDevice(m_gpus[g]));        
+        COLL_CHECK_CUDA(cudaStreamSynchronize(streams->at(g)));
+        //cudaDeviceSynchronize();
+      }
+      destroy_streams(*streams, m_gpus);
+    }
 
+    // Reset to default
     m_trans_dir[R2L] = true;
                                         
     return 0;
