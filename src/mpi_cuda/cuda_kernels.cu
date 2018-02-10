@@ -157,8 +157,18 @@ void reduce_v(void *dst, const void *src, size_t count, cudaStream_t s) {
   int tb_dim = 256;
   count /= VectorLen;
   int grid_dim = count / tb_dim + (count % tb_dim ? 1 : 0);
+#ifdef ALUMINUM_MPI_CUDA_DEBUG
+  // clear remaining error flag
+  cudaGetLastError();
+#endif  
   reduce_kernel<op, T, VectorLen><<<grid_dim, tb_dim, 0, s>>>(
       dst, src, count);
+#ifdef ALUMINUM_MPI_CUDA_DEBUG
+  cudaError_t e = cudaPeekAtLastError();
+  if (e != cudaSuccess) {
+    throw_allreduce_exception(cudaGetErrorString(e));
+  }
+#endif  
 }
 
 // Passing each function argument to a template parameter

@@ -53,4 +53,4 @@ src/mpi_cuda/cuda_kernels.o: src/mpi_cuda/cuda_kernels.cu
 	nvcc $(NVCCFLAGS) -c $< -o $@
 
 clean:
-	rm -f liballreduce.so benchmark_allreduces benchmark_nballreduces benchmark_reductions test_correctness test_multi_nballreduces benchmark_overlap
+	rm -f liballreduce.so benchmark_allreduces benchmark_nballreduces benchmark_reductions test_correctness test_multi_nballreduces benchmark_overlap src/mpi_cuda/cuda_kernels.o

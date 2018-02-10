@@ -117,12 +117,22 @@ get_nb_allreduce_algorithms<allreduces::MPIBackend>() {
 
 bool check_vector(const std::vector<float>& expected,
                   const std::vector<float>& actual) {
+  bool match = true;
+  int rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   for (size_t i = 0; i < expected.size(); ++i) {
-    if (std::abs(expected[i] - actual[i]) > eps) {
-      std::cerr << "[" << i << "] Expected: " << expected[i]
+    float e = expected[i];
+    if (std::abs(e - actual[i]) > eps) {
+#ifdef ALUMINUM_DEBUG
+      std::stringstream ss;
+      ss << "[" << rank << "] @" << i << " Expected: " << e
                 << ", Actual: " << actual[i] << "\n";
+      std::cerr << ss.str();
+      match = false;
+#else
       return false;
+#endif
     }
   }
-  return true;
+  return match;
 }

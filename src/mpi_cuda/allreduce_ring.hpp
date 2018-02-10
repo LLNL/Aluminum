@@ -128,7 +128,8 @@ class RingMPICUDA {
   void get_gpu_bufs(size_t count, std::vector<T*> *bufs) {
     size_t real_size = sizeof(T) * count;
     //if (m_trans_dir[R2L]) real_size *= 2;
-    if (!(m_gpu_bufs[L2R].size() > 0 && m_gpu_buf_size >= real_size)) {
+    if (!(m_gpu_bufs[L2R].size() > 0 && m_gpu_buf_size >= real_size
+          && (!m_trans_dir[R2L] || m_gpu_bufs[R2L].size() > 0))) {
 #ifdef ALUMINUM_MPI_CUDA_DEBUG
         MPIPrintStream(std::cerr, m_pid)()
             << "Setting up a new workspace buffer\n";
@@ -164,20 +165,19 @@ class RingMPICUDA {
   }
 
   void free_gpu_bufs() {
-    if (m_gpu_bufs[L2R].size() > 0) {
-      for (int i = 0; i < m_num_gpus; ++i) {
+    for (int dir = 0; dir < 2; ++dir) {
+      if (m_gpu_bufs[dir].size() > 0) {
+        for (int i = 0; i < m_num_gpus; ++i) {
 #ifdef ALUMINUM_MPI_CUDA_DEBUG
-        MPIPrintStream(std::cerr, m_pid)()
-            << "Freeing workspace buffer for device "
-            << m_gpus[i] << "\n";
+          MPIPrintStream(std::cerr, m_pid)()
+              << "Freeing workspace buffer for device "
+              << m_gpus[i] << "\n";
 #endif
-        COLL_CHECK_CUDA(cudaSetDevice(m_gpus[i]));
-        COLL_CHECK_CUDA(cudaFree(m_gpu_bufs[L2R][i]));
-        if (m_trans_dir[R2L])
-          COLL_CHECK_CUDA(cudaFree(m_gpu_bufs[R2L][i]));
+          COLL_CHECK_CUDA(cudaSetDevice(m_gpus[i]));
+          COLL_CHECK_CUDA(cudaFree(m_gpu_bufs[dir][i]));
+        }
+        m_gpu_bufs[dir].clear();
       }
-      m_gpu_bufs[L2R].clear();
-      m_gpu_bufs[R2L].clear();        
     }
   }
 
@@ -441,8 +441,10 @@ class RingMPICUDA {
       const std::vector<T*> *bufs_l2r,
       const std::vector<T*> *bufs_r2l) {
     // Use the pointer value of the first device as the key for
-    // caching 
-    if (m_ipc_cache_buf == bufs_l2r->front()) {
+    // caching.
+    // Disable caching as the address does not indicate the same
+    // allocation is used
+    if (false && m_ipc_cache_buf == bufs_l2r->front()) {
       // Can reuse the previous mapping
 #ifdef ALUMINUM_MPI_CUDA_DEBUG
       MPIPrintStream(std::cerr, m_pid)() << "Reusing remote buffer mapping\n";
@@ -677,6 +679,9 @@ class RingMPICUDA {
                 std::vector<cudaStream_t> *streams=nullptr,
                 bool bidirectional=true) {
     if (count == 0) return 0;
+
+    // Set whether the second direction is used
+    m_trans_dir[R2L] = bidirectional;
     
     int num_total_gpus = m_np * m_num_gpus;
     std::vector<size_t> pe_counts[2];
@@ -703,9 +708,6 @@ class RingMPICUDA {
     // Map the base addresses as IPC handles can be taken only for
     // base addresses.  
     setup_remote_buffer_mapping_with_caching<T>(&bufs, &bufs);
-
-    // Set whether the second direction is used
-    m_trans_dir[R2L] = bidirectional;
 
     // Push is faster than pull on P8+GPU.
     // Step 1: Reduce-scatter
@@ -780,8 +782,16 @@ class RingMPICUDA {
       m_recv_idx[i] = recv_idx_ref[i];
     }
     
-    if (!stream_passed) destroy_streams(*streams, m_gpus);
+    if (!stream_passed) {
+      for (int g = 0; g < m_num_gpus; ++g) {
+        COLL_CHECK_CUDA(cudaSetDevice(m_gpus[g]));        
+        COLL_CHECK_CUDA(cudaStreamSynchronize(streams->at(g)));
+        //cudaDeviceSynchronize();
+      }
+      destroy_streams(*streams, m_gpus);
+    }
 
+    // Reset to default
     m_trans_dir[R2L] = true;
                                         
     return 0;
