@@ -165,7 +165,6 @@ bool check_vector(const CUDAVector<float>& expected,
 }
 
 void get_expected_result(CUDAVector<float>& expected) {
-  std::cerr << "Get expected result device\n";
   std::vector<float> &&host_data = expected.copyout();
   MPI_Allreduce(MPI_IN_PLACE, host_data.data(), expected.size(),
                 MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
