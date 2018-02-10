@@ -59,7 +59,6 @@ class RingMPICUDA {
   
   ~RingMPICUDA() {
     destroy_events();
-    close_remote_buffer_mapping(m_neighbor_buf);
     close_remote_buffer_mapping(m_neighbor_work);
     free_gpu_bufs();
   }
@@ -436,35 +435,6 @@ class RingMPICUDA {
     }
   }
 
-  template <typename T>
-  void setup_remote_buffer_mapping_with_caching(
-      const std::vector<T*> *bufs_l2r,
-      const std::vector<T*> *bufs_r2l) {
-    // Use the pointer value of the first device as the key for
-    // caching.
-    // Disable caching as the address does not indicate the same
-    // allocation is used
-    if (false && m_ipc_cache_buf == bufs_l2r->front()) {
-      // Can reuse the previous mapping
-#ifdef ALUMINUM_MPI_CUDA_DEBUG
-      MPIPrintStream(std::cerr, m_pid)() << "Reusing remote buffer mapping\n";
-#endif      
-      return;
-    }
-    // Close the current mapping if exists
-    if (m_ipc_cache_buf != nullptr) {
-#ifdef ALUMINUM_MPI_CUDA_DEBUG
-      MPIPrintStream(std::cerr, m_pid)() << "Destroy previous mapping\n";
-#endif      
-      close_remote_buffer_mapping(m_neighbor_buf);
-    }
-#ifdef ALUMINUM_MPI_CUDA_DEBUG
-    MPIPrintStream(std::cerr, m_pid)() << "setup new mapping\n";
-#endif      
-    setup_remote_buffer_mapping(bufs_l2r, bufs_r2l, m_neighbor_buf);
-    m_ipc_cache_buf = bufs_l2r->front();
-  }
-
 
   void notify(int rank, int dir) {
     char x = 0;
@@ -584,24 +554,16 @@ class RingMPICUDA {
             m_comm, &requests[num_requests++]));
       }
       if (g == last_dev) {
-        if (scatter_reduce) {
-          if (dst_require_mpi) {
-            COLL_CHECK_CUDA(cudaEventSynchronize(m_ev_comp[trans][g]));
-          } else {
-            // Make sure the completion event of computation was
-            // recorded before sending the buffer
-            if (iter_idx != 0) {
-              wait_for_next_rank(trans);
-            } 
-            COLL_CHECK_CUDA(cudaStreamWaitEvent(
-                streams[g], m_neighbor_ev[trans][dst], 0));
-          }
+        if (dst_require_mpi) {
+          COLL_CHECK_CUDA(cudaEventSynchronize(m_ev_comp[trans][g]));
         } else {
-          if (dst_require_mpi) {
-            // wait for the completion of scatter reduce or transfer
-            // from previous device
-            COLL_CHECK_CUDA(cudaEventSynchronize(m_ev_comp[trans][g]));
-          }
+          // Make sure the completion event of computation was
+          // recorded before sending the buffer
+          if (iter_idx != 0) {
+            wait_for_next_rank(trans);
+          } 
+          COLL_CHECK_CUDA(cudaStreamWaitEvent(
+              streams[g], m_neighbor_ev[trans][dst], 0));
         }
         // Send to neighbor        
         T *src_ptr = bufs[g] + send_offset;
@@ -610,8 +572,7 @@ class RingMPICUDA {
               src_ptr, send_count, mpi_type,
               dst_mpi_rank, tag, m_comm, &requests[num_requests++]));
         } else {
-          void *dst_ptr = scatter_reduce ? m_neighbor_work[dst] :
-              static_cast<T*>(m_neighbor_buf[dst]) + send_offset;
+          void *dst_ptr = m_neighbor_work[dst];
           COLL_CHECK_CUDA(cudaMemcpyPeerAsync(
               dst_ptr, m_neighbor_dev[dst], src_ptr, g,
               send_count * sizeof(T), streams[g]));
@@ -634,15 +595,17 @@ class RingMPICUDA {
       if (g != first_dev) {
         int prev_dev = trans == L2R ? g-1 : g+1;        
         COLL_CHECK_CUDA(cudaStreamWaitEvent(streams[g], m_ev_trans[trans][prev_dev], 0));
+        T *dst_ptr = bufs[g] + recv_offset;        
         if (scatter_reduce) {
-          T *dst_ptr = bufs[g] + recv_offset;
           reduce1(dst_ptr, work_bufs[g], recv_count, streams[g],
                   ReductionOperator::sum,
                   GetReductionOperandType<T>::key);
           COLL_CHECK_CUDA(cudaEventRecord(m_ev_comp[trans][g], streams[g]));
         } else {
-          // Record the event so that the send op can wait for the
-          // completion of transfer
+          COLL_CHECK_CUDA(cudaMemcpyAsync(dst_ptr, work_bufs[g],
+                                          recv_count * sizeof(T),
+                                          cudaMemcpyDeviceToDevice,
+                                          streams[g]));
           COLL_CHECK_CUDA(cudaEventRecord(m_ev_comp[trans][g], streams[g]));
         }
       }
@@ -705,10 +668,6 @@ class RingMPICUDA {
       create_streams(*streams, m_gpus);      
     }
 
-    // Map the base addresses as IPC handles can be taken only for
-    // base addresses.  
-    setup_remote_buffer_mapping_with_caching<T>(&bufs, &bufs);
-
     // Push is faster than pull on P8+GPU.
     // Step 1: Reduce-scatter
     // Step 2: Allgather
@@ -727,33 +686,31 @@ class RingMPICUDA {
           num_requests += bh_num_requests;
         }
         ensure_transfer(requests, num_requests, *streams);
-        if (step == 0) {
-          for (int trans = 0; trans < 2 && m_trans_dir[trans]; ++trans) {
-            int devid = trans == L2R ? 0 : m_num_gpus - 1;
-            T *dst_base = bufs[devid];
-            COLL_CHECK_CUDA(cudaSetDevice(m_gpus[devid]));
+        for (int trans = 0; trans < 2 && m_trans_dir[trans]; ++trans) {
+          int devid = trans == L2R ? 0 : m_num_gpus - 1;
+          T *dst_base = bufs[devid];
+          COLL_CHECK_CUDA(cudaSetDevice(m_gpus[devid]));
+          if (step == 0) {
             reduce1(dst_base + pe_offsets[trans][m_recv_idx[trans][devid]],
                     work_bufs[trans][devid],
                     pe_counts[trans][m_recv_idx[trans][devid]],
                     streams->at(devid), ReductionOperator::sum,
                     GetReductionOperandType<T>::key);
-            COLL_CHECK_CUDA(cudaEventRecord(m_ev_comp[trans][devid],
-                                            streams->at(devid)));
-            // notify prev rank for the recording of comp event if MPI
-            // is not used
-            bool transfer_done_by_cuda =
-                m_access_type[trans == L2R ? LHS : RHS] != MPI;
-            if (transfer_done_by_cuda) notify_prev_rank(trans);
+          } else {
+            COLL_CHECK_CUDA(cudaMemcpyAsync(
+                bufs[devid] + pe_offsets[trans][m_recv_idx[trans][devid]],
+                work_bufs[trans][devid],
+                pe_counts[trans][m_recv_idx[trans][devid]] * sizeof(T),
+                cudaMemcpyDeviceToDevice,
+                streams->at(devid)));
           }
-        } else {
-          // Record the event so that the send op can wait for the
-          // completion of transfer
-          for (int trans = 0; trans < 2 && m_trans_dir[trans]; ++trans) {
-            int devid = trans == L2R ? 0 : m_num_gpus - 1;
-            COLL_CHECK_CUDA(cudaSetDevice(m_gpus[devid]));
-            COLL_CHECK_CUDA(cudaEventRecord(m_ev_comp[trans][devid],
-                                            streams->at(devid)));
-          }
+          COLL_CHECK_CUDA(cudaEventRecord(m_ev_comp[trans][devid],
+                                          streams->at(devid)));
+          // notify prev rank for the recording of comp event if MPI
+          // is not used
+          bool transfer_done_by_cuda =
+              m_access_type[trans == L2R ? LHS : RHS] != MPI;
+          if (transfer_done_by_cuda) notify_prev_rank(trans);
         }
         for (int g = 0; g < m_num_gpus; ++g) {
           m_send_idx[L2R][g] = dec(m_send_idx[L2R][g], num_total_gpus);
@@ -762,14 +719,12 @@ class RingMPICUDA {
           m_recv_idx[R2L][g] = inc(m_recv_idx[R2L][g], num_total_gpus);
         }
       }
-      if (step == 0) {
-        // There remains an un-received notificaton from RHS. 
-        if (m_access_type[RHS] != MPI) {
-          wait_for_next_rank(L2R);
-        }
-        if (m_trans_dir[R2L] && m_access_type[LHS] != MPI) {
-          wait_for_next_rank(R2L);
-        }
+      // There remains an un-received notificaton from RHS. 
+      if (m_access_type[RHS] != MPI) {
+        wait_for_next_rank(L2R);
+      }
+      if (m_trans_dir[R2L] && m_access_type[LHS] != MPI) {
+        wait_for_next_rank(R2L);
       }
 #ifdef ALUMINUM_MPI_CUDA_DEBUG
       MPIPrintStream(std::cerr, m_pid)() << "Step " << step << " done\n";
@@ -825,8 +780,6 @@ class RingMPICUDA {
 
   AccessType m_access_type[2];
   int m_neighbor_dev[2];
-  void *m_ipc_cache_buf = nullptr;
-  void *m_neighbor_buf[2] = {nullptr, nullptr};
   void *m_neighbor_work[2] = {nullptr, nullptr};
   cudaEvent_t m_neighbor_ev[2][2]; // [L2R/R2L][LHS/RHS]
 
