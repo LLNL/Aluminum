@@ -74,12 +74,12 @@ class CUDAVector {
   CUDAVector(const std::vector<T> &host_vector):
       m_count(host_vector.size()), m_ptr(nullptr) {
     allocate();
-    cudaMemcpy(m_ptr, host_vector.data(), get_bytes(), cudaMemcpyDefault);
+    CHECK_CUDA(cudaMemcpy(m_ptr, host_vector.data(), get_bytes(), cudaMemcpyDefault));
   }
 
   CUDAVector(const CUDAVector &v): m_count(v.m_count), m_ptr(nullptr) {
     allocate();
-    cudaMemcpy(m_ptr, v.data(), get_bytes(), cudaMemcpyDefault);
+    CHECK_CUDA(cudaMemcpy(m_ptr, v.data(), get_bytes(), cudaMemcpyDefault));
   }
 
   CUDAVector(CUDAVector &&v): CUDAVector() {
@@ -106,7 +106,7 @@ class CUDAVector {
 
   void clear() {
     if (m_count > 0) {
-      cudaFree(m_ptr);
+      CHECK_CUDA(cudaFree(m_ptr));
       m_ptr = nullptr;
       m_count = 0;
     }
@@ -114,7 +114,7 @@ class CUDAVector {
 
   void allocate() {
     if (m_count > 0) {
-      cudaMalloc(&m_ptr, get_bytes());
+      CHECK_CUDA(cudaMalloc(&m_ptr, get_bytes()));
     }
   }
 
@@ -122,7 +122,7 @@ class CUDAVector {
     clear();
     m_count = v.m_count;
     allocate();
-    cudaMemcpy(m_ptr, v.m_ptr, get_bytes(), cudaMemcpyDefault);
+    CHECK_CUDA(cudaMemcpy(m_ptr, v.m_ptr, get_bytes(), cudaMemcpyDefault));
     return *this;
   }
 
@@ -136,12 +136,12 @@ class CUDAVector {
 
   std::vector<T> copyout() const {
     std::vector<T> hv(size());
-    cudaMemcpy(hv.data(), m_ptr, get_bytes(), cudaMemcpyDeviceToHost);
+    CHECK_CUDA(cudaMemcpy(hv.data(), m_ptr, get_bytes(), cudaMemcpyDeviceToHost));
     return hv;
   }
   
   void copyin(const T *hp) {
-    cudaMemcpy(m_ptr, hp, get_bytes(), cudaMemcpyHostToDevice);
+    CHECK_CUDA(cudaMemcpy(m_ptr, hp, get_bytes(), cudaMemcpyHostToDevice));
   }
 
   void copyin(const std::vector<T> &hv) {
@@ -165,6 +165,7 @@ bool check_vector(const CUDAVector<float>& expected,
 }
 
 void get_expected_result(CUDAVector<float>& expected) {
+  std::cerr << "Get expected result device\n";
   std::vector<float> &&host_data = expected.copyout();
   MPI_Allreduce(MPI_IN_PLACE, host_data.data(), expected.size(),
                 MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
