@@ -119,6 +119,8 @@ bool check_vector(const std::vector<float>& expected,
                   const std::vector<float>& actual) {
   for (size_t i = 0; i < expected.size(); ++i) {
     if (std::abs(expected[i] - actual[i]) > eps) {
+      std::cerr << "[" << i << "] Expected: " << expected[i]
+                << ", Actual: " << actual[i] << "\n";
       return false;
     }
   }

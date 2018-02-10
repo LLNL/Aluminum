@@ -1,8 +1,11 @@
 #include <iostream>
 #include "allreduce.hpp"
 #include "test_utils.hpp"
-#ifdef ALUMINUM_HAS_CUDA
-#include "test_utils_cuda.hpp"
+#ifdef ALUMINUM_HAS_NCCL
+#include "test_utils_nccl.hpp"
+#endif
+#ifdef ALUMINUM_HAS_MPI_CUDA
+#include "test_utils_mpi_cuda.hpp"
 #endif
 
 #include <stdlib.h>
@@ -30,7 +33,8 @@ void test_allreduce_algo(const typename VectorType<Backend>::type& expected,
                                  allreduces::ReductionOperator::sum, comm, algo);
   if (!check_vector(expected, recv)) {
     std::cout << comm.rank() << ": regular allreduce does not match" <<
-      std::endl;
+        std::endl;
+    std::abort();
   }
   // Test in-place allreduce.
   allreduces::Allreduce<Backend>(input.data(), input.size(),
@@ -126,10 +130,16 @@ int main(int argc, char** argv) {
     test_correctness<allreduces::MPIBackend>();
 #ifdef ALUMINUM_HAS_NCCL
   } else if (backend == "NCCL") {
+    set_device();
     test_correctness<allreduces::NCCLBackend>();
 #endif
+#ifdef ALUMINUM_HAS_MPI_CUDA
+  } else if (backend == "MPI-CUDA") {
+    set_device();    
+    test_correctness<allreduces::MPICUDABackend>();
+#endif    
   } else {
-    std::cerr << "usage: " << argv[0] << " [MPI | NCCL]\n";
+    std::cerr << "usage: " << argv[0] << " [MPI | NCCL | MPI-CUDA]\n";
     return -1;
   }
 

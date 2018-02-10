@@ -6,6 +6,62 @@
 
 #define NCCL_THRESHOLD	1e-05
 
+#define CHECK_CUDA(cuda_call)                                           \
+  do {                                                                  \
+    const cudaError_t cuda_status = cuda_call;                          \
+    if (cuda_status != cudaSuccess) {                                   \
+      std::cerr << "CUDA error: " << cudaGetErrorString(cuda_status) << "\n"; \
+      std::cerr << "Error at " << __FILE__ << ":" << __LINE__ << "\n";  \
+      cudaDeviceReset();                                                \
+      abort();                                                          \
+    }                                                                   \
+  } while (0)
+
+int get_number_of_gpus() {
+  int num_gpus = 0;
+  char *env = getenv("ALUMINUM_NUM_GPUS");
+  if (env) {
+    std::cout << "Number of GPUs set by ALUMINUM_NUM_GPUS\n";
+    num_gpus = atoi(env);
+  } else {
+    CHECK_CUDA(cudaGetDeviceCount(&num_gpus));    
+  }
+  return num_gpus;
+}
+
+int get_local_rank() {
+  char *env = getenv("MV2_COMM_WORLD_LOCAL_RANK");
+  if (!env) env = getenv("OMPI_COMM_WORLD_LOCAL_RANK");
+  if (!env) {
+    std::cerr << "Can't determine local rank\n";
+    abort();
+  }
+  return atoi(env);
+}
+
+int get_local_size() {
+  char *env = getenv("MV2_COMM_WORLD_LOCAL_SIZE");
+  if (!env) env = getenv("OMPI_COMM_WORLD_LOCAL_SIZE");
+  if (!env) {
+    std::cerr << "Can't determine local size\n";
+    abort();
+  }
+  return atoi(env);
+}
+
+inline int set_device() {
+  int num_gpus = get_number_of_gpus();
+  int local_rank = get_local_rank();
+  int local_size = get_local_size();
+  if (num_gpus < local_size) {
+    std::cerr << "Number of available GPUs is smaller than the number of local MPI ranks\n";
+    abort();
+  }    
+  int device = local_rank;
+  CHECK_CUDA(cudaSetDevice(device));
+  return device;
+}
+
 template <typename T>
 class CUDAVector {
  public:
@@ -18,12 +74,12 @@ class CUDAVector {
   CUDAVector(const std::vector<T> &host_vector):
       m_count(host_vector.size()), m_ptr(nullptr) {
     allocate();
-    cudaMemcpy(m_ptr, host_vector.data(), get_bytes(), cudaMemcpyDefault);
+    CHECK_CUDA(cudaMemcpy(m_ptr, host_vector.data(), get_bytes(), cudaMemcpyDefault));
   }
 
   CUDAVector(const CUDAVector &v): m_count(v.m_count), m_ptr(nullptr) {
     allocate();
-    cudaMemcpy(m_ptr, v.data(), get_bytes(), cudaMemcpyDefault);
+    CHECK_CUDA(cudaMemcpy(m_ptr, v.data(), get_bytes(), cudaMemcpyDefault));
   }
 
   CUDAVector(CUDAVector &&v): CUDAVector() {
@@ -50,7 +106,7 @@ class CUDAVector {
 
   void clear() {
     if (m_count > 0) {
-      cudaFree(m_ptr);
+      CHECK_CUDA(cudaFree(m_ptr));
       m_ptr = nullptr;
       m_count = 0;
     }
@@ -58,7 +114,7 @@ class CUDAVector {
 
   void allocate() {
     if (m_count > 0) {
-      cudaMalloc(&m_ptr, get_bytes());
+      CHECK_CUDA(cudaMalloc(&m_ptr, get_bytes()));
     }
   }
 
@@ -66,7 +122,7 @@ class CUDAVector {
     clear();
     m_count = v.m_count;
     allocate();
-    cudaMemcpy(m_ptr, v.m_ptr, get_bytes(), cudaMemcpyDefault);
+    CHECK_CUDA(cudaMemcpy(m_ptr, v.m_ptr, get_bytes(), cudaMemcpyDefault));
     return *this;
   }
 
@@ -80,12 +136,12 @@ class CUDAVector {
 
   std::vector<T> copyout() const {
     std::vector<T> hv(size());
-    cudaMemcpy(hv.data(), m_ptr, get_bytes(), cudaMemcpyDeviceToHost);
+    CHECK_CUDA(cudaMemcpy(hv.data(), m_ptr, get_bytes(), cudaMemcpyDeviceToHost));
     return hv;
   }
   
   void copyin(const T *hp) {
-    cudaMemcpy(m_ptr, hp, get_bytes(), cudaMemcpyHostToDevice);
+    CHECK_CUDA(cudaMemcpy(m_ptr, hp, get_bytes(), cudaMemcpyHostToDevice));
   }
 
   void copyin(const std::vector<T> &hv) {
@@ -100,18 +156,6 @@ class CUDAVector {
   T *m_ptr;
 };
 
-template <>
-struct VectorType<allreduces::NCCLBackend> {
-  using type = CUDAVector<float>;
-};
-
-template <>
-typename VectorType<allreduces::NCCLBackend>::type
-gen_data<allreduces::NCCLBackend>(size_t count) {
-  auto &&host_data = gen_data<allreduces::MPIBackend>(count);
-  CUDAVector<float> data(host_data);
-  return data;
-}
 
 bool check_vector(const CUDAVector<float>& expected,
                   const CUDAVector<float>& actual) {
@@ -121,6 +165,7 @@ bool check_vector(const CUDAVector<float>& expected,
 }
 
 void get_expected_result(CUDAVector<float>& expected) {
+  std::cerr << "Get expected result device\n";
   std::vector<float> &&host_data = expected.copyout();
   MPI_Allreduce(MPI_IN_PLACE, host_data.data(), expected.size(),
                 MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
@@ -128,10 +173,3 @@ void get_expected_result(CUDAVector<float>& expected) {
 }
 
 
-template <>
-std::vector<typename allreduces::NCCLBackend::algo_type>
-get_nb_allreduce_algorithms<allreduces::NCCLBackend>() {
-  // NCCLBackend does not have non-blocking interface implemented
-  std::vector<typename allreduces::NCCLBackend::algo_type> algos = {};
-  return algos;
-}
