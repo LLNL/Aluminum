@@ -1,9 +1,11 @@
 #pragma once
 
 #include <cuda_runtime.h>
+#include <mpi.h>
+
 #include <iostream>
 #include <sstream>
-
+#include <vector>
 #include <unistd.h>
 #include <cstdlib>
 

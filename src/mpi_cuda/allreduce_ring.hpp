@@ -129,9 +129,13 @@ class RingMPICUDA {
     size_t real_size = sizeof(T) * count;
     //if (m_trans_dir[R2L]) real_size *= 2;
     if (!(m_gpu_bufs[L2R].size() > 0 && m_gpu_buf_size >= real_size)) {
+#ifdef ALUMINUM_MPI_CUDA_DEBUG
+        MPIPrintStream(std::cerr, m_pid)()
+            << "Setting up a new workspace buffer\n";
+#endif      
       close_remote_buffer_mapping(m_neighbor_work);
       // Make sure everyone unmap the IPC handle before actually
-        // freeing the memory
+      // freeing the memory
       COLL_CHECK_MPI(MPI_Barrier(m_comm));
       free_gpu_bufs();
       for (int i = 0; i < m_num_gpus; ++i) {
@@ -162,6 +166,11 @@ class RingMPICUDA {
   void free_gpu_bufs() {
     if (m_gpu_bufs[L2R].size() > 0) {
       for (int i = 0; i < m_num_gpus; ++i) {
+#ifdef ALUMINUM_MPI_CUDA_DEBUG
+        MPIPrintStream(std::cerr, m_pid)()
+            << "Freeing workspace buffer for device "
+            << m_gpus[i] << "\n";
+#endif
         COLL_CHECK_CUDA(cudaSetDevice(m_gpus[i]));
         COLL_CHECK_CUDA(cudaFree(m_gpu_bufs[L2R][i]));
         if (m_trans_dir[R2L])
@@ -625,7 +634,9 @@ class RingMPICUDA {
         COLL_CHECK_CUDA(cudaStreamWaitEvent(streams[g], m_ev_trans[trans][prev_dev], 0));
         if (scatter_reduce) {
           T *dst_ptr = bufs[g] + recv_offset;
-          reduce1(dst_ptr, work_bufs[g], recv_count, streams[g]);
+          reduce1(dst_ptr, work_bufs[g], recv_count, streams[g],
+                  ReductionOperator::sum,
+                  GetReductionOperandType<T>::key);
           COLL_CHECK_CUDA(cudaEventRecord(m_ev_comp[trans][g], streams[g]));
         } else {
           // Record the event so that the send op can wait for the
@@ -722,7 +733,8 @@ class RingMPICUDA {
             reduce1(dst_base + pe_offsets[trans][m_recv_idx[trans][devid]],
                     work_bufs[trans][devid],
                     pe_counts[trans][m_recv_idx[trans][devid]],
-                    streams->at(devid));
+                    streams->at(devid), ReductionOperator::sum,
+                    GetReductionOperandType<T>::key);
             COLL_CHECK_CUDA(cudaEventRecord(m_ev_comp[trans][devid],
                                             streams->at(devid)));
             // notify prev rank for the recording of comp event if MPI

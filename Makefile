@@ -1,7 +1,7 @@
 cur_dir = $(shell pwd)
 CXXFLAGS += -Wall -Wextra -pedantic -Wshadow -O3 -std=c++11 -fopenmp -g -fPIC -lhwloc -I$(cur_dir)/src -I$(cur_dir)/test
 LIB = -L$(cur_dir) -lallreduce -Wl,-rpath=$(cur_dir) -lrt
-NVCCFLAGS += -arch sm_30 -G
+NVCCFLAGS += -arch sm_30 -I$(cur_dir)/src -I$(cur_dir)/test -std=c++11
 
 # NCCL2 is available at:
 # - ray: /usr/workspace/wsb/brain/nccl2/nccl-2.0.5-3+cuda8.0_ppc64el
