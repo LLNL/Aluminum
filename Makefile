@@ -31,8 +31,8 @@ all: liballreduce.so benchmark_allreduces benchmark_nballreduces benchmark_overl
 liballreduce.so: src/allreduce.cpp src/allreduce_mpi_impl.cpp src/allreduce.hpp src/allreduce_impl.hpp src/allreduce_mempool.hpp src/allreduce_mpi_impl.hpp src/tuning_params.hpp src/allreduce_nccl_impl.hpp $(CUDA_OBJ) $(MPI_CUDA_HEADERS)
 	mpicxx $(CXXFLAGS) -shared -o liballreduce.so src/allreduce.cpp src/allreduce_mpi_impl.cpp
 
-benchmark_allreduces: liballreduce.so benchmark/benchmark_allreduces.cpp src/allreduce_nccl_impl.hpp
-	mpicxx $(CXXFLAGS) $(LIB) -o benchmark_allreduces benchmark/benchmark_allreduces.cpp
+benchmark_allreduces: liballreduce.so benchmark/benchmark_allreduces.cpp src/allreduce_nccl_impl.hpp $(CUDA_OBJ) $(MPI_CUDA_HEADERS)
+	mpicxx $(CXXFLAGS) $(LIB) -o benchmark_allreduces benchmark/benchmark_allreduces.cpp $(CUDA_OBJ) 
 
 benchmark_nballreduces: liballreduce.so benchmark/benchmark_nballreduces.cpp
 	mpicxx $(CXXFLAGS) $(LIB) -o benchmark_nballreduces benchmark/benchmark_nballreduces.cpp
