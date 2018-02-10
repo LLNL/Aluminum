@@ -113,8 +113,24 @@ class CUDAVector {
   }
 
   void allocate() {
+    assert(m_ptr == nullptr);
     if (m_count > 0) {
+#if 0
       CHECK_CUDA(cudaMalloc(&m_ptr, get_bytes()));
+#else
+      cudaError_t e = cudaMalloc(&m_ptr, get_bytes());
+      if (e != cudaSuccess) {
+        
+        size_t free_mem, total_mem;
+        cudaMemGetInfo(&free_mem, &total_mem);
+        std::cerr << "Error allocating "
+                  << get_bytes() << " bytes of memory: "
+                  << cudaGetErrorString(e)
+                  << ", free: " << free_mem << "\n";
+        cudaDeviceReset();
+        abort();
+      }
+#endif
     }
   }
 
