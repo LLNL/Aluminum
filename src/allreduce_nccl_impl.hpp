@@ -160,6 +160,13 @@ class NCCLCommunicator : public MPICommunicator {
     }
   }
 
+  void synchronize() {
+    for (int i = 0; i < m_num_gpus; ++i) {
+      cudaSetDevice(m_gpus[i]);
+      cudaStreamSynchronize(m_streams[i]);
+    }
+  }
+      
 
  private:
 
@@ -189,8 +196,26 @@ class NCCLBackend {
   template <typename T>
   static void Allreduce(const T* sendbuf, T* recvbuf, size_t count,
                         ReductionOperator op, comm_type& comm,
-                        algo_type) {
+                        algo_type algo) {
+    AllreduceRequest req;
+    NonblockingAllreduce(sendbuf, recvbuf, count, op, comm, req, algo);
+    comm.synchronize();
+  }
 
+  template <typename T>
+  static void Allreduce(T* recvbuf, size_t count,
+                        ReductionOperator op, comm_type& comm,
+                        algo_type algo) {
+    Allreduce(internal::IN_PLACE<T>(), recvbuf, count, op, comm, algo);
+  }
+
+  template <typename T>
+  static void NonblockingAllreduce(
+      const T* sendbuf, T* recvbuf, size_t count,
+      ReductionOperator op,
+      comm_type& comm,
+      AllreduceRequest& req,
+      algo_type) {
     ncclDataType_t nccl_type;
     switch(sizeof(T)) {
       case 8:
@@ -229,23 +254,6 @@ class NCCLBackend {
     }
     
     comm.Allreduce((void*) sendbuf, (void*) recvbuf, count, nccl_type, nccl_redop);
-  }
-
-  template <typename T>
-  static void Allreduce(T* recvbuf, size_t count,
-                        ReductionOperator op, comm_type& comm,
-                        algo_type algo) {
-    Allreduce(internal::IN_PLACE<T>(), recvbuf, count, op, comm, algo);
-  }
-
-  template <typename T>
-  static void NonblockingAllreduce(
-      const T* sendbuf, T* recvbuf, size_t count,
-      ReductionOperator op,
-      comm_type& comm,
-      AllreduceRequest& req,
-      algo_type algo) {
-    throw_allreduce_exception("Not implemented");
   }
 
   template <typename T>
