@@ -91,6 +91,7 @@ int main(int argc, char** argv) {
 #endif    
 #ifdef ALUMINUM_HAS_MPI_CUDA    
   } else if (backend == "MPI-CUDA") {
+    set_device();        
     do_benchmark<allreduces::MPICUDABackend>();
 #endif    
   } else {
