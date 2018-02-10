@@ -214,9 +214,9 @@ void NonblockingAllreduce(
 /**
  * Test whether req has completed or not, returning true if it has.
  */
-bool Test(AllreduceRequest req);
+bool Test(AllreduceRequest& req);
 /** Wait until req has been completed. */
-void Wait(AllreduceRequest req);
+void Wait(AllreduceRequest& req);
 
 /**
  * Internal implementations of allreduce.
