@@ -441,8 +441,10 @@ class RingMPICUDA {
       const std::vector<T*> *bufs_l2r,
       const std::vector<T*> *bufs_r2l) {
     // Use the pointer value of the first device as the key for
-    // caching 
-    if (m_ipc_cache_buf == bufs_l2r->front()) {
+    // caching.
+    // Disable caching as the address does not indicate the same
+    // allocation is used
+    if (false && m_ipc_cache_buf == bufs_l2r->front()) {
       // Can reuse the previous mapping
 #ifdef ALUMINUM_MPI_CUDA_DEBUG
       MPIPrintStream(std::cerr, m_pid)() << "Reusing remote buffer mapping\n";
