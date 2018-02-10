@@ -128,7 +128,8 @@ class RingMPICUDA {
   void get_gpu_bufs(size_t count, std::vector<T*> *bufs) {
     size_t real_size = sizeof(T) * count;
     //if (m_trans_dir[R2L]) real_size *= 2;
-    if (!(m_gpu_bufs[L2R].size() > 0 && m_gpu_buf_size >= real_size)) {
+    if (!(m_gpu_bufs[L2R].size() > 0 && m_gpu_buf_size >= real_size
+          && (!m_trans_dir[R2L] || m_gpu_bufs[R2L].size() > 0))) {
 #ifdef ALUMINUM_MPI_CUDA_DEBUG
         MPIPrintStream(std::cerr, m_pid)()
             << "Setting up a new workspace buffer\n";
@@ -164,20 +165,19 @@ class RingMPICUDA {
   }
 
   void free_gpu_bufs() {
-    if (m_gpu_bufs[L2R].size() > 0) {
-      for (int i = 0; i < m_num_gpus; ++i) {
+    for (int dir = 0; dir < 2; ++dir) {
+      if (m_gpu_bufs[dir].size() > 0) {
+        for (int i = 0; i < m_num_gpus; ++i) {
 #ifdef ALUMINUM_MPI_CUDA_DEBUG
-        MPIPrintStream(std::cerr, m_pid)()
-            << "Freeing workspace buffer for device "
-            << m_gpus[i] << "\n";
+          MPIPrintStream(std::cerr, m_pid)()
+              << "Freeing workspace buffer for device "
+              << m_gpus[i] << "\n";
 #endif
-        COLL_CHECK_CUDA(cudaSetDevice(m_gpus[i]));
-        COLL_CHECK_CUDA(cudaFree(m_gpu_bufs[L2R][i]));
-        if (m_trans_dir[R2L])
-          COLL_CHECK_CUDA(cudaFree(m_gpu_bufs[R2L][i]));
+          COLL_CHECK_CUDA(cudaSetDevice(m_gpus[i]));
+          COLL_CHECK_CUDA(cudaFree(m_gpu_bufs[dir][i]));
+        }
+        m_gpu_bufs[dir].clear();
       }
-      m_gpu_bufs[L2R].clear();
-      m_gpu_bufs[R2L].clear();        
     }
   }
 
