@@ -12,6 +12,9 @@ namespace mpi {
 template <typename T>
 inline MPI_Datatype TypeMap();
 template <> inline MPI_Datatype TypeMap<int>() { return MPI_INT; }
+template <> inline MPI_Datatype TypeMap<unsigned int>() { return MPI_UNSIGNED; }
+template <> inline MPI_Datatype TypeMap<long int>() { return MPI_LONG_INT; }
+template <> inline MPI_Datatype TypeMap<long long int>() { return MPI_LONG_LONG_INT; }
 template <> inline MPI_Datatype TypeMap<float>() { return MPI_FLOAT; }
 template <> inline MPI_Datatype TypeMap<double>() { return MPI_DOUBLE; }
 
