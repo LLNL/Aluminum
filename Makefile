@@ -15,7 +15,7 @@ endif
 
 ifeq ($(ENABLE_MPI_CUDA), YES)
 	ENABLE_CUDA = YES
-	CXXFLAGS += -DALUMINUM_HAS_MPI_CUDA -DALUMINUM_MPI_CUDA_DEBUG
+	CXXFLAGS += -DALUMINUM_HAS_MPI_CUDA # -DALUMINUM_MPI_CUDA_DEBUG
 	CUDA_OBJ = src/mpi_cuda/cuda_kernels.o
 	MPI_CUDA_HEADERS = src/allreduce_mpi_cuda_impl.hpp test/test_utils_mpi_cuda.hpp src/mpi_cuda/allreduce.hpp src/mpi_cuda/allreduce_ring.hpp
 endif
