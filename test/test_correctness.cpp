@@ -139,7 +139,14 @@ int main(int argc, char** argv) {
     test_correctness<allreduces::MPICUDABackend>();
 #endif    
   } else {
-    std::cerr << "usage: " << argv[0] << " [MPI | NCCL | MPI-CUDA]\n";
+    std::cerr << "usage: " << argv[0] << " [MPI";
+#ifdef ALUMINUM_HAS_NCCL
+    std::cerr << " | NCCL";
+#endif
+#ifdef ALUMINUM_HAS_MPI_CUDA
+    std::cerr << " | MPI-CUDA";
+#endif
+    std::cerr << "]" << std::endl;
     return -1;
   }
 
