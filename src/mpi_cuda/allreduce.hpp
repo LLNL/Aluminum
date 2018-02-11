@@ -1,6 +1,7 @@
 #pragma once
 
 #include "mpi_cuda/allreduce_ring.hpp"
+#include "mpi_cuda/util.hpp"
 #include <cassert>
 
 namespace allreduces {
@@ -25,7 +26,8 @@ void ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                     ReductionOperator op, MPICUDACommunicator& comm) {
   assert(op == ReductionOperator::sum);
   if (sendbuf != recvbuf) {
-    cudaMemcpy(recvbuf, sendbuf, sizeof(T) * count, cudaMemcpyDefault);
+    COLL_CHECK_CUDA(cudaMemcpy(recvbuf, sendbuf, sizeof(T) * count,
+                               cudaMemcpyDefault));
   }
   comm.get_ring().allreduce<T>({recvbuf}, count, nullptr, false);
 }
@@ -35,33 +37,36 @@ void bi_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                        ReductionOperator op, MPICUDACommunicator& comm) {
   assert(op == ReductionOperator::sum);  
   if (sendbuf != recvbuf) {
-    cudaMemcpy(recvbuf, sendbuf, sizeof(T) * count, cudaMemcpyDefault);
+    COLL_CHECK_CUDA(cudaMemcpy(recvbuf, sendbuf, sizeof(T) * count,
+                               cudaMemcpyDefault));
   }
   comm.get_ring().allreduce<T>({recvbuf}, count, nullptr, true);
 }
 
-// TODO: This is actually blocking
 template <typename T> inline
 void nb_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                        ReductionOperator op, MPICUDACommunicator& comm,
-                       AllreduceRequest&) {
+                       cudaStream_t &stream) {
   assert(op == ReductionOperator::sum);  
   if (sendbuf != recvbuf) {
-    cudaMemcpy(recvbuf, sendbuf, sizeof(T) * count, cudaMemcpyDefault);
+    COLL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, sendbuf, sizeof(T) * count,
+                                    cudaMemcpyDefault, stream));
   }
-  comm.get_ring().allreduce<T>({recvbuf}, count, nullptr, false);
+  std::vector<cudaStream_t> streams = {stream};
+  comm.get_ring().allreduce<T>({recvbuf}, count, &streams, false);
 }
 
-// TODO: This is actually blocking
 template <typename T> inline
 void nb_bi_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                           ReductionOperator op, MPICUDACommunicator& comm,
-                          AllreduceRequest&) {
+                          cudaStream_t &stream) {
   assert(op == ReductionOperator::sum);  
   if (sendbuf != recvbuf) {
-    cudaMemcpy(recvbuf, sendbuf, sizeof(T) * count, cudaMemcpyDefault);
+    COLL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, sendbuf, sizeof(T) * count,
+                                    cudaMemcpyDefault, stream));
   }
-  comm.get_ring().allreduce<T>({recvbuf}, count, nullptr, true);
+  std::vector<cudaStream_t> streams = {stream};  
+  comm.get_ring().allreduce<T>({recvbuf}, count, &streams, true);
 }
 
 

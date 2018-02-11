@@ -136,3 +136,13 @@ bool check_vector(const std::vector<float>& expected,
   }
   return match;
 }
+
+template <typename Backend>
+typename Backend::req_type get_request();
+
+template <>
+inline typename allreduces::MPIBackend::req_type
+get_request<allreduces::MPIBackend>() {
+  int req = 0;
+  return req;
+}

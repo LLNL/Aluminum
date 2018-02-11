@@ -51,8 +51,10 @@ class NCCLCommunicator : public MPICommunicator {
 
   /// It is assumed that both sendbuf and recvbuf are in device memory
   /// for NCCL sendbuf and recvbuf can be identical; in-place operation will be performed
-  void Allreduce(void* sendbuf, void* recvbuf, size_t count, ncclDataType_t nccl_type,
-                 ncclRedOp_t nccl_redop) {
+  void Allreduce(void* sendbuf, void* recvbuf, size_t count,
+                 ncclDataType_t nccl_type,
+                 ncclRedOp_t nccl_redop,
+                 cudaStream_t stream) {
 
     if(count == 0) return;
     int num_gpus_assigned = m_gpus.size();
@@ -60,7 +62,7 @@ class NCCLCommunicator : public MPICommunicator {
     if(num_gpus_assigned > 1) ncclGroupStart();
     for(int i = 0; i < num_gpus_assigned; ++i) {
       CUDACHECK(cudaSetDevice(m_gpus[i]));
-      NCCLCHECK(ncclAllReduce(sendbuf, recvbuf, count, nccl_type, nccl_redop, m_nccl_comm[i], m_streams[i]));
+      NCCLCHECK(ncclAllReduce(sendbuf, recvbuf, count, nccl_type, nccl_redop, m_nccl_comm[i], stream));
     }
     if(num_gpus_assigned > 1) ncclGroupEnd();
 
@@ -126,7 +128,10 @@ class NCCLCommunicator : public MPICommunicator {
       cudaStreamSynchronize(m_streams[i]);
     }
   }
-      
+
+  cudaStream_t get_default_stream() {
+    return m_streams[0];
+  }
 
  private:
 
@@ -152,13 +157,15 @@ class NCCLBackend {
  public:
   using algo_type = NCCLAllreduceAlgorithm;
   using comm_type = NCCLCommunicator;
+  using req_type = cudaStream_t;
 
   template <typename T>
   static void Allreduce(const T* sendbuf, T* recvbuf, size_t count,
                         ReductionOperator op, comm_type& comm,
                         algo_type algo) {
-    AllreduceRequest req;
-    NonblockingAllreduce(sendbuf, recvbuf, count, op, comm, req, algo);
+    cudaStream_t default_stream = comm.get_default_stream();
+    NonblockingAllreduce(sendbuf, recvbuf, count, op, comm,
+                         default_stream, algo);
     comm.synchronize();
   }
 
@@ -174,7 +181,7 @@ class NCCLBackend {
       const T* sendbuf, T* recvbuf, size_t count,
       ReductionOperator op,
       comm_type& comm,
-      AllreduceRequest& req,
+      req_type& req,
       algo_type) {
     ncclDataType_t nccl_type;
     switch(sizeof(T)) {
@@ -213,19 +220,31 @@ class NCCLBackend {
       sendbuf = recvbuf;
     }
     
-    comm.Allreduce((void*) sendbuf, (void*) recvbuf, count, nccl_type, nccl_redop);
+    comm.Allreduce((void*) sendbuf, (void*) recvbuf, count,
+                   nccl_type, nccl_redop, req);
   }
 
   template <typename T>
   static void NonblockingAllreduce(
       T* recvbuf, size_t count,
       ReductionOperator op, comm_type& comm,
-      AllreduceRequest& req,
+      req_type& req,
       algo_type algo) {
     NonblockingAllreduce(internal::IN_PLACE<T>(), recvbuf, count, op, comm,
                          req, algo);
   }
 
 };
+
+template <>
+inline bool Test<NCCLBackend>(typename NCCLBackend::req_type& req) {
+  return cudaStreamQuery(req) == cudaSuccess;
+}
+
+template <>
+inline void Wait<NCCLBackend>(typename NCCLBackend::req_type& req) {
+  cudaStreamSynchronize(req);
+}
+
 
 }  // namespace allreduces

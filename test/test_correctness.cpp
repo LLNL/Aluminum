@@ -53,13 +53,13 @@ void test_nb_allreduce_algo(const typename VectorType<Backend>::type& expected,
                             typename VectorType<Backend>::type input,
                             typename Backend::comm_type& comm,
                             typename Backend::algo_type algo) {
-  allreduces::AllreduceRequest req;
+  typename Backend::req_type req = get_request<Backend>();
   auto recv = get_vector<Backend>(input.size());
   // Test regular allreduce.
   allreduces::NonblockingAllreduce<Backend>(input.data(), recv.data(), input.size(),
                                             allreduces::ReductionOperator::sum, comm,
                                             req, algo);
-  allreduces::Wait(req);
+  allreduces::Wait<Backend>(req);
   if (!check_vector(expected, recv)) {
     std::cout << comm.rank() << ": regular allreduce does not match" <<
       std::endl;
@@ -68,7 +68,7 @@ void test_nb_allreduce_algo(const typename VectorType<Backend>::type& expected,
   allreduces::NonblockingAllreduce<Backend>(input.data(), input.size(),
                                             allreduces::ReductionOperator::sum, comm,
                                             req, algo);
-  allreduces::Wait(req);
+  allreduces::Wait<Backend>(req);
   if (!check_vector(expected, input)) {
     std::cout << comm.rank() << ": in-place allreduce does not match" <<
       std::endl;

@@ -31,9 +31,16 @@ template <>
 std::vector<typename allreduces::MPICUDABackend::algo_type>
 get_nb_allreduce_algorithms<allreduces::MPICUDABackend>() {
   std::vector<typename allreduces::MPICUDABackend::algo_type> algos = {
-    //    allreduces::MPICUDABackend::algo_type::automatic,
-    //    allreduces::MPICUDABackend::algo_type::ring,
-    //    allreduces::MPICUDABackend::algo_type::bi_ring
+    allreduces::MPICUDABackend::algo_type::ring,
+    allreduces::MPICUDABackend::algo_type::bi_ring
   };
   return algos;
+}
+
+template <>
+inline typename allreduces::MPICUDABackend::req_type
+get_request<allreduces::MPICUDABackend>() {
+  cudaStream_t s;
+  cudaStreamCreate(&s);
+  return s;
 }

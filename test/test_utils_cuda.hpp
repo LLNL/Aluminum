@@ -186,5 +186,3 @@ void get_expected_result(CUDAVector<float>& expected) {
                 MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
   expected.copyin(host_data);
 }
-
-

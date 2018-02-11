@@ -17,10 +17,9 @@ gen_data<allreduces::NCCLBackend>(size_t count) {
 }
 
 template <>
-std::vector<typename allreduces::NCCLBackend::algo_type>
-get_nb_allreduce_algorithms<allreduces::NCCLBackend>() {
-  // NCCLBackend does not have non-blocking interface implemented
-  std::vector<typename allreduces::NCCLBackend::algo_type> algos = {};
-  return algos;
+inline typename allreduces::NCCLBackend::req_type
+get_request<allreduces::NCCLBackend>() {
+  cudaStream_t s;
+  cudaStreamCreate(&s);
+  return s;
 }
-
