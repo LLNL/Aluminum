@@ -24,6 +24,16 @@
 
 namespace allreduces {
 
+/** Predefined communicator types. */
+enum class CommunicatorType {
+  mpi, nccl
+};
+
+/** Predefined reduction operations. */
+enum class ReductionOperator {
+  sum, prod, min, max
+};
+
 /**
  * Base allreduce exception class.
  */
@@ -75,6 +85,8 @@ class Communicator {
   virtual int rank() const = 0;
   /** Return the number of processes in the communicator. */
   virtual int size() const = 0;
+
+  virtual CommunicatorType get_comm_type();
 };
 
 /**
@@ -107,6 +119,8 @@ class MPICommunicator : public Communicator {
   int local_size() const { return size_of_local_comm; }
   MPI_Comm get_local_comm() const { return local_comm; }
   int get_free_tag() { return free_tag++; }
+  
+  CommunicatorType get_comm_type() { return CommunicatorType::mpi; }
  private:
   /** Associated MPI communicator. */
   MPI_Comm comm;
@@ -122,11 +136,6 @@ class MPICommunicator : public Communicator {
   int size_of_local_comm;
   /** Free tag for communication. */
   int free_tag = 1;
-};
-
-/** Predefined reduction operations. */
-enum class ReductionOperator {
-  sum, prod, min, max
 };
 
 /** Request handle for non-blocking allreduces. */
