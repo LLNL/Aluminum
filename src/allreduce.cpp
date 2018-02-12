@@ -44,16 +44,6 @@ bool Initialized() {
   return is_initialized;
 }
 
-bool Test(AllreduceRequest& req) {
-  internal::ProgressEngine* pe = internal::get_progress_engine();
-  return pe->is_complete(req);
-}
-
-void Wait(AllreduceRequest& req) {
-  internal::ProgressEngine* pe = internal::get_progress_engine();
-  pe->wait_for_completion(req);
-}
-
 namespace internal {
 
 AllreduceRequest get_free_request() {

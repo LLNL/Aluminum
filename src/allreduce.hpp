@@ -100,9 +100,6 @@ class MPICommunicator : public Communicator {
   int free_tag = 1;
 };
 
-/** Request handle for non-blocking allreduces. */
-using AllreduceRequest = int;  // TODO: This is a placeholder.
-
 /**
  * Supported allreduce algorithms.
  * This is used for requesting a particular algorithm. Use automatic to let the
@@ -194,7 +191,7 @@ void NonblockingAllreduce(
   const T* sendbuf, T* recvbuf, size_t count,
   ReductionOperator op,
   typename Backend::comm_type& comm,
-  AllreduceRequest& req,
+  typename Backend::req_type& req,
   typename Backend::algo_type algo = Backend::algo_type::automatic) {
   Backend::template NonblockingAllreduce<T>(sendbuf, recvbuf, count, op,
                                             comm, req, algo);
@@ -205,7 +202,7 @@ void NonblockingAllreduce(
   T* recvbuf, size_t count,
   ReductionOperator op,
   typename Backend::comm_type& comm,
-  AllreduceRequest& req,
+  typename Backend::req_type& req,
   typename Backend::algo_type algo = Backend::algo_type::automatic) {
   Backend::template NonblockingAllreduce<T>(recvbuf, count, op,
                                             comm, req, algo);
@@ -214,9 +211,12 @@ void NonblockingAllreduce(
 /**
  * Test whether req has completed or not, returning true if it has.
  */
-bool Test(AllreduceRequest& req);
+template <typename Backend>
+bool Test(typename Backend::req_type& req);
 /** Wait until req has been completed. */
-void Wait(AllreduceRequest& req);
+template <typename Backend>
+void Wait(typename Backend::req_type& req);
+
 
 /**
  * Internal implementations of allreduce.
@@ -238,6 +238,9 @@ T* get_memory(size_t count);
 /** Release memory that you got with get_memory. */
 template <typename T>
 void release_memory(T* mem);
+
+/** Request handle for non-blocking allreduces. */
+using AllreduceRequest = int;  // TODO: This is a placeholder.
 
 /** Return a free allreduce request for use. */
 AllreduceRequest get_free_request();

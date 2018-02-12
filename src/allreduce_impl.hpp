@@ -7,6 +7,7 @@ class MPIBackend {
  public:
   using algo_type = AllreduceAlgorithm;
   using comm_type = MPICommunicator;
+  using req_type = int;
 
   template <typename T>
   static void Allreduce(const T* sendbuf, T* recvbuf, size_t count,
@@ -56,7 +57,7 @@ class MPIBackend {
       const T* sendbuf, T* recvbuf, size_t count,
       ReductionOperator op,
       comm_type& comm,
-      AllreduceRequest& req,
+      req_type& req,
       algo_type algo) {
     if (algo == AllreduceAlgorithm::automatic) {
       // TODO: Better algorithm selection/performance model.
@@ -95,12 +96,24 @@ class MPIBackend {
   static void NonblockingAllreduce(
       T* recvbuf, size_t count,
       ReductionOperator op, comm_type& comm,
-      AllreduceRequest& req,
+      req_type& req,
       algo_type algo) {
     NonblockingAllreduce(internal::IN_PLACE<T>(), recvbuf, count, op, comm,
                          req, algo);
   }
 };
+
+template <>
+inline bool Test<MPIBackend>(typename MPIBackend::req_type& req) {
+  internal::ProgressEngine* pe = internal::get_progress_engine();
+  return pe->is_complete(req);
+}
+
+template <>
+inline void Wait<MPIBackend>(typename MPIBackend::req_type& req) {
+  internal::ProgressEngine* pe = internal::get_progress_engine();
+  pe->wait_for_completion(req);
+}
 
 }  // namespace allreduces
 

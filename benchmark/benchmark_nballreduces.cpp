@@ -28,20 +28,20 @@ void time_allreduce_algo(typename VectorType<Backend>::type input,
   for (size_t trial = 0; trial < num_trials + 1; ++trial) {
     auto recv = get_vector<Backend>(input.size());
     auto in_place_input(input);    
-    allreduces::AllreduceRequest req;
+    typename Backend::req_type req = get_request<Backend>();
     MPI_Barrier(MPI_COMM_WORLD);
     double start = get_time();
     allreduces::NonblockingAllreduce<Backend>(
         input.data(), recv.data(), input.size(),
         allreduces::ReductionOperator::sum, comm, req, algo);
-    allreduces::Wait(req);
+    allreduces::Wait<Backend>(req);
     times.push_back(get_time() - start);
     MPI_Barrier(MPI_COMM_WORLD);
     start = get_time();
     allreduces::NonblockingAllreduce<Backend>(
         in_place_input.data(), input.size(),
         allreduces::ReductionOperator::sum, comm, req, algo);
-    allreduces::Wait(req);
+    allreduces::Wait<Backend>(req);
     in_place_times.push_back(get_time() - start);
   }
   // Delete warmup trial.

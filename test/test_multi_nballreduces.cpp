@@ -24,7 +24,7 @@ int main(int argc, char** argv) {
       }
     }
   }
-  std::vector<allreduces::AllreduceRequest> reqs(sizes.size());
+  std::vector<typename allreduces::MPIBackend::req_type> reqs(sizes.size());
   std::vector<std::vector<float>> input_data(sizes.size());
   std::vector<std::vector<float>> expected_data(sizes.size());
   for (size_t i = 0; i < sizes.size(); ++i) {
@@ -44,7 +44,7 @@ int main(int argc, char** argv) {
   }
   for (size_t i = 0; i < sizes.size(); ++i) {
     //size_t size = sizes[i];
-    allreduces::Wait(reqs[i]);
+    allreduces::Wait<allreduces::MPIBackend>(reqs[i]);
     //if (comm.rank() == 0) std::cout << comm.rank() << ": size=" << size << std::endl;
     if (!check_vector(expected_data[i], input_data[i])) {
       std::cout << comm.rank() << ": allreduce doesn't match" << std::endl;

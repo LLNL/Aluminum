@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <assert.h>
 #include <cuda_runtime.h>
 #include "test_utils.hpp"
 
@@ -32,6 +33,7 @@ int get_number_of_gpus() {
 int get_local_rank() {
   char *env = getenv("MV2_COMM_WORLD_LOCAL_RANK");
   if (!env) env = getenv("OMPI_COMM_WORLD_LOCAL_RANK");
+  if (!env) env = getenv("SLURM_LOCALID");
   if (!env) {
     std::cerr << "Can't determine local rank\n";
     abort();
@@ -42,6 +44,7 @@ int get_local_rank() {
 int get_local_size() {
   char *env = getenv("MV2_COMM_WORLD_LOCAL_SIZE");
   if (!env) env = getenv("OMPI_COMM_WORLD_LOCAL_SIZE");
+  if (!env) env = getenv("SLURM_NTASKS_PER_NODE");
   if (!env) {
     std::cerr << "Can't determine local size\n";
     abort();
@@ -186,5 +189,3 @@ void get_expected_result(CUDAVector<float>& expected) {
                 MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
   expected.copyin(host_data);
 }
-
-

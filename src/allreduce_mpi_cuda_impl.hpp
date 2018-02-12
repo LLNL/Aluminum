@@ -6,7 +6,6 @@ namespace allreduces {
 
 enum class MPICUDAAllreduceAlgorithm {
   automatic,
-  // TODO: unidirectional ring does not work; will fix
   ring, 
   bi_ring
 };
@@ -28,6 +27,7 @@ class MPICUDABackend {
  public:
   using algo_type = MPICUDAAllreduceAlgorithm;
   using comm_type = internal::mpi_cuda::MPICUDACommunicator;
+  using req_type = cudaStream_t;
 
   template <typename T>
   static void Allreduce(const T* sendbuf, T* recvbuf, size_t count,
@@ -59,13 +59,14 @@ class MPICUDABackend {
       const T* sendbuf, T* recvbuf, size_t count,
       ReductionOperator op,
       comm_type& comm,
-      AllreduceRequest& req,
+      req_type& req,
       algo_type algo) {
     switch (algo) {
       case MPICUDAAllreduceAlgorithm::ring:
         internal::mpi_cuda::nb_ring_allreduce(sendbuf, recvbuf, count,
                                               op, comm, req);
         break;
+      case MPICUDAAllreduceAlgorithm::automatic:        
       case MPICUDAAllreduceAlgorithm::bi_ring:
         internal::mpi_cuda::nb_bi_ring_allreduce(sendbuf, recvbuf, count,
                                                  op, comm, req);
@@ -79,12 +80,22 @@ class MPICUDABackend {
   static void NonblockingAllreduce(
       T* recvbuf, size_t count,
       ReductionOperator op, comm_type& comm,
-      AllreduceRequest& req,
+      req_type& req,
       algo_type algo) {
-    NonblockingAllreduce(internal::IN_PLACE<T>(), recvbuf, count, op, comm,
+    NonblockingAllreduce(recvbuf, recvbuf, count, op, comm,
                          req, algo);
   }
 
 };
+
+template <>
+inline bool Test<MPICUDABackend>(typename MPICUDABackend::req_type& req) {
+  return cudaStreamQuery(req) == cudaSuccess;
+}
+
+template <>
+inline void Wait<MPICUDABackend>(typename MPICUDABackend::req_type& req) {
+  cudaStreamSynchronize(req);
+}
 
 } // namespace allreduces
