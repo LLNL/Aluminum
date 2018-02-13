@@ -5,7 +5,6 @@
 #pragma once
 
 #include <iostream>
-#include <exception>
 #include <limits>
 #include <functional>
 #include <vector>
@@ -20,6 +19,7 @@
 #include <algorithm>
 #include <mpi.h>
 
+#include "allreduce_base.hpp"
 #include "tuning_params.hpp"
 
 namespace allreduces {
@@ -33,30 +33,6 @@ enum class CommunicatorType {
 enum class ReductionOperator {
   sum, prod, min, max
 };
-
-/**
- * Base allreduce exception class.
- */
-class allreduce_exception : public std::exception {
- public:
-  allreduce_exception(const std::string m, const std::string f, const int l) :
-    msg(m), file(f), line(l) {
-    err = file + ":" + std::to_string(line) + " - " + msg;
-  }
-  const char* what() const noexcept override {
-    return err.c_str();
-  }
-private:
-  /** Exception message. */
-  const std::string msg;
-  /** File exception occurred in. */
-  const std::string file;
-  /** Line exception occurred at. */
-  const int line;
-  /** Constructed error message. */
-  std::string err;
-};
-#define throw_allreduce_exception(s) throw allreduce_exception(s, __FILE__, __LINE__)
 
 /**
  * Abstract base class for all communicator objects.
@@ -137,9 +113,6 @@ class MPICommunicator : public Communicator {
   /** Free tag for communication. */
   int free_tag = 1;
 };
-
-/** Request handle for non-blocking allreduces. */
-using AllreduceRequest = int;  // TODO: This is a placeholder.
 
 /**
  * Supported allreduce algorithms.
@@ -232,7 +205,7 @@ void NonblockingAllreduce(
   const T* sendbuf, T* recvbuf, size_t count,
   ReductionOperator op,
   typename Backend::comm_type& comm,
-  AllreduceRequest& req,
+  typename Backend::req_type& req,
   typename Backend::algo_type algo = Backend::algo_type::automatic) {
   Backend::template NonblockingAllreduce<T>(sendbuf, recvbuf, count, op,
                                             comm, req, algo);
@@ -243,7 +216,7 @@ void NonblockingAllreduce(
   T* recvbuf, size_t count,
   ReductionOperator op,
   typename Backend::comm_type& comm,
-  AllreduceRequest& req,
+  typename Backend::req_type& req,
   typename Backend::algo_type algo = Backend::algo_type::automatic) {
   Backend::template NonblockingAllreduce<T>(recvbuf, count, op,
                                             comm, req, algo);
@@ -252,9 +225,12 @@ void NonblockingAllreduce(
 /**
  * Test whether req has completed or not, returning true if it has.
  */
-bool Test(AllreduceRequest req);
+template <typename Backend>
+bool Test(typename Backend::req_type& req);
 /** Wait until req has been completed. */
-void Wait(AllreduceRequest req);
+template <typename Backend>
+void Wait(typename Backend::req_type& req);
+
 
 /**
  * Internal implementations of allreduce.
@@ -276,6 +252,9 @@ T* get_memory(size_t count);
 /** Release memory that you got with get_memory. */
 template <typename T>
 void release_memory(T* mem);
+
+/** Request handle for non-blocking allreduces. */
+using AllreduceRequest = int;  // TODO: This is a placeholder.
 
 /** Return a free allreduce request for use. */
 AllreduceRequest get_free_request();
@@ -462,4 +441,7 @@ void pe_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
 
 #ifdef ALUMINUM_HAS_NCCL
 #include "allreduce_nccl_impl.hpp"
+#endif
+#ifdef ALUMINUM_HAS_MPI_CUDA
+#include "allreduce_mpi_cuda_impl.hpp"
 #endif

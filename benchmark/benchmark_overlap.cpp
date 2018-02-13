@@ -32,7 +32,7 @@ void time_allreduce_algo(std::vector<float> input,
   for (size_t trial = 0; trial < num_trials + 1; ++trial) {
     std::vector<float> recv(input.size());
     std::vector<float> in_place_input(input);
-    allreduces::AllreduceRequest req;
+    typename Backend::req_type req = get_request<Backend>();
     MPI_Barrier(MPI_COMM_WORLD);
     double start = get_time();
     allreduces::NonblockingAllreduce<Backend>(
@@ -41,7 +41,7 @@ void time_allreduce_algo(std::vector<float> input,
     double init_time = get_time();
     std::this_thread::sleep_for(std::chrono::duration<double>(sleep_time));
     double asleep_time = get_time();
-    allreduces::Wait(req);
+    allreduces::Wait<Backend>(req);
     double end_time = get_time();
     // Because of scheduling issues, use the actual time asleep, not
     // sleep_time, which underestimates.
@@ -55,7 +55,7 @@ void time_allreduce_algo(std::vector<float> input,
     init_time = get_time();
     std::this_thread::sleep_for(std::chrono::duration<double>(sleep_time));
     asleep_time = get_time();
-    allreduces::Wait(req);
+    allreduces::Wait<Backend>(req);
     end_time = get_time();
     actual_sleep_time = asleep_time - init_time;
     in_place_times.push_back(std::max(end_time - start - actual_sleep_time, 0.0));

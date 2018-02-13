@@ -4,6 +4,11 @@ namespace allreduces {
 namespace internal {
 namespace mpi {
 
+namespace {
+// Whether we initialized MPI, or it was already initialized.
+bool initialized_mpi = false;
+}
+
 void init(int& argc, char**& argv) {
   int flag;
   MPI_Initialized(&flag);
@@ -13,13 +18,14 @@ void init(int& argc, char**& argv) {
     if (provided != MPI_THREAD_MULTIPLE) {
       throw_allreduce_exception("MPI_THREAD_MULTIPLE not provided");
     }
+    initialized_mpi = true;
   }
 }
 
 void finalize() {
   int flag;
   MPI_Finalized(&flag);
-  if (!flag) {
+  if (!flag && initialized_mpi) {
     MPI_Finalize();
   }
 }

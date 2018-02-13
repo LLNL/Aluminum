@@ -1,8 +1,11 @@
 #include <iostream>
 #include "allreduce.hpp"
 #include "test_utils.hpp"
-#ifdef ALUMINUM_HAS_CUDA
-#include "test_utils_cuda.hpp"
+#ifdef ALUMINUM_HAS_NCCL
+#include "test_utils_nccl.hpp"
+#endif
+#ifdef ALUMINUM_HAS_MPI_CUDA
+#include "test_utils_mpi_cuda.hpp"
 #endif
 
 const size_t max_size = 1<<30;
@@ -84,10 +87,16 @@ int main(int argc, char** argv) {
     do_benchmark<allreduces::MPIBackend>();
 #ifdef ALUMINUM_HAS_NCCL    
   } else if (backend == "NCCL") {
+    set_device();        
     do_benchmark<allreduces::NCCLBackend>();
 #endif    
+#ifdef ALUMINUM_HAS_MPI_CUDA    
+  } else if (backend == "MPI-CUDA") {
+    set_device();        
+    do_benchmark<allreduces::MPICUDABackend>();
+#endif    
   } else {
-    std::cerr << "usage: " << argv[0] << " [MPI | NCCL]\n";
+    std::cerr << "usage: " << argv[0] << " [MPI | NCCL | MPI-CUDA]\n";
     return -1;
   }
 

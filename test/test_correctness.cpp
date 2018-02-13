@@ -1,8 +1,11 @@
 #include <iostream>
 #include "allreduce.hpp"
 #include "test_utils.hpp"
-#ifdef ALUMINUM_HAS_CUDA
-#include "test_utils_cuda.hpp"
+#ifdef ALUMINUM_HAS_NCCL
+#include "test_utils_nccl.hpp"
+#endif
+#ifdef ALUMINUM_HAS_MPI_CUDA
+#include "test_utils_mpi_cuda.hpp"
 #endif
 
 #include <stdlib.h>
@@ -30,7 +33,8 @@ void test_allreduce_algo(const typename VectorType<Backend>::type& expected,
                                  allreduces::ReductionOperator::sum, comm, algo);
   if (!check_vector(expected, recv)) {
     std::cout << comm.rank() << ": regular allreduce does not match" <<
-      std::endl;
+        std::endl;
+    std::abort();
   }
   // Test in-place allreduce.
   allreduces::Allreduce<Backend>(input.data(), input.size(),
@@ -49,13 +53,13 @@ void test_nb_allreduce_algo(const typename VectorType<Backend>::type& expected,
                             typename VectorType<Backend>::type input,
                             typename Backend::comm_type& comm,
                             typename Backend::algo_type algo) {
-  allreduces::AllreduceRequest req;
+  typename Backend::req_type req = get_request<Backend>();
   auto recv = get_vector<Backend>(input.size());
   // Test regular allreduce.
   allreduces::NonblockingAllreduce<Backend>(input.data(), recv.data(), input.size(),
                                             allreduces::ReductionOperator::sum, comm,
                                             req, algo);
-  allreduces::Wait(req);
+  allreduces::Wait<Backend>(req);
   if (!check_vector(expected, recv)) {
     std::cout << comm.rank() << ": regular allreduce does not match" <<
       std::endl;
@@ -64,7 +68,7 @@ void test_nb_allreduce_algo(const typename VectorType<Backend>::type& expected,
   allreduces::NonblockingAllreduce<Backend>(input.data(), input.size(),
                                             allreduces::ReductionOperator::sum, comm,
                                             req, algo);
-  allreduces::Wait(req);
+  allreduces::Wait<Backend>(req);
   if (!check_vector(expected, input)) {
     std::cout << comm.rank() << ": in-place allreduce does not match" <<
       std::endl;
@@ -126,10 +130,23 @@ int main(int argc, char** argv) {
     test_correctness<allreduces::MPIBackend>();
 #ifdef ALUMINUM_HAS_NCCL
   } else if (backend == "NCCL") {
+    set_device();
     test_correctness<allreduces::NCCLBackend>();
 #endif
+#ifdef ALUMINUM_HAS_MPI_CUDA
+  } else if (backend == "MPI-CUDA") {
+    set_device();    
+    test_correctness<allreduces::MPICUDABackend>();
+#endif    
   } else {
-    std::cerr << "usage: " << argv[0] << " [MPI | NCCL]\n";
+    std::cerr << "usage: " << argv[0] << " [MPI";
+#ifdef ALUMINUM_HAS_NCCL
+    std::cerr << " | NCCL";
+#endif
+#ifdef ALUMINUM_HAS_MPI_CUDA
+    std::cerr << " | MPI-CUDA";
+#endif
+    std::cerr << "]" << std::endl;
     return -1;
   }
 
