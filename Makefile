@@ -8,18 +8,18 @@ NVCCFLAGS += -arch sm_30 -I$(cur_dir)/src -I$(cur_dir)/test -std=c++11
 # - ray: /usr/workspace/wsb/brain/nccl2/nccl_2.0.5-3+cuda8.0_ppc64el
 # - surface: /usr/workspace/wsb/brain/nccl2/nccl-2.0.5+cuda8.0
 ifeq ($(shell hostname|grep ray -c), 1)
-	ENABLE_CUDA = YES
-	loadcuda = $(shell module load cuda/8.0)
-	NCCL_DIR = /usr/workspace/wsb/brain/nccl2/nccl_2.0.5-3+cuda8.0_ppc64el
-	CXXFLAGS += -I$(NCCL_DIR)/include  -DALUMINUM_HAS_NCCL
-	LIB += -L$(NCCL_DIR)/lib -lnccl -Wl,-rpath=$(NCCL_DIR)/lib
+	#ENABLE_CUDA = YES
+	#loadcuda = $(shell module load cuda/8.0)
+	#NCCL_DIR = /usr/workspace/wsb/brain/nccl2/nccl_2.0.5-3+cuda8.0_ppc64el
+	#CXXFLAGS += -I$(NCCL_DIR)/include  -DALUMINUM_HAS_NCCL
+	#LIB += -L$(NCCL_DIR)/lib -lnccl -Wl,-rpath=$(NCCL_DIR)/lib
 endif
 ifeq ($(shell hostname|grep surface -c), 1)
-	ENABLE_CUDA = YES
-	loadcuda = $(shell module load cuda/8.0)
-	NCCL_DIR = /usr/workspace/wsb/brain/nccl2/nccl-2.0.5+cuda8.0
-	CXXFLAGS += -I$(NCCL_DIR)/include  -DALUMINUM_HAS_NCCL
-	LIB += -L$(NCCL_DIR)/lib -lnccl -Wl,-rpath=$(NCCL_DIR)/lib
+	#ENABLE_CUDA = YES
+	#loadcuda = $(shell module load cuda/8.0)
+	#NCCL_DIR = /usr/workspace/wsb/brain/nccl2/nccl-2.0.5+cuda8.0
+	#CXXFLAGS += -I$(NCCL_DIR)/include  -DALUMINUM_HAS_NCCL
+	#LIB += -L$(NCCL_DIR)/lib -lnccl -Wl,-rpath=$(NCCL_DIR)/lib
 endif
 
 ifeq ($(ENABLE_MPI_CUDA), YES)
@@ -37,10 +37,10 @@ endif
 
 all: liballreduce.so benchmark_allreduces benchmark_nballreduces benchmark_overlap benchmark_reductions test_correctness test_multi_nballreduces
 
-liballreduce.so: src/allreduce.cpp src/allreduce_mpi_impl.cpp src/allreduce.hpp src/allreduce_impl.hpp src/allreduce_mempool.hpp src/allreduce_mpi_impl.hpp src/tuning_params.hpp src/allreduce_nccl_impl.hpp src/allreduce_nccl_impl.cpp
-	mpicxx $(CXXFLAGS) -shared -o liballreduce.so src/allreduce.cpp src/allreduce_mpi_impl.cpp src/allreduce_nccl_impl.cpp
+liballreduce.so: src/allreduce.cpp src/allreduce_mpi_impl.cpp src/allreduce.hpp src/allreduce_impl.hpp src/allreduce_mempool.hpp src/allreduce_mpi_impl.hpp src/tuning_params.hpp
+	mpicxx $(CXXFLAGS) -shared -o liballreduce.so src/allreduce.cpp src/allreduce_mpi_impl.cpp
 
-benchmark_allreduces: liballreduce.so benchmark/benchmark_allreduces.cpp src/allreduce_nccl_impl.hpp $(CUDA_OBJ) $(MPI_CUDA_HEADERS)
+benchmark_allreduces: liballreduce.so benchmark/benchmark_allreduces.cpp  $(CUDA_OBJ) $(MPI_CUDA_HEADERS)
 	mpicxx $(CXXFLAGS) $(LIB) -o benchmark_allreduces benchmark/benchmark_allreduces.cpp $(CUDA_OBJ) 
 
 benchmark_nballreduces: liballreduce.so benchmark/benchmark_nballreduces.cpp
