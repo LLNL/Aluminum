@@ -1,3 +1,4 @@
+#ifdef ALUMINUM_HAS_NCCL
 #include "allreduce_nccl_impl.hpp"
 
 namespace allreduces {
@@ -129,4 +130,4 @@ void NCCLCommunicator::Allreduce(void* sendbuf, void* recvbuf, size_t count, ncc
 }
 
 }
-
+#endif

@@ -31,7 +31,6 @@ enum class CommunicatorType {
 };
 */
 
-/** Predefined reduction operations. */
 /*
 enum class ReductionOperator {
   sum, prod, min, max
