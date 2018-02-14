@@ -7,27 +7,26 @@ NVCCFLAGS += -arch sm_30 -I$(cur_dir)/src -I$(cur_dir)/test -std=c++11
 # NOTE: The current NCCL 2 we have is based on cuda 8.0
 # - ray: /usr/workspace/wsb/brain/nccl2/nccl_2.0.5-3+cuda8.0_ppc64el
 # - surface: /usr/workspace/wsb/brain/nccl2/nccl-2.0.5+cuda8.0
-ifeq ($(shell hostname|grep ray -c), 1)
-	#ENABLE_CUDA = YES
-	#loadcuda = $(shell module load cuda/8.0)
-	#NCCL_DIR = /usr/workspace/wsb/brain/nccl2/nccl_2.0.5-3+cuda8.0_ppc64el
-	#CXXFLAGS += -I$(NCCL_DIR)/include  -DALUMINUM_HAS_NCCL
-	#LIB += -L$(NCCL_DIR)/lib -lnccl -Wl,-rpath=$(NCCL_DIR)/lib
-endif
-ifeq ($(shell hostname|grep surface -c), 1)
-	#ENABLE_CUDA = YES
-	#loadcuda = $(shell module load cuda/8.0)
-	#NCCL_DIR = /usr/workspace/wsb/brain/nccl2/nccl-2.0.5+cuda8.0
-	#CXXFLAGS += -I$(NCCL_DIR)/include  -DALUMINUM_HAS_NCCL
-	#LIB += -L$(NCCL_DIR)/lib -lnccl -Wl,-rpath=$(NCCL_DIR)/lib
+ifeq ($(ENABLE_NCCL_CUDA), YES)
+	ENABLE_CUDA = YES
+	ifeq ($(shell hostname|grep surface -c), 1)
+		NCCL_DIR = /usr/workspace/wsb/brain/nccl2/nccl-2.0.5+cuda8.0
+  	else
+  		ifeq ($(shell hostname|grep ray -c), 1)
+			NCCL_DIR = /usr/workspace/wsb/brain/nccl2/nccl_2.0.5-3+cuda8.0_ppc64el
+ 		endif
+ 	endif
+	CXXFLAGS += -I$(NCCL_DIR)/include  -DALUMINUM_HAS_NCCL
+	LIB += -L$(NCCL_DIR)/lib -lnccl -Wl,-rpath=$(NCCL_DIR)/lib
+else
+	ifeq ($(ENABLE_MPI_CUDA), YES)
+		ENABLE_CUDA = YES
+		CXXFLAGS += -DALUMINUM_HAS_MPI_CUDA # -DALUMINUM_MPI_CUDA_DEBUG
+		CUDA_OBJ = src/mpi_cuda/cuda_kernels.o
+		MPI_CUDA_HEADERS = src/allreduce_mpi_cuda_impl.hpp test/test_utils_mpi_cuda.hpp src/mpi_cuda/allreduce.hpp src/mpi_cuda/allreduce_ring.hpp
+	endif
 endif
 
-ifeq ($(ENABLE_MPI_CUDA), YES)
-	ENABLE_CUDA = YES
-	CXXFLAGS += -DALUMINUM_HAS_MPI_CUDA # -DALUMINUM_MPI_CUDA_DEBUG
-	CUDA_OBJ = src/mpi_cuda/cuda_kernels.o
-	MPI_CUDA_HEADERS = src/allreduce_mpi_cuda_impl.hpp test/test_utils_mpi_cuda.hpp src/mpi_cuda/allreduce.hpp src/mpi_cuda/allreduce_ring.hpp
-endif
 
 ifeq ($(ENABLE_CUDA), YES)
 	CUDA_HOME = $(patsubst %/,%,$(dir $(patsubst %/,%,$(dir $(shell which nvcc)))))
@@ -37,8 +36,8 @@ endif
 
 all: liballreduce.so benchmark_allreduces benchmark_nballreduces benchmark_overlap benchmark_reductions test_correctness test_multi_nballreduces
 
-liballreduce.so: src/allreduce.cpp src/allreduce_mpi_impl.cpp src/allreduce.hpp src/allreduce_impl.hpp src/allreduce_mempool.hpp src/allreduce_mpi_impl.hpp src/tuning_params.hpp
-	mpicxx $(CXXFLAGS) -shared -o liballreduce.so src/allreduce.cpp src/allreduce_mpi_impl.cpp
+liballreduce.so: src/allreduce.cpp src/allreduce_mpi_impl.cpp src/allreduce.hpp src/allreduce_impl.hpp src/allreduce_mempool.hpp src/allreduce_mpi_impl.hpp src/tuning_params.hpp src/allreduce_nccl_impl.hpp src/allreduce_nccl_impl.cpp
+	mpicxx $(CXXFLAGS) -shared -o liballreduce.so src/allreduce.cpp src/allreduce_mpi_impl.cpp src/allreduce_nccl_impl.cpp
 
 benchmark_allreduces: liballreduce.so benchmark/benchmark_allreduces.cpp  $(CUDA_OBJ) $(MPI_CUDA_HEADERS)
 	mpicxx $(CXXFLAGS) $(LIB) -o benchmark_allreduces benchmark/benchmark_allreduces.cpp $(CUDA_OBJ) 
