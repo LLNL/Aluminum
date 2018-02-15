@@ -4,53 +4,13 @@
 namespace allreduces {
 
 void NCCLCommunicator::gpu_setup() {
-
-  const int rank_in_node = local_rank();
-  const int procs_per_node = local_size();
-
-  /// Determine number of visible GPUs on the current node
-  CUDACHECK(cudaGetDeviceCount(&m_num_visible_gpus));
-
-  if(m_num_visible_gpus < 1) {
-    std::cerr << "NCCLCommunicator: rank " << rank() << ": has no GPUs found on the node\n";
-    MPI_Abort(mpi_comm, -1);
-  }
-  if(m_num_visible_gpus < procs_per_node) {
-    std::cerr << "NCCLCommunicator: rank " << rank() << ": does not have enough GPUs available\n";
-    MPI_Abort(mpi_comm, -2);
-  }
-  else{
-    /// The number of GPUs on this node is greater than or equal to that of ranks assigned to this node;
-    /// ensure that the right number of GPUs are used
-    m_num_visible_gpus = procs_per_node;
-  }
-
-  // Assign GPUs to process
-  int gpu_start, gpu_end;
-  const int gpus_per_proc = m_num_visible_gpus / procs_per_node;
-  const int num_leftover_gpus = m_num_visible_gpus % procs_per_node;
-  gpu_start = rank_in_node * gpus_per_proc;
-  gpu_end = (rank_in_node + 1) * gpus_per_proc;
-  if(rank_in_node < num_leftover_gpus) {
-    gpu_start += rank_in_node;
-    gpu_end += rank_in_node + 1;
-  }
-  else {
-    gpu_start += num_leftover_gpus;
-    gpu_end += num_leftover_gpus;
-  }
-
-  // Construct GPU objects
-  for(int gpu = gpu_start; gpu < gpu_end; ++gpu) {
-    CUDACHECK(cudaSetDevice(gpu));
-    m_gpus.push_back(gpu);
-    m_streams.push_back(nullptr);
-
-    CUDACHECK(cudaStreamCreate(&m_streams.back()));
-  }
-
-  // Get number of GPUs for current MPI rank
-  m_num_gpus = m_gpus.size();
+  int device;
+  cudaGetDevice(&device);
+  m_gpus.push_back(device);
+  cudaStream_t s;
+  cudaStreamCreate(&s);
+  m_streams.push_back(s);
+  m_num_gpus = 1;
 }
 
 void NCCLCommunicator::nccl_setup() {
