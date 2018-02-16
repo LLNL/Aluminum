@@ -20,16 +20,13 @@ inline std::string allreduce_name(NCCLAllreduceAlgorithm algo) {
 }
 
 /// We assume NCCL version 2.0 or higher for allreduce to work
-class NCCLCommunicator : public Communicator {
-//class NCCLCommunicator : public Communicator {
+class NCCLCommunicator : public MPICommunicator {
  public:
   /** Default constructor; use MPI_COMM_WORLD. */
   NCCLCommunicator() : NCCLCommunicator(MPI_COMM_WORLD) {}
   /** Use a particular MPI communicator. */
-  NCCLCommunicator(MPI_Comm comm_) : Communicator() {
-
-    /// Set up MPI communicator
-    mpi_setup(comm_);
+  NCCLCommunicator(MPI_Comm comm_) : MPICommunicator(comm_) {
+    MPI_Comm_dup(comm_, &mpi_comm);
 
     /// Set up GPU-related informatiton
     gpu_setup();
@@ -39,20 +36,21 @@ class NCCLCommunicator : public Communicator {
   }
 
   ~NCCLCommunicator() override {
-    // TODO: Fix; can't do this after finalization.
-    //MPI_Comm_free(&comm);
+    nccl_destroy();
   }
 
   Communicator* copy() const override { return new NCCLCommunicator(mpi_comm); }
-  int rank() const override { return rank_in_comm; }
-  int size() const override { return size_of_comm; }
-  MPI_Comm get_comm() const { return mpi_comm; }
-  int local_rank() const { return rank_in_local_comm; }
-  int local_size() const { return size_of_local_comm; }
-  MPI_Comm get_local_comm() const { return local_comm; }
+
+  void synchronize();
+
+  cudaStream_t get_default_stream();
+
+  /// It is assumed that both sendbuf and recvbuf are in device memory
+  /// for NCCL sendbuf and recvbuf can be identical; in-place operation will be performed
+  void Allreduce(void* sendbuf, void* recvbuf, size_t count, ncclDataType_t nccl_type,
+               ncclRedOp_t nccl_redop); 
 
 protected:
-  void mpi_setup(MPI_Comm comm_);
 
   void gpu_setup();
 
@@ -60,26 +58,9 @@ protected:
 
   void nccl_destroy();
 
-  /// It is assumed that both sendbuf and recvbuf are in device memory
-  /// for NCCL sendbuf and recvbuf can be identical; in-place operation will be performed
-  void Allreduce(void* sendbuf, void* recvbuf, size_t count, ncclDataType_t nccl_type,
-               ncclRedOp_t nccl_redop); 
-
  private:
-  /** Associated MPI communicator. */
+
   MPI_Comm mpi_comm;
-  /** Communicator for the local node. */
-  MPI_Comm local_comm;
-
-  /** Rank in comm. */
-  int rank_in_comm;
-  /** Size of comm. */
-  int size_of_comm;
-
-  /** Rank in the local communicator. */
-  int rank_in_local_comm;
-  /** Size of the local communicator. */
-  int size_of_local_comm;
 
   /** List of GPU related variables. */
   /// List of GPUs to be used
@@ -95,136 +76,6 @@ protected:
   /// NOTE: It is assumed that ONLY ONE GPU is allocated to one MPI rank
   std::vector<ncclComm_t> m_nccl_comm;
 };
-/*
-class NCCLCommunicator : public Communicator {
- public:
-
-  /// NCCL communicator MUST operate in conjunction with an MPI_Comm 
-  /// Default constructor; use MPI_COMM_WORLD
-  NCCLCommunicator() : NCCLCommunicator(MPI_COMM_WORLD) {}
-
-  /// NCCLCommunicator with an MPI communicator given
-  NCCLCommunicator(MPI_Comm comm_) : MPICommunicator(comm_) {
-
-    mpicomm = get_comm();
-
-    /// Set up GPU-related informatiton
-    gpu_setup();
-
-    /// NCCL set up here
-    nccl_setup();
-  }
-
-  ~NCCLCommunicator() override {
-    /// NCCL destroy here
-    nccl_destroy();
-  }
-
-
-  /// It is assumed that both sendbuf and recvbuf are in device memory
-  /// for NCCL sendbuf and recvbuf can be identical; in-place operation will be performed
-  void Allreduce(void* sendbuf, void* recvbuf, size_t count,
-                 ncclDataType_t nccl_type,
-                 ncclRedOp_t nccl_redop,
-                 cudaStream_t stream) {
-
-    if(count == 0) return;
-    int num_gpus_assigned = m_gpus.size();
-
-    if(num_gpus_assigned > 1) ncclGroupStart();
-    for(int i = 0; i < num_gpus_assigned; ++i) {
-      CUDACHECK(cudaSetDevice(m_gpus[i]));
-      NCCLCHECK(ncclAllReduce(sendbuf, recvbuf, count, nccl_type, nccl_redop, m_nccl_comm[i], stream));
-    }
-    if(num_gpus_assigned > 1) ncclGroupEnd();
-
-  }
-
-  void gpu_setup() {
-    int device;
-    cudaGetDevice(&device);
-    m_gpus.push_back(device);
-    cudaStream_t s;
-    cudaStreamCreate(&s);
-    m_streams.push_back(s);
-    m_num_gpus = 1;
-  }
-
-
-  void nccl_setup() {
-
-    if(m_num_gpus != 1){
-      std::cerr << "NCCLCommunicator: rank " << rank() << ": the number of GPUs assigned to process is " << m_num_gpus << "; should be 1\n";
-      MPI_Abort(mpicomm, -3);
-    }
-
-    /// Create nccl communicators
-    int num_gpus_assigned = m_num_gpus;
-    m_nccl_comm.resize(num_gpus_assigned);
-
-    int nProcs = size();
-    int myid = rank();
-    int total_num_comms = nProcs*num_gpus_assigned;
-
-    ncclUniqueId ncclId;
-    if (myid == 0) {
-      NCCLCHECK(ncclGetUniqueId(&ncclId));
-    }
-
-    MPI_Bcast(&ncclId, sizeof(ncclId), MPI_BYTE, 0, mpicomm);
-
-    if (nProcs == 1) {
-      int gpuArray = 0;
-      NCCLCHECK(ncclCommInitAll(&(m_nccl_comm[0]), 1, &gpuArray));
-    }
-    else {
-      if(num_gpus_assigned > 1) NCCLCHECK(ncclGroupStart());
-      for(int i=0; i<num_gpus_assigned; i++){
-        CUDACHECK(cudaSetDevice(m_gpus[i]));
-        NCCLCHECK(ncclCommInitRank(&(m_nccl_comm[i]), total_num_comms, ncclId, num_gpus_assigned*myid+i));
-      }
-      if(num_gpus_assigned > 1) NCCLCHECK(ncclGroupEnd());
-    }
-  } // nccl_setup
-
-  void nccl_destroy() {
-    int num_gpus_assigned = m_gpus.size();
-    for(int i=0; i<num_gpus_assigned; i++){
-      ncclCommDestroy(m_nccl_comm[i]);
-    }
-  }
-
-  void synchronize() {
-    for (int i = 0; i < m_num_gpus; ++i) {
-      cudaSetDevice(m_gpus[i]);
-      cudaStreamSynchronize(m_streams[i]);
-    }
-  }
-
-  cudaStream_t get_default_stream() {
-    return m_streams[0];
-  }
-
- private:
-
-  MPI_Comm mpicomm;
-
-  ** List of GPU related variables.
-  /// List of GPUs to be used
-  std::vector<int> m_gpus;
-  /// List of CUDA streams
-  std::vector<cudaStream_t> m_streams;
-  /// Number of GPUs allocated to the current rank
-  int m_num_gpus;
-  /// Number of visible GPUs on this compute node
-  int m_num_visible_gpus;
-
-
-  ** List of NCCL 2 related variables.
-  /// NOTE: It is assumed that ONLY ONE GPU is allocated to one MPI rank
-  std::vector<ncclComm_t> m_nccl_comm;
-};
-*/
 
 class NCCLBackend {
  public:
@@ -294,7 +145,8 @@ class NCCLBackend {
     }
     
     comm.Allreduce((void*) sendbuf, (void*) recvbuf, count,
-                   nccl_type, nccl_redop, req);
+                   nccl_type, nccl_redop);
+                   //nccl_type, nccl_redop, req);
   }
 
   template <typename T>
@@ -318,7 +170,6 @@ template <>
 inline void Wait<NCCLBackend>(typename NCCLBackend::req_type& req) {
   cudaStreamSynchronize(req);
 }
-
 
 }  // namespace allreduces
 

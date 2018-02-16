@@ -24,19 +24,6 @@
 
 namespace allreduces {
 
-/** Predefined communicator types. */
-/*
-enum class CommunicatorType {
-  mpi, nccl
-};
-*/
-
-/*
-enum class ReductionOperator {
-  sum, prod, min, max
-};
-*/
-
 /**
  * Abstract base class for all communicator objects.
  * Implementation note: Try to keep these lightweight.
@@ -64,8 +51,6 @@ class Communicator {
   virtual int rank() const = 0;
   /** Return the number of processes in the communicator. */
   virtual int size() const = 0;
-
-  //virtual CommunicatorType get_comm_type();
 };
 
 /**
@@ -99,7 +84,6 @@ class MPICommunicator : public Communicator {
   MPI_Comm get_local_comm() const { return local_comm; }
   int get_free_tag() { return free_tag++; }
   
-  //CommunicatorType get_comm_type() { return CommunicatorType::mpi; }
  private:
   /** Associated MPI communicator. */
   MPI_Comm comm;
@@ -432,10 +416,7 @@ void pe_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                        ReductionOperator op, Communicator& comm);
 
 }  // namespace mpi
-
 }  // namespace internal
-
-
 }  // namespace allreduces
 
 #include "allreduce_impl.hpp"

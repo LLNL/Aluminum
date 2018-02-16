@@ -36,8 +36,8 @@ void Finalize() {
   progress_engine->stop();
   delete progress_engine;
   progress_engine = nullptr;
-  internal::mpi::finalize();
   is_initialized = false;
+  internal::mpi::finalize();
 }
 
 bool Initialized() {
