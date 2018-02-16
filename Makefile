@@ -12,19 +12,19 @@ ifeq ($(ENABLE_NCCL_CUDA), YES)
 	ifeq ($(shell hostname|grep surface -c), 1)
 		NCCL_DIR = /usr/workspace/wsb/brain/nccl2/nccl-2.0.5+cuda8.0
   	else
-  		ifeq ($(shell hostname|grep ray -c), 1)
-			NCCL_DIR = /usr/workspace/wsb/brain/nccl2/nccl_2.0.5-3+cuda8.0_ppc64el
- 		endif
+  	  ifeq ($(shell hostname|grep ray -c), 1)
+	  	NCCL_DIR = /usr/workspace/wsb/brain/nccl2/nccl_2.0.5-3+cuda8.0_ppc64el
+ 	  endif
  	endif
 	CXXFLAGS += -I$(NCCL_DIR)/include  -DALUMINUM_HAS_NCCL
 	LIB += -L$(NCCL_DIR)/lib -lnccl -Wl,-rpath=$(NCCL_DIR)/lib
-else
-	ifeq ($(ENABLE_MPI_CUDA), YES)
-		ENABLE_CUDA = YES
-		CXXFLAGS += -DALUMINUM_HAS_MPI_CUDA # -DALUMINUM_MPI_CUDA_DEBUG
-		CUDA_OBJ = src/mpi_cuda/cuda_kernels.o
-		MPI_CUDA_HEADERS = src/allreduce_mpi_cuda_impl.hpp test/test_utils_mpi_cuda.hpp src/mpi_cuda/allreduce.hpp src/mpi_cuda/allreduce_ring.hpp
-	endif
+endif
+
+ifeq ($(ENABLE_MPI_CUDA), YES)
+	ENABLE_CUDA = YES
+	CXXFLAGS += -DALUMINUM_HAS_MPI_CUDA # -DALUMINUM_MPI_CUDA_DEBUG
+	CUDA_OBJ = src/mpi_cuda/cuda_kernels.o
+	MPI_CUDA_HEADERS = src/allreduce_mpi_cuda_impl.hpp test/test_utils_mpi_cuda.hpp src/mpi_cuda/allreduce.hpp src/mpi_cuda/allreduce_ring.hpp
 endif
 
 
