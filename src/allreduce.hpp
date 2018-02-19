@@ -83,6 +83,7 @@ class MPICommunicator : public Communicator {
   int local_size() const { return size_of_local_comm; }
   MPI_Comm get_local_comm() const { return local_comm; }
   int get_free_tag() { return free_tag++; }
+  
  private:
   /** Associated MPI communicator. */
   MPI_Comm comm;
@@ -421,10 +422,7 @@ void pe_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                        ReductionOperator op, Communicator& comm);
 
 }  // namespace mpi
-
 }  // namespace internal
-
-
 }  // namespace allreduces
 
 #include "allreduce_impl.hpp"
