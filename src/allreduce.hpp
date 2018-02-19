@@ -307,6 +307,12 @@ class ProgressEngine {
   std::thread thread;
   /** Atomic flag indicating the progress engine should stop; true to stop. */
   std::atomic<bool> stop_flag;
+  /** For startup_cv. */
+  std::mutex startup_mutex;
+  /** Used to signal to the main thread that the progress engine has started. */
+  std::condition_variable startup_cv;
+  /** Atomic flag indicating that the progress engine has completed startup. */
+  std::atomic<bool> started_flag;
   /**
    * The list of requests that have been enqueued to the progress engine, but
    * that it has not yet begun to process. Threads may add states for

@@ -53,6 +53,7 @@ AllreduceRequest get_free_request() {
 
 ProgressEngine::ProgressEngine() {
   stop_flag = false;
+  started_flag = false;
   world_comm = new MPICommunicator(MPI_COMM_WORLD);
 }
 
@@ -62,6 +63,9 @@ ProgressEngine::~ProgressEngine() {
 
 void ProgressEngine::run() {
   thread = std::thread(&ProgressEngine::engine, this);
+  // Wait for the progress engine to start.
+  std::unique_lock<std::mutex> lock(startup_mutex);
+  startup_cv.wait(lock, [this] {return started_flag.load() == true;});
 }
 
 void ProgressEngine::stop() {
@@ -177,6 +181,8 @@ void ProgressEngine::bind() {
 
 void ProgressEngine::engine() {
   bind();
+  started_flag = true;
+  startup_cv.notify_one();
   while (!stop_flag.load()) {
     // Check for newly-submitted requests, if we can take more.
     if (ALLREDUCE_PE_NUM_CONCURRENT_ALLREDUCES == 0 ||
