@@ -292,12 +292,6 @@ void recursive_doubling_allreduce(const T* sendbuf, T* recvbuf, size_t count,
   int rank = comm.rank();
   int nprocs = comm.size();
   MPI_Comm mpi_comm = dynamic_cast<MPICommunicator&>(comm).get_comm();
-  // Currently only supports a power-of-2 number of processes.
-  // TODO: Support any number of processors.
-  if (nprocs & (nprocs - 1)) {
-    throw_allreduce_exception("Recursive doubling requires a power-of-2 number"
-                              " of processes");
-  }
   if (sendbuf != IN_PLACE<T>()) {
     // Copy our data into the receive buffer.
     std::copy_n(sendbuf, count, recvbuf);
@@ -308,13 +302,49 @@ void recursive_doubling_allreduce(const T* sendbuf, T* recvbuf, size_t count,
   unsigned int mask = 1;
   T* recv_to = get_memory<T>(count);
   auto reduction_op = ReductionMap<T>(op);
-  while (mask < static_cast<unsigned int>(nprocs)) {
-    int partner = rank ^ mask;
+  // Check if we are in a non-power-of-2 case.
+  // First find the nearest power-of-2 <= nprocs.
+  int pow2 = 1;
+  while (pow2 <= nprocs) pow2 <<= 1;
+  pow2 >>= 1;
+  int pow2_remainder = nprocs - pow2;
+  int orig_rank = rank;
+  if (rank < 2 * pow2_remainder) {
+    // We have a non-power-of-2 number of processes (pow2_remainder > 0).
+    // The *even* processes of rank < 2*pow2_remainder will send their data
+    // to the odd processes, which will reduce it into their data.
+    // The even processes will not participate until the end.
+    // There is a power-of-2 number of remaining processes.
+    if (rank % 2 == 0) {
+      MPI_Send(recvbuf, count, type, rank + 1, 0, mpi_comm);
+      rank = -1;  // Don't participate.
+    } else {
+      MPI_Recv(recv_to, count, type, rank - 1, 0, mpi_comm, MPI_STATUS_IGNORE);
+      reduction_op(recv_to, recvbuf, count);
+      rank /= 2;  // Change our rank.
+    }
+  } else {
+    rank -= pow2_remainder;  // This is a NOP when nprocs is power-of-2.
+  }
+  while (rank != -1 && mask < static_cast<unsigned int>(pow2)) {
+    // Need to get real rank.
+    int partner_ = rank ^ mask;
+    int partner = (partner_ < pow2_remainder) ? partner_ * 2 + 1 :
+      partner_ + pow2_remainder;
     MPI_Sendrecv(recvbuf, count, type, partner, 0,
                  recv_to, count, type, partner, 0,
                  mpi_comm, MPI_STATUS_IGNORE);
     reduction_op(recv_to, recvbuf, count);
     mask <<= 1;
+  }
+  // In the non-power-of-2 case, the even ranks need to get their data.
+  if (orig_rank < 2 * pow2_remainder) {
+    if (orig_rank % 2 == 0) {
+      MPI_Recv(recvbuf, count, type, orig_rank + 1, 0, mpi_comm,
+               MPI_STATUS_IGNORE);
+    } else {
+      MPI_Send(recvbuf, count, type, orig_rank - 1, 0, mpi_comm);
+    }
   }
   release_memory(recv_to);
 }
