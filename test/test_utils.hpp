@@ -3,6 +3,7 @@
 #include <vector>
 #include <random>
 #include <chrono>
+#include <sstream>
 
 #include "allreduce.hpp"
 
