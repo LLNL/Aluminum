@@ -603,103 +603,140 @@ void rabenseifner_allreduce(const T* sendbuf, T* recvbuf, size_t count,
   int rank = comm.rank();
   int nprocs = comm.size();
   MPI_Comm mpi_comm = dynamic_cast<MPICommunicator&>(comm).get_comm();
-  // Currently only supports a power-of-2 number of processes.
-  // TODO: Support any number of processors.
-  if (nprocs & (nprocs - 1)) {
-    throw_allreduce_exception("Rabenseifner requires a power-of-2 number"
-                              " of processes");
-  }
   if (sendbuf != IN_PLACE<T>()) {
     // Copy our data into the receive buffer.
     std::copy_n(sendbuf, count, recvbuf);
   }
   if (nprocs == 1) return;  // Only needed to copy data.
-  // Compute the slices of data to be moved.
-  const size_t size_per_rank = count / nprocs;
-  const size_t remainder = count % nprocs;
-  std::vector<size_t> slice_lengths(nprocs, size_per_rank);
-  // Add in the remainder as evenly as possible.
-  for (size_t i = 0; i < remainder; ++i) {
-    slice_lengths[i] += 1;
-  }
-  std::vector<size_t> slice_ends(nprocs);
-  std::partial_sum(slice_lengths.begin(), slice_lengths.end(),
-                   slice_ends.begin());
-  // Temporary buffer for receiving.
-  // We receive at most half the data.
-  T* recv_to = get_memory<T>(slice_ends[nprocs / 2]);
   MPI_Datatype type = TypeMap<T>();
   auto reduction_op = ReductionMap<T>(op);
-  // Do a recursive-halving reduce-scatter.
-  unsigned int partner_mask = nprocs >> 1;
-  // Used to compute the number of slices sent in a step.
-  unsigned int slice_mask = 1;
-  int send_idx = 0;  // Starting index for sending.
-  int recv_idx = 0;  // Starting index for receiving.
-  int last_idx = nprocs;  // End of right-most region.
-  while (partner_mask > 0) {
-    int partner = rank ^ partner_mask;
-    // Compute the range of data to send and receive.
-    size_t send_start, send_end, recv_start, recv_end;
-    if (rank < partner) {
-      send_idx = recv_idx + nprocs / (slice_mask*2);
-      send_start = slice_ends[send_idx] - slice_lengths[send_idx];
-      send_end = slice_ends[last_idx - 1];
-      recv_start = slice_ends[recv_idx] - slice_lengths[recv_idx];
-      recv_end = slice_ends[send_idx - 1];
+  // Check if we are in the non-power-of-2 case.
+  // This works basically as with recursive-doubling.
+  int pow2 = 1;
+  while (pow2 <= nprocs) pow2 <<= 1;
+  pow2 >>= 1;
+  int pow2_remainder = nprocs - pow2;
+  int orig_rank = rank;
+  // Temporary buffer for receiving. In the non-power-of-2 case, we need a
+  // larger buffer; otherwise we will receive at most half the data.
+  T* recv_to = nullptr;
+  if (rank < 2 * pow2_remainder) {
+    if (rank % 2 == 0) {
+      MPI_Send(recvbuf, count, type, rank + 1, 0, mpi_comm);
+      rank = -1;  // Don't participate.
     } else {
-      recv_idx = send_idx + nprocs / (slice_mask*2);
-      send_start = slice_ends[send_idx] - slice_lengths[send_idx];
-      send_end = slice_ends[recv_idx - 1];
-      recv_start = slice_ends[recv_idx] - slice_lengths[recv_idx];
-      recv_end = slice_ends[last_idx - 1];
+      recv_to = get_memory<T>(count);
+      MPI_Recv(recv_to, count, type, rank - 1, 0, mpi_comm, MPI_STATUS_IGNORE);
+      reduction_op(recv_to, recvbuf, count);
+      rank /= 2;
     }
-    MPI_Sendrecv(recvbuf + send_start, send_end - send_start, type, partner, 0,
-                 recv_to, recv_end - recv_start, type, partner, 0,
-                 mpi_comm, MPI_STATUS_IGNORE);
-    reduction_op(recv_to, recvbuf + recv_start, recv_end - recv_start);
-    // Update for the next iteration, except last_idx, which is needed by the
-    // allgather.
-    send_idx = recv_idx;
-    partner_mask >>= 1;
-    slice_mask <<= 1;
-    if (partner_mask > 0) {
-      last_idx = recv_idx + nprocs / slice_mask;
+  } else {
+    rank -= pow2_remainder;
+  }
+  if (rank != -1) {
+    // Compute the slices of data to be moved.
+    const size_t size_per_rank = count / pow2;
+    const size_t remainder = count % pow2;
+    std::vector<size_t> slice_lengths(pow2, size_per_rank);
+    // Add in the remainder as evenly as possible.
+    for (size_t i = 0; i < remainder; ++i) {
+      slice_lengths[i] += 1;
+    }
+    std::vector<size_t> slice_ends(pow2);
+    std::partial_sum(slice_lengths.begin(), slice_lengths.end(),
+                     slice_ends.begin());
+    // Allocate temporary buffer if needed.
+    if (recv_to == nullptr) {
+      recv_to = get_memory<T>(slice_ends[pow2 / 2]);
+    }
+    // Do a recursive-halving reduce-scatter.
+    unsigned int partner_mask = pow2 >> 1;
+    // Used to compute the number of slices sent in a step.
+    unsigned int slice_mask = 1;
+    int send_idx = 0;  // Starting index for sending.
+    int recv_idx = 0;  // Starting index for receiving.
+    int last_idx = pow2;  // End of right-most region.
+    while (partner_mask > 0) {
+      // Compute the real rank.
+      int partner_ = rank ^ partner_mask;
+      int partner = (partner_ < pow2_remainder) ? partner_ * 2 + 1 :
+        partner_ + pow2_remainder;
+      // Compute the range of data to send and receive.
+      size_t send_start, send_end, recv_start, recv_end;
+      // The check is done on the adjusted partner rank.
+      if (rank < partner_) {
+        send_idx = recv_idx + pow2 / (slice_mask*2);
+        send_start = slice_ends[send_idx] - slice_lengths[send_idx];
+        send_end = slice_ends[last_idx - 1];
+        recv_start = slice_ends[recv_idx] - slice_lengths[recv_idx];
+        recv_end = slice_ends[send_idx - 1];
+      } else {
+        recv_idx = send_idx + pow2 / (slice_mask*2);
+        send_start = slice_ends[send_idx] - slice_lengths[send_idx];
+        send_end = slice_ends[recv_idx - 1];
+        recv_start = slice_ends[recv_idx] - slice_lengths[recv_idx];
+        recv_end = slice_ends[last_idx - 1];
+      }
+      MPI_Sendrecv(recvbuf + send_start, send_end - send_start, type, partner, 0,
+                   recv_to, recv_end - recv_start, type, partner, 0,
+                   mpi_comm, MPI_STATUS_IGNORE);
+      reduction_op(recv_to, recvbuf + recv_start, recv_end - recv_start);
+      // Update for the next iteration, except last_idx, which is needed by the
+      // allgather.
+      send_idx = recv_idx;
+      partner_mask >>= 1;
+      slice_mask <<= 1;
+      if (partner_mask > 0) {
+        last_idx = recv_idx + pow2 / slice_mask;
+      }
+    }
+    // Do a recursive-doubling allgather.
+    slice_mask >>= 1;
+    partner_mask = 1;
+    while (partner_mask < static_cast<unsigned int>(pow2)) {
+      // Compute the real rank.
+      int partner_ = rank ^ partner_mask;
+      int partner = (partner_ < pow2_remainder) ? partner_ * 2 + 1 :
+        partner_ + pow2_remainder;
+      // The send/recv ranges are computed similarly to above.
+      size_t send_start, send_end, recv_start, recv_end;
+      // The check is done on the adjusted partner rank.
+      if (rank < partner_) {
+        // Except on the first iteration, update last_idx.
+        if (slice_mask != static_cast<unsigned int>(pow2) / 2) {
+          last_idx += pow2 / (slice_mask*2);
+        }
+        recv_idx = send_idx + pow2 / (slice_mask*2);
+        send_start = slice_ends[send_idx] - slice_lengths[send_idx];
+        send_end = slice_ends[recv_idx - 1];
+        recv_start = slice_ends[recv_idx] - slice_lengths[recv_idx];
+        recv_end = slice_ends[last_idx - 1];
+      } else {
+        recv_idx = send_idx - pow2 / (slice_mask*2);
+        send_start = slice_ends[send_idx] - slice_lengths[send_idx];
+        send_end = slice_ends[last_idx - 1];
+        recv_start = slice_ends[recv_idx] - slice_lengths[recv_idx];
+        recv_end = slice_ends[send_idx - 1];
+      }
+      MPI_Sendrecv(recvbuf + send_start, send_end - send_start, type, partner, 0,
+                   recvbuf + recv_start, recv_end - recv_start, type, partner, 0,
+                   mpi_comm, MPI_STATUS_IGNORE);
+      // Update for next iteration.
+      if (rank > partner_) {  // Check on adjusted partner.
+        send_idx = recv_idx;
+      }
+      partner_mask <<= 1;
+      slice_mask >>= 1;
     }
   }
-  // Do a recursive-doubling allgather.
-  slice_mask >>= 1;
-  partner_mask = 1;
-  while (partner_mask < static_cast<unsigned int>(nprocs)) {
-    int partner = rank ^ partner_mask;
-    // The send/recv ranges are computed similarly to above.
-    size_t send_start, send_end, recv_start, recv_end;
-    if (rank < partner) {
-      // Except on the first iteration, update last_idx.
-      if (slice_mask != static_cast<unsigned int>(nprocs) / 2) {
-        last_idx += nprocs / (slice_mask*2);
-      }
-      recv_idx = send_idx + nprocs / (slice_mask*2);
-      send_start = slice_ends[send_idx] - slice_lengths[send_idx];
-      send_end = slice_ends[recv_idx - 1];
-      recv_start = slice_ends[recv_idx] - slice_lengths[recv_idx];
-      recv_end = slice_ends[last_idx - 1];
+  // Send the excluded ranks their data in the non-power-of-2 case.
+  if (orig_rank < 2 * pow2_remainder) {
+    if (orig_rank % 2 == 0) {
+      MPI_Recv(recvbuf, count, type, orig_rank + 1, 0, mpi_comm,
+               MPI_STATUS_IGNORE);
     } else {
-      recv_idx = send_idx - nprocs / (slice_mask*2);
-      send_start = slice_ends[send_idx] - slice_lengths[send_idx];
-      send_end = slice_ends[last_idx - 1];
-      recv_start = slice_ends[recv_idx] - slice_lengths[recv_idx];
-      recv_end = slice_ends[send_idx - 1];
+      MPI_Send(recvbuf, count, type, orig_rank - 1, 0, mpi_comm);
     }
-    MPI_Sendrecv(recvbuf + send_start, send_end - send_start, type, partner, 0,
-                 recvbuf + recv_start, recv_end - recv_start, type, partner, 0,
-                 mpi_comm, MPI_STATUS_IGNORE);
-    // Update for next iteration.
-    if (rank > partner) {
-      send_idx = recv_idx;
-    }
-    partner_mask <<= 1;
-    slice_mask >>= 1;
   }
   release_memory(recv_to);
 }
