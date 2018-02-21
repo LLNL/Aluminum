@@ -24,7 +24,6 @@ class MPICUDACommunicator: public MPICommunicator {
 template <typename T> inline
 void ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                     ReductionOperator op, MPICUDACommunicator& comm) {
-  assert(op == ReductionOperator::sum);
   if (sendbuf != recvbuf) {
     COLL_CHECK_CUDA(cudaMemcpy(recvbuf, sendbuf, sizeof(T) * count,
                                cudaMemcpyDefault));
@@ -35,7 +34,6 @@ void ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
 template <typename T> inline
 void bi_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                        ReductionOperator op, MPICUDACommunicator& comm) {
-  assert(op == ReductionOperator::sum);  
   if (sendbuf != recvbuf) {
     COLL_CHECK_CUDA(cudaMemcpy(recvbuf, sendbuf, sizeof(T) * count,
                                cudaMemcpyDefault));
@@ -47,7 +45,6 @@ template <typename T> inline
 void nb_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                        ReductionOperator op, MPICUDACommunicator& comm,
                        cudaStream_t &stream) {
-  assert(op == ReductionOperator::sum);  
   if (sendbuf != recvbuf) {
     COLL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, sendbuf, sizeof(T) * count,
                                     cudaMemcpyDefault, stream));
@@ -60,7 +57,6 @@ template <typename T> inline
 void nb_bi_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                           ReductionOperator op, MPICUDACommunicator& comm,
                           cudaStream_t &stream) {
-  assert(op == ReductionOperator::sum);  
   if (sendbuf != recvbuf) {
     COLL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, sendbuf, sizeof(T) * count,
                                     cudaMemcpyDefault, stream));
