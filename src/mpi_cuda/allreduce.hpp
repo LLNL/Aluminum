@@ -28,7 +28,7 @@ void ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
     COLL_CHECK_CUDA(cudaMemcpy(recvbuf, sendbuf, sizeof(T) * count,
                                cudaMemcpyDefault));
   }
-  comm.get_ring().allreduce<T>({recvbuf}, count, nullptr, false);
+  comm.get_ring().allreduce<T>({recvbuf}, count, op, nullptr, false);
 }
 
 template <typename T> inline
@@ -38,7 +38,7 @@ void bi_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
     COLL_CHECK_CUDA(cudaMemcpy(recvbuf, sendbuf, sizeof(T) * count,
                                cudaMemcpyDefault));
   }
-  comm.get_ring().allreduce<T>({recvbuf}, count, nullptr, true);
+  comm.get_ring().allreduce<T>({recvbuf}, count, op, nullptr, true);
 }
 
 template <typename T> inline
@@ -50,7 +50,7 @@ void nb_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                                     cudaMemcpyDefault, stream));
   }
   std::vector<cudaStream_t> streams = {stream};
-  comm.get_ring().allreduce<T>({recvbuf}, count, &streams, false);
+  comm.get_ring().allreduce<T>({recvbuf}, count, op, &streams, false);
 }
 
 template <typename T> inline
@@ -62,7 +62,7 @@ void nb_bi_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                                     cudaMemcpyDefault, stream));
   }
   std::vector<cudaStream_t> streams = {stream};  
-  comm.get_ring().allreduce<T>({recvbuf}, count, &streams, true);
+  comm.get_ring().allreduce<T>({recvbuf}, count, op, &streams, true);
 }
 
 
