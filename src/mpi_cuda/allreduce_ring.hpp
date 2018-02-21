@@ -526,7 +526,8 @@ class RingMPICUDA {
                 MPI_Request *requests,
                 int &num_requests,
                 const TransferDir trans,
-                bool scatter_reduce) {
+                bool scatter_reduce,
+                ReductionOperator op) {
     const int tag = 0;
     const MPI_Datatype mpi_type = get_mpi_data_type<T>();
     const AccessDir src = get_src_dir(trans);    
@@ -598,8 +599,7 @@ class RingMPICUDA {
         T *dst_ptr = bufs[g] + recv_offset;        
         if (scatter_reduce) {
           reduce1(dst_ptr, work_bufs[g], recv_count, streams[g],
-                  ReductionOperator::sum,
-                  GetReductionOperandType<T>::key);
+                  op, GetReductionOperandType<T>::key);
           COLL_CHECK_CUDA(cudaEventRecord(m_ev_comp[trans][g], streams[g]));
         } else {
           COLL_CHECK_CUDA(cudaMemcpyAsync(dst_ptr, work_bufs[g],
@@ -639,6 +639,7 @@ class RingMPICUDA {
   template <typename T>
   int allreduce(const std::vector<T*> &bufs,
                 size_t count,
+                ReductionOperator op,
                 std::vector<cudaStream_t> *streams=nullptr,
                 bool bidirectional=true) {
     if (count == 0) return 0;
@@ -677,12 +678,12 @@ class RingMPICUDA {
         MPI_Request requests[4];
         int num_requests = 0;
         transfer(bufs, work_bufs[L2R], pe_counts, pe_offsets, *streams,
-                 i, requests, num_requests, L2R, step == 0);
+                 i, requests, num_requests, L2R, step == 0, op);
         if (m_trans_dir[R2L]) {
           int bh_num_requests = 0;
           transfer(bufs, work_bufs[R2L], pe_counts, pe_offsets, *streams,
                    i, requests + num_requests,
-                   bh_num_requests, R2L, step == 0);
+                   bh_num_requests, R2L, step == 0, op);
           num_requests += bh_num_requests;
         }
         ensure_transfer(requests, num_requests, *streams);
@@ -694,7 +695,7 @@ class RingMPICUDA {
             reduce1(dst_base + pe_offsets[trans][m_recv_idx[trans][devid]],
                     work_bufs[trans][devid],
                     pe_counts[trans][m_recv_idx[trans][devid]],
-                    streams->at(devid), ReductionOperator::sum,
+                    streams->at(devid), op,
                     GetReductionOperandType<T>::key);
           } else {
             COLL_CHECK_CUDA(cudaMemcpyAsync(
