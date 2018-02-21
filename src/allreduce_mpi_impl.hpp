@@ -328,9 +328,10 @@ void recursive_doubling_allreduce(const T* sendbuf, T* recvbuf, size_t count,
   }
   while (rank != -1 && mask < static_cast<unsigned int>(pow2)) {
     // Need to get real rank.
-    int partner_ = rank ^ mask;
-    int partner = (partner_ < pow2_remainder) ? partner_ * 2 + 1 :
-      partner_ + pow2_remainder;
+    int adjusted_partner = rank ^ mask;
+    int partner = (adjusted_partner < pow2_remainder) ?
+      adjusted_partner * 2 + 1 :
+      adjusted_partner + pow2_remainder;
     MPI_Sendrecv(recvbuf, count, type, partner, 0,
                  recv_to, count, type, partner, 0,
                  mpi_comm, MPI_STATUS_IGNORE);
@@ -658,13 +659,14 @@ void rabenseifner_allreduce(const T* sendbuf, T* recvbuf, size_t count,
     int last_idx = pow2;  // End of right-most region.
     while (partner_mask > 0) {
       // Compute the real rank.
-      int partner_ = rank ^ partner_mask;
-      int partner = (partner_ < pow2_remainder) ? partner_ * 2 + 1 :
-        partner_ + pow2_remainder;
+      int adjusted_partner = rank ^ partner_mask;
+      int partner = (adjusted_partner < pow2_remainder) ?
+        adjusted_partner * 2 + 1 :
+        adjusted_partner + pow2_remainder;
       // Compute the range of data to send and receive.
       size_t send_start, send_end, recv_start, recv_end;
       // The check is done on the adjusted partner rank.
-      if (rank < partner_) {
+      if (rank < adjusted_partner) {
         send_idx = recv_idx + pow2 / (slice_mask*2);
         send_start = slice_ends[send_idx] - slice_lengths[send_idx];
         send_end = slice_ends[last_idx - 1];
@@ -695,13 +697,14 @@ void rabenseifner_allreduce(const T* sendbuf, T* recvbuf, size_t count,
     partner_mask = 1;
     while (partner_mask < static_cast<unsigned int>(pow2)) {
       // Compute the real rank.
-      int partner_ = rank ^ partner_mask;
-      int partner = (partner_ < pow2_remainder) ? partner_ * 2 + 1 :
-        partner_ + pow2_remainder;
+      int adjusted_partner = rank ^ partner_mask;
+      int partner = (adjusted_partner < pow2_remainder) ?
+        adjusted_partner * 2 + 1 :
+        adjusted_partner + pow2_remainder;
       // The send/recv ranges are computed similarly to above.
       size_t send_start, send_end, recv_start, recv_end;
       // The check is done on the adjusted partner rank.
-      if (rank < partner_) {
+      if (rank < adjusted_partner) {
         // Except on the first iteration, update last_idx.
         if (slice_mask != static_cast<unsigned int>(pow2) / 2) {
           last_idx += pow2 / (slice_mask*2);
@@ -722,7 +725,7 @@ void rabenseifner_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                    recvbuf + recv_start, recv_end - recv_start, type, partner, 0,
                    mpi_comm, MPI_STATUS_IGNORE);
       // Update for next iteration.
-      if (rank > partner_) {  // Check on adjusted partner.
+      if (rank > adjusted_partner) {  // Check on adjusted partner.
         send_idx = recv_idx;
       }
       partner_mask <<= 1;
