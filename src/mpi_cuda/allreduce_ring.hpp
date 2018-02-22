@@ -556,10 +556,8 @@ class RingMPICUDA {
       size_t send_count = pe_counts[trans][m_send_idx[trans][g]];
       size_t recv_count = pe_counts[trans][m_recv_idx[trans][g]]; 
       if (g == first_dev && src_require_mpi) {
-        if (scatter_reduce) {
-          COLL_CHECK_CUDA(cudaEventSynchronize(m_ev_comp[trans][g]));
-        }
-        T *recv_ptr = scatter_reduce ? work_bufs[g] : bufs[g] + recv_offset;
+        COLL_CHECK_CUDA(cudaEventSynchronize(m_ev_comp[trans][g]));
+        T *recv_ptr = work_bufs[g];
         COLL_CHECK_MPI(MPI_Irecv(
             recv_ptr, recv_count, mpi_type, src_mpi_rank, tag,
             m_comm, &requests[num_requests++]));
@@ -593,11 +591,9 @@ class RingMPICUDA {
       }
       if (g != last_dev) {
         int next_dev = trans == L2R ? g+1 : g-1;
-        if (scatter_reduce) {
-          COLL_CHECK_CUDA(cudaStreamWaitEvent(streams[g], m_ev_comp[trans][next_dev], 0));
-        }
+        COLL_CHECK_CUDA(cudaStreamWaitEvent(streams[g], m_ev_comp[trans][next_dev], 0));
         T *src_ptr = bufs[g] + send_offset;
-        T *dst_ptr = scatter_reduce ? work_bufs[next_dev] : bufs[next_dev] + send_offset;
+        T *dst_ptr = work_bufs[next_dev];
         COLL_CHECK_CUDA(cudaMemcpyPeerAsync(
             dst_ptr, next_dev, src_ptr, g, send_count * sizeof(T),
             streams[g]));
