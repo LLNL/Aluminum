@@ -285,14 +285,19 @@ class RingMPICUDA {
       char *peer_proc_name = i == 0 ? proc_name_lhs : proc_name_rhs;
       if (std::strcmp(peer_proc_name, proc_name) == 0) {
         int peer_access = 0;
-        std::cerr << "[" << m_pid << "] enable peer; local_dev: " << local_dev
-                  << ", peer dev: " << m_neighbor_dev[i] << "\n";
         COLL_CHECK_CUDA(cudaSetDevice(local_dev));
         COLL_CHECK_CUDA(cudaDeviceCanAccessPeer(&peer_access, local_dev, m_neighbor_dev[i]));
         if (peer_access) {
+#ifdef ALUMINUM_MPI_CUDA_DEBUG
+          MPIPrintStream(std::cerr, m_pid)()
+              << "enabling peer access; local_dev: "
+              << local_dev << ", peer dev: " << m_neighbor_dev[i] << "\n";
+#endif          
           cudaError_t err = cudaDeviceEnablePeerAccess(m_neighbor_dev[i], 0);
           if (err != cudaSuccess && err != cudaErrorPeerAccessAlreadyEnabled) {
-            std::cerr << "Enabling peer access failed\n";
+            MPIPrintStream(std::cerr, m_pid)()
+                << "Enabling peer access failed; local: " << local_dev
+                << ", peer: " << m_neighbor_dev[i] << "\n";
             abort();
           }
           m_access_type[i] = PEER;        
@@ -409,6 +414,11 @@ class RingMPICUDA {
         // If it needs to be accessed through host memory, open the
         // IPC handle at a context on the remote GPU
         if (m_access_type[i] == HOST) {
+#ifdef ALUMINUM_MPI_CUDA_DEBUG
+          MPIPrintStream(std::cerr, m_pid)()
+              << "Opening a context on a remote GPU, " 
+              << m_neighbor_dev[i] << ", from process " << m_pid << "\n";
+#endif          
           COLL_CHECK_CUDA(cudaSetDevice(m_neighbor_dev[i]));
         } else {
           COLL_CHECK_CUDA(cudaSetDevice(dev_accessing_peer));
