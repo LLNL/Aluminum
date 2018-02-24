@@ -361,21 +361,76 @@ class MPIRecursiveDoublingAllreduceState : public MPIAllreduceState<T> {
     bool r = MPIAllreduceState<T>::setup();
     if (!r) {
       this->recv_to = get_memory<T>(this->count);
+      // Check if we're in a non-power-of-2 case.
+      while (pow2 <= this->nprocs) pow2 <<= 1;
+      pow2 >>= 1;
+      pow2_remainder = this->nprocs - pow2;
+      adjusted_rank = this->rank;
+      // Adjust rank and start a send/recv for the data if needed.
+      if (this->rank < 2 * pow2_remainder) {
+        if (this->rank % 2 == 0) {
+          MPI_Isend(this->recvbuf, this->count, this->type, this->rank + 1,
+                    this->tag, this->comm, &(this->send_recv_reqs[0]));
+          adjusted_rank = -1;  // Don't participate.
+        } else {
+          MPI_Irecv(this->recv_to, this->count, this->type, this->rank - 1,
+                    this->tag, this->comm, &(this->send_recv_reqs[0]));
+          adjusted_rank /= 2;
+        }
+      } else {
+        setup_comm_done = true;  // No send/recv on this process.
+        adjusted_rank -= pow2_remainder;
+      }
     }
     return r;
   }
   bool step() override {
+    // Check the send/recv from setup, if any.
+    if (!setup_comm_done) {
+      if (this->test_send_recv()) {
+        setup_comm_done = true;
+        if (this->rank % 2) {
+          // We received, need to reduce the data into our local buffer.
+          this->reduction_op(this->recv_to, this->recvbuf, this->count);
+        }
+      } else {
+        return false;
+      }
+    }
+    // Complete final communication in the non-power-of-2 case.
+    if (final_comm_started) {
+      return this->test_send_recv();
+    }
+    if (adjusted_rank == -1) {
+      // Just need to wait for data.
+      MPI_Irecv(this->recvbuf, this->count, this->type, this->rank + 1,
+                this->tag, this->comm, &(this->send_recv_reqs[0]));
+      final_comm_started = true;
+      return false;
+    }
     bool test = this->test_send_recv();
     if (started && test) {
       // Send completed, reduce and update state.
       this->reduction_op(this->recv_to, this->recvbuf, this->count);
       mask <<= 1;
-      if (mask >= static_cast<unsigned int>(this->nprocs)) {
-        return true;
+      if (mask >= static_cast<unsigned int>(pow2)) {
+        // Done, but in the non-power-of-2 case we need to send to our partner.
+        if (this->rank < 2 * pow2_remainder) {
+          MPI_Isend(this->recvbuf, this->count, this->type, this->rank - 1,
+                    this->tag, this->comm, &(this->send_recv_reqs[0]));
+          final_comm_started = true;
+          return false;
+        } else {
+          return true;
+        }
       }
     }
     if (test) {
-      const int partner = this->rank ^ mask;
+      // Compute the real rank to send to.
+      const int adjusted_partner = this->adjusted_rank ^ mask;
+      const int partner = (adjusted_partner < pow2_remainder) ?
+        adjusted_partner * 2 + 1 :
+        adjusted_partner + pow2_remainder;
       this->start_send_recv(this->recvbuf, this->count, partner,
                             this->recv_to, this->count, partner);
       started = true;
@@ -387,16 +442,25 @@ class MPIRecursiveDoublingAllreduceState : public MPIAllreduceState<T> {
   unsigned int mask = 1;
   /** Whether communication has started. */
   bool started = false;
+  /** Whether the send/recv from non-power-of-2 setup has completed. */
+  bool setup_comm_done = false;
+  /** Whether the final send/recv from the non-power-of-2 case has started. */
+  bool final_comm_started = false;
+  /** Nearest power-of-2 <= nprocs. */
+  int pow2 = 1;
+  /** Processes left over in the non-power-of-2 case. */
+  int pow2_remainder = 0;
+  /**
+   * Process's adjusted rank for the non-power-of-2 case.
+   * This is equal to rank if nprocs is a power of 2.
+   */
+  int adjusted_rank = -1;
 };
 
 template <typename T>
 void nb_recursive_doubling_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                                      ReductionOperator op, Communicator& comm,
                                      AllreduceRequest& req) {
-  if (comm.size() & (comm.size() - 1)) {
-    throw_allreduce_exception("Recursive doubling requires a power-of-2 number"
-                              " of processes");
-  }
   req = get_free_request();
   MPIRecursiveDoublingAllreduceState<T>* state =
     new MPIRecursiveDoublingAllreduceState<T>(
