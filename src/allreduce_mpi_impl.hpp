@@ -818,25 +818,75 @@ class MPIRabenseifnerAllreduceState : public MPIAllreduceState<T> {
   bool setup() override {
     bool r = MPIAllreduceState<T>::setup();
     if (!r) {
-      // Compute slices of data to be moved.
-      const size_t size_per_rank = this->count / this->nprocs;
-      const size_t remainder = this->count % this->nprocs;
-      slice_lengths.resize(this->nprocs, size_per_rank);
-      // Add in the remainder as evenly as possible.
-      for (size_t i = 0; i < remainder; ++i) {
-        slice_lengths[i] += 1;
+      // Check if we're in the non-power-of-2 case.
+      while (pow2 <= this->nprocs) pow2 <<= 1;
+      pow2 >>= 1;
+      pow2_remainder = this->nprocs - pow2;
+      adjusted_rank = this->rank;
+      this->recv_to = nullptr;  // Will allocate later.
+      // Adjust rank and start a send/recv for data if needed.
+      if (this->rank < 2 * pow2_remainder) {
+        if (this->rank % 2 == 0) {
+          MPI_Isend(this->recvbuf, this->count, this->type, this->rank + 1,
+                    this->tag, this->comm, &(this->send_recv_reqs[0]));
+          adjusted_rank = -1;  // Don't participate.
+        } else {
+          // Need to receive entire buffer.
+          this->recv_to = get_memory<T>(this->count);
+          MPI_Irecv(this->recv_to, this->count, this->type, this->rank - 1,
+                    this->tag, this->comm, &(this->send_recv_reqs[0]));
+          adjusted_rank /= 2;
+        }
+      } else {
+        setup_comm_done = true;  // No send/recv on this process.
+        adjusted_rank -= pow2_remainder;
       }
-      slice_ends.resize(this->nprocs);
-      std::partial_sum(slice_lengths.begin(), slice_lengths.end(),
-                       slice_ends.begin());
-      // Receive at most half the data.
-      this->recv_to = get_memory<T>(slice_ends[this->nprocs / 2]);
-      partner_mask = this->nprocs >> 1;
-      last_idx = this->nprocs;
+      if (adjusted_rank != -1) {
+        // Compute slices of data to be moved.
+        const size_t size_per_rank = this->count / pow2;
+        const size_t remainder = this->count % pow2;
+        slice_lengths.resize(pow2, size_per_rank);
+        // Add in the remainder as evenly as possible.
+        for (size_t i = 0; i < remainder; ++i) {
+          slice_lengths[i] += 1;
+        }
+        slice_ends.resize(pow2);
+        std::partial_sum(slice_lengths.begin(), slice_lengths.end(),
+                         slice_ends.begin());
+        // Receive at most half the data.
+        if (this->recv_to == nullptr) {
+          this->recv_to = get_memory<T>(slice_ends[pow2 / 2]);
+        }
+        partner_mask = pow2 >> 1;
+        last_idx = pow2;
+      }
     }
     return r;
   }
   bool step() override {
+    // Complete setup communication, if any.
+    if (!setup_comm_done) {
+      if (this->test_send_recv()) {
+        setup_comm_done = true;
+        if (this->rank % 2) {
+          // Received data, need to reduce it.
+          this->reduction_op(this->recv_to, this->recvbuf, this->count);
+        }
+      } else {
+        return false;
+      }
+    }
+    // Complete final communication in the non-power-of-2 case.
+    if (final_comm_started) {
+      return this->test_send_recv();
+    }
+    if (adjusted_rank == -1) {
+      // Just need to wait for data.
+      MPI_Irecv(this->recvbuf, this->count, this->type, this->rank + 1,
+                this->tag, this->comm, &(this->send_recv_reqs[0]));
+      final_comm_started = true;
+      return false;
+    }
     if (phase == 0) {
       if (rs_step()) {
         // Switch to allgather for next step.
@@ -847,7 +897,19 @@ class MPIRabenseifnerAllreduceState : public MPIAllreduceState<T> {
       }
       return false;
     } else {
-      return ag_step();
+      if (ag_step()) {
+        // Done, but in the non-power-of-2 case we need to send to our partner.
+        if (this->rank < 2 * pow2_remainder) {
+          MPI_Isend(this->recvbuf, this->count, this->type, this->rank - 1,
+                    this->tag, this->comm, &(this->send_recv_reqs[0]));
+          final_comm_started = true;
+          return false;
+        } else {
+          return true;
+        }
+      } else {
+        return false;
+      }
     }
   }
  private:
@@ -855,6 +917,19 @@ class MPIRabenseifnerAllreduceState : public MPIAllreduceState<T> {
   int phase = 0;
   /** Whether communication has started. */
   bool started = false;
+  /** Whether the send/recv from non-power-of-2 setup has completed. */
+  bool setup_comm_done = false;
+  /** Whether the final send/recv from the non-power-of-2 case has started. */
+  bool final_comm_started = false;
+  /** Nearest power-of-2 <= nprocs. */
+  int pow2 = 1;
+  /** Processes left over in the non-power-of-2 case. */
+  int pow2_remainder = 0;
+  /**
+   * Process's adjusted rank for the non-power-of-2 case.
+   * This is equal to rank if nprocs is a power of 2.
+   */
+  int adjusted_rank = -1;
   /** Mask for computing the partner. */
   unsigned int partner_mask;
   /** Mask for computing the data slices to send. */
@@ -872,10 +947,10 @@ class MPIRabenseifnerAllreduceState : public MPIAllreduceState<T> {
   bool rs_step() {
     bool test = this->test_send_recv();
     if (started && test) {
-      const int old_partner = this->rank ^ partner_mask;
+      const int adjusted_old_partner = this->adjusted_rank ^ partner_mask;
       size_t old_recv_start = slice_ends[recv_idx] - slice_lengths[recv_idx];
       size_t old_recv_end;
-      if (this->rank < old_partner) {
+      if (adjusted_rank < adjusted_old_partner) {
         old_recv_end = slice_ends[send_idx - 1];
       } else {
         old_recv_end = slice_ends[last_idx - 1];
@@ -889,20 +964,23 @@ class MPIRabenseifnerAllreduceState : public MPIAllreduceState<T> {
         return true;
       }
       // This isn't updated on the last iteration.
-      last_idx = recv_idx + this->nprocs / slice_mask;
+      last_idx = recv_idx + pow2 / slice_mask;
     }
     if (test) {
-      const int partner = this->rank ^ partner_mask;
+      const int adjusted_partner = adjusted_rank ^ partner_mask;
+      const int partner = (adjusted_partner < pow2_remainder) ?
+        adjusted_partner * 2 + 1 :
+        adjusted_partner + pow2_remainder;
       // Compute the range of data to send/receive.
       size_t send_start, send_end, recv_start, recv_end;
-      if (this->rank < partner) {
-        send_idx = recv_idx + this->nprocs / (slice_mask*2);
+      if (adjusted_rank < adjusted_partner) {
+        send_idx = recv_idx + pow2 / (slice_mask*2);
         send_start = slice_ends[send_idx] - slice_lengths[send_idx];
         send_end = slice_ends[last_idx - 1];
         recv_start = slice_ends[recv_idx] - slice_lengths[recv_idx];
         recv_end = slice_ends[send_idx - 1];
       } else {
-        recv_idx = send_idx + this->nprocs / (slice_mask*2);
+        recv_idx = send_idx + pow2 / (slice_mask*2);
         send_start = slice_ends[send_idx] - slice_lengths[send_idx];
         send_end = slice_ends[recv_idx - 1];
         recv_start = slice_ends[recv_idx] - slice_lengths[recv_idx];
@@ -914,68 +992,40 @@ class MPIRabenseifnerAllreduceState : public MPIAllreduceState<T> {
       started = true;
     }
     return false;
-    /*const int partner = this->rank ^ partner_mask;
-    // Compute the range of data to send/receive.
-    size_t send_start, send_end, recv_start, recv_end;
-    if (this->rank < partner) {
-      send_idx = recv_idx + this->nprocs / (slice_mask*2);
-      send_start = slice_ends[send_idx] - slice_lengths[send_idx];
-      send_end = slice_ends[last_idx - 1];
-      recv_start = slice_ends[recv_idx] - slice_lengths[recv_idx];
-      recv_end = slice_ends[send_idx - 1];
-    } else {
-      recv_idx = send_idx + this->nprocs / (slice_mask*2);
-      send_start = slice_ends[send_idx] - slice_lengths[send_idx];
-      send_end = slice_ends[recv_idx - 1];
-      recv_start = slice_ends[recv_idx] - slice_lengths[recv_idx];
-      recv_end = slice_ends[last_idx - 1];
-    }
-    MPI_Sendrecv(this->recvbuf + send_start, send_end - send_start, this->type,
-                 partner, this->tag, this->recv_to, recv_end - recv_start,
-                 this->type, partner, this->tag, this->comm,
-                 MPI_STATUS_IGNORE);
-    this->reduction_op(this->recv_to, this->recvbuf + recv_start,
-                       recv_end - recv_start);
-    send_idx = recv_idx;
-    partner_mask >>= 1;
-    slice_mask <<= 1;
-    if (partner_mask == 0) {
-      return true;  // Done.
-    }
-    // This isn't updated on the last iteration.
-    last_idx = recv_idx + this->nprocs / slice_mask;
-    return false;*/
   }
   bool ag_step() {
     bool test = this->test_send_recv();
     if (started && test) {
       // Update state.
-      const int old_partner = this->rank ^ partner_mask;
-      if (this->rank > old_partner) {
+      const int adjusted_old_partner = adjusted_rank ^ partner_mask;
+      if (adjusted_rank > adjusted_old_partner) {
         send_idx = recv_idx;
       }
       partner_mask <<= 1;
       slice_mask >>= 1;
-      if (partner_mask >= static_cast<unsigned int>(this->nprocs)) {
+      if (partner_mask >= static_cast<unsigned int>(pow2)) {
         return true;
       }
     }
     if (test) {
-      const int partner = this->rank ^ partner_mask;
+      const int adjusted_partner = adjusted_rank ^ partner_mask;
+      const int partner = (adjusted_partner < pow2_remainder) ?
+        adjusted_partner * 2 + 1 :
+        adjusted_partner + pow2_remainder;
       // The send/recv ranges are computed similarly to above.
       size_t send_start, send_end, recv_start, recv_end;
-      if (this->rank < partner) {
+      if (adjusted_rank < adjusted_partner) {
         // Except on the first iteration, update last_idx.
-        if (slice_mask != static_cast<unsigned int>(this->nprocs) / 2) {
-          last_idx += this->nprocs / (slice_mask*2);
+        if (slice_mask != static_cast<unsigned int>(pow2) / 2) {
+          last_idx += pow2 / (slice_mask*2);
         }
-        recv_idx = send_idx + this->nprocs / (slice_mask*2);
+        recv_idx = send_idx + pow2 / (slice_mask*2);
         send_start = slice_ends[send_idx] - slice_lengths[send_idx];
         send_end = slice_ends[recv_idx - 1];
         recv_start = slice_ends[recv_idx] - slice_lengths[recv_idx];
         recv_end = slice_ends[last_idx - 1];
       } else {
-        recv_idx = send_idx - this->nprocs / (slice_mask*2);
+        recv_idx = send_idx - pow2 / (slice_mask*2);
         send_start = slice_ends[send_idx] - slice_lengths[send_idx];
         send_end = slice_ends[last_idx - 1];
         recv_start = slice_ends[recv_idx] - slice_lengths[recv_idx];
@@ -987,40 +1037,6 @@ class MPIRabenseifnerAllreduceState : public MPIAllreduceState<T> {
       started = true;
     }
     return false;
-    /*const int partner = this->rank ^ partner_mask;
-    // The send/recv ranges are computed similarly to above.
-    size_t send_start, send_end, recv_start, recv_end;
-    if (this->rank < partner) {
-      // Except on the first iteration, update last_idx.
-      if (slice_mask != static_cast<unsigned int>(this->nprocs) / 2) {
-        last_idx += this->nprocs / (slice_mask*2);
-      }
-      recv_idx = send_idx + this->nprocs / (slice_mask*2);
-      send_start = slice_ends[send_idx] - slice_lengths[send_idx];
-      send_end = slice_ends[recv_idx - 1];
-      recv_start = slice_ends[recv_idx] - slice_lengths[recv_idx];
-      recv_end = slice_ends[last_idx - 1];
-    } else {
-      recv_idx = send_idx - this->nprocs / (slice_mask*2);
-      send_start = slice_ends[send_idx] - slice_lengths[send_idx];
-      send_end = slice_ends[last_idx - 1];
-      recv_start = slice_ends[recv_idx] - slice_lengths[recv_idx];
-      recv_end = slice_ends[send_idx - 1];
-    }
-    MPI_Sendrecv(this->recvbuf + send_start, send_end - send_start,
-                 this->type, partner, this->tag,
-                 this->recvbuf + recv_start, recv_end - recv_start,
-                 this->type, partner, this->tag,
-                 this->comm, MPI_STATUS_IGNORE);
-    if (this->rank > partner) {
-      send_idx = recv_idx;
-    }
-    partner_mask <<= 1;
-    slice_mask >>= 1;
-    if (partner_mask >= static_cast<unsigned int>(this->nprocs)) {
-      return true;  // Done.
-    }
-    return false;*/
   }
 };
 
@@ -1028,10 +1044,6 @@ template <typename T>
 void nb_rabenseifner_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                                ReductionOperator op, Communicator& comm,
                                AllreduceRequest& req) {
-  if (comm.size() & (comm.size() - 1)) {
-    throw_allreduce_exception("Rabenseifner doubling requires a power-of-2 number"
-                              " of processes");
-  }
   req = get_free_request();
   MPIRabenseifnerAllreduceState<T>* state =
     new MPIRabenseifnerAllreduceState<T>(
