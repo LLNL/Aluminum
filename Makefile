@@ -11,11 +11,11 @@ ifeq ($(ENABLE_NCCL_CUDA), YES)
 	ENABLE_CUDA = YES
 	ifeq ($(shell hostname|grep surface -c), 1)
 		NCCL_DIR = /usr/workspace/wsb/brain/nccl2/nccl-2.0.5+cuda8.0
-  	else
-  	  ifeq ($(shell hostname|grep ray -c), 1)
+	else
+	  ifeq ($(shell hostname|grep ray -c), 1)
 	  	NCCL_DIR = /usr/workspace/wsb/brain/nccl2/nccl_2.0.5-3+cuda8.0_ppc64el
- 	  endif
- 	endif
+	  endif
+	endif
 	CXXFLAGS += -I$(NCCL_DIR)/include  -DALUMINUM_HAS_NCCL
 	LIB += -L$(NCCL_DIR)/lib -lnccl -Wl,-rpath=$(NCCL_DIR)/lib
 endif
