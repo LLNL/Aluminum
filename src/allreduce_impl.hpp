@@ -16,7 +16,6 @@ class MPIBackend {
     if (algo == AllreduceAlgorithm::automatic) {
       // TODO: Better algorithm selection/performance model.
       // TODO: Make tuneable.
-      algo = AllreduceAlgorithm::mpi_passthrough;
       if (count <= 1<<9) {
         algo = AllreduceAlgorithm::mpi_recursive_doubling;
       } else {
