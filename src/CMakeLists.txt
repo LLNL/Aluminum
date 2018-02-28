@@ -1,5 +1,6 @@
 set(ALUMINUM_HEADERS
   allreduce.hpp
+  allreduce_base.hpp
   allreduce_impl.hpp
   allreduce_mempool.hpp
   allreduce_mpi_impl.hpp
