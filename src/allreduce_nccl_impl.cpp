@@ -24,13 +24,31 @@
 namespace allreduces {
 
 void NCCLCommunicator::gpu_setup() {
-  int device;
-  cudaGetDevice(&device);
-  m_gpus.push_back(device);
-  cudaStream_t s;
-  cudaStreamCreate(&s);
-  m_streams.push_back(s);
-  m_num_gpus = 1;
+
+  // Initialize list of GPUs
+  if (m_gpus.empty()) {
+    m_gpus.push_back(0);
+    cudaGetDevice(&m_gpus.back());
+  }
+  m_num_gpus = m_gpus.size();
+
+  // Initialize list of 
+  if (m_streams.empty()) {
+    for (const auto& gpu : m_gpus) {
+      cudaSetDevice(gpu);
+      m_streams.push_back(nullptr);
+      cudaStreamCreate(&m_streams.back());
+    }
+  }
+  if ((int)m_streams.size() != m_num_gpus) {
+    std::cerr << "NCCLCommunicator: rank " << rank() << ": "
+              << "attempted to initialize with "
+              << m_num_gpus << " GPUs and "
+              << m_streams.size() << " CUDA streams"
+              << std::endl;
+    MPI_Abort(mpi_comm, -3);
+  }
+
 }
 
 void NCCLCommunicator::nccl_setup() {
