@@ -23,20 +23,9 @@ inline std::string allreduce_name(NCCLAllreduceAlgorithm algo) {
 class NCCLCommunicator : public MPICommunicator {
  public:
   NCCLCommunicator(MPI_Comm comm_ = MPI_COMM_WORLD,
-                   std::vector<int> gpus = std::vector<int>(),
-                   std::vector<cudaStream_t> streams = std::vector<cudaStream_t>())
-    : MPICommunicator(comm_),
-      m_gpus(gpus),
-      m_streams(streams),
-      m_num_gpus(gpus.size()) {
-    MPI_Comm_dup(comm_, &mpi_comm);
-    gpu_setup();
-    nccl_setup();
-  }
+                   std::vector<int> gpus = std::vector<int>());
 
-  ~NCCLCommunicator() override {
-    nccl_destroy();
-  }
+  ~NCCLCommunicator() override;
 
   Communicator* copy() const override { return new NCCLCommunicator(mpi_comm); }
 
