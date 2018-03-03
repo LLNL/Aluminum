@@ -22,22 +22,10 @@ inline std::string allreduce_name(NCCLAllreduceAlgorithm algo) {
 /// We assume NCCL version 2.0 or higher for allreduce to work
 class NCCLCommunicator : public MPICommunicator {
  public:
-  /** Default constructor; use MPI_COMM_WORLD. */
-  NCCLCommunicator() : NCCLCommunicator(MPI_COMM_WORLD) {}
-  /** Use a particular MPI communicator. */
-  NCCLCommunicator(MPI_Comm comm_) : MPICommunicator(comm_) {
-    MPI_Comm_dup(comm_, &mpi_comm);
+  NCCLCommunicator(MPI_Comm comm_ = MPI_COMM_WORLD,
+                   std::vector<int> gpus = std::vector<int>());
 
-    /// Set up GPU-related informatiton
-    gpu_setup();
-
-    /// NCCL set up here
-    nccl_setup();
-  }
-
-  ~NCCLCommunicator() override {
-    nccl_destroy();
-  }
+  ~NCCLCommunicator() override;
 
   Communicator* copy() const override { return new NCCLCommunicator(mpi_comm); }
 
@@ -69,8 +57,6 @@ protected:
   std::vector<cudaStream_t> m_streams;
   /// Number of GPUs allocated to the current rank
   int m_num_gpus;
-  /// Number of visible GPUs on this compute node
-  int m_num_visible_gpus;
 
   /** List of NCCL 2 related variables. */
   /// NOTE: It is assumed that ONLY ONE GPU is allocated to one MPI rank
@@ -146,6 +132,7 @@ class NCCLBackend {
     
     comm.Allreduce((void*) sendbuf, (void*) recvbuf, count,
                    nccl_type, nccl_redop);
+    req = comm.get_default_stream();
                    //nccl_type, nccl_redop, req);
   }
 

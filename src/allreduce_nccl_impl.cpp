@@ -1,16 +1,61 @@
 #ifdef ALUMINUM_HAS_NCCL
 #include "allreduce_nccl_impl.hpp"
 
+// Error checking macros
+#define CUDACHECK(cmd) do {                     \
+  cudaError_t e = cmd;                          \
+  if (e != cudaSuccess) {                       \
+    printf("CUDA failure %s:%d '%s'\n",         \
+           __FILE__, __LINE__,                  \
+           cudaGetErrorString(e));              \
+    exit(EXIT_FAILURE);                         \
+  }                                             \
+} while(0)
+#define NCCLCHECK(cmd) do {                     \
+  ncclResult_t r = cmd;                         \
+  if (r!= ncclSuccess) {                        \
+    printf("NCCL failure %s:%d '%s'\n",         \
+           __FILE__, __LINE__,                  \
+           ncclGetErrorString(r));              \
+    exit(EXIT_FAILURE);                         \
+  }                                             \
+} while(0)
+
 namespace allreduces {
 
+NCCLCommunicator::NCCLCommunicator(MPI_Comm comm_, std::vector<int> gpus)
+  : MPICommunicator(comm_),
+    m_gpus(gpus),
+    m_num_gpus(gpus.size()) {
+  MPI_Comm_dup(comm_, &mpi_comm);
+  gpu_setup();
+  nccl_setup();
+}
+
+NCCLCommunicator::~NCCLCommunicator() {
+  nccl_destroy();
+  for (size_t i=0; i<m_gpus.size(); ++i) {
+    CUDACHECK(cudaSetDevice(m_gpus[i]));
+    CUDACHECK(cudaStreamDestroy(m_streams[i]));
+  }
+}
+
 void NCCLCommunicator::gpu_setup() {
-  int device;
-  cudaGetDevice(&device);
-  m_gpus.push_back(device);
-  cudaStream_t s;
-  cudaStreamCreate(&s);
-  m_streams.push_back(s);
-  m_num_gpus = 1;
+
+  // Initialize list of GPUs
+  if (m_gpus.empty()) {
+    m_gpus.push_back(0);
+    CUDACHECK(cudaGetDevice(&m_gpus.back()));
+  }
+  m_num_gpus = m_gpus.size();
+
+  // Initialize streams
+  for (const auto& gpu : m_gpus) {
+    CUDACHECK(cudaSetDevice(gpu));
+    m_streams.push_back(nullptr);
+    CUDACHECK(cudaStreamCreate(&m_streams.back()));
+  }
+
 }
 
 void NCCLCommunicator::nccl_setup() {

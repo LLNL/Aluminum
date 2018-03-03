@@ -71,7 +71,7 @@ class MPICommunicator : public Communicator {
     MPI_Comm_rank(local_comm, &rank_in_local_comm);
     MPI_Comm_size(local_comm, &size_of_local_comm);
   }
-  ~MPICommunicator() override {
+  virtual ~MPICommunicator() override {
     // TODO: Fix; can't do this after finalization.
     //MPI_Comm_free(&comm);
   }
