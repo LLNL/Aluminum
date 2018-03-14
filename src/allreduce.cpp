@@ -181,7 +181,10 @@ void ProgressEngine::bind() {
 
 void ProgressEngine::engine() {
   bind();
-  started_flag = true;
+  {
+    std::unique_lock<std::mutex> lock(startup_mutex);
+    started_flag = true;
+  }
   startup_cv.notify_one();
   while (!stop_flag.load()) {
     // Check for newly-submitted requests, if we can take more.
