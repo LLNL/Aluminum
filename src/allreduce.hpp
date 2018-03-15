@@ -209,6 +209,75 @@ void NonblockingAllreduce(
                                             comm, req, algo);
 }
 
+template <typename Backend, typename T>
+void Reduce(const T* sendbuf, T* recvbuf, size_t count,
+            ReductionOperator op, int root, typename Backend::comm_type& comm,
+            typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  Backend::template Reduce<T>(sendbuf, recvbuf, count, op, root, comm, algo);
+}
+
+template <typename Backend, typename T>
+void Reduce(T* recvbuf, size_t count,
+            ReductionOperator op, int root, typename Backend::comm_type& comm,
+            typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  Backend::template Reduce<T>( recvbuf, count, op, root, comm, algo);
+}
+
+template <typename Backend, typename T>
+void NonblockingReduce(
+  const T* sendbuf, T* recvbuf, size_t count,
+  ReductionOperator op,
+  int root,
+  typename Backend::comm_type& comm,
+  typename Backend::req_type& req,
+  typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  Backend::template NonblockingRreduce<T>(sendbuf, recvbuf, count, op, root, comm, req, algo);
+}
+
+template <typename Backend, typename T>
+void NonblockingReduce(
+  T* recvbuf, size_t count,
+  ReductionOperator op,
+  int root,
+  typename Backend::comm_type& comm,
+  typename Backend::req_type& req, 
+  typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  Backend::template NonblockingReduce<T>(recvbuf, count, op, root, comm, req, algo);
+}
+
+template <typename Backend, typename T>
+void Allgather(const T* sendbuf, T* recvbuf, size_t count,
+               typename Backend::comm_type& comm,
+               typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  Backend::template Allgather<T>(sendbuf, recvbuf, count, comm, algo);
+}
+
+template <typename Backend, typename T>
+void Allgather(T* recvbuf, size_t count,
+               typename Backend::comm_type& comm,
+               typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  Backend::template Allgather<T>(recvbuf, count, comm, algo);
+}
+
+template <typename Backend, typename T>
+void NonblockingAllgather(
+  const T* sendbuf, T* recvbuf, size_t count,
+  typename Backend::comm_type& comm,
+  typename Backend::req_type& req,
+  typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  Backend::template NonblockingAllgather<T>(sendbuf, recvbuf, count, comm, req, algo);
+}
+
+template <typename Backend, typename T>
+void NonblockingAllgather(
+  T* recvbuf, size_t count,
+  typename Backend::comm_type& comm,
+  typename Backend::req_type& req,
+  typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  Backend::template NonblockingAllgather<T>(recvbuf, count, comm, req, algo);
+}
+
+
 /**
  * Test whether req has completed or not, returning true if it has.
  */
