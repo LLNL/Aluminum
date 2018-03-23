@@ -8,6 +8,7 @@ class MPIBackend {
   using algo_type = AllreduceAlgorithm;
   using comm_type = MPICommunicator;
   using req_type = int;
+  static constexpr req_type null_req = internal::NULL_REQUEST;
 
   template <typename T>
   static void Allreduce(const T* sendbuf, T* recvbuf, size_t count,
