@@ -2,7 +2,7 @@
 #include "allreduce.hpp"
 #include "test_utils.hpp"
 #ifdef ALUMINUM_HAS_NCCL
-#include "test_utils_nccl.hpp"
+#include "test_utils_nccl_cuda.hpp"
 #endif
 #ifdef ALUMINUM_HAS_MPI_CUDA
 #include "test_utils_mpi_cuda.hpp"

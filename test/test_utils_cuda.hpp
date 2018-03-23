@@ -145,6 +145,11 @@ class CUDAVector {
     return *this;
   }
 
+  CUDAVector& move(const CUDAVector<T> &v) {
+    CHECK_CUDA(cudaMemcpy(m_ptr, v.m_ptr, v.get_bytes(), cudaMemcpyDefault));
+    return *this;
+  }
+
   T *data() {
     return m_ptr;
   }
@@ -184,6 +189,9 @@ bool check_vector(const CUDAVector<float>& expected,
 }
 
 void get_expected_result(CUDAVector<float>& expected) {
+
+
+
   std::vector<float> &&host_data = expected.copyout();
   MPI_Allreduce(MPI_IN_PLACE, host_data.data(), expected.size(),
                 MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);

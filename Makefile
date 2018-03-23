@@ -1,7 +1,7 @@
 cur_dir = $(shell pwd)
 MPICXX ?= mpicxx
 NVCC ?= nvcc
-CXXFLAGS += -Wall -Wextra -pedantic -Wshadow -O3 -std=gnu++11 -fopenmp -g -fPIC -lhwloc -I$(cur_dir)/src -I$(cur_dir)/test
+CXXFLAGS += -DALUMINUM_DEBUG -Wall -Wextra -pedantic -Wshadow -O3 -std=gnu++11 -fopenmp -g -fPIC -lhwloc -I$(cur_dir)/src -I$(cur_dir)/test
 LIB = -L$(cur_dir) -lallreduce -Wl,-rpath=$(cur_dir) -lrt
 NVCCFLAGS += --compiler-bindir $(CXX) -arch sm_30 -I$(cur_dir)/src -I$(cur_dir)/test -std=c++11
 
@@ -34,7 +34,7 @@ ifeq ($(ENABLE_CUDA), YES)
 	LIB += -L$(CUDA_HOME)/lib64 -lcudart -Wl,-rpath=$(CUDA_HOME)/lib64
 endif
 
-all: liballreduce.so benchmark_allreduces benchmark_nballreduces benchmark_overlap benchmark_reductions test_correctness test_multi_nballreduces
+all: liballreduce.so benchmark_allreduces benchmark_nballreduces benchmark_overlap benchmark_reductions test_correctness test_multi_nballreduces test_nccl_collectives
 
 liballreduce.so: src/allreduce.cpp src/allreduce_mpi_impl.cpp src/allreduce.hpp src/allreduce_impl.hpp src/allreduce_mempool.hpp src/allreduce_mpi_impl.hpp src/tuning_params.hpp src/allreduce_nccl_impl.hpp src/allreduce_nccl_impl.cpp
 	$(MPICXX) $(CXXFLAGS) -shared -o liballreduce.so src/allreduce.cpp src/allreduce_mpi_impl.cpp src/allreduce_nccl_impl.cpp
@@ -51,6 +51,9 @@ benchmark_overlap: liballreduce.so benchmark/benchmark_overlap.cpp
 test_correctness: liballreduce.so test/test_correctness.cpp src/allreduce_nccl_impl.hpp test/test_utils.hpp $(CUDA_OBJ) $(MPI_CUDA_HEADERS)
 	$(MPICXX) $(CXXFLAGS) $(LIB) -o test_correctness test/test_correctness.cpp $(CUDA_OBJ)
 
+test_nccl_collectives: liballreduce.so test/test_nccl_collectives.cpp src/allreduce_nccl_impl.hpp test/test_utils.hpp $(CUDA_OBJ) $(MPI_CUDA_HEADERS)
+	$(MPICXX) $(CXXFLAGS) $(LIB) -o test_nccl_collectives test/test_nccl_collectives.cpp $(CUDA_OBJ)
+
 test_multi_nballreduces: liballreduce.so test/test_multi_nballreduces.cpp
 	$(MPICXX) $(CXXFLAGS) $(LIB) -o test_multi_nballreduces test/test_multi_nballreduces.cpp
 
@@ -61,4 +64,4 @@ src/mpi_cuda/cuda_kernels.o: src/mpi_cuda/cuda_kernels.cu
 	$(NVCC) $(NVCCFLAGS) -x cu -c $< -o $@
 
 clean:
-	rm -f liballreduce.so benchmark_allreduces benchmark_nballreduces benchmark_reductions test_correctness test_multi_nballreduces benchmark_overlap src/mpi_cuda/cuda_kernels.o
+	rm -f liballreduce.so benchmark_allreduces benchmark_nballreduces benchmark_reductions test_correctness test_multi_nballreduces test_nccl_collectives benchmark_overlap src/mpi_cuda/cuda_kernels.o

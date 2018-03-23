@@ -33,16 +33,17 @@ class NCCLCommunicator : public MPICommunicator {
 
   cudaStream_t get_default_stream();
 
-  /// It is assumed that both sendbuf and recvbuf are in device memory
+  /// For following reduction functions, it is assumed that both sendbuf and recvbuf are in device memory
   /// for NCCL sendbuf and recvbuf can be identical; in-place operation will be performed
   void Allreduce(void* sendbuf, void* recvbuf, size_t count, ncclDataType_t nccl_type,
                ncclRedOp_t nccl_redop, cudaStream_t default_stream); 
 
-  void Bcast(void* sendbuf, size_t count, ncclDataType_t nccl_type, int root, 
-               cudaStream_t default_stream); 
-
   void Reduce(void* sendbuf, void* recvbuf, size_t count, ncclDataType_t nccl_type,
                ncclRedOp_t nccl_redop, int root, cudaStream_t default_stream); 
+
+  /// It is assumed that the sendbuff is in device memory for broadcast operation
+  void Bcast(void* sendbuf, size_t count, ncclDataType_t nccl_type, int root, 
+               cudaStream_t default_stream); 
 
   /**
   * It is assumed that both sendbuf and recvbuf are in device memory
@@ -167,28 +168,6 @@ class NCCLBackend {
       algo_type algo) {
     NonblockingAllreduce(internal::IN_PLACE<T>(), recvbuf, count, op, comm,
                          req, algo);
-  }
-
-  template <typename T>
-  static void Bcast(const T* sendbuf, size_t count, int root, comm_type& comm, algo_type algo) {
-    cudaStream_t default_stream = comm.get_default_stream();
-    ncclDataType_t nccl_type;
-    switch(sizeof(T)) {
-      case 8:
-        nccl_type = ncclDouble;
-        break;
-      case 4:
-        nccl_type = ncclFloat;
-        break;
-      case 2:
-        nccl_type = ncclHalf;
-        break;
-      default:
-        throw_allreduce_exception("unsupported NCCL data type");
-    }
-
-    Bcast(sendbuf, count, nccl_type, root, default_stream);
-    comm.synchronize();
   }
 
   template <typename T>
@@ -400,6 +379,42 @@ class NCCLBackend {
     NonblockingReduce_scatter(internal::IN_PLACE<T>(), recvbuf, recv_count, op, comm, req, algo);
   }
 
+  template <typename T>
+  static void Bcast(const T* sendbuf, 
+                    size_t count, 
+                    int root, 
+                    comm_type& comm, 
+                    algo_type algo) {
+    cudaStream_t default_stream = comm.get_default_stream();
+    NonblockingBcast(sendbuf, count, root, comm, default_stream, algo);
+    comm.synchronize();
+  }
+
+
+  template <typename T>
+  static void NonblockingBcast(const T* sendbuf, 
+                               size_t count, 
+                               int root, 
+                               comm_type& comm,  
+                               req_type& req, 
+                               algo_type algo) {
+    ncclDataType_t nccl_type;
+    switch(sizeof(T)) {
+      case 8:
+        nccl_type = ncclDouble;
+        break;
+      case 4:
+        nccl_type = ncclFloat;
+        break;
+      case 2:
+        nccl_type = ncclHalf;
+        break;
+      default:
+        throw_allreduce_exception("unsupported NCCL data type");
+    }
+
+    comm.Bcast((void *) sendbuf, count, nccl_type, root, req);
+  }
 };
 
 
@@ -414,5 +429,4 @@ inline void Wait<NCCLBackend>(typename NCCLBackend::req_type& req) {
 }
 
 }  // namespace allreduces
-
 

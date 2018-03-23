@@ -231,7 +231,7 @@ void NonblockingReduce(
   typename Backend::comm_type& comm,
   typename Backend::req_type& req,
   typename Backend::algo_type algo = Backend::algo_type::automatic) {
-  Backend::template NonblockingRreduce<T>(sendbuf, recvbuf, count, op, root, comm, req, algo);
+  Backend::template NonblockingReduce<T>(sendbuf, recvbuf, count, op, root, comm, req, algo);
 }
 
 template <typename Backend, typename T>
@@ -243,6 +243,40 @@ void NonblockingReduce(
   typename Backend::req_type& req, 
   typename Backend::algo_type algo = Backend::algo_type::automatic) {
   Backend::template NonblockingReduce<T>(recvbuf, count, op, root, comm, req, algo);
+}
+
+template <typename Backend, typename T>
+void Reduce_scatter(const T* sendbuf, T* recvbuf, size_t count,
+            ReductionOperator op, typename Backend::comm_type& comm,
+            typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  Backend::template Reduce_scatter<T>(sendbuf, recvbuf, count, op, comm, algo);
+}
+
+template <typename Backend, typename T>
+void Reduce_scatter(T* recvbuf, size_t count,
+            ReductionOperator op, typename Backend::comm_type& comm,
+            typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  Backend::template Reduce_scatter<T>(recvbuf, count, op, comm, algo);
+}
+
+template <typename Backend, typename T>
+void NonblockingReduce_scatter(
+  const T* sendbuf, T* recvbuf, size_t count,
+  ReductionOperator op,
+  typename Backend::comm_type& comm,
+  typename Backend::req_type& req,
+  typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  Backend::template NonblockingReduce_scatter<T>(sendbuf, recvbuf, count, op, comm, req, algo);
+}
+
+template <typename Backend, typename T>
+void NonblockingReduce_scatter(
+  T* recvbuf, size_t count,
+  ReductionOperator op,
+  typename Backend::comm_type& comm,
+  typename Backend::req_type& req, 
+  typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  Backend::template NonblockingReduce_scatter<T>(recvbuf, count, op, comm, req, algo);
 }
 
 template <typename Backend, typename T>
@@ -278,6 +312,27 @@ void NonblockingAllgather(
 }
 
 
+template <typename Backend, typename T>
+void Bcast(const T* sendbuf, 
+           size_t count, 
+           int root, 
+           typename Backend::comm_type& comm,
+           typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  Backend::template Bcast<T>(sendbuf, count, root, comm, algo);
+}
+
+template <typename Backend, typename T>
+void NonblockingBcast(
+  const T* sendbuf, 
+  size_t count,
+  int root,
+  typename Backend::comm_type& comm,
+  typename Backend::req_type& req,
+  typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  Backend::template NonblockingBcast<T>(sendbuf,  count, root, comm, req, algo);
+}
+
+/// No in-place Bcast is defined, because Bcast is by default an in-place collective
 /**
  * Test whether req has completed or not, returning true if it has.
  */
@@ -504,3 +559,4 @@ void pe_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
 #ifdef ALUMINUM_HAS_MPI_CUDA
 #include "allreduce_mpi_cuda_impl.hpp"
 #endif
+
