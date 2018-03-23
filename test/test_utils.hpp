@@ -29,6 +29,24 @@ typename VectorType<Backend>::type gen_data(size_t count);
 template <>
 typename VectorType<allreduces::MPIBackend>::type
 gen_data<allreduces::MPIBackend>(size_t count) {
+/*
+  int rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  if (!rng_seeded) {
+    int flag;
+    MPI_Initialized(&flag);
+    if (flag) {
+      rng_gen.seed(rank);
+    }
+  }
+  std::uniform_real_distribution<float> rng;
+  std::vector<float> v(count);
+  for (size_t i = 0; i < count; ++i) {
+    v[i] = (float) (count*rank+i);
+  }
+  return v;
+*/
+
   if (!rng_seeded) {
     int flag;
     MPI_Initialized(&flag);
@@ -42,6 +60,21 @@ gen_data<allreduces::MPIBackend>(size_t count) {
   std::vector<float> v(count);
   for (size_t i = 0; i < count; ++i) {
     v[i] = rng(rng_gen);
+  }
+  return v;
+}
+
+
+template <typename Backend=allreduces::MPIBackend>
+typename VectorType<Backend>::type create_data(size_t count);
+
+template <>
+typename VectorType<allreduces::MPIBackend>::type
+create_data<allreduces::MPIBackend>(size_t count) {
+
+  std::vector<float> v(count);
+  for (size_t i = 0; i < count; ++i) {
+    v[i] = 0.0;
   }
   return v;
 }
@@ -123,6 +156,7 @@ bool check_vector(const std::vector<float>& expected,
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   for (size_t i = 0; i < expected.size(); ++i) {
     float e = expected[i];
+
     if (std::abs(e - actual[i]) > eps) {
 #ifdef ALUMINUM_DEBUG
       std::stringstream ss;
@@ -130,6 +164,7 @@ bool check_vector(const std::vector<float>& expected,
                 << ", Actual: " << actual[i] << "\n";
       std::cerr << ss.str();
       match = false;
+      return false;
 #else
       return false;
 #endif
