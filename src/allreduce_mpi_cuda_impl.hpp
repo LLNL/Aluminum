@@ -28,6 +28,7 @@ class MPICUDABackend {
   using algo_type = MPICUDAAllreduceAlgorithm;
   using comm_type = internal::mpi_cuda::MPICUDACommunicator;
   using req_type = cudaStream_t;
+  static constexpr req_type null_req = (req_type) (-1);
 
   template <typename T>
   static void Allreduce(const T* sendbuf, T* recvbuf, size_t count,

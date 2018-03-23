@@ -93,6 +93,7 @@ class NCCLBackend {
   using algo_type = NCCLCollectiveAlgorithm;
   using comm_type = NCCLCommunicator;
   using req_type = cudaStream_t;
+  static constexpr req_type null_req = (req_type) (-1);
 
   template <typename T>
   static void Allreduce(const T* sendbuf, T* recvbuf, size_t count,
@@ -402,7 +403,6 @@ class NCCLBackend {
 
 };
 
-
 template <>
 inline bool Test<NCCLBackend>(typename NCCLBackend::req_type& req) {
   return cudaStreamQuery(req) == cudaSuccess;
@@ -414,5 +414,3 @@ inline void Wait<NCCLBackend>(typename NCCLBackend::req_type& req) {
 }
 
 }  // namespace allreduces
-
-
