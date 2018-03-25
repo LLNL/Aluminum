@@ -167,6 +167,13 @@ class NCCLBackend {
   using req_type = cudaStream_t;
   static constexpr req_type null_req = (req_type) (-1);
 
+  /** Return a fresh request. */
+  static req_type get_request() {
+    cudaStream_t s;
+    cudaStreamCreate(&s);
+    return s;
+  }
+
   template <typename T>
   static void Allreduce(const T* sendbuf, T* recvbuf, size_t count,
                         ReductionOperator op, comm_type& comm,
@@ -192,6 +199,9 @@ class NCCLBackend {
     ncclRedOp_t nccl_redop = internal::nccl::ReductionOperator2ncclRedOp(op);
     if (sendbuf == internal::IN_PLACE<T>()) {
       sendbuf = recvbuf;
+    }
+    if (req == null_req) {
+      req = get_request();
     }
     comm.Allreduce((void*) sendbuf, (void*) recvbuf, count,
                    nccl_type, nccl_redop, req);
@@ -231,6 +241,9 @@ class NCCLBackend {
     if (sendbuf == internal::IN_PLACE<T>()) {
       sendbuf = recvbuf;
     }
+    if (req == null_req) {
+      req = get_request();
+    }
     comm.Reduce((void*) sendbuf, (void*) recvbuf, count,
                 nccl_type, nccl_redop, root, req);
   }
@@ -263,6 +276,9 @@ class NCCLBackend {
     ncclDataType_t nccl_type = internal::nccl::TypeMap<T>();
     if (sendbuf == internal::IN_PLACE<T>()) {
       sendbuf = recvbuf;
+    }
+    if (req == null_req) {
+      req = get_request();
     }
     comm.Allgather((void*) sendbuf, (void*) recvbuf, count,
                    nccl_type, req);
@@ -300,6 +316,9 @@ class NCCLBackend {
     if (sendbuf == internal::IN_PLACE<T>()) {
       sendbuf = recvbuf;
     }
+    if (req == null_req) {
+      req = get_request();
+    }
     comm.Reduce_scatter((void*) sendbuf, (void*) recvbuf, recv_count,
                         nccl_type, nccl_redop, req);
   }
@@ -323,17 +342,26 @@ class NCCLBackend {
   static void NonblockingBcast(const T* sendbuf, size_t count, int root,
                                comm_type& comm, req_type& req, algo_type) {
     ncclDataType_t nccl_type = internal::nccl::TypeMap<T>();
+    if (req == null_req) {
+      req = get_request();
+    }
     comm.Bcast((void *) sendbuf, count, nccl_type, root, req);
   }
 };
 
 template <>
 inline bool Test<NCCLBackend>(typename NCCLBackend::req_type& req) {
+  if (req == NCCLBackend::null_req) {
+    return true;
+  }
   return cudaStreamQuery(req) == cudaSuccess;
 }
 
 template <>
 inline void Wait<NCCLBackend>(typename NCCLBackend::req_type& req) {
+  if (req == NCCLBackend::null_req) {
+    return;
+  }
   cudaStreamSynchronize(req);
 }
 
