@@ -1,7 +1,7 @@
 cur_dir = $(shell pwd)
 MPICXX ?= mpicxx
 NVCC ?= nvcc
-CXXFLAGS += -DALUMINUM_DEBUG -Wall -Wextra -pedantic -Wshadow -O3 -std=gnu++11 -fopenmp -g -fPIC -lhwloc -I$(cur_dir)/src -I$(cur_dir)/test
+CXXFLAGS += -Wall -Wextra -pedantic -Wshadow -O3 -std=gnu++11 -fopenmp -g -fPIC -lhwloc -I$(cur_dir)/src -I$(cur_dir)/test
 LIB = -L$(cur_dir) -lallreduce -Wl,-rpath=$(cur_dir) -lrt
 NVCCFLAGS += --compiler-bindir $(CXX) -arch sm_30 -I$(cur_dir)/src -I$(cur_dir)/test -std=c++11
 
