@@ -246,14 +246,14 @@ void NonblockingReduce(
 }
 
 template <typename Backend, typename T>
-void Reduce_scatter(const T* sendbuf, T* recvbuf, size_t count,
+void Reduce_scatter(const T* sendbuf, T* recvbuf, size_t *count,
             ReductionOperator op, typename Backend::comm_type& comm,
             typename Backend::algo_type algo = Backend::algo_type::automatic) {
   Backend::template Reduce_scatter<T>(sendbuf, recvbuf, count, op, comm, algo);
 }
 
 template <typename Backend, typename T>
-void Reduce_scatter(T* recvbuf, size_t count,
+void Reduce_scatter(T* recvbuf, size_t *count,
             ReductionOperator op, typename Backend::comm_type& comm,
             typename Backend::algo_type algo = Backend::algo_type::automatic) {
   Backend::template Reduce_scatter<T>(recvbuf, count, op, comm, algo);
@@ -261,7 +261,7 @@ void Reduce_scatter(T* recvbuf, size_t count,
 
 template <typename Backend, typename T>
 void NonblockingReduce_scatter(
-  const T* sendbuf, T* recvbuf, size_t count,
+  const T* sendbuf, T* recvbuf, size_t *count,
   ReductionOperator op,
   typename Backend::comm_type& comm,
   typename Backend::req_type& req,
@@ -271,7 +271,7 @@ void NonblockingReduce_scatter(
 
 template <typename Backend, typename T>
 void NonblockingReduce_scatter(
-  T* recvbuf, size_t count,
+  T* recvbuf, size_t *count,
   ReductionOperator op,
   typename Backend::comm_type& comm,
   typename Backend::req_type& req, 
