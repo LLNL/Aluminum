@@ -165,7 +165,7 @@ class NCCLBackend {
   using algo_type = NCCLCollectiveAlgorithm;
   using comm_type = NCCLCommunicator;
   using req_type = cudaStream_t;
-  static constexpr req_type null_req = (req_type) (-1);
+  static const req_type null_req;
 
   /** Return a fresh request. */
   static req_type get_request() {

@@ -5,6 +5,10 @@
 #include <cassert>
 
 namespace allreduces {
+
+// Initialize this.
+const MPICUDABackend::req_type MPICUDABackend::null_req = (MPICUDABackend::req_type) (-1);
+
 namespace internal {
 namespace mpi_cuda {
 

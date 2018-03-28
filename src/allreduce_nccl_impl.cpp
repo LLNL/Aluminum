@@ -23,6 +23,9 @@
 
 namespace allreduces {
 
+// Initialize this.
+const NCCLBackend::req_type NCCLBackend::null_req = (NCCLBackend::req_type) (-1);
+
 NCCLCommunicator::NCCLCommunicator(MPI_Comm comm_, std::vector<int> gpus)
   : MPICommunicator(comm_),
     m_gpus(gpus),
