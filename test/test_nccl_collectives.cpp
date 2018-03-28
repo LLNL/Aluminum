@@ -141,7 +141,12 @@ void test_reduce_scatter_algo(const typename VectorType<Backend>::type& expected
                          typename Backend::algo_type algo) {
 
   auto recv = get_vector<Backend>(expected.size());
-  allreduces::Reduce_scatter<Backend>(input.data(), recv.data(), expected.size(), allreduces::ReductionOperator::sum, comm, algo);
+  std::vector<size_t> recv_count(comm.size());
+  for(int i=0; i<comm.size(); i++){
+    recv_count[i] = expected.size();
+  }
+
+  allreduces::Reduce_scatter<Backend>(input.data(), recv.data(), recv_count.data(), allreduces::ReductionOperator::sum, comm, algo);
 
   if (!check_vector(expected, recv)) {
     std::cout << comm.rank() << ": regular reduce_scatter does not match" <<
@@ -150,7 +155,7 @@ void test_reduce_scatter_algo(const typename VectorType<Backend>::type& expected
   }
 
   auto input_copy (input);
-  allreduces::Reduce_scatter<Backend>(input_copy.data(), expected.size(), allreduces::ReductionOperator::sum, comm, algo);
+  allreduces::Reduce_scatter<Backend>(input_copy.data(), recv_count.data(), allreduces::ReductionOperator::sum, comm, algo);
   if (!check_vector(expected, input_copy)) {
     std::cout << comm.rank() << ": in-place reduce_scatter does not match" <<
       std::endl;
@@ -167,9 +172,13 @@ void test_nb_reduce_scatter_algo(const typename VectorType<Backend>::type& expec
 
   typename Backend::req_type req = get_request<Backend>();
   auto recv = get_vector<Backend>(expected.size());
+  std::vector<size_t> recv_count(comm.size());
+  for(int i=0; i<comm.size(); i++){
+    recv_count[i] = expected.size();
+  }
 
   /// Test regular reduce_scatter
-  allreduces::NonblockingReduce_scatter<Backend>(input.data(), recv.data(), expected.size(), allreduces::ReductionOperator::sum, comm, req, algo);
+  allreduces::NonblockingReduce_scatter<Backend>(input.data(), recv.data(), recv_count.data(), allreduces::ReductionOperator::sum, comm, req, algo);
   allreduces::Wait<Backend>(req);
 
   if (!check_vector(expected, recv)) {
@@ -180,7 +189,7 @@ void test_nb_reduce_scatter_algo(const typename VectorType<Backend>::type& expec
 
   /// Test in-place reduce_scatter
   auto input_copy (input);
-  allreduces::NonblockingReduce_scatter<Backend>(input_copy.data(), expected.size(), allreduces::ReductionOperator::sum, comm, req,  algo);
+  allreduces::NonblockingReduce_scatter<Backend>(input_copy.data(), recv_count.data(), allreduces::ReductionOperator::sum, comm, req,  algo);
   if (!check_vector(expected, input_copy)) {
     std::cout << comm.rank() << ": non-blocking in-place reduce_scatter does not match" <<
       std::endl;

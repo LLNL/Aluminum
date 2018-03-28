@@ -291,7 +291,7 @@ class NCCLBackend {
   }
 
   template <typename T>
-  static void Reduce_scatter(const T* sendbuf, T* recvbuf, size_t recv_count,
+  static void Reduce_scatter(const T* sendbuf, T* recvbuf, size_t *recv_count,
                              ReductionOperator op, comm_type& comm,
                              algo_type algo) {
     cudaStream_t default_stream = comm.get_default_stream();
@@ -300,7 +300,7 @@ class NCCLBackend {
   }
 
   template <typename T>
-  static void Reduce_scatter(T* recvbuf, size_t recv_count,
+  static void Reduce_scatter(T* recvbuf, size_t *recv_count,
                              ReductionOperator op, comm_type& comm,
                              algo_type algo) {
     Reduce_scatter(internal::IN_PLACE<T>(), recvbuf, recv_count, op, comm, algo);
@@ -308,9 +308,25 @@ class NCCLBackend {
 
   template <typename T>
   static void NonblockingReduce_scatter(const T* sendbuf, T* recvbuf,
-                                        size_t recv_count, ReductionOperator op,
+                                        size_t *recv_count, ReductionOperator op,
                                         comm_type& comm, req_type& req,
                                         algo_type) {
+    /// Checking recv_count. This is to fix syntactic mismatch between NCCL and MPI Reduce_scatter.
+    size_t r_count = (size_t) recv_count[0];
+    bool check = true;
+    for (int i=1; i<comm.size(); i++) {
+      if(recv_count[i] != recv_count[0]){
+        check = false;
+        break;
+      }
+    }
+    if(!check){
+      if(comm.rank() == 0){
+        std::cerr << "For NCCL_Reduce_scatter recv_count must be equal for all ranks\n";
+        std::abort();
+      }
+    }
+
     ncclDataType_t nccl_type = internal::nccl::TypeMap<T>();
     ncclRedOp_t nccl_redop = internal::nccl::ReductionOperator2ncclRedOp(op);
     if (sendbuf == internal::IN_PLACE<T>()) {
@@ -319,12 +335,12 @@ class NCCLBackend {
     if (req == null_req) {
       req = get_request();
     }
-    comm.Reduce_scatter((void*) sendbuf, (void*) recvbuf, recv_count,
+    comm.Reduce_scatter((void*) sendbuf, (void*) recvbuf, r_count,
                         nccl_type, nccl_redop, req);
   }
 
   template <typename T>
-  static void NonblockingReduce_scatter(T* recvbuf, size_t recv_count,
+  static void NonblockingReduce_scatter(T* recvbuf, size_t *recv_count,
                                         ReductionOperator op, comm_type& comm,
                                         req_type& req, algo_type algo) {
     NonblockingReduce_scatter(internal::IN_PLACE<T>(), recvbuf, recv_count, op, comm, req, algo);
