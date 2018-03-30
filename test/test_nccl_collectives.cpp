@@ -461,15 +461,17 @@ void test_correctness() {
 int main(int argc, char** argv) {
   allreduces::Initialize(argc, argv);
 
-  std::string backend = "NCCL";
+  std::string backend = "";
   max_size = std::stoul(argv[1]);
 
+#ifdef ALUMINUM_HAS_NCCL
   if (backend == "NCCL") {
     set_device();
     test_correctness<allreduces::NCCLBackend>();
-  } 
-  else {
-    std::cerr << "usage: " << argv[0] << " \n";
+  }
+#endif
+  if (backend == "") {
+    std::cerr << "usage: " << argv[0] << " [NCCL] \n";
     return -1;
   }
 
