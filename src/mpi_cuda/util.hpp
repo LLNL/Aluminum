@@ -47,7 +47,7 @@
   } while (0)
 
 
-namespace allreduces {
+namespace Al {
 namespace internal {
 namespace mpi_cuda {
 
@@ -139,4 +139,4 @@ class MPIPrintStream {
 
 } // namespace mpi_cuda
 } // namespace internal
-} // namespace allreduces
+} // namespace Al

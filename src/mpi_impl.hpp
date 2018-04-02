@@ -4,7 +4,7 @@
 #include <vector>
 #include <numeric>
 
-namespace allreduces {
+namespace Al {
 namespace internal {
 namespace mpi {
 
@@ -25,15 +25,15 @@ inline bool check_count_fits_mpi(size_t count) {
 /** Throw an exception if count elements cannot be sent by MPI. */
 inline void assert_count_fits_mpi(size_t count) {
   if (!check_count_fits_mpi(count)) {
-    throw_allreduce_exception("Message count too large for MPI");
+    throw_al_exception("Message count too large for MPI");
   }
 }
 
 /** Basic sum reduction. */
 template <typename T>
 void sum_reduction(const T* src, T* dest, size_t count) {
-#if ALLREDUCE_MPI_USE_OPENMP
-  if (count >= ALLREDUCE_MPI_MULTITHREAD_SUM_THRESH) {
+#if AL_MPI_USE_OPENMP
+  if (count >= AL_MPI_MULTITHREAD_SUM_THRESH) {
     #pragma omp parallel for
     for (size_t i = 0; i < count; ++i) {
       dest[i] += src[i];
@@ -52,8 +52,8 @@ void sum_reduction(const T* src, T* dest, size_t count) {
 /** Basic prod reduction. */
 template <typename T>
 void prod_reduction(const T* src, T* dest, size_t count) {
-#if ALLREDUCE_MPI_USE_OPENMP
-  if (count >= ALLREDUCE_MPI_MULTITHREAD_PROD_THRESH) {
+#if AL_MPI_USE_OPENMP
+  if (count >= AL_MPI_MULTITHREAD_PROD_THRESH) {
     #pragma omp parallel for
     for (size_t i = 0; i < count; ++i) {
       dest[i] *= src[i];
@@ -72,8 +72,8 @@ void prod_reduction(const T* src, T* dest, size_t count) {
 /** Basic min reduction. */
 template <typename T>
 void min_reduction(const T* src, T* dest, size_t count) {
-#if ALLREDUCE_MPI_USE_OPENMP
-  if (count >= ALLREDUCE_MPI_MULTITHREAD_MINMAX_THRESH) {
+#if AL_MPI_USE_OPENMP
+  if (count >= AL_MPI_MULTITHREAD_MINMAX_THRESH) {
     #pragma omp parallel for
     for (size_t i = 0; i < count; ++i) {
       dest[i] = std::min(dest[i], src[i]);
@@ -92,8 +92,8 @@ void min_reduction(const T* src, T* dest, size_t count) {
 /** Basic max reduction. */
 template <typename T>
 void max_reduction(const T* src, T* dest, size_t count) {
-#if ALLREDUCE_MPI_USE_OPENMP
-  if (count >= ALLREDUCE_MPI_MULTITHREAD_MINMAX_THRESH) {
+#if AL_MPI_USE_OPENMP
+  if (count >= AL_MPI_MULTITHREAD_MINMAX_THRESH) {
     #pragma omp parallel for
     for (size_t i = 0; i < count; ++i) {
       dest[i] = std::max(dest[i], src[i]);
@@ -124,7 +124,7 @@ inline std::function<void(const T*, T*, size_t)> ReductionMap(
   case ReductionOperator::max:
     return max_reduction<T>;
   default:
-    throw_allreduce_exception("Reduction operator not supported");
+    throw_al_exception("Reduction operator not supported");
   }
 }
 
@@ -140,18 +140,18 @@ inline MPI_Op ReductionOperator2MPI_Op(ReductionOperator op) {
   case ReductionOperator::max:
     return MPI_MAX;
   default:
-    throw_allreduce_exception("Reduction operator not supported");
+    throw_al_exception("Reduction operator not supported");
   }
 }
 
 /** Base state class for MPI allreduces. */
 template <typename T>
-class MPIAllreduceState : public AllreduceState {
+class MPIAlState : public AlState {
  public:
-  MPIAllreduceState(const T* sendbuf_, T* recvbuf_, size_t count_,
-                    ReductionOperator op_, Communicator& comm_,
-                    AllreduceRequest req_) :
-    AllreduceState(req_), sendbuf(sendbuf_), recvbuf(recvbuf_), recv_to(nullptr),
+  MPIAlState(const T* sendbuf_, T* recvbuf_, size_t count_,
+             ReductionOperator op_, Communicator& comm_,
+             AlRequest req_) :
+    AlState(req_), sendbuf(sendbuf_), recvbuf(recvbuf_), recv_to(nullptr),
     count(count_) {
     comm = dynamic_cast<MPICommunicator&>(comm_).get_comm();
     type = TypeMap<T>();
@@ -160,7 +160,7 @@ class MPIAllreduceState : public AllreduceState {
     nprocs = comm_.size();
     tag = dynamic_cast<MPICommunicator&>(comm_).get_free_tag();
   }
-  ~MPIAllreduceState() override {
+  ~MPIAlState() override {
     if (recv_to != nullptr) {
       release_memory(recv_to);
     }
@@ -239,12 +239,12 @@ void passthrough_allreduce(const T* sendbuf, T* recvbuf, size_t count,
 }
 
 template <typename T>
-class MPIPassthroughAllreduceState : public MPIAllreduceState<T> {
+class MPIPassthroughAlState : public MPIAlState<T> {
  public:
-  MPIPassthroughAllreduceState(
+  MPIPassthroughAlState(
     const T* sendbuf_, T* recvbuf_, size_t count_,
-    ReductionOperator op_, Communicator& comm_, AllreduceRequest req_) :
-    MPIAllreduceState<T>(sendbuf_, recvbuf_, count_, op_, comm_, req_) {
+    ReductionOperator op_, Communicator& comm_, AlRequest req_) :
+    MPIAlState<T>(sendbuf_, recvbuf_, count_, op_, comm_, req_) {
     mpi_op = ReductionOperator2MPI_Op(op_);
   }
   bool setup() override {
@@ -274,10 +274,10 @@ class MPIPassthroughAllreduceState : public MPIAllreduceState<T> {
 template <typename T>
 void nb_passthrough_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                               ReductionOperator op, Communicator& comm,
-                              AllreduceRequest& req) {
+                              AlRequest& req) {
   req = get_free_request();
-  MPIPassthroughAllreduceState<T>* state =
-    new MPIPassthroughAllreduceState<T>(
+  MPIPassthroughAlState<T>* state =
+    new MPIPassthroughAlState<T>(
       sendbuf, recvbuf, count, op, comm, req);
   state->setup();
   ProgressEngine* pe = get_progress_engine();
@@ -351,14 +351,14 @@ void recursive_doubling_allreduce(const T* sendbuf, T* recvbuf, size_t count,
 }
 
 template <typename T>
-class MPIRecursiveDoublingAllreduceState : public MPIAllreduceState<T> {
+class MPIRecursiveDoublingAlState : public MPIAlState<T> {
  public:
-  MPIRecursiveDoublingAllreduceState(
+  MPIRecursiveDoublingAlState(
     const T* sendbuf_, T* recvbuf_, size_t count_,
-    ReductionOperator op_, Communicator& comm_, AllreduceRequest req_) :
-    MPIAllreduceState<T>(sendbuf_, recvbuf_, count_, op_, comm_, req_) {}
+    ReductionOperator op_, Communicator& comm_, AlRequest req_) :
+    MPIAlState<T>(sendbuf_, recvbuf_, count_, op_, comm_, req_) {}
   bool setup() override {
-    bool r = MPIAllreduceState<T>::setup();
+    bool r = MPIAlState<T>::setup();
     if (!r) {
       this->recv_to = get_memory<T>(this->count);
       // Check if we're in a non-power-of-2 case.
@@ -460,10 +460,10 @@ class MPIRecursiveDoublingAllreduceState : public MPIAllreduceState<T> {
 template <typename T>
 void nb_recursive_doubling_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                                      ReductionOperator op, Communicator& comm,
-                                     AllreduceRequest& req) {
+                                     AlRequest& req) {
   req = get_free_request();
-  MPIRecursiveDoublingAllreduceState<T>* state =
-    new MPIRecursiveDoublingAllreduceState<T>(
+  MPIRecursiveDoublingAlState<T>* state =
+    new MPIRecursiveDoublingAlState<T>(
       sendbuf, recvbuf, count, op, comm, req);
   if (state->setup()) {
     req = NULL_REQUEST;
@@ -533,14 +533,14 @@ void ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
 }
 
 template <typename T>
-class MPIRingAllreduceState : public MPIAllreduceState<T> {
+class MPIRingAlState : public MPIAlState<T> {
  public:
-  MPIRingAllreduceState(
+  MPIRingAlState(
     const T* sendbuf_, T* recvbuf_, size_t count_,
-    ReductionOperator op_, Communicator& comm_, AllreduceRequest req_) :
-    MPIAllreduceState<T>(sendbuf_, recvbuf_, count_, op_, comm_, req_) {}
+    ReductionOperator op_, Communicator& comm_, AlRequest req_) :
+    MPIAlState<T>(sendbuf_, recvbuf_, count_, op_, comm_, req_) {}
   bool setup() override {
-    bool r = MPIAllreduceState<T>::setup();
+    bool r = MPIAlState<T>::setup();
     if (!r) {
       // Compute slices of data to be moved.
       const size_t size_per_rank = this->count / this->nprocs;
@@ -647,10 +647,10 @@ class MPIRingAllreduceState : public MPIAllreduceState<T> {
 template <typename T>
 void nb_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                        ReductionOperator op, Communicator& comm,
-                       AllreduceRequest& req) {
+                       AlRequest& req) {
   req = get_free_request();
-  MPIRingAllreduceState<T>* state =
-    new MPIRingAllreduceState<T>(
+  MPIRingAlState<T>* state =
+    new MPIRingAlState<T>(
       sendbuf, recvbuf, count, op, comm, req);
   if (state->setup()) {
     req = NULL_REQUEST;
@@ -809,14 +809,14 @@ void rabenseifner_allreduce(const T* sendbuf, T* recvbuf, size_t count,
 }
 
 template <typename T>
-class MPIRabenseifnerAllreduceState : public MPIAllreduceState<T> {
+class MPIRabenseifnerAlState : public MPIAlState<T> {
  public:
-  MPIRabenseifnerAllreduceState(
+  MPIRabenseifnerAlState(
     const T* sendbuf_, T* recvbuf_, size_t count_,
-    ReductionOperator op_, Communicator& comm_, AllreduceRequest req_) :
-    MPIAllreduceState<T>(sendbuf_, recvbuf_, count_, op_, comm_, req_) {}
+    ReductionOperator op_, Communicator& comm_, AlRequest req_) :
+    MPIAlState<T>(sendbuf_, recvbuf_, count_, op_, comm_, req_) {}
   bool setup() override {
-    bool r = MPIAllreduceState<T>::setup();
+    bool r = MPIAlState<T>::setup();
     if (!r) {
       // Check if we're in the non-power-of-2 case.
       while (pow2 <= this->nprocs) pow2 <<= 1;
@@ -1043,10 +1043,10 @@ class MPIRabenseifnerAllreduceState : public MPIAllreduceState<T> {
 template <typename T>
 void nb_rabenseifner_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                                ReductionOperator op, Communicator& comm,
-                               AllreduceRequest& req) {
+                               AlRequest& req) {
   req = get_free_request();
-  MPIRabenseifnerAllreduceState<T>* state =
-    new MPIRabenseifnerAllreduceState<T>(
+  MPIRabenseifnerAlState<T>* state =
+    new MPIRabenseifnerAlState<T>(
       sendbuf, recvbuf, count, op, comm, req);
   if (state->setup()) {
     req = NULL_REQUEST;
@@ -1118,4 +1118,4 @@ void pe_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
 
 }  // namespace mpi
 }  // namespace internal
-}  // namespace allreduces
+}  // namespace Al

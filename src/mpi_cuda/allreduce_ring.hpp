@@ -6,7 +6,7 @@
 #include <cstring>
 #include <cuda_runtime.h>
 
-namespace allreduces {
+namespace Al {
 namespace internal {
 namespace mpi_cuda {
 
@@ -74,7 +74,7 @@ class RingMPICUDA {
     int local_size = get_mpi_comm_local_size();
     if (local_size == 2) {
       // 0-1-3-2
-#ifdef ALUMINUM_MPI_CUDA_DEBUG
+#ifdef AL_MPI_CUDA_DEBUG
       if (self == 0) {      
         MPIPrintStream(std::cout, self)()
             << "Ring mapping for 2 ranks per node: "
@@ -94,7 +94,7 @@ class RingMPICUDA {
       if (self == 0) ring_lhs = num_procs - 2;
       if (self == num_procs - 2) ring_rhs = 0;
     } else if (local_size == 4) {
-#ifdef ALUMINUM_MPI_CUDA_DEBUG      
+#ifdef AL_MPI_CUDA_DEBUG      
       // 0-1-2-3-6-7-4-5
       if (self == 0) {
         MPIPrintStream(std::cout, self)()
@@ -129,7 +129,7 @@ class RingMPICUDA {
     //if (m_trans_dir[R2L]) real_size *= 2;
     if (!(m_gpu_bufs[L2R].size() > 0 && m_gpu_buf_size >= real_size
           && (!m_trans_dir[R2L] || m_gpu_bufs[R2L].size() > 0))) {
-#ifdef ALUMINUM_MPI_CUDA_DEBUG
+#ifdef AL_MPI_CUDA_DEBUG
         MPIPrintStream(std::cerr, m_pid)()
             << "Setting up a new workspace buffer\n";
 #endif      
@@ -167,7 +167,7 @@ class RingMPICUDA {
     for (int dir = 0; dir < 2; ++dir) {
       if (m_gpu_bufs[dir].size() > 0) {
         for (int i = 0; i < m_num_gpus; ++i) {
-#ifdef ALUMINUM_MPI_CUDA_DEBUG
+#ifdef AL_MPI_CUDA_DEBUG
           MPIPrintStream(std::cerr, m_pid)()
               << "Freeing workspace buffer for device "
               << m_gpus[i] << "\n";
@@ -288,7 +288,7 @@ class RingMPICUDA {
         COLL_CHECK_CUDA(cudaSetDevice(local_dev));
         COLL_CHECK_CUDA(cudaDeviceCanAccessPeer(&peer_access, local_dev, m_neighbor_dev[i]));
         if (peer_access) {
-#ifdef ALUMINUM_MPI_CUDA_DEBUG
+#ifdef AL_MPI_CUDA_DEBUG
           MPIPrintStream(std::cerr, m_pid)()
               << "enabling peer access; local_dev: "
               << local_dev << ", peer dev: " << m_neighbor_dev[i] << "\n";
@@ -414,7 +414,7 @@ class RingMPICUDA {
         // If it needs to be accessed through host memory, open the
         // IPC handle at a context on the remote GPU
         if (m_access_type[i] == HOST) {
-#ifdef ALUMINUM_MPI_CUDA_DEBUG
+#ifdef AL_MPI_CUDA_DEBUG
           MPIPrintStream(std::cerr, m_pid)()
               << "Opening a context on a remote GPU, " 
               << m_neighbor_dev[i] << ", from process " << m_pid << "\n";
@@ -733,7 +733,7 @@ class RingMPICUDA {
       if (m_trans_dir[R2L] && m_access_type[LHS] != MPI) {
         wait_for_next_rank(R2L);
       }
-#ifdef ALUMINUM_MPI_CUDA_DEBUG
+#ifdef AL_MPI_CUDA_DEBUG
       MPIPrintStream(std::cerr, m_pid)() << "Step " << step << " done\n";
 #endif
     }
@@ -797,4 +797,4 @@ class RingMPICUDA {
 
 } // namespace mpi_cuda
 } // namespace internal
-} // namespace allreduces
+} // namespace Al

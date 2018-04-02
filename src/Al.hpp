@@ -1,5 +1,5 @@
 /**
- * Various optimized allreduce implementations.
+ * Various optimized collective implementations.
  */
 
 #pragma once
@@ -19,10 +19,10 @@
 #include <algorithm>
 #include <mpi.h>
 
-#include "allreduce_base.hpp"
+#include "base.hpp"
 #include "tuning_params.hpp"
 
-namespace allreduces {
+namespace Al {
 
 /**
  * Abstract base class for all communicator objects.
@@ -135,17 +135,17 @@ inline std::string allreduce_name(AllreduceAlgorithm algo) {
 }
 
 /**
- * Initialize the allreduce library.
+ * Initialize Aluminum.
  * This must be called before any other calls to the library. It is safe to
  * call this multiple times.
  */
 void Initialize(int& argc, char**& argv);
 /**
- * Clean up the allreduce library.
+ * Clean up Aluminum.
  * Do not make any further calls to the library after calling this.
  */
 void Finalize();
-/** Return true if the library has been initialized. */
+/** Return true if Aluminum has been initialized. */
 bool Initialized();
 
 /**
@@ -167,7 +167,7 @@ void Allreduce(const T* sendbuf, T* recvbuf, size_t count,
 /**
  * Perform an in-place allreduce.
  * @param recvbuf Input and output data; input will be overwritten.
- * @param count Length of sendbuf and recvbuf.
+ * @param count Length of recvbuf.
  * @param op The reduction operation to perform.
  * @param comm The communicator to reduce over.
  * @param algo Request a particular allreduce algorithm.
@@ -209,6 +209,16 @@ void NonblockingAllreduce(
                                             comm, req, algo);
 }
 
+/**
+ * Perform a reduction.
+ * @param sendbuf Input data.
+ * @param recvbuf Output data; should already be allocated.
+ * @param count Length of sendbuf and recvbuf.
+ * @param op The reduction operation to perform.
+ * @param root The root of the reduction, which gets the final result.
+ * @param comm The communicator to reduce over.
+ * @param algo Request a particular reduction algorithm.
+ */
 template <typename Backend, typename T>
 void Reduce(const T* sendbuf, T* recvbuf, size_t count,
             ReductionOperator op, int root, typename Backend::comm_type& comm,
@@ -216,6 +226,15 @@ void Reduce(const T* sendbuf, T* recvbuf, size_t count,
   Backend::template Reduce<T>(sendbuf, recvbuf, count, op, root, comm, algo);
 }
 
+/**
+ * Perform an in-place reduction.
+ * @param recvbuf Input and output data; input will be overwritten.
+ * @param count Length of recvbuf.
+ * @param op The reduction operation to perform.
+ * @param root The root of the reduction, which gets the final result.
+ * @param comm The communicator to reduce over.
+ * @param algo Request a particular reduction algorithm.
+ */
 template <typename Backend, typename T>
 void Reduce(T* recvbuf, size_t count,
             ReductionOperator op, int root, typename Backend::comm_type& comm,
@@ -223,6 +242,13 @@ void Reduce(T* recvbuf, size_t count,
   Backend::template Reduce<T>( recvbuf, count, op, root, comm, algo);
 }
 
+/**
+ * Non-blocking version of Reduce.
+ * This returns immediately (i.e. does only local operations) and starts the
+ * reduction asynchronously.
+ * It is not safe to modify sendbuf or recvbuf until the request indicates that
+ * the operation has completed.
+ */
 template <typename Backend, typename T>
 void NonblockingReduce(
   const T* sendbuf, T* recvbuf, size_t count,
@@ -234,6 +260,7 @@ void NonblockingReduce(
   Backend::template NonblockingReduce<T>(sendbuf, recvbuf, count, op, root, comm, req, algo);
 }
 
+/** In-place version of NonblockingReduce; same semantics apply. */
 template <typename Backend, typename T>
 void NonblockingReduce(
   T* recvbuf, size_t count,
@@ -245,6 +272,15 @@ void NonblockingReduce(
   Backend::template NonblockingReduce<T>(recvbuf, count, op, root, comm, req, algo);
 }
 
+/**
+ * Perform a reduce-scatter.
+ * @param sendbuf Input data.
+ * @param recvbuf Output data; should already be allocated.
+ * @param count Length of recvbuf.
+ * @param op The reduction operation to perform.
+ * @param comm The communicator to reduce/scatter over.
+ * @param algo Request a particular reduce-scatter algorithm.
+ */
 template <typename Backend, typename T>
 void Reduce_scatter(const T* sendbuf, T* recvbuf, size_t *count,
             ReductionOperator op, typename Backend::comm_type& comm,
@@ -252,6 +288,14 @@ void Reduce_scatter(const T* sendbuf, T* recvbuf, size_t *count,
   Backend::template Reduce_scatter<T>(sendbuf, recvbuf, count, op, comm, algo);
 }
 
+/**
+ * Perform an in-place reduce-scatter.
+ * @param recvbuf Input and output data; input will be overwritten.
+ * @param count Length of data to be received.
+ * @param op The reduction operation to perform.
+ * @param comm The communicator to reduce/scatter over.
+ * @param algo Request a particular reduce-scatter algorithm.
+ */
 template <typename Backend, typename T>
 void Reduce_scatter(T* recvbuf, size_t *count,
             ReductionOperator op, typename Backend::comm_type& comm,
@@ -259,6 +303,13 @@ void Reduce_scatter(T* recvbuf, size_t *count,
   Backend::template Reduce_scatter<T>(recvbuf, count, op, comm, algo);
 }
 
+/**
+ * Non-blocking version of Reduce_scatter.
+ * This returns immediately (i.e. does only local operations) and starts the
+ * reduce-scatter asynchronously.
+ * It is not safe to modify sendbuf or recvbuf until the request indicates that
+ * the operation has completed.
+ */
 template <typename Backend, typename T>
 void NonblockingReduce_scatter(
   const T* sendbuf, T* recvbuf, size_t *count,
@@ -269,6 +320,7 @@ void NonblockingReduce_scatter(
   Backend::template NonblockingReduce_scatter<T>(sendbuf, recvbuf, count, op, comm, req, algo);
 }
 
+/** In-place version of NonblockingReduce_scatter; same semantics apply. */
 template <typename Backend, typename T>
 void NonblockingReduce_scatter(
   T* recvbuf, size_t *count,
@@ -279,6 +331,14 @@ void NonblockingReduce_scatter(
   Backend::template NonblockingReduce_scatter<T>(recvbuf, count, op, comm, req, algo);
 }
 
+/**
+ * Perform an allgather.
+ * @param sendbuf Input data.
+ * @param recvbuf Output data; should already be allocated.
+ * @param count Length of sendbuf.
+ * @param comm The communicator to allgather over.
+ * @param algo Request a particular allgather algorithm.
+ */
 template <typename Backend, typename T>
 void Allgather(const T* sendbuf, T* recvbuf, size_t count,
                typename Backend::comm_type& comm,
@@ -286,6 +346,13 @@ void Allgather(const T* sendbuf, T* recvbuf, size_t count,
   Backend::template Allgather<T>(sendbuf, recvbuf, count, comm, algo);
 }
 
+/**
+ * Perform an in-place allgather.
+ * @param recvbuf Input and output data; input will be overwritten.
+ * @param count Length of data to send.
+ * @param comm The communicator to allgather over.
+ * @param algo Request a particular allgather algorithm.
+ */
 template <typename Backend, typename T>
 void Allgather(T* recvbuf, size_t count,
                typename Backend::comm_type& comm,
@@ -293,6 +360,13 @@ void Allgather(T* recvbuf, size_t count,
   Backend::template Allgather<T>(recvbuf, count, comm, algo);
 }
 
+/**
+ * Non-blocking version of allgather.
+ * This returns immediately (i.e. does only local operations) and starts the
+ * allgather asynchronously.
+ * It is not safe to modify sendbuf or recvbuf until the request indicates that
+ * the operation has completed.
+ */
 template <typename Backend, typename T>
 void NonblockingAllgather(
   const T* sendbuf, T* recvbuf, size_t count,
@@ -302,6 +376,7 @@ void NonblockingAllgather(
   Backend::template NonblockingAllgather<T>(sendbuf, recvbuf, count, comm, req, algo);
 }
 
+/** In-place version of NonblockingAllgather; same semantics apply. */
 template <typename Backend, typename T>
 void NonblockingAllgather(
   T* recvbuf, size_t count,
@@ -311,28 +386,43 @@ void NonblockingAllgather(
   Backend::template NonblockingAllgather<T>(recvbuf, count, comm, req, algo);
 }
 
+// There are no in-place broadcast versions; it is always in-place.
 
+/**
+ * Perform a broadcast.
+ * @param buf Data to send on root; received into on other processes.
+ * @param count Length of buf.
+ * @param root The root of the broadcast.
+ * @param comm The communicator to broadcast over.
+ * @param algo Request a particular broadcast algorithm.
+ */
 template <typename Backend, typename T>
-void Bcast(const T* sendbuf, 
+void Bcast(T* buf, 
            size_t count, 
            int root, 
            typename Backend::comm_type& comm,
            typename Backend::algo_type algo = Backend::algo_type::automatic) {
-  Backend::template Bcast<T>(sendbuf, count, root, comm, algo);
+  Backend::template Bcast<T>(buf, count, root, comm, algo);
 }
 
+/**
+ * Non-blocking version of Bcast.
+ * This returns immediately (i.e. does only local operations) and starts the
+ * broadcast asynchronously.
+ * It is not safe to modify buf until the request indicates that the operation
+ * has completed.
+ */
 template <typename Backend, typename T>
 void NonblockingBcast(
-  const T* sendbuf, 
+  T* buf, 
   size_t count,
   int root,
   typename Backend::comm_type& comm,
   typename Backend::req_type& req,
   typename Backend::algo_type algo = Backend::algo_type::automatic) {
-  Backend::template NonblockingBcast<T>(sendbuf,  count, root, comm, req, algo);
+  Backend::template NonblockingBcast<T>(buf,  count, root, comm, req, algo);
 }
 
-/// No in-place Bcast is defined, because Bcast is by default an in-place collective
 /**
  * Test whether req has completed or not, returning true if it has.
  */
@@ -342,10 +432,9 @@ bool Test(typename Backend::req_type& req);
 template <typename Backend>
 void Wait(typename Backend::req_type& req);
 
-
 /**
- * Internal implementations of allreduce.
- * Generic code for all allreduce implementations is in here.
+ * Internal implementations.
+ * Generic code for all collective implementations is in here.
  * Implementation-specific code is in separate namespaces inside internal.
  */
 namespace internal {
@@ -364,39 +453,39 @@ T* get_memory(size_t count);
 template <typename T>
 void release_memory(T* mem);
 
-/** Request handle for non-blocking allreduces. */
-using AllreduceRequest = int;  // TODO: This is a placeholder.
+/** Request handle for non-blocking operations.. */
+using AlRequest = int;  // TODO: This is a placeholder.
 
-/** Return a free allreduce request for use. */
-AllreduceRequest get_free_request();
+/** Return a free request for use. */
+AlRequest get_free_request();
 /** Special marker for null requests. */
-static const AllreduceRequest NULL_REQUEST = 0;
+static const AlRequest NULL_REQUEST = 0;
 
 /**
- * Represents the state and algorithm for an asynchronous allreduce.
- * A non-blocking allreduce should create one of these and enqueue it for
+ * Represents the state and algorithm for an asynchronous operation.
+ * A non-blocking operation should create one of these and enqueue it for
  * execution by the progress thread. Specific implementations can override
  * as needed.
  * An algorithm should be broken up into steps which execute some small,
- * discrete operation. Steps from different allreduces may be interleaved.
+ * discrete operation. Steps from different operations may be interleaved.
  * Note that the memory pool is not thread-safe, so memory from it should be
  * pre-allocated before enqueueing.
  */
-class AllreduceState {
+class AlState {
  public:
-  /** Create with an associated allreduce request. */
-  AllreduceState(AllreduceRequest req_) : req(req_) {}
-  virtual ~AllreduceState() {}
+  /** Create with an associated request. */
+  AlState(AlRequest req_) : req(req_) {}
+  virtual ~AlState() {}
   /**
-   * Start one step of the allreduce algorithm.
-   * Return true if the allreduce has completed, false if it has more steps
+   * Start one step of the algorithm.
+   * Return true if the operation has completed, false if it has more steps
    * remaining.
    */
   virtual bool step() = 0;
   /** Return the associated request. */
-  AllreduceRequest get_req() const { return req; }
+  AlRequest get_req() const { return req; }
  private:
-  AllreduceRequest req;
+  AlRequest req;
 };
 
 /**
@@ -415,18 +504,18 @@ class ProgressEngine {
   /** Stop the progress engine. */
   void stop();
   /** Enqueue state for asynchronous execution. */
-  void enqueue(AllreduceState* state);
+  void enqueue(AlState* state);
   /**
    * Check whether a request has completed.
    * If the request is completed, it is removed.
    * This does not block and may spuriously return false.
    */
-  bool is_complete(AllreduceRequest& req);
+  bool is_complete(AlRequest& req);
   /**
    * Wait until a request has completed, then remove it.
    * This will block the calling thread.
    */
-  void wait_for_completion(AllreduceRequest& req);
+  void wait_for_completion(AlRequest& req);
  private:
   /** The actual thread of execution. */
   std::thread thread;
@@ -445,10 +534,10 @@ class ProgressEngine {
    * begins to run them.
    * This is protected by the enqueue_mutex.
    */
-  std::queue<AllreduceState*> enqueued_reqs;
+  std::queue<AlState*> enqueued_reqs;
   /** Protects enqueued_reqs. */
   std::mutex enqueue_mutex;
-#if ALLREDUCE_PE_SLEEPS
+#if AL_PE_SLEEPS
   /**
    * The progress engine will sleep on this when there is otherwise no work to
    * do.
@@ -459,14 +548,14 @@ class ProgressEngine {
    * Requests the progress engine is currently processing.
    * This should be accessed only by the progress engine (it is not protected).
    */
-  std::list<AllreduceState*> in_progress_reqs;
+  std::list<AlState*> in_progress_reqs;
   /**
    * Requests that have been completed.
    * The request is added by the progress engine once it has been completed.
    * States should be deallocated by whatever removes them from this.
    * This is protected by the completed_mutex.
    */
-  std::unordered_map<AllreduceRequest, AllreduceState*> completed_reqs;
+  std::unordered_map<AlRequest, AlState*> completed_reqs;
   /** Protects completed_reqs. */
   std::mutex completed_mutex;
   /** Used to notify any thread waiting for completion. */
@@ -490,7 +579,7 @@ class ProgressEngine {
 /** Return a pointer to the progress engine. */
 ProgressEngine* get_progress_engine();
 
-/** MPI-based allreduce implementations. */
+/** MPI-based implementations. */
 namespace mpi {
 
 /** MPI initialization. */
@@ -506,7 +595,7 @@ void passthrough_allreduce(const T* sendbuf, T* recvbuf, size_t count,
 template <typename T>
 void nb_passthrough_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                               ReductionOperator op, Communicator& comm,
-                              AllreduceRequest& req);
+                              AlRequest& req);
 /** Use a recursive-doubling algorithm to perform the allreduce. */
 template <typename T>
 void recursive_doubling_allreduce(const T* sendbuf, T* recvbuf, size_t count,
@@ -515,7 +604,7 @@ void recursive_doubling_allreduce(const T* sendbuf, T* recvbuf, size_t count,
 template <typename T>
 void nb_recursive_doubling_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                                      ReductionOperator op, Communicator& comm,
-                                     AllreduceRequest& req);
+                                     AlRequest& req);
 /** Use a ring-based reduce-scatter then allgather to perform the allreduce. */
 template <typename T>
 void ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
@@ -524,7 +613,7 @@ void ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
 template <typename T>
 void nb_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                        ReductionOperator op, Communicator& comm,
-                       AllreduceRequest& req);
+                       AlRequest& req);
 /**
  * Use Rabenseifner's algorithm (recursive halving/doubling) to perform the
  * allreduce.
@@ -536,7 +625,7 @@ void rabenseifner_allreduce(const T* sendbuf, T* recvbuf, size_t count,
 template <typename T>
 void nb_rabenseifner_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                                ReductionOperator op, Communicator& comm,
-                               AllreduceRequest& req);
+                               AlRequest& req);
 /**
  * Use a pairwise-exchange reduce-scatter and ring allgather to perform the
  * allreduce.
@@ -547,16 +636,15 @@ void pe_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
 
 }  // namespace mpi
 }  // namespace internal
-}  // namespace allreduces
+}  // namespace Al
 
-#include "allreduce_impl.hpp"
-#include "allreduce_mempool.hpp"
-#include "allreduce_mpi_impl.hpp"
+#include "Al_impl.hpp"
+#include "mempool.hpp"
+#include "mpi_impl.hpp"
 
-#ifdef ALUMINUM_HAS_NCCL
-#include "allreduce_nccl_impl.hpp"
+#ifdef AL_HAS_NCCL
+#include "nccl_impl.hpp"
 #endif
-#ifdef ALUMINUM_HAS_MPI_CUDA
-#include "allreduce_mpi_cuda_impl.hpp"
+#ifdef AL_HAS_MPI_CUDA
+#include "mpi_cuda_impl.hpp"
 #endif
-

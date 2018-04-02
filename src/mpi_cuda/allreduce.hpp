@@ -4,11 +4,7 @@
 #include "mpi_cuda/util.hpp"
 #include <cassert>
 
-namespace allreduces {
-
-// Initialize this.
-const MPICUDABackend::req_type MPICUDABackend::null_req = (MPICUDABackend::req_type) (-1);
-
+namespace Al {
 namespace internal {
 namespace mpi_cuda {
 
@@ -69,8 +65,6 @@ void nb_bi_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
   comm.get_ring().allreduce<T>({recvbuf}, count, op, &streams, true);
 }
 
-
 } // namespace mpi_cuda
 } // namespace internal
-} // namespace allreduces
-
+} // namespace Al

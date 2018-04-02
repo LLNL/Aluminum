@@ -1,5 +1,5 @@
 #include <hwloc.h>
-#include "allreduce.hpp"
+#include "Al.hpp"
 
 // For ancient versions of hwloc.
 #if HWLOC_API_VERSION < 0x00010b00
@@ -16,7 +16,7 @@ hwloc_obj_t hwloc_get_numanode_obj_by_os_index(hwloc_topology_t topology, unsign
 }
 #endif
 
-namespace allreduces {
+namespace Al {
 
 namespace {
 // Whether the library has been initialized.
@@ -46,8 +46,8 @@ bool Initialized() {
 
 namespace internal {
 
-AllreduceRequest get_free_request() {
-  static AllreduceRequest cur_req = 1;
+AlRequest get_free_request() {
+  static AlRequest cur_req = 1;
   return cur_req++;
 }
 
@@ -70,32 +70,32 @@ void ProgressEngine::run() {
 
 void ProgressEngine::stop() {
   if (stop_flag.load()) {
-    throw_allreduce_exception("Stop called twice on progress engine");
+    throw_al_exception("Stop called twice on progress engine");
   }
   stop_flag = true;
-#if ALLREDUCE_PE_SLEEPS
+#if AL_PE_SLEEPS
   enqueue_cv.notify_one();  // Wake up the engine if needed.
 #endif
   thread.join();
 }
 
-void ProgressEngine::enqueue(AllreduceState* state) {
+void ProgressEngine::enqueue(AlState* state) {
   enqueue_mutex.lock();
   enqueued_reqs.push(state);
   enqueue_mutex.unlock();
-#if ALLREDUCE_PE_SLEEPS
+#if AL_PE_SLEEPS
   enqueue_cv.notify_one();  // Wake up the engine if needed.
 #endif
 }
 
-bool ProgressEngine::is_complete(AllreduceRequest& req) {
+bool ProgressEngine::is_complete(AlRequest& req) {
   if (req == NULL_REQUEST) {
     return true;
   }
   if (completed_mutex.try_lock()) {
     auto i = completed_reqs.find(req);
     if (i != completed_reqs.end()) {
-      AllreduceState* state = i->second;
+      AlState* state = i->second;
       completed_reqs.erase(i);
       completed_mutex.unlock();
       delete state;
@@ -108,7 +108,7 @@ bool ProgressEngine::is_complete(AllreduceRequest& req) {
   return false;
 }
 
-void ProgressEngine::wait_for_completion(AllreduceRequest& req) {
+void ProgressEngine::wait_for_completion(AlRequest& req) {
   if (req == NULL_REQUEST) {
     return;
   }
@@ -116,7 +116,7 @@ void ProgressEngine::wait_for_completion(AllreduceRequest& req) {
   std::unique_lock<std::mutex> lock(completed_mutex);
   auto i = completed_reqs.find(req);
   if (i != completed_reqs.end()) {
-    AllreduceState* state = i->second;
+    AlState* state = i->second;
     completed_reqs.erase(i);
     lock.unlock();
     delete state;
@@ -129,7 +129,7 @@ void ProgressEngine::wait_for_completion(AllreduceRequest& req) {
     completion_cv.wait(lock);
     i = completed_reqs.find(req);
     if (i != completed_reqs.end()) {
-      AllreduceState* state = i->second;
+      AlState* state = i->second;
       completed_reqs.erase(i);
       lock.unlock();
       delete state;
@@ -147,7 +147,7 @@ void ProgressEngine::bind() {
   // Determine how many NUMA nodes there are.
   int num_numa_nodes = hwloc_get_nbobjs_by_type(topo, HWLOC_OBJ_NUMANODE);
   if (num_numa_nodes == -1) {
-    throw_allreduce_exception("Cannot determine number of NUMA nodes.");
+    throw_al_exception("Cannot determine number of NUMA nodes.");
   }
   // Determine the NUMA node we're currently on.
   hwloc_cpuset_t cpuset = hwloc_bitmap_alloc();
@@ -171,7 +171,7 @@ void ProgressEngine::bind() {
   hwloc_cpuset_t coreset = hwloc_bitmap_dup(core->cpuset);
   hwloc_bitmap_singlify(coreset);
   if (hwloc_set_cpubind(topo, coreset, HWLOC_CPUBIND_THREAD) == -1) {
-    throw_allreduce_exception("Cannot bind progress engine");
+    throw_al_exception("Cannot bind progress engine");
   }
   hwloc_bitmap_free(cpuset);
   hwloc_bitmap_free(nodeset);
@@ -188,35 +188,35 @@ void ProgressEngine::engine() {
   startup_cv.notify_one();
   while (!stop_flag.load()) {
     // Check for newly-submitted requests, if we can take more.
-    if (ALLREDUCE_PE_NUM_CONCURRENT_ALLREDUCES == 0 ||
-         in_progress_reqs.size() < ALLREDUCE_PE_NUM_CONCURRENT_ALLREDUCES) {
+    if (AL_PE_NUM_CONCURRENT_ALLREDUCES == 0 ||
+         in_progress_reqs.size() < AL_PE_NUM_CONCURRENT_ALLREDUCES) {
       // Don't block if someone else has the lock.
       std::unique_lock<std::mutex> lock(enqueue_mutex, std::try_to_lock);
       if (lock) {
-#if ALLREDUCE_PE_SLEEPS
+#if AL_PE_SLEEPS
         // If there's no work, we sleep.
         if (in_progress_reqs.empty() && enqueued_reqs.empty()) {
           enqueue_cv.wait(
             lock, [this] {
               return (!enqueued_reqs.empty() &&
-                      (ALLREDUCE_PE_NUM_CONCURRENT_ALLREDUCES == 0 ||
-                       in_progress_reqs.size() < ALLREDUCE_PE_NUM_CONCURRENT_ALLREDUCES)) ||
+                      (AL_PE_NUM_CONCURRENT_ALLREDUCES == 0 ||
+                       in_progress_reqs.size() < AL_PE_NUM_CONCURRENT_ALLREDUCES)) ||
                 stop_flag.load();
             });
         }
 #endif
         while (!enqueued_reqs.empty() &&
-               (ALLREDUCE_PE_NUM_CONCURRENT_ALLREDUCES == 0 ||
-                in_progress_reqs.size() < ALLREDUCE_PE_NUM_CONCURRENT_ALLREDUCES)) {
+               (AL_PE_NUM_CONCURRENT_ALLREDUCES == 0 ||
+                in_progress_reqs.size() < AL_PE_NUM_CONCURRENT_ALLREDUCES)) {
           in_progress_reqs.push_back(enqueued_reqs.front());
           enqueued_reqs.pop();
         }
       }
     }
-    std::vector<AllreduceState*> completed;
+    std::vector<AlState*> completed;
     // Process one step of each in-progress request.
     for (auto i = in_progress_reqs.begin(); i != in_progress_reqs.end();) {
-      AllreduceState* state = *i;
+      AlState* state = *i;
       if (state->step()) {
         // Request completed, but don't try to block here.
         completed.push_back(state);
@@ -228,7 +228,7 @@ void ProgressEngine::engine() {
     // Shift over completed requests.
     if (!completed.empty()) {
       completed_mutex.lock();
-      for (AllreduceState* state : completed) {
+      for (AlState* state : completed) {
         completed_reqs[state->get_req()] = state;
       }
       completed_mutex.unlock();
@@ -242,4 +242,4 @@ ProgressEngine* get_progress_engine() {
 }
 
 }  // namespace internal
-}  // namespace allreduces
+}  // namespace Al

@@ -1,5 +1,5 @@
 #include <iostream>
-#include "allreduce.hpp"
+#include "Al.hpp"
 #include "test_utils.hpp"
 #ifdef ALUMINUM_HAS_CUDA
 #include "test_utils_cuda.hpp"
@@ -31,17 +31,17 @@ void time_allreduce_algo(typename VectorType<Backend>::type input,
     typename Backend::req_type req = get_request<Backend>();
     MPI_Barrier(MPI_COMM_WORLD);
     double start = get_time();
-    allreduces::NonblockingAllreduce<Backend>(
+    Al::NonblockingAllreduce<Backend>(
         input.data(), recv.data(), input.size(),
-        allreduces::ReductionOperator::sum, comm, req, algo);
-    allreduces::Wait<Backend>(req);
+        Al::ReductionOperator::sum, comm, req, algo);
+    Al::Wait<Backend>(req);
     times.push_back(get_time() - start);
     MPI_Barrier(MPI_COMM_WORLD);
     start = get_time();
-    allreduces::NonblockingAllreduce<Backend>(
+    Al::NonblockingAllreduce<Backend>(
         in_place_input.data(), input.size(),
-        allreduces::ReductionOperator::sum, comm, req, algo);
-    allreduces::Wait<Backend>(req);
+        Al::ReductionOperator::sum, comm, req, algo);
+    Al::Wait<Backend>(req);
     in_place_times.push_back(get_time() - start);
   }
   // Delete warmup trial.
@@ -78,7 +78,7 @@ void do_benchmark() {
 
 
 int main(int argc, char** argv) {
-  allreduces::Initialize(argc, argv);
+  Al::Initialize(argc, argv);
 
   std::string backend = "MPI";
   if (argc == 2) {
@@ -86,12 +86,12 @@ int main(int argc, char** argv) {
   }
   
   if (backend == "MPI") {
-    do_benchmark<allreduces::MPIBackend>();
+    do_benchmark<Al::MPIBackend>();
   } else {
     std::cerr << "usage: " << argv[0] << " [MPI | NCCL]\n";
     return -1;
   }
 
-  allreduces::Finalize();
+  Al::Finalize();
   return 0;
 }

@@ -1,5 +1,5 @@
 #include <iostream>
-#include "allreduce.hpp"
+#include "Al.hpp"
 #include "test_utils.hpp"
 
 const size_t max_size = 1<<22;
@@ -35,13 +35,13 @@ void time_allreduce_algo(std::vector<float> input,
     typename Backend::req_type req = get_request<Backend>();
     MPI_Barrier(MPI_COMM_WORLD);
     double start = get_time();
-    allreduces::NonblockingAllreduce<Backend>(
+    Al::NonblockingAllreduce<Backend>(
         input.data(), recv.data(), input.size(),
-        allreduces::ReductionOperator::sum, comm, req, algo);
+        Al::ReductionOperator::sum, comm, req, algo);
     double init_time = get_time();
     std::this_thread::sleep_for(std::chrono::duration<double>(sleep_time));
     double asleep_time = get_time();
-    allreduces::Wait<Backend>(req);
+    Al::Wait<Backend>(req);
     double end_time = get_time();
     // Because of scheduling issues, use the actual time asleep, not
     // sleep_time, which underestimates.
@@ -49,13 +49,13 @@ void time_allreduce_algo(std::vector<float> input,
     times.push_back(std::max(end_time - start - actual_sleep_time, 0.0));
     MPI_Barrier(MPI_COMM_WORLD);
     start = get_time();
-    allreduces::NonblockingAllreduce<Backend>(
+    Al::NonblockingAllreduce<Backend>(
         in_place_input.data(), input.size(),
-        allreduces::ReductionOperator::sum, comm, req, algo);
+        Al::ReductionOperator::sum, comm, req, algo);
     init_time = get_time();
     std::this_thread::sleep_for(std::chrono::duration<double>(sleep_time));
     asleep_time = get_time();
-    allreduces::Wait<Backend>(req);
+    Al::Wait<Backend>(req);
     end_time = get_time();
     actual_sleep_time = asleep_time - init_time;
     in_place_times.push_back(std::max(end_time - start - actual_sleep_time, 0.0));
@@ -77,7 +77,7 @@ void time_allreduce_algo(std::vector<float> input,
 }
 
 void time_mpi_baseline(std::vector<float> input,
-                       allreduces::Communicator& comm) {
+                       Al::Communicator& comm) {
   std::vector<double> times, in_place_times;
   for (size_t trial = 0; trial < num_trials + 1; ++trial) {
     std::vector<float> recv(input.size());
@@ -120,13 +120,13 @@ void time_mpi_baseline(std::vector<float> input,
 template <typename Backend>
 void do_benchmark() {
   // Add algorithms to test here.
-  std::vector<allreduces::AllreduceAlgorithm> algos = {
-    allreduces::AllreduceAlgorithm::mpi_passthrough,
-    allreduces::AllreduceAlgorithm::mpi_recursive_doubling,
-    allreduces::AllreduceAlgorithm::mpi_ring,
-    allreduces::AllreduceAlgorithm::mpi_rabenseifner,
+  std::vector<Al::AllreduceAlgorithm> algos = {
+    Al::AllreduceAlgorithm::mpi_passthrough,
+    Al::AllreduceAlgorithm::mpi_recursive_doubling,
+    Al::AllreduceAlgorithm::mpi_ring,
+    Al::AllreduceAlgorithm::mpi_rabenseifner,
   };
-  allreduces::MPICommunicator comm;  // Use COMM_WORLD.
+  Al::MPICommunicator comm;  // Use COMM_WORLD.
   std::vector<size_t> sizes = {0};
   for (size_t size = 1; size <= max_size; size *= 2) {
     sizes.push_back(size);
@@ -144,19 +144,19 @@ void do_benchmark() {
 }
 
 int main(int argc, char *argv[]) {
-  allreduces::Initialize(argc, argv);
+  Al::Initialize(argc, argv);
   std::string backend = "MPI";
   if (argc == 2) {
     backend = argv[1];
   }
   
   if (backend == "MPI") {
-    do_benchmark<allreduces::MPIBackend>();
+    do_benchmark<Al::MPIBackend>();
   } else {
     std::cerr << "usage: " << argv[0] << " [MPI | NCCL]\n";
     return -1;
   }
 
-  allreduces::Finalize();
+  Al::Finalize();
   return 0;
 }

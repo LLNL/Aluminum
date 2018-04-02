@@ -1,5 +1,5 @@
 #include <iostream>
-#include "allreduce.hpp"
+#include "Al.hpp"
 #include "test_utils.hpp"
 #ifdef ALUMINUM_HAS_NCCL
 #include "test_utils_nccl_cuda.hpp"
@@ -33,13 +33,13 @@ void time_allreduce_algo(typename VectorType<Backend>::type input,
     auto in_place_input(input);
     MPI_Barrier(MPI_COMM_WORLD);
     double start = get_time();
-    allreduces::Allreduce<Backend>(input.data(), recv.data(), input.size(),
-                                   allreduces::ReductionOperator::sum, comm, algo);
+    Al::Allreduce<Backend>(input.data(), recv.data(), input.size(),
+                           Al::ReductionOperator::sum, comm, algo);
     times.push_back(get_time() - start);
     MPI_Barrier(MPI_COMM_WORLD);
     start = get_time();
-    allreduces::Allreduce<Backend>(in_place_input.data(), input.size(),
-                                   allreduces::ReductionOperator::sum, comm, algo);
+    Al::Allreduce<Backend>(in_place_input.data(), input.size(),
+                           Al::ReductionOperator::sum, comm, algo);
     in_place_times.push_back(get_time() - start);
   }
   // Delete warmup trial.
@@ -75,7 +75,7 @@ void do_benchmark() {
 }
 
 int main(int argc, char** argv) {
-  allreduces::Initialize(argc, argv);
+  Al::Initialize(argc, argv);
   // Add algorithms to test here.
 
   std::string backend = "MPI";
@@ -84,23 +84,23 @@ int main(int argc, char** argv) {
   }
   
   if (backend == "MPI") {
-    do_benchmark<allreduces::MPIBackend>();
+    do_benchmark<Al::MPIBackend>();
 #ifdef ALUMINUM_HAS_NCCL    
   } else if (backend == "NCCL") {
     set_device();        
-    do_benchmark<allreduces::NCCLBackend>();
+    do_benchmark<Al::NCCLBackend>();
 #endif    
 #ifdef ALUMINUM_HAS_MPI_CUDA    
   } else if (backend == "MPI-CUDA") {
     set_device();        
-    do_benchmark<allreduces::MPICUDABackend>();
+    do_benchmark<Al::MPICUDABackend>();
 #endif    
   } else {
     std::cerr << "usage: " << argv[0] << " [MPI | NCCL | MPI-CUDA]\n";
     return -1;
   }
 
-  allreduces::Finalize();
+  Al::Finalize();
   return 0;
   
 }

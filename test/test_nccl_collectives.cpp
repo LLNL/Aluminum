@@ -1,11 +1,8 @@
 #include <iostream>
-#include "allreduce.hpp"
+#include "Al.hpp"
 #include "test_utils.hpp"
-#ifdef ALUMINUM_HAS_NCCL
+#ifdef AL_HAS_NCCL
 #include "test_utils_nccl_cuda.hpp"
-#endif
-#ifdef ALUMINUM_HAS_MPI_CUDA
-#include "test_utils_mpi_cuda.hpp"
 #endif
 
 #include <stdlib.h>
@@ -24,16 +21,16 @@ void test_allreduce_algo(const typename VectorType<Backend>::type& expected,
                          typename Backend::algo_type algo) {
   auto recv = get_vector<Backend>(input.size());
   // Test regular allreduce.
-  allreduces::Allreduce<Backend>(input.data(), recv.data(), input.size(),
-                                 allreduces::ReductionOperator::sum, comm, algo);
+  Al::Allreduce<Backend>(input.data(), recv.data(), input.size(),
+                         Al::ReductionOperator::sum, comm, algo);
   if (!check_vector(expected, recv)) {
     std::cout << comm.rank() << ": regular allreduce does not match" <<
         std::endl;
     std::abort();
   }
   // Test in-place allreduce.
-  allreduces::Allreduce<Backend>(input.data(), input.size(),
-                                 allreduces::ReductionOperator::sum, comm, algo);
+  Al::Allreduce<Backend>(input.data(), input.size(),
+                         Al::ReductionOperator::sum, comm, algo);
   if (!check_vector(expected, input)) {
     std::cout << comm.rank() << ": in-place allreduce does not match" <<
       std::endl;
@@ -52,20 +49,20 @@ void test_nb_allreduce_algo(const typename VectorType<Backend>::type& expected,
   auto recv = get_vector<Backend>(input.size());
 
   // Test nonblocking allreduce.
-  allreduces::NonblockingAllreduce<Backend>(input.data(), recv.data(), input.size(),
-                                            allreduces::ReductionOperator::sum, comm,
-                                            req, algo);
+  Al::NonblockingAllreduce<Backend>(input.data(), recv.data(), input.size(),
+                                    Al::ReductionOperator::sum, comm,
+                                    req, algo);
 
-  allreduces::Wait<Backend>(req);
+  Al::Wait<Backend>(req);
   if (!check_vector(expected, recv)) {
     std::cout << comm.rank() << ": non-blocking allreduce does not match" <<
       std::endl;
   }
 
-  allreduces::NonblockingAllreduce<Backend>(input.data(), input.size(),
-                                            allreduces::ReductionOperator::sum, comm,
-                                            req, algo);
-  allreduces::Wait<Backend>(req);
+  Al::NonblockingAllreduce<Backend>(input.data(), input.size(),
+                                    Al::ReductionOperator::sum, comm,
+                                    req, algo);
+  Al::Wait<Backend>(req);
   if (!check_vector(expected, input)) {
     std::cout << comm.rank() << ": in-place non-blocking allreduce does not match" <<
       std::endl;
@@ -79,7 +76,7 @@ void test_reduce_algo(const typename VectorType<Backend>::type& expected,
                       typename Backend::algo_type algo) {
   auto recv = get_vector<Backend>(input.size());
   
-  allreduces::Reduce<Backend>(input.data(), recv.data(), input.size(), allreduces::ReductionOperator::sum, 0, comm, algo);
+  Al::Reduce<Backend>(input.data(), recv.data(), input.size(), Al::ReductionOperator::sum, 0, comm, algo);
   if(comm.rank() == 0){
     if (!check_vector(expected, recv)) {
       std::cout << comm.rank() << ": regular reduce does not match" <<
@@ -88,7 +85,7 @@ void test_reduce_algo(const typename VectorType<Backend>::type& expected,
     }
   }
 
-  allreduces::Reduce<Backend>(input.data(), input.size(), allreduces::ReductionOperator::sum, 0, comm, algo);
+  Al::Reduce<Backend>(input.data(), input.size(), Al::ReductionOperator::sum, 0, comm, algo);
   if(comm.rank() == 0){
     if (!check_vector(expected, recv)) {
       std::cout << comm.rank() << ": in-place reduce does not match" <<
@@ -107,9 +104,9 @@ void test_nb_reduce_algo(const typename VectorType<Backend>::type& expected,
   typename Backend::req_type req = get_request<Backend>();
   auto recv = get_vector<Backend>(input.size());
   // Test regular reduce.
-  allreduces::NonblockingReduce<Backend>(input.data(), recv.data(), input.size(), allreduces::ReductionOperator::sum, 0, comm, req, algo);
+  Al::NonblockingReduce<Backend>(input.data(), recv.data(), input.size(), Al::ReductionOperator::sum, 0, comm, req, algo);
 
-  allreduces::Wait<Backend>(req);
+  Al::Wait<Backend>(req);
   if(comm.rank() == 0){
     if (!check_vector(expected, recv)) {
       std::cout << comm.rank() << ": non-blocking regular reduce does not match" <<
@@ -120,10 +117,10 @@ void test_nb_reduce_algo(const typename VectorType<Backend>::type& expected,
   }
 
   // Test in-place reduce.
-  allreduces::NonblockingReduce<Backend>(input.data(), input.size(),
-                                            allreduces::ReductionOperator::sum, 0, comm,
-                                            req, algo);
-  allreduces::Wait<Backend>(req);
+  Al::NonblockingReduce<Backend>(input.data(), input.size(),
+                                 Al::ReductionOperator::sum, 0, comm,
+                                 req, algo);
+  Al::Wait<Backend>(req);
   if(comm.rank() == 0){
     if (!check_vector(expected, input)) {
       std::cout << comm.rank() << ": non-blocking in-place reduce does not match" <<
@@ -146,7 +143,7 @@ void test_reduce_scatter_algo(const typename VectorType<Backend>::type& expected
     recv_count[i] = expected.size();
   }
 
-  allreduces::Reduce_scatter<Backend>(input.data(), recv.data(), recv_count.data(), allreduces::ReductionOperator::sum, comm, algo);
+  Al::Reduce_scatter<Backend>(input.data(), recv.data(), recv_count.data(), Al::ReductionOperator::sum, comm, algo);
 
   if (!check_vector(expected, recv)) {
     std::cout << comm.rank() << ": regular reduce_scatter does not match" <<
@@ -155,7 +152,7 @@ void test_reduce_scatter_algo(const typename VectorType<Backend>::type& expected
   }
 
   auto input_copy (input);
-  allreduces::Reduce_scatter<Backend>(input_copy.data(), recv_count.data(), allreduces::ReductionOperator::sum, comm, algo);
+  Al::Reduce_scatter<Backend>(input_copy.data(), recv_count.data(), Al::ReductionOperator::sum, comm, algo);
   if (!check_vector(expected, input_copy)) {
     std::cout << comm.rank() << ": in-place reduce_scatter does not match" <<
       std::endl;
@@ -178,8 +175,8 @@ void test_nb_reduce_scatter_algo(const typename VectorType<Backend>::type& expec
   }
 
   /// Test regular reduce_scatter
-  allreduces::NonblockingReduce_scatter<Backend>(input.data(), recv.data(), recv_count.data(), allreduces::ReductionOperator::sum, comm, req, algo);
-  allreduces::Wait<Backend>(req);
+  Al::NonblockingReduce_scatter<Backend>(input.data(), recv.data(), recv_count.data(), Al::ReductionOperator::sum, comm, req, algo);
+  Al::Wait<Backend>(req);
 
   if (!check_vector(expected, recv)) {
     std::cout << comm.rank() << ": non-blocking regular reduce_scatter does not match" <<
@@ -189,7 +186,7 @@ void test_nb_reduce_scatter_algo(const typename VectorType<Backend>::type& expec
 
   /// Test in-place reduce_scatter
   auto input_copy (input);
-  allreduces::NonblockingReduce_scatter<Backend>(input_copy.data(), recv_count.data(), allreduces::ReductionOperator::sum, comm, req,  algo);
+  Al::NonblockingReduce_scatter<Backend>(input_copy.data(), recv_count.data(), Al::ReductionOperator::sum, comm, req,  algo);
   if (!check_vector(expected, input_copy)) {
     std::cout << comm.rank() << ": non-blocking in-place reduce_scatter does not match" <<
       std::endl;
@@ -203,7 +200,7 @@ void test_allgather_algo(const typename VectorType<Backend>::type& expected,
                          typename Backend::comm_type& comm,
                          typename Backend::algo_type algo) {
   auto recv = get_vector<Backend>(expected.size());
-  allreduces::Allgather<Backend>(input.data(), recv.data(), input.size(), comm, algo);
+  Al::Allgather<Backend>(input.data(), recv.data(), input.size(), comm, algo);
   if (!check_vector(expected, recv)) {
     std::cout << comm.rank() << ": regular allgather does not match" <<
         std::endl;
@@ -212,7 +209,7 @@ void test_allgather_algo(const typename VectorType<Backend>::type& expected,
   
   // Copy input to recv
   recv.move(input);
-  allreduces::Allgather<Backend>(recv.data(), input.size(), comm, algo);
+  Al::Allgather<Backend>(recv.data(), input.size(), comm, algo);
   if (!check_vector(expected, recv )) {
     std::cout << comm.rank() << ": in-place allgather does not match" <<
       std::endl;
@@ -227,17 +224,17 @@ void test_nb_allgather_algo(const typename VectorType<Backend>::type& expected,
                             typename Backend::algo_type algo) {
   typename Backend::req_type req = get_request<Backend>();
   auto recv = get_vector<Backend>(expected.size());
-  allreduces::NonblockingAllgather<Backend>(input.data(), recv.data(), input.size(), comm, req, algo);
+  Al::NonblockingAllgather<Backend>(input.data(), recv.data(), input.size(), comm, req, algo);
 
-  allreduces::Wait<Backend>(req);
+  Al::Wait<Backend>(req);
   if (!check_vector(expected, recv)) {
     std::cout << comm.rank() << ": non-blocking regular allgather does not match" <<
       std::endl;
   }
 
   recv.move(input);
-  allreduces::NonblockingAllgather<Backend>(recv.data(), input.size(), comm, req, algo);
-  allreduces::Wait<Backend>(req);
+  Al::NonblockingAllgather<Backend>(recv.data(), input.size(), comm, req, algo);
+  Al::Wait<Backend>(req);
   if (!check_vector(expected, recv )) {
     std::cout << comm.rank() << ": non-blocking in-place allgather does not match" <<
       std::endl;
@@ -251,7 +248,7 @@ void test_bcast_algo(const typename VectorType<Backend>::type& expected,
                      typename Backend::algo_type algo) {
 
   auto input_copy(input);
-  allreduces::Bcast<Backend>(input_copy.data(), input_copy.size(),  0, comm, algo);
+  Al::Bcast<Backend>(input_copy.data(), input_copy.size(),  0, comm, algo);
   if (!check_vector(expected, input_copy)) {
     std::cout << comm.rank() << ": regular bcast does not match" <<
         std::endl;
@@ -271,7 +268,7 @@ void test_nb_bcast_algo(const typename VectorType<Backend>::type& expected,
   typename Backend::req_type req = get_request<Backend>();
   auto input_copy(input);
 
-  allreduces::NonblockingBcast<Backend>(input_copy.data(), input_copy.size(),  0, comm, req, algo);
+  Al::NonblockingBcast<Backend>(input_copy.data(), input_copy.size(),  0, comm, req, algo);
   if (!check_vector(expected, input_copy)) {
     std::cout << comm.rank() << ": in-place bcast does not match" <<
         std::endl;
@@ -317,14 +314,14 @@ void test_correctness() {
     for (auto&& algo : algos) {
       MPI_Barrier(MPI_COMM_WORLD);
       if (comm.rank() == 0) {
-        std::cout << " Algo: " << allreduces::allreduce_name(algo) << std::endl;
+        std::cout << " Algo: " << Al::allreduce_name(algo) << std::endl;
       }
       test_allreduce_algo<Backend>(expected, data, comm, algo);
     }
     for (auto&& algo : nb_algos) {
       MPI_Barrier(MPI_COMM_WORLD);
       if (comm.rank() == 0) {
-        std::cout << " Algo: NB " << allreduces::allreduce_name(algo) << std::endl;
+        std::cout << " Algo: NB " << Al::allreduce_name(algo) << std::endl;
       }
       test_nb_allreduce_algo<Backend>(expected, data, comm, algo);
     }
@@ -348,14 +345,14 @@ void test_correctness() {
     for (auto&& algo : algos) {
       MPI_Barrier(MPI_COMM_WORLD);
       if (comm.rank() == 0) {
-        std::cout << " Algo: " << allreduces::allreduce_name(algo) << std::endl;
+        std::cout << " Algo: " << Al::allreduce_name(algo) << std::endl;
       }
       test_reduce_algo<Backend>(expected, data, comm, algo);
     }
     for (auto&& algo : nb_algos) {
       MPI_Barrier(MPI_COMM_WORLD);
       if (comm.rank() == 0) {
-        std::cout << " Algo: NB " << allreduces::allreduce_name(algo) << std::endl;
+        std::cout << " Algo: NB " << Al::allreduce_name(algo) << std::endl;
       }
       test_nb_reduce_algo<Backend>(expected, data, comm, algo);
     }
@@ -380,14 +377,14 @@ void test_correctness() {
     for (auto&& algo : algos) {
       MPI_Barrier(MPI_COMM_WORLD);
       if (comm.rank() == 0) {
-        std::cout << " Algo: " << allreduces::allreduce_name(algo) << std::endl;
+        std::cout << " Algo: " << Al::allreduce_name(algo) << std::endl;
       }
       test_allgather_algo<Backend>(expected, data, comm, algo);
     }
     for (auto&& algo : nb_algos) {
       MPI_Barrier(MPI_COMM_WORLD);
       if (comm.rank() == 0) {
-        std::cout << " Algo: NB " << allreduces::allreduce_name(algo) << std::endl;
+        std::cout << " Algo: NB " << Al::allreduce_name(algo) << std::endl;
       }
       test_nb_allgather_algo<Backend>(expected, data, comm, algo);
     }
@@ -412,14 +409,14 @@ void test_correctness() {
     for (auto&& algo : algos) {
       MPI_Barrier(MPI_COMM_WORLD);
       if (comm.rank() == 0) {
-        std::cout << " Algo: " << allreduces::allreduce_name(algo) << std::endl;
+        std::cout << " Algo: " << Al::allreduce_name(algo) << std::endl;
       }
       test_reduce_scatter_algo<Backend>(expected, data, comm, algo);
     }
     for (auto&& algo : nb_algos) {
       MPI_Barrier(MPI_COMM_WORLD);
       if (comm.rank() == 0) {
-        std::cout << " Algo: NB " << allreduces::allreduce_name(algo) << std::endl;
+        std::cout << " Algo: NB " << Al::allreduce_name(algo) << std::endl;
       }
       test_nb_reduce_scatter_algo<Backend>(expected, data, comm, algo);
     }
@@ -444,14 +441,14 @@ void test_correctness() {
     for (auto&& algo : algos) {
       MPI_Barrier(MPI_COMM_WORLD);
       if (comm.rank() == 0) {
-        std::cout << " Algo: " << allreduces::allreduce_name(algo) << std::endl;
+        std::cout << " Algo: " << Al::allreduce_name(algo) << std::endl;
       }
       test_bcast_algo<Backend>(expected, data, comm, algo);
     }
     for (auto&& algo : nb_algos) {
       MPI_Barrier(MPI_COMM_WORLD);
       if (comm.rank() == 0) {
-        std::cout << " Algo: NB " << allreduces::allreduce_name(algo) << std::endl;
+        std::cout << " Algo: NB " << Al::allreduce_name(algo) << std::endl;
       }
       test_nb_bcast_algo<Backend>(expected, data, comm, algo);
     }
@@ -459,15 +456,15 @@ void test_correctness() {
 }
 
 int main(int argc, char** argv) {
-  allreduces::Initialize(argc, argv);
+  Al::Initialize(argc, argv);
 
   std::string backend = "";
   max_size = std::stoul(argv[1]);
 
-#ifdef ALUMINUM_HAS_NCCL
+#ifdef AL_HAS_NCCL
   if (backend == "NCCL") {
     set_device();
-    test_correctness<allreduces::NCCLBackend>();
+    test_correctness<Al::NCCLBackend>();
   }
 #endif
   if (backend == "") {
@@ -475,7 +472,7 @@ int main(int argc, char** argv) {
     return -1;
   }
 
-  allreduces::Finalize();
+  Al::Finalize();
   return 0;
 }
   

@@ -3,14 +3,14 @@
 #include <exception>
 #include <string>
 
-namespace allreduces {
+namespace Al {
 
 /**
- * Base allreduce exception class.
+ * Base Aluminum exception class.
  */
-class allreduce_exception : public std::exception {
+class al_exception : public std::exception {
  public:
-  allreduce_exception(const std::string m, const std::string f, const int l) :
+  al_exception(const std::string m, const std::string f, const int l) :
     msg(m), file(f), line(l) {
     err = file + ":" + std::to_string(line) + " - " + msg;
   }
@@ -27,11 +27,11 @@ private:
   /** Constructed error message. */
   std::string err;
 };
-#define throw_allreduce_exception(s) throw allreduce_exception(s, __FILE__, __LINE__)
+#define throw_al_exception(s) throw al_exception(s, __FILE__, __LINE__)
 
 /** Predefined reduction operations. */
 enum class ReductionOperator {
   sum, prod, min, max
 };
 
-} // namespace allreduces
+} // namespace Al

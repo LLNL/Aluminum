@@ -1,7 +1,6 @@
 #pragma once
 
-namespace allreduces {
-
+namespace Al {
 
 class MPIBackend {
  public:
@@ -41,7 +40,7 @@ class MPIBackend {
         internal::mpi::pe_ring_allreduce(sendbuf, recvbuf, count, op, comm);
         break;
       default:
-        throw_allreduce_exception("Invalid algorithm for Allreduce");
+        throw_al_exception("Invalid algorithm for Allreduce");
     }
   }
   
@@ -88,7 +87,7 @@ class MPIBackend {
           internal::mpi::nb_pe_ring_allreduce(sendbuf, recvbuf, count, op, comm, req);
           break;*/
       default:
-        throw_allreduce_exception("Invalid algorithm for NonblockingAllreduce");
+        throw_al_exception("Invalid algorithm for NonblockingAllreduce");
     }
   }
 
@@ -115,6 +114,4 @@ inline void Wait<MPIBackend>(typename MPIBackend::req_type& req) {
   pe->wait_for_completion(req);
 }
 
-}  // namespace allreduces
-
-
+}  // namespace Al

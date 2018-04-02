@@ -1,8 +1,9 @@
 #pragma once
 
+#include "Al.hpp"
 #include "mpi_cuda/allreduce.hpp"
 
-namespace allreduces {
+namespace Al {
 
 enum class MPICUDAAllreduceAlgorithm {
   automatic,
@@ -45,7 +46,7 @@ class MPICUDABackend {
                                               op, comm);
         break;
       default:
-        throw_allreduce_exception("Invalid algorithm");
+        throw_al_exception("Invalid algorithm");
     }
   }
   template <typename T>
@@ -73,7 +74,7 @@ class MPICUDABackend {
                                                  op, comm, req);
         break;
       default:
-        throw_allreduce_exception("Invalid algorithm");
+        throw_al_exception("Invalid algorithm");
     }
   }
 
@@ -99,4 +100,4 @@ inline void Wait<MPICUDABackend>(typename MPICUDABackend::req_type& req) {
   cudaStreamSynchronize(req);
 }
 
-} // namespace allreduces
+}  // namespace Al
