@@ -1,5 +1,5 @@
 #include <iostream>
-#include "allreduce.hpp"
+#include "Al.hpp"
 #include "test_utils.hpp"
 #ifdef ALUMINUM_HAS_NCCL
 #include "test_utils_nccl_cuda.hpp"

@@ -1,5 +1,5 @@
 #include <hwloc.h>
-#include "allreduce.hpp"
+#include "Al.hpp"
 
 // For ancient versions of hwloc.
 #if HWLOC_API_VERSION < 0x00010b00

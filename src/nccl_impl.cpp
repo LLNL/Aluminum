@@ -1,5 +1,5 @@
 #ifdef ALUMINUM_HAS_NCCL
-#include "allreduce_nccl_impl.hpp"
+#include "nccl_impl.hpp"
 
 // Error checking macros
 #define CUDACHECK(cmd) do {                     \

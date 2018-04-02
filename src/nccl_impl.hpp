@@ -1,7 +1,7 @@
 #pragma once
 
-#include "allreduce.hpp"
-#include "nccl.h"
+#include <nccl.h>
+#include "Al.hpp"
 #include "common.h"
 
 namespace allreduces {

@@ -19,7 +19,7 @@
 #include <algorithm>
 #include <mpi.h>
 
-#include "allreduce_base.hpp"
+#include "base.hpp"
 #include "tuning_params.hpp"
 
 namespace allreduces {
@@ -549,14 +549,14 @@ void pe_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
 }  // namespace internal
 }  // namespace allreduces
 
-#include "allreduce_impl.hpp"
-#include "allreduce_mempool.hpp"
-#include "allreduce_mpi_impl.hpp"
+#include "Al_impl.hpp"
+#include "mempool.hpp"
+#include "mpi_impl.hpp"
 
 #ifdef ALUMINUM_HAS_NCCL
-#include "allreduce_nccl_impl.hpp"
+#include "nccl_impl.hpp"
 #endif
 #ifdef ALUMINUM_HAS_MPI_CUDA
-#include "allreduce_mpi_cuda_impl.hpp"
+#include "mpi_cuda_impl.hpp"
 #endif
 

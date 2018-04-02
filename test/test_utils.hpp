@@ -5,7 +5,7 @@
 #include <chrono>
 #include <sstream>
 
-#include "allreduce.hpp"
+#include "Al.hpp"
 
 namespace {
 static std::mt19937 rng_gen;

@@ -1,6 +1,6 @@
 #include <iostream>
 #include <string>
-#include "allreduce.hpp"
+#include "Al.hpp"
 #include "test_utils.hpp"
 
 size_t max_size = 1<<20;

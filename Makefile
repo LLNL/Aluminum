@@ -24,7 +24,7 @@ ifeq ($(ENABLE_MPI_CUDA), YES)
 	ENABLE_CUDA = YES
 	CXXFLAGS += -DALUMINUM_HAS_MPI_CUDA # -DALUMINUM_MPI_CUDA_DEBUG
 	CUDA_OBJ = src/mpi_cuda/cuda_kernels.o
-	MPI_CUDA_HEADERS = src/allreduce_mpi_cuda_impl.hpp test/test_utils_mpi_cuda.hpp src/mpi_cuda/allreduce.hpp src/mpi_cuda/allreduce_ring.hpp
+	MPI_CUDA_HEADERS = src/mpi_cuda_impl.hpp test/test_utils_mpi_cuda.hpp src/mpi_cuda/allreduce.hpp src/mpi_cuda/allreduce_ring.hpp
 endif
 
 
@@ -36,8 +36,8 @@ endif
 
 all: liballreduce.so benchmark_allreduces benchmark_nballreduces benchmark_overlap benchmark_reductions test_correctness test_multi_nballreduces test_nccl_collectives
 
-liballreduce.so: src/allreduce.cpp src/allreduce_mpi_impl.cpp src/allreduce.hpp src/allreduce_impl.hpp src/allreduce_mempool.hpp src/allreduce_mpi_impl.hpp src/tuning_params.hpp src/allreduce_nccl_impl.hpp src/allreduce_nccl_impl.cpp
-	$(MPICXX) $(CXXFLAGS) -shared -o liballreduce.so src/allreduce.cpp src/allreduce_mpi_impl.cpp src/allreduce_nccl_impl.cpp
+liballreduce.so: src/Al.cpp src/mpi_impl.cpp src/Al.hpp src/Al_impl.hpp src/mempool.hpp src/mpi_impl.hpp src/tuning_params.hpp src/nccl_impl.hpp src/nccl_impl.cpp
+	$(MPICXX) $(CXXFLAGS) -shared -o liballreduce.so src/Al.cpp src/mpi_impl.cpp src/nccl_impl.cpp
 
 benchmark_allreduces: liballreduce.so benchmark/benchmark_allreduces.cpp  $(CUDA_OBJ) $(MPI_CUDA_HEADERS)
 	$(MPICXX) $(CXXFLAGS) $(LIB) -o benchmark_allreduces benchmark/benchmark_allreduces.cpp $(CUDA_OBJ) 
@@ -48,10 +48,10 @@ benchmark_nballreduces: liballreduce.so benchmark/benchmark_nballreduces.cpp
 benchmark_overlap: liballreduce.so benchmark/benchmark_overlap.cpp
 	$(MPICXX) $(CXXFLAGS) $(LIB) -o benchmark_overlap benchmark/benchmark_overlap.cpp
 
-test_correctness: liballreduce.so test/test_correctness.cpp src/allreduce_nccl_impl.hpp test/test_utils.hpp $(CUDA_OBJ) $(MPI_CUDA_HEADERS)
+test_correctness: liballreduce.so test/test_correctness.cpp src/nccl_impl.hpp test/test_utils.hpp $(CUDA_OBJ) $(MPI_CUDA_HEADERS)
 	$(MPICXX) $(CXXFLAGS) $(LIB) -o test_correctness test/test_correctness.cpp $(CUDA_OBJ)
 
-test_nccl_collectives: liballreduce.so test/test_nccl_collectives.cpp src/allreduce_nccl_impl.hpp test/test_utils.hpp $(CUDA_OBJ) $(MPI_CUDA_HEADERS)
+test_nccl_collectives: liballreduce.so test/test_nccl_collectives.cpp src/nccl_impl.hpp test/test_utils.hpp $(CUDA_OBJ) $(MPI_CUDA_HEADERS)
 	$(MPICXX) $(CXXFLAGS) $(LIB) -o test_nccl_collectives test/test_nccl_collectives.cpp $(CUDA_OBJ)
 
 test_multi_nballreduces: liballreduce.so test/test_multi_nballreduces.cpp

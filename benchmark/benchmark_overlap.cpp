@@ -1,5 +1,5 @@
 #include <iostream>
-#include "allreduce.hpp"
+#include "Al.hpp"
 #include "test_utils.hpp"
 
 const size_t max_size = 1<<22;
