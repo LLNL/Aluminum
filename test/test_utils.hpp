@@ -23,12 +23,12 @@ typename VectorType<Backend>::type get_vector(size_t count) {
 }
 
 /** Generate random data of length count. */
-template <typename Backend=allreduces::MPIBackend>
+template <typename Backend=Al::MPIBackend>
 typename VectorType<Backend>::type gen_data(size_t count);
 
 template <>
-typename VectorType<allreduces::MPIBackend>::type
-gen_data<allreduces::MPIBackend>(size_t count) {
+typename VectorType<Al::MPIBackend>::type
+gen_data<Al::MPIBackend>(size_t count) {
 /*
   int rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -65,12 +65,12 @@ gen_data<allreduces::MPIBackend>(size_t count) {
 }
 
 
-template <typename Backend=allreduces::MPIBackend>
+template <typename Backend=Al::MPIBackend>
 typename VectorType<Backend>::type create_data(size_t count);
 
 template <>
-typename VectorType<allreduces::MPIBackend>::type
-create_data<allreduces::MPIBackend>(size_t count) {
+typename VectorType<Al::MPIBackend>::type
+create_data<Al::MPIBackend>(size_t count) {
 
   std::vector<float> v(count);
   for (size_t i = 0; i < count; ++i) {
@@ -113,15 +113,15 @@ std::vector<typename Backend::algo_type> get_allreduce_algorithms() {
 }
  
 template <>
-std::vector<allreduces::MPIBackend::algo_type>
-get_allreduce_algorithms<allreduces::MPIBackend>() {  
-   std::vector<allreduces::AllreduceAlgorithm> algos = {
-    allreduces::AllreduceAlgorithm::automatic,
-    allreduces::AllreduceAlgorithm::mpi_passthrough,
-    allreduces::AllreduceAlgorithm::mpi_recursive_doubling,
-    allreduces::AllreduceAlgorithm::mpi_ring,
-    allreduces::AllreduceAlgorithm::mpi_rabenseifner,
-    allreduces::AllreduceAlgorithm::mpi_pe_ring
+std::vector<Al::MPIBackend::algo_type>
+get_allreduce_algorithms<Al::MPIBackend>() {  
+   std::vector<Al::AllreduceAlgorithm> algos = {
+    Al::AllreduceAlgorithm::automatic,
+    Al::AllreduceAlgorithm::mpi_passthrough,
+    Al::AllreduceAlgorithm::mpi_recursive_doubling,
+    Al::AllreduceAlgorithm::mpi_ring,
+    Al::AllreduceAlgorithm::mpi_rabenseifner,
+    Al::AllreduceAlgorithm::mpi_pe_ring
   };
   return algos;
 }
@@ -134,15 +134,15 @@ std::vector<typename Backend::algo_type> get_nb_allreduce_algorithms() {
 }
  
 template <>
-std::vector<allreduces::MPIBackend::algo_type>
-get_nb_allreduce_algorithms<allreduces::MPIBackend>() {  
-  std::vector<allreduces::AllreduceAlgorithm> algos = {
-    allreduces::AllreduceAlgorithm::automatic,
-    allreduces::AllreduceAlgorithm::mpi_passthrough,
-    allreduces::AllreduceAlgorithm::mpi_recursive_doubling,
-    allreduces::AllreduceAlgorithm::mpi_ring,
-    allreduces::AllreduceAlgorithm::mpi_rabenseifner,
-    //allreduces::AllreduceAlgorithm::mpi_pe_ring
+std::vector<Al::MPIBackend::algo_type>
+get_nb_allreduce_algorithms<Al::MPIBackend>() {  
+  std::vector<Al::AllreduceAlgorithm> algos = {
+    Al::AllreduceAlgorithm::automatic,
+    Al::AllreduceAlgorithm::mpi_passthrough,
+    Al::AllreduceAlgorithm::mpi_recursive_doubling,
+    Al::AllreduceAlgorithm::mpi_ring,
+    Al::AllreduceAlgorithm::mpi_rabenseifner,
+    //Al::AllreduceAlgorithm::mpi_pe_ring
   };
   return algos;
 }
@@ -177,8 +177,8 @@ template <typename Backend>
 typename Backend::req_type get_request();
 
 template <>
-inline typename allreduces::MPIBackend::req_type
-get_request<allreduces::MPIBackend>() {
+inline typename Al::MPIBackend::req_type
+get_request<Al::MPIBackend>() {
   int req = 0;
   return req;
 }

@@ -3,7 +3,7 @@
 //#include <thrust/device_ptr.h>
 #include "mpi_cuda/cuda_kernels.hpp"
 
-namespace allreduces {
+namespace Al {
 namespace internal {
 namespace mpi_cuda {
 
@@ -258,5 +258,4 @@ void reduce_thrust(float *dst, const float *src, size_t count,
 
 } // namespace mpi_cuda
 } // namespace internal
-} // namespace allreduces
-
+} // namespace Al

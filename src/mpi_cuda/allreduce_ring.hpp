@@ -6,7 +6,7 @@
 #include <cstring>
 #include <cuda_runtime.h>
 
-namespace allreduces {
+namespace Al {
 namespace internal {
 namespace mpi_cuda {
 
@@ -797,4 +797,4 @@ class RingMPICUDA {
 
 } // namespace mpi_cuda
 } // namespace internal
-} // namespace allreduces
+} // namespace Al

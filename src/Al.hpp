@@ -1,5 +1,5 @@
 /**
- * Various optimized allreduce implementations.
+ * Various optimized collective implementations.
  */
 
 #pragma once
@@ -22,7 +22,7 @@
 #include "base.hpp"
 #include "tuning_params.hpp"
 
-namespace allreduces {
+namespace Al {
 
 /**
  * Abstract base class for all communicator objects.
@@ -135,17 +135,17 @@ inline std::string allreduce_name(AllreduceAlgorithm algo) {
 }
 
 /**
- * Initialize the allreduce library.
+ * Initialize Aluminum.
  * This must be called before any other calls to the library. It is safe to
  * call this multiple times.
  */
 void Initialize(int& argc, char**& argv);
 /**
- * Clean up the allreduce library.
+ * Clean up Aluminum.
  * Do not make any further calls to the library after calling this.
  */
 void Finalize();
-/** Return true if the library has been initialized. */
+/** Return true if Aluminum has been initialized. */
 bool Initialized();
 
 /**
@@ -311,6 +311,7 @@ void NonblockingAllgather(
   Backend::template NonblockingAllgather<T>(recvbuf, count, comm, req, algo);
 }
 
+// There are no in-place broadcast versions; it is always in-place.
 
 template <typename Backend, typename T>
 void Bcast(const T* sendbuf, 
@@ -332,7 +333,6 @@ void NonblockingBcast(
   Backend::template NonblockingBcast<T>(sendbuf,  count, root, comm, req, algo);
 }
 
-/// No in-place Bcast is defined, because Bcast is by default an in-place collective
 /**
  * Test whether req has completed or not, returning true if it has.
  */
@@ -342,10 +342,9 @@ bool Test(typename Backend::req_type& req);
 template <typename Backend>
 void Wait(typename Backend::req_type& req);
 
-
 /**
- * Internal implementations of allreduce.
- * Generic code for all allreduce implementations is in here.
+ * Internal implementations.
+ * Generic code for all collective implementations is in here.
  * Implementation-specific code is in separate namespaces inside internal.
  */
 namespace internal {
@@ -448,7 +447,7 @@ class ProgressEngine {
   std::queue<AllreduceState*> enqueued_reqs;
   /** Protects enqueued_reqs. */
   std::mutex enqueue_mutex;
-#if ALLREDUCE_PE_SLEEPS
+#if AL_PE_SLEEPS
   /**
    * The progress engine will sleep on this when there is otherwise no work to
    * do.
@@ -547,7 +546,7 @@ void pe_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
 
 }  // namespace mpi
 }  // namespace internal
-}  // namespace allreduces
+}  // namespace Al
 
 #include "Al_impl.hpp"
 #include "mempool.hpp"
@@ -559,4 +558,3 @@ void pe_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
 #ifdef ALUMINUM_HAS_MPI_CUDA
 #include "mpi_cuda_impl.hpp"
 #endif
-

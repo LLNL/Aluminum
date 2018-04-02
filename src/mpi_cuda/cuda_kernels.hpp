@@ -1,8 +1,8 @@
 #pragma once
 
-#include "allreduce_base.hpp"
+#include "base.hpp"
 
-namespace allreduces {
+namespace Al {
 namespace internal {
 namespace mpi_cuda {
 
@@ -51,5 +51,4 @@ void reduce_thrust(void *dst, const void *src, size_t count,
 
 } // namespace mpi_cuda
 } // namespace internal
-} // namespace allreduces
-
+} // namespace Al

@@ -3,7 +3,7 @@
 #include <exception>
 #include <string>
 
-namespace allreduces {
+namespace Al {
 
 /**
  * Base allreduce exception class.
@@ -34,4 +34,4 @@ enum class ReductionOperator {
   sum, prod, min, max
 };
 
-} // namespace allreduces
+} // namespace Al

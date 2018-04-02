@@ -16,7 +16,7 @@ hwloc_obj_t hwloc_get_numanode_obj_by_os_index(hwloc_topology_t topology, unsign
 }
 #endif
 
-namespace allreduces {
+namespace Al {
 
 namespace {
 // Whether the library has been initialized.
@@ -73,7 +73,7 @@ void ProgressEngine::stop() {
     throw_allreduce_exception("Stop called twice on progress engine");
   }
   stop_flag = true;
-#if ALLREDUCE_PE_SLEEPS
+#if AL_PE_SLEEPS
   enqueue_cv.notify_one();  // Wake up the engine if needed.
 #endif
   thread.join();
@@ -83,7 +83,7 @@ void ProgressEngine::enqueue(AllreduceState* state) {
   enqueue_mutex.lock();
   enqueued_reqs.push(state);
   enqueue_mutex.unlock();
-#if ALLREDUCE_PE_SLEEPS
+#if AL_PE_SLEEPS
   enqueue_cv.notify_one();  // Wake up the engine if needed.
 #endif
 }
@@ -188,26 +188,26 @@ void ProgressEngine::engine() {
   startup_cv.notify_one();
   while (!stop_flag.load()) {
     // Check for newly-submitted requests, if we can take more.
-    if (ALLREDUCE_PE_NUM_CONCURRENT_ALLREDUCES == 0 ||
-         in_progress_reqs.size() < ALLREDUCE_PE_NUM_CONCURRENT_ALLREDUCES) {
+    if (AL_PE_NUM_CONCURRENT_ALLREDUCES == 0 ||
+         in_progress_reqs.size() < AL_PE_NUM_CONCURRENT_ALLREDUCES) {
       // Don't block if someone else has the lock.
       std::unique_lock<std::mutex> lock(enqueue_mutex, std::try_to_lock);
       if (lock) {
-#if ALLREDUCE_PE_SLEEPS
+#if AL_PE_SLEEPS
         // If there's no work, we sleep.
         if (in_progress_reqs.empty() && enqueued_reqs.empty()) {
           enqueue_cv.wait(
             lock, [this] {
               return (!enqueued_reqs.empty() &&
-                      (ALLREDUCE_PE_NUM_CONCURRENT_ALLREDUCES == 0 ||
-                       in_progress_reqs.size() < ALLREDUCE_PE_NUM_CONCURRENT_ALLREDUCES)) ||
+                      (AL_PE_NUM_CONCURRENT_ALLREDUCES == 0 ||
+                       in_progress_reqs.size() < AL_PE_NUM_CONCURRENT_ALLREDUCES)) ||
                 stop_flag.load();
             });
         }
 #endif
         while (!enqueued_reqs.empty() &&
-               (ALLREDUCE_PE_NUM_CONCURRENT_ALLREDUCES == 0 ||
-                in_progress_reqs.size() < ALLREDUCE_PE_NUM_CONCURRENT_ALLREDUCES)) {
+               (AL_PE_NUM_CONCURRENT_ALLREDUCES == 0 ||
+                in_progress_reqs.size() < AL_PE_NUM_CONCURRENT_ALLREDUCES)) {
           in_progress_reqs.push_back(enqueued_reqs.front());
           enqueued_reqs.pop();
         }
@@ -242,4 +242,4 @@ ProgressEngine* get_progress_engine() {
 }
 
 }  // namespace internal
-}  // namespace allreduces
+}  // namespace Al

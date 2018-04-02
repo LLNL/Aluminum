@@ -6,8 +6,8 @@
 size_t max_size = 1<<20;
 
 int main(int argc, char** argv) {
-  allreduces::Initialize(argc, argv);
-  allreduces::MPICommunicator comm;  // Use COMM_WORLD.
+  Al::Initialize(argc, argv);
+  Al::MPICommunicator comm;  // Use COMM_WORLD.
 
   if (argc == 2) {
     max_size = std::stoul(argv[1]);
@@ -24,7 +24,7 @@ int main(int argc, char** argv) {
       }
     }
   }
-  std::vector<typename allreduces::MPIBackend::req_type> reqs(sizes.size());
+  std::vector<typename Al::MPIBackend::req_type> reqs(sizes.size());
   std::vector<std::vector<float>> input_data(sizes.size());
   std::vector<std::vector<float>> expected_data(sizes.size());
   for (size_t i = 0; i < sizes.size(); ++i) {
@@ -38,18 +38,18 @@ int main(int argc, char** argv) {
   }
   for (size_t i = 0; i < sizes.size(); ++i) {
     size_t size = sizes[i];
-    allreduces::NonblockingAllreduce<allreduces::MPIBackend>(
-      input_data[i].data(), size, allreduces::ReductionOperator::sum, comm,
-      reqs[i], allreduces::AllreduceAlgorithm::mpi_recursive_doubling);
+    Al::NonblockingAllreduce<Al::MPIBackend>(
+      input_data[i].data(), size, Al::ReductionOperator::sum, comm,
+      reqs[i], Al::AllreduceAlgorithm::mpi_recursive_doubling);
   }
   for (size_t i = 0; i < sizes.size(); ++i) {
     //size_t size = sizes[i];
-    allreduces::Wait<allreduces::MPIBackend>(reqs[i]);
+    Al::Wait<Al::MPIBackend>(reqs[i]);
     //if (comm.rank() == 0) std::cout << comm.rank() << ": size=" << size << std::endl;
     if (!check_vector(expected_data[i], input_data[i])) {
       std::cout << comm.rank() << ": allreduce doesn't match" << std::endl;
     }
   }
-  allreduces::Finalize();
+  Al::Finalize();
   return 0;
 }

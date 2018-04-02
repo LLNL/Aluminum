@@ -1,6 +1,6 @@
 #pragma once
 
-namespace allreduces {
+namespace Al {
 namespace internal {
 
 /** An entry in a simple memory pool. */
@@ -70,4 +70,4 @@ void release_memory(T* mem) {
 }
 
 }  // namespace internal
-}  // namespace allreduces
+}  // namespace Al

@@ -21,7 +21,7 @@
   }                                             \
 } while(0)
 
-namespace allreduces {
+namespace Al {
 
 // Initialize this.
 const NCCLBackend::req_type NCCLBackend::null_req = (NCCLBackend::req_type) (-1);
@@ -145,6 +145,6 @@ void NCCLCommunicator::Reduce_scatter(void* sendbuf, void* recvbuf,
                               nccl_redop, m_nccl_comm, default_stream));
 }
 
-}  // namespace allreduces
+}  // namespace Al
 
 #endif  // ALUMINUM_HAS_NCCL

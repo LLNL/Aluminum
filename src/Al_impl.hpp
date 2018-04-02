@@ -1,7 +1,6 @@
 #pragma once
 
-namespace allreduces {
-
+namespace Al {
 
 class MPIBackend {
  public:
@@ -115,6 +114,4 @@ inline void Wait<MPIBackend>(typename MPIBackend::req_type& req) {
   pe->wait_for_completion(req);
 }
 
-}  // namespace allreduces
-
-
+}  // namespace Al

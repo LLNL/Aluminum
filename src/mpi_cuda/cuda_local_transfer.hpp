@@ -8,8 +8,7 @@
 
 #include "mpi_cuda/coll_util.hpp"
 
-
-namespace allreduces {
+namespace Al {
 namespace internal {
 namespace mpi_cuda {
 
@@ -43,9 +42,6 @@ void gpu_broadcast(const std::vector<int> &gpus,
                    size_t count,
                    std::vector<cudaStream_t> &streams);
 
-
-
 } // namespace mpi_cuda
 } // namespace internal
-} // namespace allreduces
-
+} // namespace Al

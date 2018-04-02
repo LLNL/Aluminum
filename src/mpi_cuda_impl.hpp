@@ -1,8 +1,9 @@
 #pragma once
 
+#include "Al.hpp"
 #include "mpi_cuda/allreduce.hpp"
 
-namespace allreduces {
+namespace Al {
 
 enum class MPICUDAAllreduceAlgorithm {
   automatic,
@@ -99,4 +100,4 @@ inline void Wait<MPICUDABackend>(typename MPICUDABackend::req_type& req) {
   cudaStreamSynchronize(req);
 }
 
-} // namespace allreduces
+}  // namespace Al

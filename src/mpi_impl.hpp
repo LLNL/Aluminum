@@ -4,7 +4,7 @@
 #include <vector>
 #include <numeric>
 
-namespace allreduces {
+namespace Al {
 namespace internal {
 namespace mpi {
 
@@ -32,8 +32,8 @@ inline void assert_count_fits_mpi(size_t count) {
 /** Basic sum reduction. */
 template <typename T>
 void sum_reduction(const T* src, T* dest, size_t count) {
-#if ALLREDUCE_MPI_USE_OPENMP
-  if (count >= ALLREDUCE_MPI_MULTITHREAD_SUM_THRESH) {
+#if AL_MPI_USE_OPENMP
+  if (count >= AL_MPI_MULTITHREAD_SUM_THRESH) {
     #pragma omp parallel for
     for (size_t i = 0; i < count; ++i) {
       dest[i] += src[i];
@@ -52,8 +52,8 @@ void sum_reduction(const T* src, T* dest, size_t count) {
 /** Basic prod reduction. */
 template <typename T>
 void prod_reduction(const T* src, T* dest, size_t count) {
-#if ALLREDUCE_MPI_USE_OPENMP
-  if (count >= ALLREDUCE_MPI_MULTITHREAD_PROD_THRESH) {
+#if AL_MPI_USE_OPENMP
+  if (count >= AL_MPI_MULTITHREAD_PROD_THRESH) {
     #pragma omp parallel for
     for (size_t i = 0; i < count; ++i) {
       dest[i] *= src[i];
@@ -72,8 +72,8 @@ void prod_reduction(const T* src, T* dest, size_t count) {
 /** Basic min reduction. */
 template <typename T>
 void min_reduction(const T* src, T* dest, size_t count) {
-#if ALLREDUCE_MPI_USE_OPENMP
-  if (count >= ALLREDUCE_MPI_MULTITHREAD_MINMAX_THRESH) {
+#if AL_MPI_USE_OPENMP
+  if (count >= AL_MPI_MULTITHREAD_MINMAX_THRESH) {
     #pragma omp parallel for
     for (size_t i = 0; i < count; ++i) {
       dest[i] = std::min(dest[i], src[i]);
@@ -92,8 +92,8 @@ void min_reduction(const T* src, T* dest, size_t count) {
 /** Basic max reduction. */
 template <typename T>
 void max_reduction(const T* src, T* dest, size_t count) {
-#if ALLREDUCE_MPI_USE_OPENMP
-  if (count >= ALLREDUCE_MPI_MULTITHREAD_MINMAX_THRESH) {
+#if AL_MPI_USE_OPENMP
+  if (count >= AL_MPI_MULTITHREAD_MINMAX_THRESH) {
     #pragma omp parallel for
     for (size_t i = 0; i < count; ++i) {
       dest[i] = std::max(dest[i], src[i]);
@@ -1118,4 +1118,4 @@ void pe_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
 
 }  // namespace mpi
 }  // namespace internal
-}  // namespace allreduces
+}  // namespace Al

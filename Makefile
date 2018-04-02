@@ -36,8 +36,8 @@ endif
 
 all: liballreduce.so benchmark_allreduces benchmark_nballreduces benchmark_overlap benchmark_reductions test_correctness test_multi_nballreduces test_nccl_collectives
 
-liballreduce.so: src/Al.cpp src/mpi_impl.cpp src/Al.hpp src/Al_impl.hpp src/mempool.hpp src/mpi_impl.hpp src/tuning_params.hpp src/nccl_impl.hpp src/nccl_impl.cpp
-	$(MPICXX) $(CXXFLAGS) -shared -o liballreduce.so src/Al.cpp src/mpi_impl.cpp src/nccl_impl.cpp
+liballreduce.so: src/Al.cpp src/mpi_impl.cpp src/Al.hpp src/Al_impl.hpp src/mempool.hpp src/mpi_impl.hpp src/tuning_params.hpp src/nccl_impl.hpp src/nccl_impl.cpp src/mpi_cuda_impl.cpp
+	$(MPICXX) $(CXXFLAGS) -shared -o liballreduce.so src/Al.cpp src/mpi_impl.cpp src/nccl_impl.cpp src/mpi_cuda_impl.cpp
 
 benchmark_allreduces: liballreduce.so benchmark/benchmark_allreduces.cpp  $(CUDA_OBJ) $(MPI_CUDA_HEADERS)
 	$(MPICXX) $(CXXFLAGS) $(LIB) -o benchmark_allreduces benchmark/benchmark_allreduces.cpp $(CUDA_OBJ) 

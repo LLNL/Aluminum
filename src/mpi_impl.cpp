@@ -1,6 +1,6 @@
 #include "Al.hpp"
 
-namespace allreduces {
+namespace Al {
 namespace internal {
 namespace mpi {
 
@@ -32,4 +32,4 @@ void finalize() {
 
 }  // namespace mpi
 }  // namespace internal
-}  // namespace allreduces
+}  // namespace Al

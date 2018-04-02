@@ -4,7 +4,7 @@
 #include "Al.hpp"
 #include "common.h"
 
-namespace allreduces {
+namespace Al {
 
 enum class NCCLCollectiveAlgorithm {
   automatic
@@ -381,4 +381,4 @@ inline void Wait<NCCLBackend>(typename NCCLBackend::req_type& req) {
   cudaStreamSynchronize(req);
 }
 
-}  // namespace allreduces
+}  // namespace Al
