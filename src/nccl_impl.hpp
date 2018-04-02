@@ -52,7 +52,7 @@ class NCCLCommunicator : public MPICommunicator {
    * @param nccl_redop The reduction operation to perform.
    * @param default_stream CUDA stream to associate with the operation.
    */
-  void Allreduce(void* sendbuf, void* recvbuf, size_t count,
+  void Allreduce(const void* sendbuf, void* recvbuf, size_t count,
                  ncclDataType_t nccl_type, ncclRedOp_t nccl_redop,
                  cudaStream_t default_stream); 
 
@@ -66,7 +66,7 @@ class NCCLCommunicator : public MPICommunicator {
    * @param root Rank to receive the final result.
    * @param default_stream CUDA stream to associate with the operation.
    */
-  void Reduce(void* sendbuf, void* recvbuf, size_t count,
+  void Reduce(const void* sendbuf, void* recvbuf, size_t count,
               ncclDataType_t nccl_type, ncclRedOp_t nccl_redop, int root,
               cudaStream_t default_stream); 
 
@@ -90,7 +90,7 @@ class NCCLCommunicator : public MPICommunicator {
    * @param nccl_type Type of data being gathered.
    * @param default_stream CUDA stream to associate with the operation.
    */
-  void Allgather(void* sendbuf, void* recvbuf, size_t send_count,
+  void Allgather(const void* sendbuf, void* recvbuf, size_t send_count,
                  ncclDataType_t nccl_type, cudaStream_t default_stream);
 
   /**
@@ -103,7 +103,7 @@ class NCCLCommunicator : public MPICommunicator {
    * @param nccl_redop The reduction operation to perform.
    * @param default_stream CUDA stream to associate with the operation.
    */
-  void Reduce_scatter(void* sendbuf, void* recvbuf, size_t recv_count,
+  void Reduce_scatter(const void* sendbuf, void* recvbuf, size_t recv_count,
                       ncclDataType_t nccl_type, ncclRedOp_t nccl_redop,
                       cudaStream_t default_stream);
 
@@ -202,7 +202,7 @@ class NCCLBackend {
     if (req == null_req) {
       req = get_request();
     }
-    comm.Allreduce((void*) sendbuf, (void*) recvbuf, count,
+    comm.Allreduce((const void*) sendbuf, (void*) recvbuf, count,
                    nccl_type, nccl_redop, req);
   }
 
@@ -243,7 +243,7 @@ class NCCLBackend {
     if (req == null_req) {
       req = get_request();
     }
-    comm.Reduce((void*) sendbuf, (void*) recvbuf, count,
+    comm.Reduce((const void*) sendbuf, (void*) recvbuf, count,
                 nccl_type, nccl_redop, root, req);
   }
 
@@ -279,7 +279,7 @@ class NCCLBackend {
     if (req == null_req) {
       req = get_request();
     }
-    comm.Allgather((void*) sendbuf, (void*) recvbuf, count,
+    comm.Allgather((const void*) sendbuf, (void*) recvbuf, count,
                    nccl_type, req);
   }
 
@@ -310,17 +310,18 @@ class NCCLBackend {
                                         size_t *recv_count, ReductionOperator op,
                                         comm_type& comm, req_type& req,
                                         algo_type) {
-    /// Checking recv_count. This is to fix syntactic mismatch between NCCL and MPI Reduce_scatter.
+    // Checking recv_count. This is to fix syntactic mismatch between NCCL and
+    // MPI Reduce_scatter.
     size_t r_count = (size_t) recv_count[0];
     bool check = true;
-    for (int i=1; i<comm.size(); i++) {
-      if(recv_count[i] != recv_count[0]){
+    for (int i = 1; i < comm.size(); i++) {
+      if (recv_count[i] != recv_count[0]) {
         check = false;
         break;
       }
     }
-    if(!check){
-      if(comm.rank() == 0){
+    if (!check) {
+      if (comm.rank() == 0) {
         std::cerr << "For NCCL_Reduce_scatter recv_count must be equal for all ranks\n";
         std::abort();
       }
@@ -334,7 +335,7 @@ class NCCLBackend {
     if (req == null_req) {
       req = get_request();
     }
-    comm.Reduce_scatter((void*) sendbuf, (void*) recvbuf, r_count,
+    comm.Reduce_scatter((const void*) sendbuf, (void*) recvbuf, r_count,
                         nccl_type, nccl_redop, req);
   }
 
@@ -346,21 +347,21 @@ class NCCLBackend {
   }
 
   template <typename T>
-  static void Bcast(const T* sendbuf, size_t count, int root, comm_type& comm, 
+  static void Bcast(T* buf, size_t count, int root, comm_type& comm, 
                     algo_type algo) {
     cudaStream_t default_stream = comm.get_default_stream();
-    NonblockingBcast(sendbuf, count, root, comm, default_stream, algo);
+    NonblockingBcast(buf, count, root, comm, default_stream, algo);
     comm.synchronize();
   }
 
   template <typename T>
-  static void NonblockingBcast(const T* sendbuf, size_t count, int root,
+  static void NonblockingBcast(T* buf, size_t count, int root,
                                comm_type& comm, req_type& req, algo_type) {
     ncclDataType_t nccl_type = internal::nccl::TypeMap<T>();
     if (req == null_req) {
       req = get_request();
     }
-    comm.Bcast((void *) sendbuf, count, nccl_type, root, req);
+    comm.Bcast((void*) buf, count, nccl_type, root, req);
   }
 };
 

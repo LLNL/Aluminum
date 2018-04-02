@@ -103,8 +103,8 @@ cudaStream_t NCCLCommunicator::get_default_stream() {
   return m_streams[0];
 }
 
-void NCCLCommunicator::Allreduce(void* sendbuf, void* recvbuf, size_t count,
-                                 ncclDataType_t nccl_type,
+void NCCLCommunicator::Allreduce(const void* sendbuf, void* recvbuf,
+                                 size_t count, ncclDataType_t nccl_type,
                                  ncclRedOp_t nccl_redop,
                                  cudaStream_t default_stream) {
   if (count == 0) return;
@@ -112,7 +112,7 @@ void NCCLCommunicator::Allreduce(void* sendbuf, void* recvbuf, size_t count,
                           m_nccl_comm, default_stream));
 }
 
-void NCCLCommunicator::Reduce(void* sendbuf, void* recvbuf, size_t count,
+void NCCLCommunicator::Reduce(const void* sendbuf, void* recvbuf, size_t count,
                               ncclDataType_t nccl_type, ncclRedOp_t nccl_redop,
                               int root, cudaStream_t default_stream) {
   if (count == 0) return;
@@ -120,22 +120,22 @@ void NCCLCommunicator::Reduce(void* sendbuf, void* recvbuf, size_t count,
                        m_nccl_comm, default_stream));
 }
 
-void NCCLCommunicator::Bcast(void* sendbuf, size_t count,
+void NCCLCommunicator::Bcast(void* buf, size_t count,
                              ncclDataType_t nccl_type, int root,
                              cudaStream_t default_stream) {
   if (count == 0) return;
-  NCCLCHECK(ncclBcast(sendbuf, count, nccl_type, root, m_nccl_comm,
+  NCCLCHECK(ncclBcast(buf, count, nccl_type, root, m_nccl_comm,
                       default_stream));
 }
 
-void NCCLCommunicator::Allgather(void* sendbuf, void* recvbuf,
+void NCCLCommunicator::Allgather(const void* sendbuf, void* recvbuf,
                                  size_t send_count, ncclDataType_t nccl_type,
                                  cudaStream_t default_stream) {
   if (send_count == 0) return;
   NCCLCHECK(ncclAllGather(sendbuf, recvbuf, send_count, nccl_type, m_nccl_comm, default_stream));
 }
 
-void NCCLCommunicator::Reduce_scatter(void* sendbuf, void* recvbuf,
+void NCCLCommunicator::Reduce_scatter(const void* sendbuf, void* recvbuf,
                                       size_t recv_count,
                                       ncclDataType_t nccl_type,
                                       ncclRedOp_t nccl_redop,

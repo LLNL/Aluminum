@@ -397,12 +397,12 @@ void NonblockingAllgather(
  * @param algo Request a particular broadcast algorithm.
  */
 template <typename Backend, typename T>
-void Bcast(const T* buf, 
+void Bcast(T* buf, 
            size_t count, 
            int root, 
            typename Backend::comm_type& comm,
            typename Backend::algo_type algo = Backend::algo_type::automatic) {
-  Backend::template Bcast<T>(sendbuf, count, root, comm, algo);
+  Backend::template Bcast<T>(buf, count, root, comm, algo);
 }
 
 /**
@@ -414,13 +414,13 @@ void Bcast(const T* buf,
  */
 template <typename Backend, typename T>
 void NonblockingBcast(
-  const T* buf, 
+  T* buf, 
   size_t count,
   int root,
   typename Backend::comm_type& comm,
   typename Backend::req_type& req,
   typename Backend::algo_type algo = Backend::algo_type::automatic) {
-  Backend::template NonblockingBcast<T>(sendbuf,  count, root, comm, req, algo);
+  Backend::template NonblockingBcast<T>(buf,  count, root, comm, req, algo);
 }
 
 /**
