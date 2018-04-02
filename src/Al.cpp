@@ -46,8 +46,8 @@ bool Initialized() {
 
 namespace internal {
 
-AllreduceRequest get_free_request() {
-  static AllreduceRequest cur_req = 1;
+AlRequest get_free_request() {
+  static AlRequest cur_req = 1;
   return cur_req++;
 }
 
@@ -79,7 +79,7 @@ void ProgressEngine::stop() {
   thread.join();
 }
 
-void ProgressEngine::enqueue(AllreduceState* state) {
+void ProgressEngine::enqueue(AlState* state) {
   enqueue_mutex.lock();
   enqueued_reqs.push(state);
   enqueue_mutex.unlock();
@@ -88,14 +88,14 @@ void ProgressEngine::enqueue(AllreduceState* state) {
 #endif
 }
 
-bool ProgressEngine::is_complete(AllreduceRequest& req) {
+bool ProgressEngine::is_complete(AlRequest& req) {
   if (req == NULL_REQUEST) {
     return true;
   }
   if (completed_mutex.try_lock()) {
     auto i = completed_reqs.find(req);
     if (i != completed_reqs.end()) {
-      AllreduceState* state = i->second;
+      AlState* state = i->second;
       completed_reqs.erase(i);
       completed_mutex.unlock();
       delete state;
@@ -108,7 +108,7 @@ bool ProgressEngine::is_complete(AllreduceRequest& req) {
   return false;
 }
 
-void ProgressEngine::wait_for_completion(AllreduceRequest& req) {
+void ProgressEngine::wait_for_completion(AlRequest& req) {
   if (req == NULL_REQUEST) {
     return;
   }
@@ -116,7 +116,7 @@ void ProgressEngine::wait_for_completion(AllreduceRequest& req) {
   std::unique_lock<std::mutex> lock(completed_mutex);
   auto i = completed_reqs.find(req);
   if (i != completed_reqs.end()) {
-    AllreduceState* state = i->second;
+    AlState* state = i->second;
     completed_reqs.erase(i);
     lock.unlock();
     delete state;
@@ -129,7 +129,7 @@ void ProgressEngine::wait_for_completion(AllreduceRequest& req) {
     completion_cv.wait(lock);
     i = completed_reqs.find(req);
     if (i != completed_reqs.end()) {
-      AllreduceState* state = i->second;
+      AlState* state = i->second;
       completed_reqs.erase(i);
       lock.unlock();
       delete state;
@@ -213,10 +213,10 @@ void ProgressEngine::engine() {
         }
       }
     }
-    std::vector<AllreduceState*> completed;
+    std::vector<AlState*> completed;
     // Process one step of each in-progress request.
     for (auto i = in_progress_reqs.begin(); i != in_progress_reqs.end();) {
-      AllreduceState* state = *i;
+      AlState* state = *i;
       if (state->step()) {
         // Request completed, but don't try to block here.
         completed.push_back(state);
@@ -228,7 +228,7 @@ void ProgressEngine::engine() {
     // Shift over completed requests.
     if (!completed.empty()) {
       completed_mutex.lock();
-      for (AllreduceState* state : completed) {
+      for (AlState* state : completed) {
         completed_reqs[state->get_req()] = state;
       }
       completed_mutex.unlock();

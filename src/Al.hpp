@@ -363,39 +363,39 @@ T* get_memory(size_t count);
 template <typename T>
 void release_memory(T* mem);
 
-/** Request handle for non-blocking allreduces. */
-using AllreduceRequest = int;  // TODO: This is a placeholder.
+/** Request handle for non-blocking operations.. */
+using AlRequest = int;  // TODO: This is a placeholder.
 
-/** Return a free allreduce request for use. */
-AllreduceRequest get_free_request();
+/** Return a free request for use. */
+AlRequest get_free_request();
 /** Special marker for null requests. */
-static const AllreduceRequest NULL_REQUEST = 0;
+static const AlRequest NULL_REQUEST = 0;
 
 /**
- * Represents the state and algorithm for an asynchronous allreduce.
- * A non-blocking allreduce should create one of these and enqueue it for
+ * Represents the state and algorithm for an asynchronous operation.
+ * A non-blocking operation should create one of these and enqueue it for
  * execution by the progress thread. Specific implementations can override
  * as needed.
  * An algorithm should be broken up into steps which execute some small,
- * discrete operation. Steps from different allreduces may be interleaved.
+ * discrete operation. Steps from different operations may be interleaved.
  * Note that the memory pool is not thread-safe, so memory from it should be
  * pre-allocated before enqueueing.
  */
-class AllreduceState {
+class AlState {
  public:
-  /** Create with an associated allreduce request. */
-  AllreduceState(AllreduceRequest req_) : req(req_) {}
-  virtual ~AllreduceState() {}
+  /** Create with an associated request. */
+  AlState(AlRequest req_) : req(req_) {}
+  virtual ~AlState() {}
   /**
-   * Start one step of the allreduce algorithm.
-   * Return true if the allreduce has completed, false if it has more steps
+   * Start one step of the algorithm.
+   * Return true if the operation has completed, false if it has more steps
    * remaining.
    */
   virtual bool step() = 0;
   /** Return the associated request. */
-  AllreduceRequest get_req() const { return req; }
+  AlRequest get_req() const { return req; }
  private:
-  AllreduceRequest req;
+  AlRequest req;
 };
 
 /**
@@ -414,18 +414,18 @@ class ProgressEngine {
   /** Stop the progress engine. */
   void stop();
   /** Enqueue state for asynchronous execution. */
-  void enqueue(AllreduceState* state);
+  void enqueue(AlState* state);
   /**
    * Check whether a request has completed.
    * If the request is completed, it is removed.
    * This does not block and may spuriously return false.
    */
-  bool is_complete(AllreduceRequest& req);
+  bool is_complete(AlRequest& req);
   /**
    * Wait until a request has completed, then remove it.
    * This will block the calling thread.
    */
-  void wait_for_completion(AllreduceRequest& req);
+  void wait_for_completion(AlRequest& req);
  private:
   /** The actual thread of execution. */
   std::thread thread;
@@ -444,7 +444,7 @@ class ProgressEngine {
    * begins to run them.
    * This is protected by the enqueue_mutex.
    */
-  std::queue<AllreduceState*> enqueued_reqs;
+  std::queue<AlState*> enqueued_reqs;
   /** Protects enqueued_reqs. */
   std::mutex enqueue_mutex;
 #if AL_PE_SLEEPS
@@ -458,14 +458,14 @@ class ProgressEngine {
    * Requests the progress engine is currently processing.
    * This should be accessed only by the progress engine (it is not protected).
    */
-  std::list<AllreduceState*> in_progress_reqs;
+  std::list<AlState*> in_progress_reqs;
   /**
    * Requests that have been completed.
    * The request is added by the progress engine once it has been completed.
    * States should be deallocated by whatever removes them from this.
    * This is protected by the completed_mutex.
    */
-  std::unordered_map<AllreduceRequest, AllreduceState*> completed_reqs;
+  std::unordered_map<AlRequest, AlState*> completed_reqs;
   /** Protects completed_reqs. */
   std::mutex completed_mutex;
   /** Used to notify any thread waiting for completion. */
@@ -489,7 +489,7 @@ class ProgressEngine {
 /** Return a pointer to the progress engine. */
 ProgressEngine* get_progress_engine();
 
-/** MPI-based allreduce implementations. */
+/** MPI-based implementations. */
 namespace mpi {
 
 /** MPI initialization. */
@@ -505,7 +505,7 @@ void passthrough_allreduce(const T* sendbuf, T* recvbuf, size_t count,
 template <typename T>
 void nb_passthrough_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                               ReductionOperator op, Communicator& comm,
-                              AllreduceRequest& req);
+                              AlRequest& req);
 /** Use a recursive-doubling algorithm to perform the allreduce. */
 template <typename T>
 void recursive_doubling_allreduce(const T* sendbuf, T* recvbuf, size_t count,
@@ -514,7 +514,7 @@ void recursive_doubling_allreduce(const T* sendbuf, T* recvbuf, size_t count,
 template <typename T>
 void nb_recursive_doubling_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                                      ReductionOperator op, Communicator& comm,
-                                     AllreduceRequest& req);
+                                     AlRequest& req);
 /** Use a ring-based reduce-scatter then allgather to perform the allreduce. */
 template <typename T>
 void ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
@@ -523,7 +523,7 @@ void ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
 template <typename T>
 void nb_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                        ReductionOperator op, Communicator& comm,
-                       AllreduceRequest& req);
+                       AlRequest& req);
 /**
  * Use Rabenseifner's algorithm (recursive halving/doubling) to perform the
  * allreduce.
@@ -535,7 +535,7 @@ void rabenseifner_allreduce(const T* sendbuf, T* recvbuf, size_t count,
 template <typename T>
 void nb_rabenseifner_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                                ReductionOperator op, Communicator& comm,
-                               AllreduceRequest& req);
+                               AlRequest& req);
 /**
  * Use a pairwise-exchange reduce-scatter and ring allgather to perform the
  * allreduce.

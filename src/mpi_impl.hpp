@@ -146,12 +146,12 @@ inline MPI_Op ReductionOperator2MPI_Op(ReductionOperator op) {
 
 /** Base state class for MPI allreduces. */
 template <typename T>
-class MPIAllreduceState : public AllreduceState {
+class MPIAlState : public AlState {
  public:
-  MPIAllreduceState(const T* sendbuf_, T* recvbuf_, size_t count_,
-                    ReductionOperator op_, Communicator& comm_,
-                    AllreduceRequest req_) :
-    AllreduceState(req_), sendbuf(sendbuf_), recvbuf(recvbuf_), recv_to(nullptr),
+  MPIAlState(const T* sendbuf_, T* recvbuf_, size_t count_,
+             ReductionOperator op_, Communicator& comm_,
+             AlRequest req_) :
+    AlState(req_), sendbuf(sendbuf_), recvbuf(recvbuf_), recv_to(nullptr),
     count(count_) {
     comm = dynamic_cast<MPICommunicator&>(comm_).get_comm();
     type = TypeMap<T>();
@@ -160,7 +160,7 @@ class MPIAllreduceState : public AllreduceState {
     nprocs = comm_.size();
     tag = dynamic_cast<MPICommunicator&>(comm_).get_free_tag();
   }
-  ~MPIAllreduceState() override {
+  ~MPIAlState() override {
     if (recv_to != nullptr) {
       release_memory(recv_to);
     }
@@ -239,12 +239,12 @@ void passthrough_allreduce(const T* sendbuf, T* recvbuf, size_t count,
 }
 
 template <typename T>
-class MPIPassthroughAllreduceState : public MPIAllreduceState<T> {
+class MPIPassthroughAlState : public MPIAlState<T> {
  public:
-  MPIPassthroughAllreduceState(
+  MPIPassthroughAlState(
     const T* sendbuf_, T* recvbuf_, size_t count_,
-    ReductionOperator op_, Communicator& comm_, AllreduceRequest req_) :
-    MPIAllreduceState<T>(sendbuf_, recvbuf_, count_, op_, comm_, req_) {
+    ReductionOperator op_, Communicator& comm_, AlRequest req_) :
+    MPIAlState<T>(sendbuf_, recvbuf_, count_, op_, comm_, req_) {
     mpi_op = ReductionOperator2MPI_Op(op_);
   }
   bool setup() override {
@@ -274,10 +274,10 @@ class MPIPassthroughAllreduceState : public MPIAllreduceState<T> {
 template <typename T>
 void nb_passthrough_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                               ReductionOperator op, Communicator& comm,
-                              AllreduceRequest& req) {
+                              AlRequest& req) {
   req = get_free_request();
-  MPIPassthroughAllreduceState<T>* state =
-    new MPIPassthroughAllreduceState<T>(
+  MPIPassthroughAlState<T>* state =
+    new MPIPassthroughAlState<T>(
       sendbuf, recvbuf, count, op, comm, req);
   state->setup();
   ProgressEngine* pe = get_progress_engine();
@@ -351,14 +351,14 @@ void recursive_doubling_allreduce(const T* sendbuf, T* recvbuf, size_t count,
 }
 
 template <typename T>
-class MPIRecursiveDoublingAllreduceState : public MPIAllreduceState<T> {
+class MPIRecursiveDoublingAlState : public MPIAlState<T> {
  public:
-  MPIRecursiveDoublingAllreduceState(
+  MPIRecursiveDoublingAlState(
     const T* sendbuf_, T* recvbuf_, size_t count_,
-    ReductionOperator op_, Communicator& comm_, AllreduceRequest req_) :
-    MPIAllreduceState<T>(sendbuf_, recvbuf_, count_, op_, comm_, req_) {}
+    ReductionOperator op_, Communicator& comm_, AlRequest req_) :
+    MPIAlState<T>(sendbuf_, recvbuf_, count_, op_, comm_, req_) {}
   bool setup() override {
-    bool r = MPIAllreduceState<T>::setup();
+    bool r = MPIAlState<T>::setup();
     if (!r) {
       this->recv_to = get_memory<T>(this->count);
       // Check if we're in a non-power-of-2 case.
@@ -460,10 +460,10 @@ class MPIRecursiveDoublingAllreduceState : public MPIAllreduceState<T> {
 template <typename T>
 void nb_recursive_doubling_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                                      ReductionOperator op, Communicator& comm,
-                                     AllreduceRequest& req) {
+                                     AlRequest& req) {
   req = get_free_request();
-  MPIRecursiveDoublingAllreduceState<T>* state =
-    new MPIRecursiveDoublingAllreduceState<T>(
+  MPIRecursiveDoublingAlState<T>* state =
+    new MPIRecursiveDoublingAlState<T>(
       sendbuf, recvbuf, count, op, comm, req);
   if (state->setup()) {
     req = NULL_REQUEST;
@@ -533,14 +533,14 @@ void ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
 }
 
 template <typename T>
-class MPIRingAllreduceState : public MPIAllreduceState<T> {
+class MPIRingAlState : public MPIAlState<T> {
  public:
-  MPIRingAllreduceState(
+  MPIRingAlState(
     const T* sendbuf_, T* recvbuf_, size_t count_,
-    ReductionOperator op_, Communicator& comm_, AllreduceRequest req_) :
-    MPIAllreduceState<T>(sendbuf_, recvbuf_, count_, op_, comm_, req_) {}
+    ReductionOperator op_, Communicator& comm_, AlRequest req_) :
+    MPIAlState<T>(sendbuf_, recvbuf_, count_, op_, comm_, req_) {}
   bool setup() override {
-    bool r = MPIAllreduceState<T>::setup();
+    bool r = MPIAlState<T>::setup();
     if (!r) {
       // Compute slices of data to be moved.
       const size_t size_per_rank = this->count / this->nprocs;
@@ -647,10 +647,10 @@ class MPIRingAllreduceState : public MPIAllreduceState<T> {
 template <typename T>
 void nb_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                        ReductionOperator op, Communicator& comm,
-                       AllreduceRequest& req) {
+                       AlRequest& req) {
   req = get_free_request();
-  MPIRingAllreduceState<T>* state =
-    new MPIRingAllreduceState<T>(
+  MPIRingAlState<T>* state =
+    new MPIRingAlState<T>(
       sendbuf, recvbuf, count, op, comm, req);
   if (state->setup()) {
     req = NULL_REQUEST;
@@ -809,14 +809,14 @@ void rabenseifner_allreduce(const T* sendbuf, T* recvbuf, size_t count,
 }
 
 template <typename T>
-class MPIRabenseifnerAllreduceState : public MPIAllreduceState<T> {
+class MPIRabenseifnerAlState : public MPIAlState<T> {
  public:
-  MPIRabenseifnerAllreduceState(
+  MPIRabenseifnerAlState(
     const T* sendbuf_, T* recvbuf_, size_t count_,
-    ReductionOperator op_, Communicator& comm_, AllreduceRequest req_) :
-    MPIAllreduceState<T>(sendbuf_, recvbuf_, count_, op_, comm_, req_) {}
+    ReductionOperator op_, Communicator& comm_, AlRequest req_) :
+    MPIAlState<T>(sendbuf_, recvbuf_, count_, op_, comm_, req_) {}
   bool setup() override {
-    bool r = MPIAllreduceState<T>::setup();
+    bool r = MPIAlState<T>::setup();
     if (!r) {
       // Check if we're in the non-power-of-2 case.
       while (pow2 <= this->nprocs) pow2 <<= 1;
@@ -1043,10 +1043,10 @@ class MPIRabenseifnerAllreduceState : public MPIAllreduceState<T> {
 template <typename T>
 void nb_rabenseifner_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                                ReductionOperator op, Communicator& comm,
-                               AllreduceRequest& req) {
+                               AlRequest& req) {
   req = get_free_request();
-  MPIRabenseifnerAllreduceState<T>* state =
-    new MPIRabenseifnerAllreduceState<T>(
+  MPIRabenseifnerAlState<T>* state =
+    new MPIRabenseifnerAlState<T>(
       sendbuf, recvbuf, count, op, comm, req);
   if (state->setup()) {
     req = NULL_REQUEST;
