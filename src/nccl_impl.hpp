@@ -2,7 +2,6 @@
 
 #include <nccl.h>
 #include "Al.hpp"
-#include "common.h"
 
 namespace Al {
 
