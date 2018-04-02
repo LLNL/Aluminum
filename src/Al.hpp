@@ -167,7 +167,7 @@ void Allreduce(const T* sendbuf, T* recvbuf, size_t count,
 /**
  * Perform an in-place allreduce.
  * @param recvbuf Input and output data; input will be overwritten.
- * @param count Length of sendbuf and recvbuf.
+ * @param count Length of recvbuf.
  * @param op The reduction operation to perform.
  * @param comm The communicator to reduce over.
  * @param algo Request a particular allreduce algorithm.
@@ -209,6 +209,16 @@ void NonblockingAllreduce(
                                             comm, req, algo);
 }
 
+/**
+ * Perform a reduction.
+ * @param sendbuf Input data.
+ * @param recvbuf Output data; should already be allocated.
+ * @param count Length of sendbuf and recvbuf.
+ * @param op The reduction operation to perform.
+ * @param root The root of the reduction, which gets the final result.
+ * @param comm The communicator to reduce over.
+ * @param algo Request a particular reduction algorithm.
+ */
 template <typename Backend, typename T>
 void Reduce(const T* sendbuf, T* recvbuf, size_t count,
             ReductionOperator op, int root, typename Backend::comm_type& comm,
@@ -216,6 +226,15 @@ void Reduce(const T* sendbuf, T* recvbuf, size_t count,
   Backend::template Reduce<T>(sendbuf, recvbuf, count, op, root, comm, algo);
 }
 
+/**
+ * Perform an in-place reduction.
+ * @param recvbuf Input and output data; input will be overwritten.
+ * @param count Length of recvbuf.
+ * @param op The reduction operation to perform.
+ * @param root The root of the reduction, which gets the final result.
+ * @param comm The communicator to reduce over.
+ * @param algo Request a particular reduction algorithm.
+ */
 template <typename Backend, typename T>
 void Reduce(T* recvbuf, size_t count,
             ReductionOperator op, int root, typename Backend::comm_type& comm,
@@ -223,6 +242,13 @@ void Reduce(T* recvbuf, size_t count,
   Backend::template Reduce<T>( recvbuf, count, op, root, comm, algo);
 }
 
+/**
+ * Non-blocking version of Reduce.
+ * This returns immediately (i.e. does only local operations) and starts the
+ * reduction asynchronously.
+ * It is not safe to modify sendbuf or recvbuf until the request indicates that
+ * the operation has completed.
+ */
 template <typename Backend, typename T>
 void NonblockingReduce(
   const T* sendbuf, T* recvbuf, size_t count,
@@ -234,6 +260,7 @@ void NonblockingReduce(
   Backend::template NonblockingReduce<T>(sendbuf, recvbuf, count, op, root, comm, req, algo);
 }
 
+/** In-place version of NonblockingReduce; same semantics apply. */
 template <typename Backend, typename T>
 void NonblockingReduce(
   T* recvbuf, size_t count,
@@ -245,6 +272,15 @@ void NonblockingReduce(
   Backend::template NonblockingReduce<T>(recvbuf, count, op, root, comm, req, algo);
 }
 
+/**
+ * Perform a reduce-scatter.
+ * @param sendbuf Input data.
+ * @param recvbuf Output data; should already be allocated.
+ * @param count Length of recvbuf.
+ * @param op The reduction operation to perform.
+ * @param comm The communicator to reduce/scatter over.
+ * @param algo Request a particular reduce-scatter algorithm.
+ */
 template <typename Backend, typename T>
 void Reduce_scatter(const T* sendbuf, T* recvbuf, size_t *count,
             ReductionOperator op, typename Backend::comm_type& comm,
@@ -252,6 +288,14 @@ void Reduce_scatter(const T* sendbuf, T* recvbuf, size_t *count,
   Backend::template Reduce_scatter<T>(sendbuf, recvbuf, count, op, comm, algo);
 }
 
+/**
+ * Perform an in-place reduce-scatter.
+ * @param recvbuf Input and output data; input will be overwritten.
+ * @param count Length of data to be received.
+ * @param op The reduction operation to perform.
+ * @param comm The communicator to reduce/scatter over.
+ * @param algo Request a particular reduce-scatter algorithm.
+ */
 template <typename Backend, typename T>
 void Reduce_scatter(T* recvbuf, size_t *count,
             ReductionOperator op, typename Backend::comm_type& comm,
@@ -259,6 +303,13 @@ void Reduce_scatter(T* recvbuf, size_t *count,
   Backend::template Reduce_scatter<T>(recvbuf, count, op, comm, algo);
 }
 
+/**
+ * Non-blocking version of Reduce_scatter.
+ * This returns immediately (i.e. does only local operations) and starts the
+ * reduce-scatter asynchronously.
+ * It is not safe to modify sendbuf or recvbuf until the request indicates that
+ * the operation has completed.
+ */
 template <typename Backend, typename T>
 void NonblockingReduce_scatter(
   const T* sendbuf, T* recvbuf, size_t *count,
@@ -269,6 +320,7 @@ void NonblockingReduce_scatter(
   Backend::template NonblockingReduce_scatter<T>(sendbuf, recvbuf, count, op, comm, req, algo);
 }
 
+/** In-place version of NonblockingReduce_scatter; same semantics apply. */
 template <typename Backend, typename T>
 void NonblockingReduce_scatter(
   T* recvbuf, size_t *count,
@@ -279,6 +331,14 @@ void NonblockingReduce_scatter(
   Backend::template NonblockingReduce_scatter<T>(recvbuf, count, op, comm, req, algo);
 }
 
+/**
+ * Perform an allgather.
+ * @param sendbuf Input data.
+ * @param recvbuf Output data; should already be allocated.
+ * @param count Length of sendbuf.
+ * @param comm The communicator to allgather over.
+ * @param algo Request a particular allgather algorithm.
+ */
 template <typename Backend, typename T>
 void Allgather(const T* sendbuf, T* recvbuf, size_t count,
                typename Backend::comm_type& comm,
@@ -286,6 +346,13 @@ void Allgather(const T* sendbuf, T* recvbuf, size_t count,
   Backend::template Allgather<T>(sendbuf, recvbuf, count, comm, algo);
 }
 
+/**
+ * Perform an in-place allgather.
+ * @param recvbuf Input and output data; input will be overwritten.
+ * @param count Length of data to send.
+ * @param comm The communicator to allgather over.
+ * @param algo Request a particular allgather algorithm.
+ */
 template <typename Backend, typename T>
 void Allgather(T* recvbuf, size_t count,
                typename Backend::comm_type& comm,
@@ -293,6 +360,13 @@ void Allgather(T* recvbuf, size_t count,
   Backend::template Allgather<T>(recvbuf, count, comm, algo);
 }
 
+/**
+ * Non-blocking version of allgather.
+ * This returns immediately (i.e. does only local operations) and starts the
+ * allgather asynchronously.
+ * It is not safe to modify sendbuf or recvbuf until the request indicates that
+ * the operation has completed.
+ */
 template <typename Backend, typename T>
 void NonblockingAllgather(
   const T* sendbuf, T* recvbuf, size_t count,
@@ -302,6 +376,7 @@ void NonblockingAllgather(
   Backend::template NonblockingAllgather<T>(sendbuf, recvbuf, count, comm, req, algo);
 }
 
+/** In-place version of NonblockingAllgather; same semantics apply. */
 template <typename Backend, typename T>
 void NonblockingAllgather(
   T* recvbuf, size_t count,
@@ -313,8 +388,16 @@ void NonblockingAllgather(
 
 // There are no in-place broadcast versions; it is always in-place.
 
+/**
+ * Perform a broadcast.
+ * @param buf Data to send on root; received into on other processes.
+ * @param count Length of buf.
+ * @param root The root of the broadcast.
+ * @param comm The communicator to broadcast over.
+ * @param algo Request a particular broadcast algorithm.
+ */
 template <typename Backend, typename T>
-void Bcast(const T* sendbuf, 
+void Bcast(const T* buf, 
            size_t count, 
            int root, 
            typename Backend::comm_type& comm,
@@ -322,9 +405,16 @@ void Bcast(const T* sendbuf,
   Backend::template Bcast<T>(sendbuf, count, root, comm, algo);
 }
 
+/**
+ * Non-blocking version of Bcast.
+ * This returns immediately (i.e. does only local operations) and starts the
+ * broadcast asynchronously.
+ * It is not safe to modify buf until the request indicates that the operation
+ * has completed.
+ */
 template <typename Backend, typename T>
 void NonblockingBcast(
-  const T* sendbuf, 
+  const T* buf, 
   size_t count,
   int root,
   typename Backend::comm_type& comm,
