@@ -158,7 +158,7 @@ bool check_vector(const std::vector<float>& expected,
     float e = expected[i];
 
     if (std::abs(e - actual[i]) > eps) {
-#ifdef ALUMINUM_DEBUG
+#ifdef AL_DEBUG
       std::stringstream ss;
       ss << "[" << rank << "] @" << i << " Expected: " << e
                 << ", Actual: " << actual[i] << "\n";

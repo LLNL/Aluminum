@@ -1,4 +1,4 @@
-#ifdef ALUMINUM_HAS_NCCL
+#ifdef AL_HAS_NCCL
 #include "nccl_impl.hpp"
 
 // Error checking macros
@@ -147,4 +147,4 @@ void NCCLCommunicator::Reduce_scatter(void* sendbuf, void* recvbuf,
 
 }  // namespace Al
 
-#endif  // ALUMINUM_HAS_NCCL
+#endif  // AL_HAS_NCCL

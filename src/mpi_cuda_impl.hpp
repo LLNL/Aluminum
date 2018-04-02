@@ -46,7 +46,7 @@ class MPICUDABackend {
                                               op, comm);
         break;
       default:
-        throw_allreduce_exception("Invalid algorithm");
+        throw_al_exception("Invalid algorithm");
     }
   }
   template <typename T>
@@ -74,7 +74,7 @@ class MPICUDABackend {
                                                  op, comm, req);
         break;
       default:
-        throw_allreduce_exception("Invalid algorithm");
+        throw_al_exception("Invalid algorithm");
     }
   }
 

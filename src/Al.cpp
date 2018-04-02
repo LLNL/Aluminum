@@ -70,7 +70,7 @@ void ProgressEngine::run() {
 
 void ProgressEngine::stop() {
   if (stop_flag.load()) {
-    throw_allreduce_exception("Stop called twice on progress engine");
+    throw_al_exception("Stop called twice on progress engine");
   }
   stop_flag = true;
 #if AL_PE_SLEEPS
@@ -147,7 +147,7 @@ void ProgressEngine::bind() {
   // Determine how many NUMA nodes there are.
   int num_numa_nodes = hwloc_get_nbobjs_by_type(topo, HWLOC_OBJ_NUMANODE);
   if (num_numa_nodes == -1) {
-    throw_allreduce_exception("Cannot determine number of NUMA nodes.");
+    throw_al_exception("Cannot determine number of NUMA nodes.");
   }
   // Determine the NUMA node we're currently on.
   hwloc_cpuset_t cpuset = hwloc_bitmap_alloc();
@@ -171,7 +171,7 @@ void ProgressEngine::bind() {
   hwloc_cpuset_t coreset = hwloc_bitmap_dup(core->cpuset);
   hwloc_bitmap_singlify(coreset);
   if (hwloc_set_cpubind(topo, coreset, HWLOC_CPUBIND_THREAD) == -1) {
-    throw_allreduce_exception("Cannot bind progress engine");
+    throw_al_exception("Cannot bind progress engine");
   }
   hwloc_bitmap_free(cpuset);
   hwloc_bitmap_free(nodeset);

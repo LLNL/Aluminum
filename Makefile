@@ -17,14 +17,14 @@ ifeq ($(ENABLE_NCCL_CUDA), YES)
 	else ifeq ($(shell hostname|grep ray -c), 1)
 	  	NCCL_DIR = /usr/workspace/wsb/brain/nccl2/nccl_2.0.5-3+cuda8.0_ppc64el
 	endif
-	CXXFLAGS += -I$(NCCL_DIR)/include  -DALUMINUM_HAS_NCCL
+	CXXFLAGS += -I$(NCCL_DIR)/include  -DAL_HAS_NCCL
 	LIB += -L$(NCCL_DIR)/lib -lnccl -Wl,-rpath=$(NCCL_DIR)/lib
 	LIB_LIB += -L$(NCCL_DIR)/lib -lnccl -Wl,-rpath=$(NCCL_DIR)/lib
 endif
 
 ifeq ($(ENABLE_MPI_CUDA), YES)
 	ENABLE_CUDA = YES
-	CXXFLAGS += -DALUMINUM_HAS_MPI_CUDA # -DALUMINUM_MPI_CUDA_DEBUG
+	CXXFLAGS += -DAL_HAS_MPI_CUDA # -DAL_MPI_CUDA_DEBUG
 	CUDA_OBJ = src/mpi_cuda/cuda_kernels.o
 	MPI_CUDA_HEADERS = src/mpi_cuda_impl.hpp test/test_utils_mpi_cuda.hpp src/mpi_cuda/allreduce.hpp src/mpi_cuda/allreduce_ring.hpp
 endif
@@ -32,7 +32,7 @@ endif
 
 ifeq ($(ENABLE_CUDA), YES)
 	CUDA_HOME = $(patsubst %/,%,$(dir $(patsubst %/,%,$(dir $(shell which $(NVCC))))))
-	CXXFLAGS += -I$(CUDA_HOME)/include -DALUMINUM_HAS_CUDA 
+	CXXFLAGS += -I$(CUDA_HOME)/include -DAL_HAS_CUDA 
 	LIB += -L$(CUDA_HOME)/lib64 -lcudart -Wl,-rpath=$(CUDA_HOME)/lib64
 	LIB_LIB += -L$(CUDA_HOME)/lib64 -lcudart -Wl,-rpath=$(CUDA_HOME)/lib64
 endif

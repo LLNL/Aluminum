@@ -140,7 +140,7 @@ inline ncclRedOp_t ReductionOperator2ncclRedOp(ReductionOperator op) {
   case ReductionOperator::max:
     return ncclMax;
   default:
-    throw_allreduce_exception("Reduction operator not supported");
+    throw_al_exception("Reduction operator not supported");
   }
 }
 template <typename T>

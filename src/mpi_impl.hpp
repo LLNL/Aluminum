@@ -25,7 +25,7 @@ inline bool check_count_fits_mpi(size_t count) {
 /** Throw an exception if count elements cannot be sent by MPI. */
 inline void assert_count_fits_mpi(size_t count) {
   if (!check_count_fits_mpi(count)) {
-    throw_allreduce_exception("Message count too large for MPI");
+    throw_al_exception("Message count too large for MPI");
   }
 }
 
@@ -124,7 +124,7 @@ inline std::function<void(const T*, T*, size_t)> ReductionMap(
   case ReductionOperator::max:
     return max_reduction<T>;
   default:
-    throw_allreduce_exception("Reduction operator not supported");
+    throw_al_exception("Reduction operator not supported");
   }
 }
 
@@ -140,7 +140,7 @@ inline MPI_Op ReductionOperator2MPI_Op(ReductionOperator op) {
   case ReductionOperator::max:
     return MPI_MAX;
   default:
-    throw_allreduce_exception("Reduction operator not supported");
+    throw_al_exception("Reduction operator not supported");
   }
 }
 

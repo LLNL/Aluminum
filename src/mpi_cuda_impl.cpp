@@ -1,4 +1,4 @@
-#ifdef ALUMINUM_HAS_MPI_CUDA
+#ifdef AL_HAS_MPI_CUDA
 #include "mpi_cuda_impl.hpp"
 
 namespace Al {
@@ -8,4 +8,4 @@ const MPICUDABackend::req_type MPICUDABackend::null_req = (MPICUDABackend::req_t
 
 }  // namespace Al
 
-#endif  // ALUMINUM_HAS_MPI_CUDA
+#endif  // AL_HAS_MPI_CUDA

@@ -16,7 +16,7 @@ void init(int& argc, char**& argv) {
     int provided;
     MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
     if (provided != MPI_THREAD_MULTIPLE) {
-      throw_allreduce_exception("MPI_THREAD_MULTIPLE not provided");
+      throw_al_exception("MPI_THREAD_MULTIPLE not provided");
     }
     initialized_mpi = true;
   }

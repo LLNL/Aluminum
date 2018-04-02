@@ -1,10 +1,10 @@
 #include <iostream>
 #include "Al.hpp"
 #include "test_utils.hpp"
-#ifdef ALUMINUM_HAS_NCCL
+#ifdef AL_HAS_NCCL
 #include "test_utils_nccl_cuda.hpp"
 #endif
-#ifdef ALUMINUM_HAS_MPI_CUDA
+#ifdef AL_HAS_MPI_CUDA
 #include "test_utils_mpi_cuda.hpp"
 #endif
 
@@ -128,22 +128,22 @@ int main(int argc, char** argv) {
 
   if (backend == "MPI") {
     test_correctness<Al::MPIBackend>();
-#ifdef ALUMINUM_HAS_NCCL
+#ifdef AL_HAS_NCCL
   } else if (backend == "NCCL") {
     set_device();
     test_correctness<Al::NCCLBackend>();
 #endif
-#ifdef ALUMINUM_HAS_MPI_CUDA
+#ifdef AL_HAS_MPI_CUDA
   } else if (backend == "MPI-CUDA") {
     set_device();    
     test_correctness<Al::MPICUDABackend>();
 #endif    
   } else {
     std::cerr << "usage: " << argv[0] << " [MPI";
-#ifdef ALUMINUM_HAS_NCCL
+#ifdef AL_HAS_NCCL
     std::cerr << " | NCCL";
 #endif
-#ifdef ALUMINUM_HAS_MPI_CUDA
+#ifdef AL_HAS_MPI_CUDA
     std::cerr << " | MPI-CUDA";
 #endif
     std::cerr << "]" << std::endl;
