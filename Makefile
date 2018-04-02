@@ -3,6 +3,7 @@ MPICXX ?= mpicxx
 NVCC ?= nvcc
 CXXFLAGS += -Wall -Wextra -pedantic -Wshadow -O3 -std=gnu++11 -fopenmp -g -fPIC -lhwloc -I$(cur_dir)/src -I$(cur_dir)/test
 LIB = -L$(cur_dir) -lAl -Wl,-rpath=$(cur_dir) -lrt
+LIB_LIB = 
 NVCCFLAGS += --compiler-bindir $(CXX) -arch sm_30 -I$(cur_dir)/src -I$(cur_dir)/test -std=c++11
 
 # NCCL2 is available at:
@@ -18,6 +19,7 @@ ifeq ($(ENABLE_NCCL_CUDA), YES)
 	endif
 	CXXFLAGS += -I$(NCCL_DIR)/include  -DALUMINUM_HAS_NCCL
 	LIB += -L$(NCCL_DIR)/lib -lnccl -Wl,-rpath=$(NCCL_DIR)/lib
+	LIB_LIB += -L$(NCCL_DIR)/lib -lnccl -Wl,-rpath=$(NCCL_DIR)/lib
 endif
 
 ifeq ($(ENABLE_MPI_CUDA), YES)
@@ -32,12 +34,13 @@ ifeq ($(ENABLE_CUDA), YES)
 	CUDA_HOME = $(patsubst %/,%,$(dir $(patsubst %/,%,$(dir $(shell which $(NVCC))))))
 	CXXFLAGS += -I$(CUDA_HOME)/include -DALUMINUM_HAS_CUDA 
 	LIB += -L$(CUDA_HOME)/lib64 -lcudart -Wl,-rpath=$(CUDA_HOME)/lib64
+	LIB_LIB += -L$(CUDA_HOME)/lib64 -lcudart -Wl,-rpath=$(CUDA_HOME)/lib64
 endif
 
 all: libAl.so benchmark_allreduces benchmark_nballreduces benchmark_overlap benchmark_reductions test_correctness test_multi_nballreduces test_nccl_collectives
 
 libAl.so: src/Al.cpp src/mpi_impl.cpp src/Al.hpp src/Al_impl.hpp src/mempool.hpp src/mpi_impl.hpp src/tuning_params.hpp src/nccl_impl.hpp src/nccl_impl.cpp src/mpi_cuda_impl.cpp
-	$(MPICXX) $(CXXFLAGS) -shared -o libAl.so src/Al.cpp src/mpi_impl.cpp src/nccl_impl.cpp src/mpi_cuda_impl.cpp
+	$(MPICXX) $(CXXFLAGS) $(LIB_LIB) -shared -o libAl.so src/Al.cpp src/mpi_impl.cpp src/nccl_impl.cpp src/mpi_cuda_impl.cpp
 
 benchmark_allreduces: libAl.so benchmark/benchmark_allreduces.cpp  $(CUDA_OBJ) $(MPI_CUDA_HEADERS)
 	$(MPICXX) $(CXXFLAGS) $(LIB) -o benchmark_allreduces benchmark/benchmark_allreduces.cpp $(CUDA_OBJ) 
