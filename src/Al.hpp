@@ -579,66 +579,9 @@ class ProgressEngine {
 /** Return a pointer to the progress engine. */
 ProgressEngine* get_progress_engine();
 
-/** MPI-based implementations. */
-namespace mpi {
-
-/** MPI initialization. */
-void init(int& argc, char**& argv);
-/** MPI finalization. */
-void finalize();
-
-/** Just call MPI_Allreduce directly. */
-template <typename T>
-void passthrough_allreduce(const T* sendbuf, T* recvbuf, size_t count,
-                           ReductionOperator op, Communicator& comm);
-/** Just call MPI_Iallreduce directly. */
-template <typename T>
-void nb_passthrough_allreduce(const T* sendbuf, T* recvbuf, size_t count,
-                              ReductionOperator op, Communicator& comm,
-                              AlRequest& req);
-/** Use a recursive-doubling algorithm to perform the allreduce. */
-template <typename T>
-void recursive_doubling_allreduce(const T* sendbuf, T* recvbuf, size_t count,
-                                  ReductionOperator op, Communicator& comm);
-/** Non-blocking recursive-doubling allreduce. */
-template <typename T>
-void nb_recursive_doubling_allreduce(const T* sendbuf, T* recvbuf, size_t count,
-                                     ReductionOperator op, Communicator& comm,
-                                     AlRequest& req);
-/** Use a ring-based reduce-scatter then allgather to perform the allreduce. */
-template <typename T>
-void ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
-                    ReductionOperator op, Communicator& comm);
-/** Non-blocking ring allreduce. */
-template <typename T>
-void nb_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
-                       ReductionOperator op, Communicator& comm,
-                       AlRequest& req);
-/**
- * Use Rabenseifner's algorithm (recursive halving/doubling) to perform the
- * allreduce.
- */
-template <typename T>
-void rabenseifner_allreduce(const T* sendbuf, T* recvbuf, size_t count,
-                            ReductionOperator op, Communicator& comm);
-/** Non-blocking Rabenseifner allreduce. */
-template <typename T>
-void nb_rabenseifner_allreduce(const T* sendbuf, T* recvbuf, size_t count,
-                               ReductionOperator op, Communicator& comm,
-                               AlRequest& req);
-/**
- * Use a pairwise-exchange reduce-scatter and ring allgather to perform the
- * allreduce.
- */
-template <typename T>
-void pe_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
-                       ReductionOperator op, Communicator& comm);
-
-}  // namespace mpi
 }  // namespace internal
 }  // namespace Al
 
-#include "Al_impl.hpp"
 #include "mempool.hpp"
 #include "mpi_impl.hpp"
 

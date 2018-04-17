@@ -8,6 +8,11 @@ namespace Al {
 namespace internal {
 namespace mpi {
 
+/** MPI initialization. */
+void init(int& argc, char**& argv);
+/** MPI finalization. */
+void finalize();
+
 /** Used to map types to the associated MPI datatype. */
 template <typename T>
 inline MPI_Datatype TypeMap();
@@ -225,6 +230,7 @@ class MPIAlState : public AlState {
   }
 };
 
+/** Just call MPI_Allreduce directly. */
 template <typename T>
 void passthrough_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                            ReductionOperator op, Communicator& comm) {
@@ -271,6 +277,7 @@ class MPIPassthroughAlState : public MPIAlState<T> {
   MPI_Request mpi_req;
 };
 
+/** Just call MPI_Iallreduce directly. */
 template <typename T>
 void nb_passthrough_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                               ReductionOperator op, Communicator& comm,
@@ -284,6 +291,7 @@ void nb_passthrough_allreduce(const T* sendbuf, T* recvbuf, size_t count,
   pe->enqueue(state);
 }
 
+/** Use a recursive-doubling algorithm to perform the allreduce. */
 template <typename T>
 void recursive_doubling_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                                   ReductionOperator op, Communicator& comm) {
@@ -457,6 +465,7 @@ class MPIRecursiveDoublingAlState : public MPIAlState<T> {
   int adjusted_rank = -1;
 };
 
+/** Non-blocking recursive-doubling allreduce. */
 template <typename T>
 void nb_recursive_doubling_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                                      ReductionOperator op, Communicator& comm,
@@ -473,6 +482,7 @@ void nb_recursive_doubling_allreduce(const T* sendbuf, T* recvbuf, size_t count,
   pe->enqueue(state);
 }
 
+/** Use a ring-based reduce-scatter then allgather to perform the allreduce. */
 template <typename T>
 void ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                     ReductionOperator op, Communicator& comm) {
@@ -644,6 +654,7 @@ class MPIRingAlState : public MPIAlState<T> {
   }
 };
 
+/** Non-blocking ring allreduce. */
 template <typename T>
 void nb_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                        ReductionOperator op, Communicator& comm,
@@ -660,6 +671,10 @@ void nb_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
   pe->enqueue(state);
 }
 
+/**
+ * Use Rabenseifner's algorithm (recursive halving/doubling) to perform the
+ * allreduce.
+ */
 template <typename T>
 void rabenseifner_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                             ReductionOperator op, Communicator& comm) {
@@ -1040,6 +1055,7 @@ class MPIRabenseifnerAlState : public MPIAlState<T> {
   }
 };
 
+/** Non-blocking Rabenseifner allreduce. */
 template <typename T>
 void nb_rabenseifner_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                                ReductionOperator op, Communicator& comm,
@@ -1056,6 +1072,10 @@ void nb_rabenseifner_allreduce(const T* sendbuf, T* recvbuf, size_t count,
   pe->enqueue(state);
 }
 
+/**
+ * Use a pairwise-exchange reduce-scatter and ring allgather to perform the
+ * allreduce.
+ */
 template <typename T>
 void pe_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                        ReductionOperator op, Communicator& comm) {
@@ -1118,4 +1138,117 @@ void pe_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
 
 }  // namespace mpi
 }  // namespace internal
+
+class MPIBackend {
+ public:
+  using algo_type = AllreduceAlgorithm;
+  using comm_type = MPICommunicator;
+  using req_type = int;
+  static constexpr req_type null_req = internal::NULL_REQUEST;
+
+  template <typename T>
+  static void Allreduce(const T* sendbuf, T* recvbuf, size_t count,
+                        ReductionOperator op, comm_type& comm,
+                        algo_type algo) {
+    if (algo == AllreduceAlgorithm::automatic) {
+      // TODO: Better algorithm selection/performance model.
+      // TODO: Make tuneable.
+      if (count <= 1<<9) {
+        algo = AllreduceAlgorithm::mpi_recursive_doubling;
+      } else {
+        algo = AllreduceAlgorithm::mpi_rabenseifner;
+      }
+    }
+    switch (algo) {
+      case AllreduceAlgorithm::mpi_passthrough:
+        internal::mpi::passthrough_allreduce(sendbuf, recvbuf, count, op, comm);
+        break;
+      case AllreduceAlgorithm::mpi_recursive_doubling:
+        internal::mpi::recursive_doubling_allreduce(
+            sendbuf, recvbuf, count, op, comm);
+        break;
+      case AllreduceAlgorithm::mpi_ring:
+        internal::mpi::ring_allreduce(sendbuf, recvbuf, count, op, comm);
+        break;
+      case AllreduceAlgorithm::mpi_rabenseifner:
+        internal::mpi::rabenseifner_allreduce(sendbuf, recvbuf, count, op, comm);
+        break;
+      case AllreduceAlgorithm::mpi_pe_ring:
+        internal::mpi::pe_ring_allreduce(sendbuf, recvbuf, count, op, comm);
+        break;
+      default:
+        throw_al_exception("Invalid algorithm for Allreduce");
+    }
+  }
+  
+  template <typename T>
+  static void Allreduce(T* recvbuf, size_t count,
+                        ReductionOperator op, comm_type& comm,
+                        algo_type algo) {
+    Allreduce(internal::IN_PLACE<T>(), recvbuf, count, op, comm, algo);
+  }
+
+  template <typename T>
+  static void NonblockingAllreduce(
+      const T* sendbuf, T* recvbuf, size_t count,
+      ReductionOperator op,
+      comm_type& comm,
+      req_type& req,
+      algo_type algo) {
+    if (algo == AllreduceAlgorithm::automatic) {
+      // TODO: Better algorithm selection/performance model.
+      // TODO: Make tuneable.
+      if (count <= 1<<9) {
+        algo = AllreduceAlgorithm::mpi_recursive_doubling;
+      } else {
+        algo = AllreduceAlgorithm::mpi_rabenseifner;
+      }
+    }
+    switch (algo) {
+      case AllreduceAlgorithm::mpi_passthrough:
+        internal::mpi::nb_passthrough_allreduce(sendbuf, recvbuf, count, op, comm,
+                                                req);
+        break;
+      case AllreduceAlgorithm::mpi_recursive_doubling:
+        internal::mpi::nb_recursive_doubling_allreduce(
+            sendbuf, recvbuf, count, op, comm, req);
+        break;
+      case AllreduceAlgorithm::mpi_ring:
+        internal::mpi::nb_ring_allreduce(sendbuf, recvbuf, count, op, comm, req);
+        break;
+      case AllreduceAlgorithm::mpi_rabenseifner:
+        internal::mpi::nb_rabenseifner_allreduce(sendbuf, recvbuf, count, op, comm,
+                                                 req);
+        break;
+        /*case AllreduceAlgorithm::mpi_pe_ring:
+          internal::mpi::nb_pe_ring_allreduce(sendbuf, recvbuf, count, op, comm, req);
+          break;*/
+      default:
+        throw_al_exception("Invalid algorithm for NonblockingAllreduce");
+    }
+  }
+
+  template <typename T>
+  static void NonblockingAllreduce(
+      T* recvbuf, size_t count,
+      ReductionOperator op, comm_type& comm,
+      req_type& req,
+      algo_type algo) {
+    NonblockingAllreduce(internal::IN_PLACE<T>(), recvbuf, count, op, comm,
+                         req, algo);
+  }
+};
+
+template <>
+inline bool Test<MPIBackend>(typename MPIBackend::req_type& req) {
+  internal::ProgressEngine* pe = internal::get_progress_engine();
+  return pe->is_complete(req);
+}
+
+template <>
+inline void Wait<MPIBackend>(typename MPIBackend::req_type& req) {
+  internal::ProgressEngine* pe = internal::get_progress_engine();
+  pe->wait_for_completion(req);
+}
+
 }  // namespace Al
