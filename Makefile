@@ -39,7 +39,7 @@ endif
 
 all: libAl.so benchmark_allreduces benchmark_nballreduces benchmark_overlap benchmark_reductions test_correctness test_multi_nballreduces test_nccl_collectives
 
-libAl.so: src/Al.cpp src/mpi_impl.cpp src/Al.hpp src/Al_impl.hpp src/mempool.hpp src/mpi_impl.hpp src/tuning_params.hpp src/nccl_impl.hpp src/nccl_impl.cpp src/mpi_cuda_impl.cpp
+libAl.so: src/Al.cpp src/mpi_impl.cpp src/Al.hpp src/mempool.hpp src/mpi_impl.hpp src/tuning_params.hpp src/nccl_impl.hpp src/nccl_impl.cpp src/mpi_cuda_impl.cpp
 	$(MPICXX) $(CXXFLAGS) $(LIB_LIB) -shared -o libAl.so src/Al.cpp src/mpi_impl.cpp src/nccl_impl.cpp src/mpi_cuda_impl.cpp
 
 benchmark_allreduces: libAl.so benchmark/benchmark_allreduces.cpp  $(CUDA_OBJ) $(MPI_CUDA_HEADERS)
