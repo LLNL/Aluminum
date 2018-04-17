@@ -13,7 +13,7 @@ NVCCFLAGS += --compiler-bindir $(CXX) -arch sm_30 -I$(cur_dir)/src -I$(cur_dir)/
 ifeq ($(ENABLE_NCCL_CUDA), YES)
 	ENABLE_CUDA = YES
 	ifeq ($(shell hostname|grep surface -c), 1)
-		NCCL_DIR = /usr/workspace/wsb/brain/nccl2/nccl-2.0.5+cuda8.0
+		NCCL_DIR = /usr/workspace/wsb/brain/nccl2/nccl_2.1.15-1+cuda9.1_x86_64
 	else ifeq ($(shell hostname|grep ray -c), 1)
 	  	NCCL_DIR = /usr/workspace/wsb/brain/nccl2/nccl_2.0.5-3+cuda8.0_ppc64el
 	endif
