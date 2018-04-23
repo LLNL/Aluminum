@@ -112,7 +112,8 @@ enum class AllreduceAlgorithm {
   mpi_recursive_doubling,
   mpi_ring,
   mpi_rabenseifner,
-  mpi_pe_ring
+  mpi_pe_ring,
+  mpi_biring
 };
 
 inline std::string allreduce_name(AllreduceAlgorithm algo) {
@@ -129,6 +130,8 @@ inline std::string allreduce_name(AllreduceAlgorithm algo) {
     return "MPI Rabenseifner";
   case AllreduceAlgorithm::mpi_pe_ring:
     return "MPI PE/ring";
+  case AllreduceAlgorithm::mpi_biring:
+    return "MPI biring";
   default:
     return "unknown";
   }

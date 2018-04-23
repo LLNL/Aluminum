@@ -1315,6 +1315,9 @@ class MPIBackend {
       case AllreduceAlgorithm::mpi_pe_ring:
         internal::mpi::pe_ring_allreduce(sendbuf, recvbuf, count, op, comm);
         break;
+      case AllreduceAlgorithm::mpi_biring:
+        internal::mpi::ring_allreduce(sendbuf, recvbuf, count, op, comm, true, 1);
+        break;
       default:
         throw_al_exception("Invalid algorithm for Allreduce");
     }

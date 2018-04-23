@@ -100,7 +100,8 @@ get_allreduce_algorithms<Al::MPIBackend>() {
      Al::AllreduceAlgorithm::mpi_recursive_doubling,
      Al::AllreduceAlgorithm::mpi_ring,
      Al::AllreduceAlgorithm::mpi_rabenseifner,
-     Al::AllreduceAlgorithm::mpi_pe_ring
+     Al::AllreduceAlgorithm::mpi_pe_ring,
+     Al::AllreduceAlgorithm::mpi_biring
   };
   return algos;
 }
@@ -120,7 +121,7 @@ get_nb_allreduce_algorithms<Al::MPIBackend>() {
     Al::AllreduceAlgorithm::mpi_passthrough,
     Al::AllreduceAlgorithm::mpi_recursive_doubling,
     Al::AllreduceAlgorithm::mpi_ring,
-    Al::AllreduceAlgorithm::mpi_rabenseifner,
+    Al::AllreduceAlgorithm::mpi_rabenseifner
     //Al::AllreduceAlgorithm::mpi_pe_ring
   };
   return algos;
