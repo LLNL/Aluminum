@@ -102,39 +102,6 @@ class MPICommunicator : public Communicator {
 };
 
 /**
- * Supported allreduce algorithms.
- * This is used for requesting a particular algorithm. Use automatic to let the
- * library select for you.
- */
-enum class AllreduceAlgorithm {
-  automatic,
-  mpi_passthrough,
-  mpi_recursive_doubling,
-  mpi_ring,
-  mpi_rabenseifner,
-  mpi_pe_ring
-};
-
-inline std::string allreduce_name(AllreduceAlgorithm algo) {
-  switch (algo) {
-  case AllreduceAlgorithm::automatic:
-    return "automatic";
-  case AllreduceAlgorithm::mpi_passthrough:
-    return "MPI passthrough";
-  case AllreduceAlgorithm::mpi_recursive_doubling:
-    return "MPI recursive doubling";
-  case AllreduceAlgorithm::mpi_ring:
-    return "MPI ring";
-  case AllreduceAlgorithm::mpi_rabenseifner:
-    return "MPI Rabenseifner";
-  case AllreduceAlgorithm::mpi_pe_ring:
-    return "MPI PE/ring";
-  default:
-    return "unknown";
-  }
-}
-
-/**
  * Initialize Aluminum.
  * This must be called before any other calls to the library. It is safe to
  * call this multiple times.

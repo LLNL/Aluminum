@@ -36,6 +36,7 @@ void test_allreduce_algo(const typename VectorType<Backend>::type& expected,
         std::endl;
     std::abort();
   }
+  MPI_Barrier(MPI_COMM_WORLD);
   // Test in-place allreduce.
   Al::Allreduce<Backend>(input.data(), input.size(),
                          Al::ReductionOperator::sum, comm, algo);
@@ -64,6 +65,7 @@ void test_nb_allreduce_algo(const typename VectorType<Backend>::type& expected,
     std::cout << comm.rank() << ": regular allreduce does not match" <<
       std::endl;
   }
+  MPI_Barrier(MPI_COMM_WORLD);
   // Test in-place allreduce.
   Al::NonblockingAllreduce<Backend>(input.data(), input.size(),
                                     Al::ReductionOperator::sum, comm,

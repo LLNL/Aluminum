@@ -485,8 +485,13 @@ void nb_recursive_doubling_allreduce(const T* sendbuf, T* recvbuf, size_t count,
 /** Use a ring-based reduce-scatter then allgather to perform the allreduce. */
 template <typename T>
 void ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
-                    ReductionOperator op, Communicator& comm) {
+                    ReductionOperator op, Communicator& comm, const bool bidir,
+                    const size_t num_rings) {
   if (count == 0) return;  // Nothing to do.
+  if (num_rings != 1) {
+    throw_al_exception("Multiple rings not yet supported");
+  }
+  const size_t bidir_cnt = bidir ? 2 : 1;
   assert_count_fits_mpi(count);
   int rank = comm.rank();
   int nprocs = comm.size();
@@ -496,50 +501,184 @@ void ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
     std::copy_n(sendbuf, count, recvbuf);
   }
   if (nprocs == 1) return;  // Only needed to copy data.
-  // Compute the slices of data to be moved.
-  const size_t size_per_rank = count / nprocs;
-  const size_t remainder = count % nprocs;
-  std::vector<size_t> slice_lengths(nprocs, size_per_rank);
-  // Add in the remainder as evenly as possible.
-  for (size_t i = 0; i < remainder; ++i) {
-    slice_lengths[i] += 1;
+  // Compute the slices of data to be moved in each ring.
+  const size_t num_slices = nprocs * num_rings * bidir_cnt;
+  const size_t size_per_msg = count / num_slices;
+  size_t remainder = count % num_slices;
+  // Indexing: [ring][dir][proc]
+  std::vector<std::vector<std::vector<size_t>>> slice_lengths(num_rings);
+  std::vector<std::vector<std::vector<size_t>>> slice_ends(num_rings);
+  size_t cur_len = 0;
+  for (size_t i = 0; i < num_rings; ++i) {
+    slice_lengths[i].resize(bidir_cnt);
+    slice_ends[i].resize(bidir_cnt);
+    for (size_t j = 0; j < bidir_cnt; ++j) {
+      slice_lengths[i][j].resize(nprocs, size_per_msg);
+      // Add in the remainder as needed.
+      const size_t to = std::min(static_cast<size_t>(nprocs), remainder);
+      for (size_t k = 0; k < to; ++k) {
+        slice_lengths[i][j][k] += 1;
+      }
+      remainder -= to;
+      slice_ends[i][j].resize(nprocs);
+      // Compute the end location of each slice, in absolute terms.
+      for (size_t k = 0; k < static_cast<size_t>(nprocs); ++k) {
+        cur_len += slice_lengths[i][j][k];
+        slice_ends[i][j][k] = cur_len;
+      }
+    }
   }
-  std::vector<size_t> slice_ends(nprocs);
-  std::partial_sum(slice_lengths.begin(), slice_lengths.end(),
-                   slice_ends.begin());
-  // Temporary buffer for receiving.
-  T* recv_to = get_memory<T>(slice_lengths[0]);
-  // Compute source (left) and destination (right) for the ring.
-  const int src = (rank - 1 + nprocs) % nprocs;
-  const int dst = (rank + 1) % nprocs;
+  // Temporary buffers for receiving. Indexing: [ring][dir]
+  std::vector<std::vector<T*>> recv_to(num_rings);
+  for (size_t i = 0; i < num_rings; ++i) {
+    recv_to[i].resize(bidir_cnt);
+    for (size_t j = 0; j < bidir_cnt; ++j) {
+      recv_to[i][j] = get_memory<T>(slice_lengths[0][0][0]);
+    }
+  }
+  // Compute sources (left) and destinations (right) for the rings.
+  // Indexing: [ring][dir]
+  // TODO: Compute ranks for num_rings > 1.
+  std::vector<std::vector<int>> srcs(num_rings);
+  for (size_t i = 0; i < num_rings; ++i) srcs[i].resize(bidir_cnt);
+  srcs[0][0] = (rank - 1 + nprocs) % nprocs;
+  std::vector<std::vector<int>> dsts(num_rings);
+  for (size_t i = 0; i < num_rings; ++i) dsts[i].resize(bidir_cnt);
+  dsts[0][0] = (rank + 1) % nprocs;
+  if (bidir) {
+    srcs[0][1] = (rank + 1) % nprocs;
+    dsts[0][1] = (rank - 1 + nprocs) % nprocs;
+  }
+  // This is used to determine how the slices are moved through based on the
+  // direction and step.
+  const int step_direction[2] = {-1, 1};
   MPI_Datatype type = TypeMap<T>();
   auto reduction_op = ReductionMap<T>(op);
+  // TODO: Merge RS/AG steps so the RS doesn't have to complete on every ring
+  // before the AG starts.
   // Ring reduce-scatter.
-  for (int step = 0; step < nprocs - 1; ++step) {
-    // Determine which slices we're sending and receiving.
-    const int send_idx = (rank - step + nprocs) % nprocs;
-    const int recv_idx = (rank - step - 1 + nprocs) % nprocs;
-    const T* to_send = recvbuf + (slice_ends[send_idx] - slice_lengths[send_idx]);
-    MPI_Sendrecv(to_send, slice_lengths[send_idx], type, dst, 0,
-                 recv_to, slice_lengths[recv_idx], type, src, 0,
-                 mpi_comm, MPI_STATUS_IGNORE);
-    reduction_op(recv_to, recvbuf + (slice_ends[recv_idx] - slice_lengths[recv_idx]),
-                 slice_lengths[recv_idx]);
+  const size_t num_transfers = num_rings * bidir_cnt * (nprocs - 1);
+  size_t completed_transfers = 0;
+  // Needs to be contiguous.
+  std::vector<MPI_Request> reqs(num_rings * bidir_cnt * 2, MPI_REQUEST_NULL);
+  // Current step of each ring/direction.
+  std::vector<std::vector<int>> steps(num_rings);
+  for (size_t i = 0; i < num_rings; ++i) steps[i].resize(bidir_cnt, 0);
+  // Start the first transfers.
+  for (size_t ring = 0; ring < num_rings; ++ring) {
+    for (size_t dir = 0; dir < bidir_cnt; ++dir) {
+      size_t req_idx = ring*num_rings + dir*2;
+      // Determine the slices being sent and received.
+      const int send_idx = rank;
+      const int recv_idx = (rank + step_direction[dir] + nprocs) % nprocs;
+      const T* to_send = recvbuf + (slice_ends[ring][dir][send_idx] -
+                                    slice_lengths[ring][dir][send_idx]);
+      MPI_Irecv(recv_to[ring][dir], slice_lengths[ring][dir][recv_idx],
+                type, srcs[ring][dir], 0, mpi_comm, &(reqs[req_idx]));
+      MPI_Isend(to_send, slice_lengths[ring][dir][send_idx], type,
+                dsts[ring][dir], 0, mpi_comm, &(reqs[req_idx+1]));
+    }
+  }
+  while (completed_transfers < num_transfers) {
+    int idx;
+    MPI_Waitany(reqs.size(), reqs.data(), &idx, MPI_STATUS_IGNORE);
+    // Determine what completed.
+    const int ring = idx / (bidir_cnt*2);
+    const int dir = (idx - ring*num_rings) / 2;
+    const int sendrecv = idx % 2;  // Whether this was a send or a receive.
+    const int req_idx = ring*num_rings + dir*2;
+    if (sendrecv == 0) {
+      // Recv completed.
+      const int recv_idx =
+        (rank + step_direction[dir]*(steps[ring][dir] + 1) + nprocs) % nprocs;
+      reduction_op(recv_to[ring][dir], recvbuf +
+                   (slice_ends[ring][dir][recv_idx] -
+                    slice_lengths[ring][dir][recv_idx]),
+                   slice_lengths[ring][dir][recv_idx]);
+    }
+    // Check if this step is done.
+    if (reqs[req_idx] == MPI_REQUEST_NULL &&
+        reqs[req_idx+1] == MPI_REQUEST_NULL) {
+      // Update counters.
+      ++completed_transfers;
+      ++steps[ring][dir];
+      if (steps[ring][dir] < nprocs - 1) {
+        // Start next set of transfers.
+        const int send_idx =
+          (rank + step_direction[dir]*steps[ring][dir] + nprocs) % nprocs;
+        const int recv_idx =
+          (rank + step_direction[dir]*(steps[ring][dir] + 1) + nprocs) % nprocs;
+        const T* to_send = recvbuf + (slice_ends[ring][dir][send_idx] -
+                                      slice_lengths[ring][dir][send_idx]);
+        MPI_Irecv(recv_to[ring][dir], slice_lengths[ring][dir][recv_idx],
+                  type, srcs[ring][dir], 0, mpi_comm, &(reqs[req_idx]));
+        MPI_Isend(to_send, slice_lengths[ring][dir][send_idx], type,
+                  dsts[ring][dir], 0, mpi_comm, &(reqs[req_idx+1]));
+      }
+    }
   }
   // Ring allgather.
-  // No temporary buffer is needed here: Receive directly into recvbuf.
-  // Compute the initial slice we send as the final slice we received.
-  int send_idx = (rank + 1) % nprocs;
-  for (int step = 0; step < nprocs - 1; ++step) {
-    const int recv_idx = (rank - step + nprocs) % nprocs;
-    const T* to_send = recvbuf + (slice_ends[send_idx] - slice_lengths[send_idx]);
-    MPI_Sendrecv(to_send, slice_lengths[send_idx], type, dst, 0,
-                 recvbuf + (slice_ends[recv_idx] - slice_lengths[recv_idx]),
-                 slice_lengths[recv_idx], type, src, 0,
-                 mpi_comm, MPI_STATUS_IGNORE);
-    send_idx = recv_idx;  // Forward the data received.
+  // Reset steps/transfers.
+  completed_transfers = 0;
+  for (size_t i = 0; i < num_rings; ++i) {
+    for (size_t j = 0; j < bidir_cnt; ++j) {
+      steps[i][j] = 0;
+    }
   }
-  release_memory(recv_to);
+  // No temporary buffer is needed here: Receive directly into recvbuf.
+  // Start the first transfers.
+  for (size_t ring = 0; ring < num_rings; ++ring) {
+    for (size_t dir = 0; dir < bidir_cnt; ++dir) {
+      size_t req_idx = ring*num_rings + dir*2;
+      //const int send_idx = (rank + 1) % nprocs;
+      const int send_idx = (rank - step_direction[dir] + nprocs) % nprocs;
+      const int recv_idx = rank;
+      const T* to_send = recvbuf + (slice_ends[ring][dir][send_idx] -
+                                    slice_lengths[ring][dir][send_idx]);
+      MPI_Irecv(recvbuf + (slice_ends[ring][dir][recv_idx]
+                           - slice_lengths[ring][dir][recv_idx]),
+                slice_lengths[ring][dir][recv_idx],
+                type, srcs[ring][dir], 0, mpi_comm, &(reqs[req_idx]));
+      MPI_Isend(to_send, slice_lengths[ring][dir][send_idx], type,
+                dsts[ring][dir], 0, mpi_comm, &(reqs[req_idx+1]));
+    }
+  }
+  while (completed_transfers < num_transfers) {
+    int idx;
+    MPI_Waitany(reqs.size(), reqs.data(), &idx, MPI_STATUS_IGNORE);
+    // Determine what completed.
+    const int ring = idx / (bidir_cnt*2);
+    const int dir = (idx - ring*num_rings) / 2;
+    const int req_idx = ring*num_rings + dir*2;
+    // Check if this step is done.
+    if (reqs[req_idx] == MPI_REQUEST_NULL &&
+        reqs[req_idx+1] == MPI_REQUEST_NULL) {
+      // Update counters.
+      ++completed_transfers;
+      ++steps[ring][dir];
+      if (steps[ring][dir] < nprocs - 1) {
+        // Start next set of transfers.
+        const int send_idx =
+          (rank + step_direction[dir]*(steps[ring][dir] - 1) + nprocs) % nprocs;
+        const int recv_idx =
+          (rank + step_direction[dir]*steps[ring][dir] + nprocs) % nprocs;
+        const T* to_send = recvbuf + (slice_ends[ring][dir][send_idx] -
+                                      slice_lengths[ring][dir][send_idx]);
+        MPI_Irecv(recvbuf + (slice_ends[ring][dir][recv_idx]
+                             - slice_lengths[ring][dir][recv_idx]),
+                  slice_lengths[ring][dir][recv_idx],
+                  type, srcs[ring][dir], 0, mpi_comm, &(reqs[req_idx]));
+        MPI_Isend(to_send, slice_lengths[ring][dir][send_idx], type,
+                  dsts[ring][dir], 0, mpi_comm, &(reqs[req_idx+1]));
+      }
+    }
+  }
+  // Release temporary receive buffers.
+  for (size_t i = 0; i < num_rings; ++i) {
+    for (size_t j = 0; j < bidir_cnt; ++j) {
+      release_memory(recv_to[i][j]);
+    }
+  }
 }
 
 template <typename T>
@@ -1139,6 +1278,43 @@ void pe_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
 }  // namespace mpi
 }  // namespace internal
 
+/**
+ * Supported allreduce algorithms.
+ * This is used for requesting a particular algorithm. Use automatic to let the
+ * library select for you.
+ */
+enum class AllreduceAlgorithm {
+  automatic,
+  mpi_passthrough,
+  mpi_recursive_doubling,
+  mpi_ring,
+  mpi_rabenseifner,
+  mpi_pe_ring,
+  mpi_biring
+};
+
+/** Return a textual name for an MPI allreduce algorithm. */
+inline std::string allreduce_name(AllreduceAlgorithm algo) {
+  switch (algo) {
+  case AllreduceAlgorithm::automatic:
+    return "automatic";
+  case AllreduceAlgorithm::mpi_passthrough:
+    return "MPI passthrough";
+  case AllreduceAlgorithm::mpi_recursive_doubling:
+    return "MPI recursive doubling";
+  case AllreduceAlgorithm::mpi_ring:
+    return "MPI ring";
+  case AllreduceAlgorithm::mpi_rabenseifner:
+    return "MPI Rabenseifner";
+  case AllreduceAlgorithm::mpi_pe_ring:
+    return "MPI PE/ring";
+  case AllreduceAlgorithm::mpi_biring:
+    return "MPI biring";
+  default:
+    return "unknown";
+  }
+}
+
 class MPIBackend {
  public:
   using algo_type = AllreduceAlgorithm;
@@ -1168,13 +1344,16 @@ class MPIBackend {
             sendbuf, recvbuf, count, op, comm);
         break;
       case AllreduceAlgorithm::mpi_ring:
-        internal::mpi::ring_allreduce(sendbuf, recvbuf, count, op, comm);
+        internal::mpi::ring_allreduce(sendbuf, recvbuf, count, op, comm, false, 1);
         break;
       case AllreduceAlgorithm::mpi_rabenseifner:
         internal::mpi::rabenseifner_allreduce(sendbuf, recvbuf, count, op, comm);
         break;
       case AllreduceAlgorithm::mpi_pe_ring:
         internal::mpi::pe_ring_allreduce(sendbuf, recvbuf, count, op, comm);
+        break;
+      case AllreduceAlgorithm::mpi_biring:
+        internal::mpi::ring_allreduce(sendbuf, recvbuf, count, op, comm, true, 1);
         break;
       default:
         throw_al_exception("Invalid algorithm for Allreduce");

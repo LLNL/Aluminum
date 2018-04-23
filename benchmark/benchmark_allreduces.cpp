@@ -8,7 +8,7 @@
 #include "test_utils_mpi_cuda.hpp"
 #endif
 
-const size_t max_size = 1<<30;
+const size_t max_size = 1<<28;
 const size_t num_trials = 10;
 
 void print_stats(std::vector<double>& times) {

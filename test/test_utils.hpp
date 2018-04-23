@@ -29,24 +29,6 @@ typename VectorType<Backend>::type gen_data(size_t count);
 template <>
 typename VectorType<Al::MPIBackend>::type
 gen_data<Al::MPIBackend>(size_t count) {
-/*
-  int rank;
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  if (!rng_seeded) {
-    int flag;
-    MPI_Initialized(&flag);
-    if (flag) {
-      rng_gen.seed(rank);
-    }
-  }
-  std::uniform_real_distribution<float> rng;
-  std::vector<float> v(count);
-  for (size_t i = 0; i < count; ++i) {
-    v[i] = (float) (count*rank+i);
-  }
-  return v;
-*/
-
   if (!rng_seeded) {
     int flag;
     MPI_Initialized(&flag);
@@ -64,21 +46,18 @@ gen_data<Al::MPIBackend>(size_t count) {
   return v;
 }
 
-
 template <typename Backend=Al::MPIBackend>
 typename VectorType<Backend>::type create_data(size_t count);
 
 template <>
 typename VectorType<Al::MPIBackend>::type
 create_data<Al::MPIBackend>(size_t count) {
-
   std::vector<float> v(count);
   for (size_t i = 0; i < count; ++i) {
     v[i] = 0.0;
   }
   return v;
 }
-
 
 /** Get current time. */
 inline double get_time() {                                                      
@@ -116,12 +95,13 @@ template <>
 std::vector<Al::MPIBackend::algo_type>
 get_allreduce_algorithms<Al::MPIBackend>() {  
    std::vector<Al::AllreduceAlgorithm> algos = {
-    Al::AllreduceAlgorithm::automatic,
-    Al::AllreduceAlgorithm::mpi_passthrough,
-    Al::AllreduceAlgorithm::mpi_recursive_doubling,
-    Al::AllreduceAlgorithm::mpi_ring,
-    Al::AllreduceAlgorithm::mpi_rabenseifner,
-    Al::AllreduceAlgorithm::mpi_pe_ring
+     Al::AllreduceAlgorithm::automatic,
+     Al::AllreduceAlgorithm::mpi_passthrough,
+     Al::AllreduceAlgorithm::mpi_recursive_doubling,
+     Al::AllreduceAlgorithm::mpi_ring,
+     Al::AllreduceAlgorithm::mpi_rabenseifner,
+     Al::AllreduceAlgorithm::mpi_pe_ring,
+     Al::AllreduceAlgorithm::mpi_biring
   };
   return algos;
 }
@@ -141,7 +121,7 @@ get_nb_allreduce_algorithms<Al::MPIBackend>() {
     Al::AllreduceAlgorithm::mpi_passthrough,
     Al::AllreduceAlgorithm::mpi_recursive_doubling,
     Al::AllreduceAlgorithm::mpi_ring,
-    Al::AllreduceAlgorithm::mpi_rabenseifner,
+    Al::AllreduceAlgorithm::mpi_rabenseifner
     //Al::AllreduceAlgorithm::mpi_pe_ring
   };
   return algos;
