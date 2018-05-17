@@ -7,7 +7,7 @@ project(ALUMINUM VERSION 0.1 LANGUAGES CXX)
 # Not "CUDA" because no CUDA sources being compiled, so don't need
 # NVCC, just cuda runtime.
 
-if (${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_BUILD_DIR})
+if (${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_BINARY_DIR})
   message(FATAL_ERROR "In-source builds are prohibited. "
     "Create a new directory and build there.")
 endif ()
@@ -18,7 +18,12 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 # Options
 
 option(ALUMINUM_ENABLE_CUDA "Enable CUDA support." OFF)
+option(ALUMINUM_ENABLE_MPI_CUDA "Enable MPI-CUDA support." OFF)
 option(ALUMINUM_ENABLE_NCCL "Enable NCCL support." OFF)
+if (ALUMINUM_ENABLE_MPI_CUDA AND NOT ALUMINUM_ENABLE_CUDA)
+  message(status "MPI-CUDA support requested; enabling CUDA support, too.")
+  set(ALUMINUM_ENABLE_CUDA ON)
+endif ()
 if (ALUMINUM_ENABLE_NCCL AND NOT ALUMINUM_ENABLE_CUDA)
   message(status "NCCL support requested; enabling CUDA support, too.")
   set(ALUMINUM_ENABLE_CUDA ON)
@@ -38,10 +43,28 @@ find_package(MPI 3.0 REQUIRED COMPONENTS CXX)
 find_package(OpenMP REQUIRED COMPONENTS CXX)
 find_package(HWLOC REQUIRED)
 
+# Fix an issue with OpenMP's egregious use of non-language-specific
+# compiler flags.
+if (OPENMP_FOUND)
+  get_target_property(
+    __omp_compile_options OpenMP::OpenMP_CXX INTERFACE_COMPILE_OPTIONS)
+  set_property(TARGET OpenMP::OpenMP_CXX PROPERTY
+    INTERFACE_COMPILE_OPTIONS
+    $<$<COMPILE_LANGUAGE:CXX>:${__omp_compile_options}>)
+  unset(__omp_compile_options)
+endif ()
+
 if (ALUMINUM_ENABLE_CUDA)
   find_package(CUDA)
   if (CUDA_FOUND)
-    set(ALUMINUM_HAS_CUDA TRUE)
+    set(AL_HAS_CUDA TRUE)
+    if (ALUMINUM_ENABLE_MPI_CUDA)
+      enable_language(CUDA)
+      set(AL_HAS_CUDA TRUE)
+      set(AL_HAS_MPI_CUDA TRUE)
+    endif ()
+
+    # Add the cuda imported target
     if (NOT TARGET cuda::cuda)
       add_library(cuda::cuda INTERFACE IMPORTED)
     endif ()
@@ -52,17 +75,12 @@ if (ALUMINUM_ENABLE_CUDA)
     set_property(TARGET cuda::cuda
       PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${CUDA_INCLUDE_DIRS})
 
-    set_property(TARGET cuda::cuda
-      PROPERTY INTERFACE_COMPILE_DEFINITIONS "ALUMINUM_HAS_CUDA")
-
     if (ALUMINUM_ENABLE_NCCL)
       find_package(NCCL 2.0.0)
       if (NCCL_FOUND)
-        set(ALUMINUM_HAS_NCCL TRUE)
+        set(AL_HAS_NCCL TRUE)
         set_property(TARGET cuda::cuda APPEND
           PROPERTY INTERFACE_LINK_LIBRARIES cuda::nccl)
-        set_property(TARGET cuda::cuda APPEND
-          PROPERTY INTERFACE_COMPILE_DEFINITIONS "ALUMINUM_HAS_NCCL")
       else ()
         message(WARNING "NCCL support requested but not found. Disabling.")
         set(ALUMINUM_ENABLE_NCCL OFF)
@@ -71,10 +89,28 @@ if (ALUMINUM_ENABLE_CUDA)
   else ()
     message(WARNING "CUDA support requested but not found. Disabling.")
     set(ALUMINUM_ENABLE_CUDA OFF)
+    set(ALUMINUM_ENABLE_MPI_CUDA OFF)
+    set(AL_HAS_CUDA FALSE)
+    set(AL_HAS_MPI_CUDA FALSE)
   endif ()
 endif ()
-
 # Build library and executables
+
+# Write the configuration file
+configure_file(
+  "${CMAKE_SOURCE_DIR}/cmake/Al_config.hpp.in"
+  "${CMAKE_BINARY_DIR}/Al_config.hpp" @ONLY)
+
+# Macro for setting up full paths
+macro(set_full_path VAR)
+  unset(__tmp_names)
+  foreach(filename ${ARGN})
+    unset(__name)
+    get_filename_component(__name "${filename}" ABSOLUTE)
+    list(APPEND __tmp_names "${__name}")
+  endforeach()
+  set(${VAR} "${__tmp_names}")
+endmacro()
 
 add_subdirectory(src)
 add_subdirectory(benchmark)

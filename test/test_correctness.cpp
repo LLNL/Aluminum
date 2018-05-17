@@ -137,9 +137,9 @@ int main(int argc, char** argv) {
 #endif
 #ifdef AL_HAS_MPI_CUDA
   } else if (backend == "MPI-CUDA") {
-    set_device();    
+    set_device();
     test_correctness<Al::MPICUDABackend>();
-#endif    
+#endif
   } else {
     std::cerr << "usage: " << argv[0] << " [MPI";
 #ifdef AL_HAS_NCCL
