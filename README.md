@@ -21,6 +21,42 @@
 
 ### Building
 
+#### CMake method
+CMake 3.9 or newer is required. Due to the Makefile-based build system
+that is also available, an out-of-source build is required:
+```
+mkdir build && cd build
+cmake <options> /path/to/aluminum/source
+```
+
+The required packages are `MPI`, `OpenMP`, and `HWLOC`. `MPI` and
+`OpenMP` use the standard CMake packages and can be manipulated in the
+standard way. `HWLOC`, if installed in a nonstandard location, may
+require `HWLOC_DIR` to be set to the appropriate installation prefix.
+
+The `CUDA`-based backends assume `CUDA` is a first-class language in
+CMake. An alternative `CUDA` compiler can be selected using
+```
+-DCMAKE_CUDA_COMPILER=/path/to/my/nvcc
+```
+If the `NCCL` backend is used, the `NCCL_DIR` variable may be
+used to point CMake to a nonstandard installation prefix.
+
+For the `NCCL` backend:
+```
+-DALUMINUM_ENABLE_NCCL=ON
+```
+
+For the `MPI-CUDA` backend:
+```
+-DALUMINUM_ENABLE_MPI_CUDA=ON
+```
+
+The `NCCL` and `MPI-CUDA` backends can be combined.
+
+#### Makefile-based method
+This method is deprecated. Prefer the CMake method.
+
 This is currently ad-hoc. You may need to edit `Makefile` to adjust paths. Run `make` to build the `libAl` library and associated tests and benchmarks. This will build the `MPI` backend.
 
 For the `NCCL` backend:

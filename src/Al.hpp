@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <mpi.h>
 
+#include "Al_config.hpp"
 #include "base.hpp"
 #include "tuning_params.hpp"
 
@@ -83,7 +84,7 @@ class MPICommunicator : public Communicator {
   int local_size() const { return size_of_local_comm; }
   MPI_Comm get_local_comm() const { return local_comm; }
   int get_free_tag() { return free_tag++; }
-  
+
  private:
   /** Associated MPI communicator. */
   MPI_Comm comm;
@@ -143,7 +144,7 @@ template <typename Backend, typename T>
 void Allreduce(T* recvbuf, size_t count,
                ReductionOperator op, typename Backend::comm_type& comm,
                typename Backend::algo_type algo = Backend::algo_type::automatic) {
-  Backend::template Allreduce<T>(recvbuf, count, op, comm, algo);  
+  Backend::template Allreduce<T>(recvbuf, count, op, comm, algo);
 }
 
 /**
@@ -234,7 +235,7 @@ void NonblockingReduce(
   ReductionOperator op,
   int root,
   typename Backend::comm_type& comm,
-  typename Backend::req_type& req, 
+  typename Backend::req_type& req,
   typename Backend::algo_type algo = Backend::algo_type::automatic) {
   Backend::template NonblockingReduce<T>(recvbuf, count, op, root, comm, req, algo);
 }
@@ -293,7 +294,7 @@ void NonblockingReduce_scatter(
   T* recvbuf, size_t *count,
   ReductionOperator op,
   typename Backend::comm_type& comm,
-  typename Backend::req_type& req, 
+  typename Backend::req_type& req,
   typename Backend::algo_type algo = Backend::algo_type::automatic) {
   Backend::template NonblockingReduce_scatter<T>(recvbuf, count, op, comm, req, algo);
 }
@@ -364,9 +365,9 @@ void NonblockingAllgather(
  * @param algo Request a particular broadcast algorithm.
  */
 template <typename Backend, typename T>
-void Bcast(T* buf, 
-           size_t count, 
-           int root, 
+void Bcast(T* buf,
+           size_t count,
+           int root,
            typename Backend::comm_type& comm,
            typename Backend::algo_type algo = Backend::algo_type::automatic) {
   Backend::template Bcast<T>(buf, count, root, comm, algo);
@@ -381,7 +382,7 @@ void Bcast(T* buf,
  */
 template <typename Backend, typename T>
 void NonblockingBcast(
-  T* buf, 
+  T* buf,
   size_t count,
   int root,
   typename Backend::comm_type& comm,
