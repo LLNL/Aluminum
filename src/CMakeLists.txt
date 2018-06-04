@@ -27,18 +27,18 @@ set(ALUMINUM_HEADERS "${HEADERS}" "${THIS_DIR_HEADERS}")
 set(ALUMINUM_CXX_SOURCES "${CXX_SOURCES}" "${THIS_DIR_CXX_SOURCES}")
 set(ALUMINUM_CUDA_SOURCES "${CUDA_SOURCES}")
 
-add_library(aluminum
+add_library(Al
   "${ALUMINUM_CXX_SOURCES}" "${ALUMINUM_CUDA_SOURCES}" "${ALUMINUM_HEADERS}")
-target_include_directories(aluminum PUBLIC
+target_include_directories(Al PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
   $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/aluminum>)
-target_link_libraries(aluminum PUBLIC
+target_link_libraries(Al PUBLIC
   MPI::MPI_CXX HWLOC::hwloc OpenMP::OpenMP_CXX
   $<$<BOOL:${AL_HAS_CUDA}>:cuda::cuda>)
-target_compile_features(aluminum PUBLIC cxx_std_11)
+target_compile_features(Al PUBLIC cxx_std_11)
 
-install(TARGETS aluminum
+install(TARGETS Al
   EXPORT AluminumTargets
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}

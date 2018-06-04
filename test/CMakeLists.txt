@@ -24,7 +24,7 @@ target_include_directories(
   aluminum_test_headers INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}")
 
 add_executable(TestCorrectness.exe test_correctness.cpp ${TEST_HEADERS})
-target_link_libraries(TestCorrectness.exe PRIVATE aluminum)
+target_link_libraries(TestCorrectness.exe PRIVATE Al)
 
 # This is mostly a sanity check
 set(TEST_ARGS MPI 8)
@@ -41,7 +41,7 @@ endif ()
 
 add_executable(TestMultiNBAllReduces.exe
   test_multi_nballreduces.cpp ${TEST_HEADERS})
-target_link_libraries(TestMultiNBAllReduces.exe PRIVATE aluminum)
+target_link_libraries(TestMultiNBAllReduces.exe PRIVATE Al)
 
 set(TEST_ARGS "8")
 add_test(NAME TestMultiNBAllReduces
@@ -57,7 +57,7 @@ endif ()
 
 add_executable(TestNCCLCollectives.exe
   test_nccl_collectives.cpp ${TEST_HEADERS})
-target_link_libraries(TestNCCLCollectives.exe PRIVATE aluminum)
+target_link_libraries(TestNCCLCollectives.exe PRIVATE Al)
 
 set(TEST_ARGS "8")
 add_test(NAME TestNCCLCollectives
