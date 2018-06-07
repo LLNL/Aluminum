@@ -51,5 +51,5 @@ install(EXPORT AluminumTargets
   DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/aluminum
   )
 
-install(FILES ${ALUMINUM_HEADERS}
+install(FILES ${THIS_DIR_HEADERS}
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/aluminum)
