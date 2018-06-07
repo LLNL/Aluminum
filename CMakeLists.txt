@@ -160,6 +160,8 @@ install(FILES "${CMAKE_BINARY_DIR}/AluminumConfig.cmake.install"
 install(FILES
   "${CMAKE_BINARY_DIR}/AluminumConfigVersion.cmake"
   DESTINATION ${CMAKE_INSTALL_DIR})
+install(FILES
+  "${CMAKE_BINARY_DIR}/Al_config.hpp" DESTINATION ${INCLUDE_INSTALL_DIRS})
 
 # Install the CMake modules we need
 install(FILES cmake/FindHWLOC.cmake cmake/FindNCCL.cmake
