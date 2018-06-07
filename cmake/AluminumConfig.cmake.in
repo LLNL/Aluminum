@@ -14,7 +14,7 @@ find_package(MPI 3.0 REQUIRED COMPONENTS CXX)
 find_package(OpenMP REQUIRED COMPONENTS CXX)
 find_package(HWLOC REQUIRED)
 
-if (ALUMINUM_HAS_CUDA)
+if (AL_HAS_CUDA)
   find_package(CUDA REQUIRED)
 
   if (NOT TARGET cuda::cuda)
@@ -27,13 +27,13 @@ if (ALUMINUM_HAS_CUDA)
   set_property(TARGET cuda::cuda
     PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${CUDA_INCLUDE_DIRS})
 
-  if (ALUMINUM_HAS_NCCL)
+  if (AL_HAS_NCCL)
     find_package(NCCL 2.0.0 REQUIRED)
 
     set_property(TARGET cuda::cuda APPEND
       PROPERTY INTERFACE_LINK_LIBRARIES cuda::nccl)
   endif ()
-endif (ALUMINUM_HAS_CUDA)
+endif (AL_HAS_CUDA)
 
 @PACKAGE_INIT@
 
