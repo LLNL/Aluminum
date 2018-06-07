@@ -59,4 +59,4 @@ endif ()
 
 check_required_components(Aluminum)
 
-set(Aluminum_LIBRARIES AL::aluminum)
+set(Aluminum_LIBRARIES AL::Al)
