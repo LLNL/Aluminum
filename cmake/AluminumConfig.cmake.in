@@ -14,6 +14,17 @@ find_package(MPI 3.0 REQUIRED COMPONENTS CXX)
 find_package(OpenMP REQUIRED COMPONENTS CXX)
 find_package(HWLOC REQUIRED)
 
+# Fix an issue with OpenMP's egregious use of non-language-specific
+# compiler flags.
+if (OPENMP_FOUND)
+  get_target_property(
+    __omp_compile_options OpenMP::OpenMP_CXX INTERFACE_COMPILE_OPTIONS)
+  set_property(TARGET OpenMP::OpenMP_CXX PROPERTY
+    INTERFACE_COMPILE_OPTIONS
+    $<$<COMPILE_LANGUAGE:CXX>:${__omp_compile_options}>)
+  unset(__omp_compile_options)
+endif ()
+
 if (AL_HAS_CUDA)
   find_package(CUDA REQUIRED)
 
