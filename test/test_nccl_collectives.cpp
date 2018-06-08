@@ -462,7 +462,6 @@ int main(int argc, char** argv) {
   max_size = std::stoul(argv[1]);
 
 #ifdef AL_HAS_NCCL
-  backend = "NCCL";
   if (backend == "NCCL") {
     set_device();
     test_correctness<Al::NCCLBackend>();

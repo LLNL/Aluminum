@@ -40,15 +40,6 @@ void Finalize() {
   internal::mpi::finalize();
 }
 
-void Finalize(bool mpi_final) {
-  progress_engine->stop();
-  delete progress_engine;
-  progress_engine = nullptr;
-  is_initialized = false;
-  if( mpi_final )
-    internal::mpi::finalize();
-}
-
 bool Initialized() {
   return is_initialized;
 }
