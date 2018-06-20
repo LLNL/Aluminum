@@ -30,11 +30,10 @@ class NCCLCommunicator : public MPICommunicator {
    * @param comm_ An MPI_Comm representing the nodes to be in the communicator.
    * @param gpus The GPUs this communicator is (locally) managing.
    */
-  NCCLCommunicator(MPI_Comm comm_ = MPI_COMM_WORLD,
-                   std::vector<int> gpus = std::vector<int>());
+  NCCLCommunicator(MPI_Comm comm_ = MPI_COMM_WORLD);
   ~NCCLCommunicator() override;
   Communicator* copy() const override {
-    return new NCCLCommunicator(get_comm(), m_gpus);
+    return new NCCLCommunicator(get_comm());
   }
 
   /** Synchronize the internal stream for each managed GPU. */
@@ -116,12 +115,8 @@ class NCCLCommunicator : public MPICommunicator {
   void nccl_destroy();
 
  private:
-  /** List of GPUs associated with this communicator. */
-  std::vector<int> m_gpus;
-  /** List of streams, one for each GPU. */
-  std::vector<cudaStream_t> m_streams;
-  /** GPUs allocated to this rank. */
-  int m_num_gpus;
+  /** Default stream for this communicator. */
+  cudaStream_t m_default_stream;
   /** NCCL communicator. */
   ncclComm_t m_nccl_comm;
 };

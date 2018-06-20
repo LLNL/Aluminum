@@ -25,81 +25,43 @@ namespace Al {
 // Initialize this.
 const NCCLBackend::req_type NCCLBackend::null_req = (NCCLBackend::req_type) (-1);
 
-NCCLCommunicator::NCCLCommunicator(MPI_Comm comm_, std::vector<int> gpus)
-  : MPICommunicator(comm_),
-    m_gpus(gpus),
-    m_num_gpus(gpus.size()) {
+NCCLCommunicator::NCCLCommunicator(MPI_Comm comm_)
+  : MPICommunicator(comm_) {
   gpu_setup();
   nccl_setup();
 }
 
 NCCLCommunicator::~NCCLCommunicator() {
   nccl_destroy();
-  for (size_t i = 0; i < m_gpus.size(); ++i) {
-    CUDACHECK(cudaSetDevice(m_gpus[i]));
-    CUDACHECK(cudaStreamDestroy(m_streams[i]));
-  }
+  CUDACHECK(cudaStreamDestroy(m_default_stream));
 }
 
 void NCCLCommunicator::gpu_setup() {
-  // Initialize list of GPUs
-  if (m_gpus.empty()) {
-    m_gpus.push_back(0);
-    CUDACHECK(cudaGetDevice(&m_gpus.back()));
-  }
-  m_num_gpus = m_gpus.size();
-
-  // Initialize streams
-  for (const auto& gpu : m_gpus) {
-    CUDACHECK(cudaSetDevice(gpu));
-    m_streams.push_back(nullptr);
-    CUDACHECK(cudaStreamCreate(&m_streams.back()));
-  }
+  CUDACHECK(cudaStreamCreate(&m_default_stream));
 }
 
 void NCCLCommunicator::nccl_setup() {
-  if (m_num_gpus != 1) {
-    std::cerr << "NCCLCommunicator: rank " << rank()
-              << ": the number of GPUs assigned to process is " << m_num_gpus
-              << "; should be 1" << std::endl;
-    MPI_Abort(get_comm(), -3);
+  // Get a unique ID for this communicator from NCCL and distribute it.
+  ncclUniqueId nccl_id;
+  if (rank() == 0) {
+    NCCLCHECK(ncclGetUniqueId(&nccl_id));
   }
+  MPI_Bcast(&nccl_id, sizeof(nccl_id), MPI_BYTE, 0, get_comm());
 
-  int num_gpus_assigned = m_num_gpus;
-  int nProcs = size();
-  int myid = rank();
-  int total_num_comms = nProcs*num_gpus_assigned;
-
-  ncclUniqueId ncclId;
-  if (myid == 0) {
-    NCCLCHECK(ncclGetUniqueId(&ncclId));
-  }
-
-  MPI_Bcast(&ncclId, sizeof(ncclId), MPI_BYTE, 0, get_comm());
-
-  if (nProcs == 1) {
-    int gpuArray = 0;
-    NCCLCHECK(ncclCommInitAll(&m_nccl_comm, 1, &gpuArray));
-  }
-  else {
-    NCCLCHECK(ncclCommInitRank(&m_nccl_comm, total_num_comms, ncclId,
-                               num_gpus_assigned*myid));
-  }
+  // This uses the current CUDA device.
+  NCCLCHECK(ncclCommInitRank(&m_nccl_comm, size(), nccl_id, rank()));
 }
 
 void NCCLCommunicator::nccl_destroy() {
-  ncclCommDestroy(m_nccl_comm);
+  NCCLCHECK(ncclCommDestroy(m_nccl_comm));
 }
 
 void NCCLCommunicator::synchronize() {
-  for (int i = 0; i < m_num_gpus; ++i) {
-    cudaSetDevice(m_gpus[i]);
-    cudaStreamSynchronize(m_streams[i]);
-  }
+  CUDACHECK(cudaStreamSynchronize(m_default_stream));
 }
 
 cudaStream_t NCCLCommunicator::get_default_stream() {
-  return m_streams[0];
+  return m_default_stream;
 }
 
 void NCCLCommunicator::Allreduce(const void* sendbuf, void* recvbuf,
