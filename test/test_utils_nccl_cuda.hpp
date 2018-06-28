@@ -19,9 +19,7 @@ gen_data<Al::NCCLBackend>(size_t count) {
 template <>
 inline typename Al::NCCLBackend::req_type
 get_request<Al::NCCLBackend>() {
-  cudaStream_t s;
-  cudaStreamCreate(&s);
-  return s;
+  return Al::NCCLBackend::null_req;
 }
 
 void get_expected_nccl_result_allreduce(CUDAVector<float>& input){

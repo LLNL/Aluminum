@@ -30,9 +30,22 @@ void Initialize(int& argc, char**& argv) {
   progress_engine = new internal::ProgressEngine();
   progress_engine->run();
   is_initialized = true;
+#ifdef AL_HAS_CUDA
+  internal::cuda::init(argc, argv);
+#endif
+#ifdef AL_HAS_NCCL
+  internal::nccl::init(argc, argv);
+#endif
 }
 
 void Finalize() {
+  // Finalize in reverse order of initialization.
+#ifdef AL_HAS_NCCL
+  internal::nccl::finalize();
+#endif
+#ifdef AL_HAS_CUDA
+  internal::cuda::finalize();
+#endif
   progress_engine->stop();
   delete progress_engine;
   progress_engine = nullptr;

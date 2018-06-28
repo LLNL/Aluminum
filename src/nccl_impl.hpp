@@ -3,6 +3,22 @@
 #include <nccl.h>
 #include "Al.hpp"
 
+#define AL_FORCE_CHECK_NCCL(nccl_call)                                \
+  do {                                                                \
+    AL_CUDA_SYNC(true);                                               \
+    ncclResult_t result_CHECK_NCCL = (nccl_call);                     \
+    if (result_CHECK_NCCL != ncclSuccess) {                           \
+      throw_al_exception(std::string("NCCL error: ")                  \
+                         + ncclGetErrorString(result_CHECK_NCCL));    \
+    }                                                                 \
+    AL_CUDA_SYNC(false);                                              \
+  } while (0)
+#ifdef AL_DEBUG
+#define AL_CHECK_NCCL(nccl_call) AL_FORCE_CHECK_NCCL(nccl_call)
+#else
+#define AL_CHECK_NCCL(nccl_call) (nccl_call)
+#endif
+
 namespace Al {
 
 enum class NCCLCollectiveAlgorithm {
@@ -18,111 +34,53 @@ inline std::string allreduce_name(NCCLCollectiveAlgorithm algo) {
   }
 }
 
+// Forward declaration.
+class NCCLBackend;
+
 /**
  * Communicator for NCCL-based allreduces.
  * This requires NCCL version 2.0 or higher.
- * This currently requires there to be only one GPU per MPI rank.
  */
-class NCCLCommunicator : public MPICommunicator {
+class NCCLCommunicator : public CUDACommunicator {
+  friend class NCCLBackend;
  public:
+  /**
+   *  Initialize a NCCL communicator on the world comm and default stream.
+   */
+  NCCLCommunicator() : NCCLCommunicator(MPI_COMM_WORLD, 0) {}
+  /**
+   * Initialize a NCCL communicator on the world comm and given stream.
+   */
+  NCCLCommunicator(cudaStream_t stream_) : NCCLCommunicator(MPI_COMM_WORLD, stream_) {}
   /**
    * Initialize a NCCL communicator.
    * @param comm_ An MPI_Comm representing the nodes to be in the communicator.
-   * @param gpus The GPUs this communicator is (locally) managing.
+   * @param stream_ The stream to associate with the communicator.
    */
-  NCCLCommunicator(MPI_Comm comm_ = MPI_COMM_WORLD);
+  NCCLCommunicator(MPI_Comm comm_, cudaStream_t stream_);
   ~NCCLCommunicator() override;
   Communicator* copy() const override {
-    return new NCCLCommunicator(get_comm());
+    return new NCCLCommunicator(get_comm(), get_stream());
   }
 
-  /** Synchronize the internal stream for each managed GPU. */
-  void synchronize();
-
-  /** Return the default stream for this communicator. */
-  cudaStream_t get_default_stream();
-
-  /**
-   * Perform an allreduce on data in device memory.
-   * @param sendbuf Input data.
-   * @param recvbuf Output data; if same as sendbuf, an in-place allreduce is done.
-   * @param count Number of elements in sendbuf/recvbuf.
-   * @param nccl_type Type of data being reduced.
-   * @param nccl_redop The reduction operation to perform.
-   * @param default_stream CUDA stream to associate with the operation.
-   */
-  void Allreduce(const void* sendbuf, void* recvbuf, size_t count,
-                 ncclDataType_t nccl_type, ncclRedOp_t nccl_redop,
-                 cudaStream_t default_stream); 
-
-  /**
-   * Perform a reduce on data in device memory.
-   * @param sendbuf Input data.
-   * @param recvbuf Output data; if same as sendbuf, an in-place reduce is done.
-   * @param count Number of elements in sendbuf/recvbuf.
-   * @param nccl_type Type of data being reduced.
-   * @param nccl_redop The reduction operation to perform.
-   * @param root Rank to receive the final result.
-   * @param default_stream CUDA stream to associate with the operation.
-   */
-  void Reduce(const void* sendbuf, void* recvbuf, size_t count,
-              ncclDataType_t nccl_type, ncclRedOp_t nccl_redop, int root,
-              cudaStream_t default_stream); 
-
-  /**
-   * Perform a broadcast on data in device memory.
-   * @param buf Data to send on the root; receive buffer on other ranks.
-   * @param count Number of elements in buf.
-   * @param nccl_type Type of data being broadcast.
-   * @param root Rank initiating the broadcast.
-   * @param default_stream CUDA stream to associate with the operation.
-   */
-  void Bcast(void* buf, size_t count, ncclDataType_t nccl_type, int root, 
-             cudaStream_t default_stream); 
-
-  /**
-   * Perform an allgather on data in device memory.
-   * @param sendbuf Input data; if this is an offset into recvbuf, an in-place
-   * operation is performed.
-   * @param recvbuf Output data; of size count*ranks.
-   * @param send_count Number of elements to send.
-   * @param nccl_type Type of data being gathered.
-   * @param default_stream CUDA stream to associate with the operation.
-   */
-  void Allgather(const void* sendbuf, void* recvbuf, size_t send_count,
-                 ncclDataType_t nccl_type, cudaStream_t default_stream);
-
-  /**
-   * Perform a reduce-scatter on data in device memory.
-   * @param sendbuf Input data; of size recv_count*ranks.
-   * @param recvbuf Output data; if this is an offset into sendbuf, an in-place
-   * operation is performed.
-   * @param recv_count Number of elements to receive.
-   * @param nccl_type Type of data being gathered.
-   * @param nccl_redop The reduction operation to perform.
-   * @param default_stream CUDA stream to associate with the operation.
-   */
-  void Reduce_scatter(const void* sendbuf, void* recvbuf, size_t recv_count,
-                      ncclDataType_t nccl_type, ncclRedOp_t nccl_redop,
-                      cudaStream_t default_stream);
-
- protected:
-  /** Initialize GPU information. */
-  void gpu_setup();
+ private:
   /** Initialize the internal NCCL communicator. */
   void nccl_setup();
   /** Clean up NCCL. */
   void nccl_destroy();
 
- private:
-  /** Default stream for this communicator. */
-  cudaStream_t m_default_stream;
   /** NCCL communicator. */
   ncclComm_t m_nccl_comm;
 };
 
 namespace internal {
 namespace nccl {
+
+/** Initialize NCCL backend. */
+void init(int& argc, char**& argv);
+/** Finalize NCCL backend. */
+void finalize();
+
 /** Convert a ReductionOperator to the corresponding ncclRedOp_t. */
 inline ncclRedOp_t ReductionOperator2ncclRedOp(ReductionOperator op) {
   switch(op) {
@@ -150,32 +108,37 @@ template <> inline ncclDataType_t TypeMap<unsigned long long int>() { return ncc
 //template <> inline ncclDataType_t TypeMap<??>() { return ncclHalf; }
 template <> inline ncclDataType_t TypeMap<float>() { return ncclFloat; }
 template <> inline ncclDataType_t TypeMap<double>() { return ncclDouble; }
+
+/** Represents a request for the NCCL backend. */
+struct NCCLRequest {
+  NCCLRequest(cudaEvent_t op_event_, cudaStream_t orig_stream_) :
+    op_event(op_event_), orig_stream(orig_stream_) {}
+  // Note: Not thread safe!
+  ~NCCLRequest() { cuda::release_cuda_event(op_event); }
+  /** Event pending on completion of the operation. */
+  cudaEvent_t op_event;
+  /** Original stream associated with the operation. */
+  cudaStream_t orig_stream;
+};
+
 }  // namespace nccl
 }  // namespace internal
 
 /** Backend implementing NCCL communication. */
 class NCCLBackend {
+  friend void internal::nccl::init(int&, char**&);
+  friend void internal::nccl::finalize();
  public:
   using algo_type = NCCLCollectiveAlgorithm;
   using comm_type = NCCLCommunicator;
-  using req_type = cudaStream_t;
-  static const req_type null_req;
-
-  /** Return a fresh request. */
-  static req_type get_request() {
-    cudaStream_t s;
-    cudaStreamCreate(&s);
-    return s;
-  }
+  using req_type = std::shared_ptr<internal::nccl::NCCLRequest>;
+  static constexpr std::nullptr_t null_req = nullptr;
 
   template <typename T>
   static void Allreduce(const T* sendbuf, T* recvbuf, size_t count,
                         ReductionOperator op, comm_type& comm,
-                        algo_type algo) {
-    cudaStream_t default_stream = comm.get_default_stream();
-    NonblockingAllreduce(sendbuf, recvbuf, count, op, comm,
-                         default_stream, algo);
-    comm.synchronize();
+                        algo_type) {
+    do_allreduce(sendbuf, recvbuf, count, op, comm, comm.get_stream());
   }
 
   template <typename T>
@@ -189,16 +152,10 @@ class NCCLBackend {
   static void NonblockingAllreduce(const T* sendbuf, T* recvbuf, size_t count,
                                    ReductionOperator op, comm_type& comm,
                                    req_type& req, algo_type) {
-    ncclDataType_t nccl_type = internal::nccl::TypeMap<T>();
-    ncclRedOp_t nccl_redop = internal::nccl::ReductionOperator2ncclRedOp(op);
-    if (sendbuf == internal::IN_PLACE<T>()) {
-      sendbuf = recvbuf;
-    }
-    if (req == null_req) {
-      req = get_request();
-    }
-    comm.Allreduce((const void*) sendbuf, (void*) recvbuf, count,
-                   nccl_type, nccl_redop, req);
+    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+    sync_internal_stream_with_comm(internal_stream, comm);
+    do_allreduce(sendbuf, recvbuf, count, op, comm, internal_stream);
+    setup_completion_event(internal_stream, comm, req);
   }
 
   template <typename T>
@@ -210,13 +167,25 @@ class NCCLBackend {
   }
 
   template <typename T>
+  static void Bcast(T* buf, size_t count, int root, comm_type& comm, 
+                    algo_type) {
+    do_broadcast(buf, count, root, comm, comm.get_stream());
+  }
+
+  template <typename T>
+  static void NonblockingBcast(T* buf, size_t count, int root,
+                               comm_type& comm, req_type& req, algo_type) {
+    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+    sync_internal_stream_with_comm(internal_stream, comm);
+    do_broadcast(buf, count, root, comm, internal_stream);
+    setup_completion_event(internal_stream, comm, req);
+  }
+
+  template <typename T>
   static void Reduce(const T* sendbuf, T* recvbuf, size_t count,
                      ReductionOperator op, int root, comm_type& comm,
-                     algo_type algo) {
-    cudaStream_t default_stream = comm.get_default_stream();
-    NonblockingReduce(sendbuf, recvbuf, count, op, root, comm,
-                      default_stream, algo);
-    comm.synchronize();
+                     algo_type) {
+    do_reduce(sendbuf, recvbuf, count, op, root, comm, comm.get_stream());
   }
 
   template <typename T>
@@ -230,16 +199,10 @@ class NCCLBackend {
   static void NonblockingReduce(const T* sendbuf, T* recvbuf, size_t count,
                                 ReductionOperator op, int root, comm_type& comm,
                                 req_type& req, algo_type) {
-    ncclDataType_t nccl_type = internal::nccl::TypeMap<T>();
-    ncclRedOp_t nccl_redop = internal::nccl::ReductionOperator2ncclRedOp(op);
-    if (sendbuf == internal::IN_PLACE<T>()) {
-      sendbuf = recvbuf;
-    }
-    if (req == null_req) {
-      req = get_request();
-    }
-    comm.Reduce((const void*) sendbuf, (void*) recvbuf, count,
-                nccl_type, nccl_redop, root, req);
+    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+    sync_internal_stream_with_comm(internal_stream, comm);
+    do_reduce(sendbuf, recvbuf, count, op, root, comm, internal_stream);
+    setup_completion_event(internal_stream, comm, req);
   }
 
   template <typename T>
@@ -251,112 +214,176 @@ class NCCLBackend {
   }
 
   template <typename T>
-  static void Allgather(const T* sendbuf, T* recvbuf, size_t count,
+  static void Allgather(const T* sendbuf, T* recvbuf, size_t send_count,
+                        comm_type& comm, algo_type) {
+    do_allgather(sendbuf, recvbuf, send_count, comm, comm.get_stream());
+  }
+
+  template <typename T>
+  static void Allgather(T* recvbuf, size_t send_count,
                         comm_type& comm, algo_type algo) {
-    cudaStream_t default_stream = comm.get_default_stream();
-    NonblockingAllgather(sendbuf, recvbuf, count, comm, default_stream, algo);
-    comm.synchronize();
+    Allgather(internal::IN_PLACE<T>(), recvbuf, send_count, comm, algo);
   }
 
   template <typename T>
-  static void Allgather(T* recvbuf, size_t count,
-                        comm_type& comm, algo_type algo) {
-    Allgather(internal::IN_PLACE<T>(), recvbuf, count, comm, algo);
+  static void NonblockingAllgather(const T* sendbuf, T* recvbuf,
+                                   size_t send_count, comm_type& comm,
+                                   req_type& req, algo_type) {
+    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+    sync_internal_stream_with_comm(internal_stream, comm);
+    do_allgather(sendbuf, recvbuf, send_count, comm, internal_stream);
+    setup_completion_event(internal_stream, comm, req);
   }
 
   template <typename T>
-  static void NonblockingAllgather(const T* sendbuf, T* recvbuf, size_t count,
-                                   comm_type& comm, req_type& req, algo_type) {
-    ncclDataType_t nccl_type = internal::nccl::TypeMap<T>();
-    if (sendbuf == internal::IN_PLACE<T>()) {
-      sendbuf = recvbuf;
-    }
-    if (req == null_req) {
-      req = get_request();
-    }
-    comm.Allgather((const void*) sendbuf, (void*) recvbuf, count,
-                   nccl_type, req);
+  static void NonblockingAllgather(T* recvbuf, size_t send_count,
+                                   comm_type& comm, req_type& req,
+                                   algo_type algo) {
+    NonblockingAllgather(internal::IN_PLACE<T>(), recvbuf, send_count, comm,
+                         req, algo);
   }
 
   template <typename T>
-  static void NonblockingAllgather(T* recvbuf, size_t count, comm_type& comm,
-                                   req_type& req, algo_type algo) {
-    NonblockingAllgather(internal::IN_PLACE<T>(),  recvbuf, count, comm, req, algo);
+  static void Reduce_scatter(const T* sendbuf, T* recvbuf, size_t* recv_counts,
+                             ReductionOperator op, comm_type& comm,
+                             algo_type) {
+    do_reduce_scatter(sendbuf, recvbuf, recv_counts, op, comm,
+                      comm.get_stream());
   }
 
   template <typename T>
-  static void Reduce_scatter(const T* sendbuf, T* recvbuf, size_t *recv_count,
+  static void Reduce_scatter(T* recvbuf, size_t* recv_counts,
                              ReductionOperator op, comm_type& comm,
                              algo_type algo) {
-    cudaStream_t default_stream = comm.get_default_stream();
-    NonblockingReduce_scatter(sendbuf, recvbuf, recv_count, op, comm, default_stream, algo);
-    comm.synchronize();
-  }
-
-  template <typename T>
-  static void Reduce_scatter(T* recvbuf, size_t *recv_count,
-                             ReductionOperator op, comm_type& comm,
-                             algo_type algo) {
-    Reduce_scatter(internal::IN_PLACE<T>(), recvbuf, recv_count, op, comm, algo);
+    Reduce_scatter(internal::IN_PLACE<T>(), recvbuf, recv_counts, op, comm,
+                   algo);
   }
 
   template <typename T>
   static void NonblockingReduce_scatter(const T* sendbuf, T* recvbuf,
-                                        size_t *recv_count, ReductionOperator op,
-                                        comm_type& comm, req_type& req,
-                                        algo_type) {
-    // Checking recv_count. This is to fix syntactic mismatch between NCCL and
-    // MPI Reduce_scatter.
-    size_t r_count = (size_t) recv_count[0];
-    bool check = true;
-    for (int i = 1; i < comm.size(); i++) {
-      if (recv_count[i] != recv_count[0]) {
-        check = false;
-        break;
-      }
-    }
-    if (!check) {
-      if (comm.rank() == 0) {
-        std::cerr << "For NCCL_Reduce_scatter recv_count must be equal for all ranks\n";
-        std::abort();
-      }
-    }
+                                        size_t* recv_counts,
+                                        ReductionOperator op, comm_type& comm,
+                                        req_type& req, algo_type) {
+    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+    sync_internal_stream_with_comm(internal_stream, comm);
+    do_reduce_scatter(sendbuf, recvbuf, recv_counts, op, comm, internal_stream);
+    setup_completion_event(internal_stream, comm, req);
+  }
 
-    ncclDataType_t nccl_type = internal::nccl::TypeMap<T>();
-    ncclRedOp_t nccl_redop = internal::nccl::ReductionOperator2ncclRedOp(op);
+  template <typename T>
+  static void NonblockingReduce_scatter(T* recvbuf, size_t* recv_counts,
+                                        ReductionOperator op, comm_type& comm,
+                                        req_type& req, algo_type algo) {
+    NonblockingReduce_scatter(internal::IN_PLACE<T>(), recvbuf, recv_counts, op,
+                              comm, req, algo);
+  }
+
+ private:
+  /** Event for synchronizing between streams. */
+  static cudaEvent_t sync_event;
+  /**
+   * Set up stream synchronization.
+   * This will cause the provided internal stream to synchronize with the stream
+   * associated with comm.
+   */
+  static void sync_internal_stream_with_comm(
+    cudaStream_t internal_stream, comm_type& comm) {
+    // We can reuse a single event for cudaStreamWaitEvent because it uses the
+    // stream/event state when it is called.
+    AL_CHECK_CUDA(cudaEventRecord(sync_event, comm.get_stream()));
+    AL_CHECK_CUDA(cudaStreamWaitEvent(internal_stream, sync_event, 0));
+  }
+  /**
+   * Set up the request for completion checking.
+   * This uses an event recorded on the provided internal stream.
+   */
+  static void setup_completion_event(
+    cudaStream_t internal_stream, comm_type& comm, req_type& req) {
+    cudaEvent_t event = internal::cuda::get_cuda_event();
+    AL_CHECK_CUDA(cudaEventRecord(event, internal_stream));
+    req = std::make_shared<internal::nccl::NCCLRequest>(event, comm.get_stream());
+  }
+  // These are thin wrappers around the actual NCCL calls.
+  /** Do a NCCL allreduce. */
+  template <typename T>
+  static void do_allreduce(const T* sendbuf, T* recvbuf, size_t count,
+                           ReductionOperator op, comm_type& comm,
+                           cudaStream_t stream) {
+    if (count == 0) {
+      return;
+    }
     if (sendbuf == internal::IN_PLACE<T>()) {
       sendbuf = recvbuf;
     }
-    if (req == null_req) {
-      req = get_request();
+    AL_CHECK_NCCL(ncclAllReduce((const void*) sendbuf, (void*) recvbuf, count,
+                                internal::nccl::TypeMap<T>(),
+                                internal::nccl::ReductionOperator2ncclRedOp(op),
+                                comm.m_nccl_comm, stream));
+  }
+  /** Do a NCCL broadcast. */
+  template <typename T>
+  static void do_broadcast(T* buf, size_t count, int root, comm_type& comm,
+                           cudaStream_t stream) {
+    if (count == 0) {
+      return;
     }
-    comm.Reduce_scatter((const void*) sendbuf, (void*) recvbuf, r_count,
-                        nccl_type, nccl_redop, req);
+    AL_CHECK_NCCL(ncclBroadcast((const void*) buf, (void*) buf, count,
+                                internal::nccl::TypeMap<T>(), root,
+                                comm.m_nccl_comm, stream));
   }
-
+  /** Do a NCCL reduce. */
   template <typename T>
-  static void NonblockingReduce_scatter(T* recvbuf, size_t *recv_count,
-                                        ReductionOperator op, comm_type& comm,
-                                        req_type& req, algo_type algo) {
-    NonblockingReduce_scatter(internal::IN_PLACE<T>(), recvbuf, recv_count, op, comm, req, algo);
-  }
-
-  template <typename T>
-  static void Bcast(T* buf, size_t count, int root, comm_type& comm, 
-                    algo_type algo) {
-    cudaStream_t default_stream = comm.get_default_stream();
-    NonblockingBcast(buf, count, root, comm, default_stream, algo);
-    comm.synchronize();
-  }
-
-  template <typename T>
-  static void NonblockingBcast(T* buf, size_t count, int root,
-                               comm_type& comm, req_type& req, algo_type) {
-    ncclDataType_t nccl_type = internal::nccl::TypeMap<T>();
-    if (req == null_req) {
-      req = get_request();
+  static void do_reduce(const T* sendbuf, T* recvbuf, size_t count,
+                        ReductionOperator op, int root, comm_type& comm,
+                        cudaStream_t stream) {
+    if (count == 0) {
+      return;
     }
-    comm.Bcast((void*) buf, count, nccl_type, root, req);
+    if (sendbuf == internal::IN_PLACE<T>()) {
+      sendbuf = recvbuf;
+    }
+    AL_CHECK_NCCL(ncclReduce((const void*) sendbuf, (void*) recvbuf, count,
+                             internal::nccl::TypeMap<T>(),
+                             internal::nccl::ReductionOperator2ncclRedOp(op),
+                             root, comm.m_nccl_comm, stream));
+  }
+  /** Do a NCCL allgather. */
+  template <typename T>
+  static void do_allgather(const T* sendbuf, T* recvbuf, size_t send_count,
+                           comm_type& comm, cudaStream_t stream) {
+    if (send_count == 0) {
+      return;
+    }
+    if (sendbuf == internal::IN_PLACE<T>()) {
+      sendbuf = recvbuf;
+    }
+    AL_CHECK_NCCL(ncclAllGather((const void*) sendbuf, (void*) recvbuf,
+                                send_count, internal::nccl::TypeMap<T>(),
+                                comm.m_nccl_comm, stream));
+  }
+  /** Do a NCCL reduce-scatter. */
+  template <typename T>
+  static void do_reduce_scatter(const T* sendbuf, T* recvbuf,
+                                size_t* recv_counts, ReductionOperator op,
+                                comm_type& comm, cudaStream_t stream) {
+    // NCCL expects an identical recv_count on every node.
+    size_t recv_count = recv_counts[0];
+    for (int i = 1; i < comm.size(); ++i) {
+      if (recv_counts[i] != recv_count) {
+        throw_al_exception(
+          "NCCL reduce scatter requires identical recv_counts on every rank");
+      }
+    }
+    if (recv_count == 0) {
+      return;
+    }
+    if (sendbuf == internal::IN_PLACE<T>()) {
+      sendbuf = recvbuf;
+    }
+    AL_CHECK_NCCL(ncclReduceScatter((const void*) sendbuf, (void*) recvbuf,
+                                    recv_count, internal::nccl::TypeMap<T>(),
+                                    internal::nccl::ReductionOperator2ncclRedOp(op),
+                                    comm.m_nccl_comm, stream));
   }
 };
 
@@ -365,7 +392,12 @@ inline bool Test<NCCLBackend>(typename NCCLBackend::req_type& req) {
   if (req == NCCLBackend::null_req) {
     return true;
   }
-  return cudaStreamQuery(req) == cudaSuccess;
+  // This is purely a host operation.
+  bool r = cudaEventQuery(req->op_event) == cudaSuccess;
+  if (r) {
+    req = NCCLBackend::null_req;
+  }
+  return r;
 }
 
 template <>
@@ -373,7 +405,9 @@ inline void Wait<NCCLBackend>(typename NCCLBackend::req_type& req) {
   if (req == NCCLBackend::null_req) {
     return;
   }
-  cudaStreamSynchronize(req);
+  // Synchronize the original stream with the request.
+  // This will not block the host.
+  AL_CHECK_CUDA(cudaStreamWaitEvent(req->orig_stream, req->op_event, 0));
 }
 
 }  // namespace Al

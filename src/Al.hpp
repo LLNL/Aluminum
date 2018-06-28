@@ -420,6 +420,15 @@ T* get_memory(size_t count);
 /** Release memory that you got with get_memory. */
 template <typename T>
 void release_memory(T* mem);
+#ifdef AL_HAS_CUDA
+// Separate memory pools for CUDA-registered pinned memory.
+/** Get pinned memory of type T. */
+template <typename T>
+T* get_pinned_memory(size_t count);
+/** Release memory that you got with get_pinned_memory. */
+template <typename T>
+void release_pinned_memory(T* mem);
+#endif  // AL_HAS_CUDA
 
 /** Request handle for non-blocking operations.. */
 using AlRequest = int;  // TODO: This is a placeholder.
@@ -549,6 +558,34 @@ ProgressEngine* get_progress_engine();
 
 }  // namespace internal
 }  // namespace Al
+
+#ifdef AL_HAS_CUDA
+#include "cuda.hpp"
+
+namespace Al {
+/**
+ * Communicator including a CUDA stream to associate with operations.
+ */
+class CUDACommunicator : public MPICommunicator {
+ public:
+  CUDACommunicator(cudaStream_t stream_) :
+    CUDACommunicator(MPI_COMM_WORLD, stream_) {}
+  CUDACommunicator(MPI_Comm comm_, cudaStream_t stream_) :
+    MPICommunicator(comm_), stream(stream_) {}
+  Communicator* copy() const override {
+    return new CUDACommunicator(get_comm(), stream);
+  }
+  /** Return the CUDA stream associated with this communicator. */
+  cudaStream_t get_stream() const { return stream; }
+  /** Set a new CUDA stream for this communicator. */
+  void set_stream(cudaStream_t stream_) { stream = stream_; }
+ private:
+  /** CUDA stream associated with this communicator. */
+  cudaStream_t stream;
+};
+
+}  // namespace Al
+#endif  // AL_HAS_CUDA
 
 #include "mempool.hpp"
 #include "mpi_impl.hpp"
