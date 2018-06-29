@@ -40,7 +40,5 @@ get_nb_allreduce_algorithms<Al::MPICUDABackend>() {
 template <>
 inline typename Al::MPICUDABackend::req_type
 get_request<Al::MPICUDABackend>() {
-  cudaStream_t s;
-  cudaStreamCreate(&s);
-  return s;
+  return Al::MPICUDABackend::null_req;
 }

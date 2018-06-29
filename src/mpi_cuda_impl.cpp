@@ -3,6 +3,20 @@
 namespace Al {
 
 // Initialize this.
-const MPICUDABackend::req_type MPICUDABackend::null_req = (MPICUDABackend::req_type) (-1);
+cudaEvent_t MPICUDABackend::sync_event = (cudaEvent_t) 0;
 
+namespace internal {
+namespace mpi_cuda {
+
+void init(int&, char**&) {
+  AL_CHECK_CUDA(cudaEventCreateWithFlags(&MPICUDABackend::sync_event,
+                                         cudaEventDisableTiming));
+}
+
+void finalize() {
+  AL_CHECK_CUDA(cudaEventDestroy(MPICUDABackend::sync_event));
+}
+
+}  // namespace mpi_cuda
+}  // namespace internal
 }  // namespace Al

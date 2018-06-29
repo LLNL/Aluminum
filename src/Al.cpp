@@ -25,10 +25,16 @@ void Initialize(int& argc, char**& argv) {
 #ifdef AL_HAS_NCCL
   internal::nccl::init(argc, argv);
 #endif
+#ifdef AL_HAS_MPI_CUDA
+  internal::mpi_cuda::init(argc, argv);
+#endif
 }
 
 void Finalize() {
   // Finalize in reverse order of initialization.
+#ifdef AL_HAS_MPI_CUDA
+  internal::mpi_cuda::finalize();
+#endif
 #ifdef AL_HAS_NCCL
   internal::nccl::finalize();
 #endif
