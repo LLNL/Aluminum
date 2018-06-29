@@ -1,5 +1,7 @@
 set_full_path(THIS_DIR_HEADERS
   Al.hpp
+  internal.hpp
+  progress.hpp
   base.hpp
   mempool.hpp
   mpi_impl.hpp
@@ -8,10 +10,12 @@ set_full_path(THIS_DIR_HEADERS
 set_full_path(THIS_DIR_CXX_SOURCES
   Al.cpp
   mpi_impl.cpp
+  progress.cpp
   )
 
 if (AL_HAS_CUDA)
   list(APPEND THIS_DIR_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/cuda.hpp")
+  list(APPEND THIS_DIR_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/cudacommunicator.hpp")
   list(APPEND THIS_DIR_CXX_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/cuda.cpp")
 endif ()
 

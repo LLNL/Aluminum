@@ -2,6 +2,9 @@
 
 #include <nccl.h>
 #include "Al.hpp"
+#include "internal.hpp"
+#include "cuda.hpp"
+#include "cudacommunicator.hpp"
 
 #define AL_FORCE_CHECK_NCCL(nccl_call)                                \
   do {                                                                \
