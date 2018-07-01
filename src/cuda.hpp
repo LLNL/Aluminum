@@ -1,5 +1,6 @@
 #pragma once
 
+#include <sstream>
 #include <cuda.h>
 #include <cuda_runtime.h>
 
