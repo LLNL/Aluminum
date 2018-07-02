@@ -35,6 +35,15 @@
     AL_CUDA_SYNC(false);                                        \
   } while (0)
 
+#define AL_FORCE_CHECK_CUDA_NOSYNC(cuda_call)                   \
+  do {                                                          \
+    cudaError_t status_CHECK_CUDA = (cuda_call);                \
+    if (status_CHECK_CUDA != cudaSuccess) {                     \
+      throw_al_exception(std::string("CUDA error: ")            \
+                  + cudaGetErrorString(status_CHECK_CUDA));     \
+    }                                                           \
+  } while (0)
+
 #ifdef AL_DEBUG
 #define AL_CHECK_CUDA(cuda_call) AL_FORCE_CHECK_CUDA(cuda_call)
 #else
