@@ -1,5 +1,6 @@
 #include "nccl_impl.hpp"
 
+
 // Error checking macros
 #define CUDACHECK(cmd) do {                     \
   cudaError_t e = cmd;                          \
@@ -25,19 +26,28 @@ namespace Al {
 // Initialize this.
 const NCCLBackend::req_type NCCLBackend::null_req = (NCCLBackend::req_type) (-1);
 
-NCCLCommunicator::NCCLCommunicator(MPI_Comm comm_, std::vector<int> gpus)
+ NCCLCommunicator::NCCLCommunicator(MPI_Comm comm_, std::vector<int> gpus)
   : MPICommunicator(comm_),
-    m_gpus(gpus),
-    m_num_gpus(gpus.size()) {
-  gpu_setup();
-  nccl_setup();
+   m_gpus(gpus),
+   m_num_gpus(gpus.size()) {
+     int flag;
+     MPI_Initialized(&flag);
+     if(flag){
+       gpu_setup();
+       nccl_setup();
+     }
 }
 
+
 NCCLCommunicator::~NCCLCommunicator() {
-  nccl_destroy();
-  for (size_t i = 0; i < m_gpus.size(); ++i) {
-    CUDACHECK(cudaSetDevice(m_gpus[i]));
-    CUDACHECK(cudaStreamDestroy(m_streams[i]));
+  int flag;
+  MPI_Initialized(&flag);
+  if(flag){
+    nccl_destroy();
+    for (size_t i = 0; i < m_gpus.size(); ++i) {
+      CUDACHECK(cudaSetDevice(m_gpus[i]));
+      CUDACHECK(cudaStreamDestroy(m_streams[i]));
+    }
   }
 }
 
@@ -65,23 +75,27 @@ void NCCLCommunicator::nccl_setup() {
     MPI_Abort(get_comm(), -3);
   }
 
-  int num_gpus_assigned = m_num_gpus;
-  int nProcs = size();
-  int myid = rank();
-  int total_num_comms = nProcs*num_gpus_assigned;
+  int flag;
+  MPI_Initialized(&flag);
+  if(flag){
+    int num_gpus_assigned = m_num_gpus;
+    int myid = rank();
+    int nProcs = size();
 
-  ncclUniqueId ncclId;
-  if (myid == 0) {
-    NCCLCHECK(ncclGetUniqueId(&ncclId));
-  }
+    
+    int total_num_comms;
+    if(nProcs == 1)
+      total_num_comms = 1;
+    else
+      total_num_comms = nProcs*num_gpus_assigned;
 
-  MPI_Bcast(&ncclId, sizeof(ncclId), MPI_BYTE, 0, get_comm());
+    ncclUniqueId ncclId;
+    if (myid == 0) {
+      NCCLCHECK(ncclGetUniqueId(&ncclId));
+    }
 
-  if (nProcs == 1) {
-    int gpuArray = 0;
-    NCCLCHECK(ncclCommInitAll(&m_nccl_comm, 1, &gpuArray));
-  }
-  else {
+    MPI_Bcast(&ncclId, sizeof(ncclId), MPI_BYTE, 0, get_comm());
+
     NCCLCHECK(ncclCommInitRank(&m_nccl_comm, total_num_comms, ncclId,
                                num_gpus_assigned*myid));
   }

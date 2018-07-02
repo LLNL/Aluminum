@@ -55,23 +55,45 @@ class Communicator {
 };
 
 /**
+ * Initialize Aluminum.
+ * This must be called before any other calls to the library. It is safe to
+ * call this multiple times.
+ */
+void Initialize(int& argc, char**& argv);
+/**
+ * Clean up Aluminum.
+ * Do not make any further calls to the library after calling this.
+ */
+//void Finalize();
+void Finalize(bool mpi_final = true);
+
+/** Return true if Aluminum has been initialized. */
+bool Initialized();
+
+/**
  * Communicator for MPI-based collectives.
  */
+
 class MPICommunicator : public Communicator {
  public:
   /** Default constructor; use MPI_COMM_WORLD. */
   MPICommunicator() : MPICommunicator(MPI_COMM_WORLD) {}
   /** Use a particular MPI communicator. */
   MPICommunicator(MPI_Comm comm_) : Communicator() {
-    // Duplicate the communicator to avoid interference.
-    MPI_Comm_dup(comm_, &comm);
-    MPI_Comm_rank(comm, &rank_in_comm);
-    MPI_Comm_size(comm, &size_of_comm);
-    MPI_Comm_split_type(comm, MPI_COMM_TYPE_SHARED, 0, MPI_INFO_NULL,
-                        &local_comm);
-    MPI_Comm_rank(local_comm, &rank_in_local_comm);
-    MPI_Comm_size(local_comm, &size_of_local_comm);
+    int flag;
+    MPI_Initialized(&flag);
+    if(flag){
+      // Duplicate the communicator to avoid interference.
+      MPI_Comm_dup(comm_, &comm);
+      MPI_Comm_rank(comm, &rank_in_comm);
+      MPI_Comm_size(comm, &size_of_comm);
+      MPI_Comm_split_type(comm, MPI_COMM_TYPE_SHARED, 0, MPI_INFO_NULL,
+                          &local_comm);
+      MPI_Comm_rank(local_comm, &rank_in_local_comm);
+      MPI_Comm_size(local_comm, &size_of_local_comm);
+    }
   }
+
   virtual ~MPICommunicator() override {
     // TODO: Fix; can't do this after finalization.
     //MPI_Comm_free(&comm);
@@ -79,6 +101,7 @@ class MPICommunicator : public Communicator {
   Communicator* copy() const override { return new MPICommunicator(comm); }
   int rank() const override { return rank_in_comm; }
   int size() const override { return size_of_comm; }
+
   MPI_Comm get_comm() const { return comm; }
   int local_rank() const { return rank_in_local_comm; }
   int local_size() const { return size_of_local_comm; }
@@ -103,6 +126,8 @@ class MPICommunicator : public Communicator {
 };
 
 /**
+<<<<<<< HEAD
+=======
  * Initialize Aluminum.
  * This must be called before any other calls to the library. It is safe to
  * call this multiple times.
@@ -113,10 +138,12 @@ void Initialize(int& argc, char**& argv);
  * Do not make any further calls to the library after calling this.
  */
 void Finalize();
+void Finalize(bool mpi_final);
 /** Return true if Aluminum has been initialized. */
 bool Initialized();
 
 /**
+>>>>>>> f181846f17c3546488402009a28870f199122125
  * Perform an allreduce.
  * @param sendbuf Input data.
  * @param recvbuf Output data; should already be allocated.

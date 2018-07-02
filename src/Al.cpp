@@ -26,18 +26,32 @@ internal::ProgressEngine* progress_engine = nullptr;
 }
 
 void Initialize(int& argc, char**& argv) {
-  internal::mpi::init(argc, argv);
+
+  int flag;
+  MPI_Initialized(&flag);
+  if(!flag)
+    internal::mpi::init(argc, argv);
   progress_engine = new internal::ProgressEngine();
   progress_engine->run();
   is_initialized = true;
 }
 
-void Finalize() {
+void Finalize(bool mpi_final) {
   progress_engine->stop();
   delete progress_engine;
   progress_engine = nullptr;
   is_initialized = false;
-  internal::mpi::finalize();
+  if( mpi_final )
+    internal::mpi::finalize();
+}
+
+void Finalize(bool mpi_final) {
+  progress_engine->stop();
+  delete progress_engine;
+  progress_engine = nullptr;
+  is_initialized = false;
+  if( mpi_final )
+    internal::mpi::finalize();
 }
 
 bool Initialized() {

@@ -32,6 +32,7 @@ class NCCLCommunicator : public MPICommunicator {
    */
   NCCLCommunicator(MPI_Comm comm_ = MPI_COMM_WORLD,
                    std::vector<int> gpus = std::vector<int>());
+  //~NCCLCommunicator();
   ~NCCLCommunicator() override;
   Communicator* copy() const override {
     return new NCCLCommunicator(get_comm(), m_gpus);
