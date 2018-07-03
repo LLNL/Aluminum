@@ -1,5 +1,6 @@
 #pragma once
 
+#include <mutex>
 #ifdef AL_HAS_CUDA
 #include "cuda.hpp"
 #endif
@@ -23,6 +24,10 @@ struct Mempool {
   MempoolMap<T> memmap;
   /** Used to find allocated memory for freeing. */
   std::unordered_map<T*, size_t> allocated;
+#if AL_LOCK_MEMPOOL
+  /** Mutex to protect concurrent access. */
+  std::mutex lock;
+#endif
 };
 /** Get the memory pool for type T. */
 template <typename T>
@@ -31,12 +36,13 @@ Mempool<T>& get_mempool() {
   return mempool;
 }
 
-// WARNING: THESE ARE NOT THREAD SAFE.
-
 /** Get memory of type T with count elements. */
 template <typename T>
 T* get_memory(size_t count) {
   auto& pool = get_mempool<T>();
+#if AL_LOCK_MEMPOOL
+  std::lock_guard<std::mutex> lock(pool.lock);
+#endif
   // Try to find free memory.
   if (pool.memmap.count(count)) {
     // See if any memory of this size is free.
@@ -66,6 +72,9 @@ T* get_memory(size_t count) {
 template <typename T>
 void release_memory(T* mem) {
   auto& pool = get_mempool<T>();
+#if AL_LOCK_MEMPOOL
+  std::lock_guard<std::mutex> lock(pool.lock);
+#endif
   size_t count = pool.allocated[mem];
   pool.allocated.erase(mem);
   // Find the entry.
@@ -92,6 +101,9 @@ Mempool<T>& get_pinned_mempool() {
 template <typename T>
 T* get_pinned_memory(size_t count) {
   auto& pool = get_pinned_mempool<T>();
+#if AL_LOCK_MEMPOOL
+  std::lock_guard<std::mutex> lock(pool.lock);
+#endif
   // Try to find free memory.
   if (pool.memmap.count(count)) {
     // See if any memory of this size is free.
@@ -124,6 +136,9 @@ T* get_pinned_memory(size_t count) {
 template <typename T>
 void release_pinned_memory(T* mem) {
   auto& pool = get_pinned_mempool<T>();
+#if AL_LOCK_MEMPOOL
+  std::lock_guard<std::mutex> lock(pool.lock);
+#endif
   size_t count = pool.allocated[mem];
   pool.allocated.erase(mem);
   // Find the entry.

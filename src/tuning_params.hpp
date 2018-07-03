@@ -29,3 +29,6 @@
  * Set to 0 to have no limit.
  */
 #define AL_PE_NUM_CONCURRENT_ALLREDUCES 3
+
+/** Whether to protect memory pools with locks. */
+#define AL_LOCK_MEMPOOL 1
