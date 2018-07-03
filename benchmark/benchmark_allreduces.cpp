@@ -32,15 +32,15 @@ void time_allreduce_algo(typename VectorType<Backend>::type input,
     auto recv = get_vector<Backend>(input.size());
     auto in_place_input(input);
     MPI_Barrier(MPI_COMM_WORLD);
-    double start = get_time();
+    start_timer<Backend>(comm);
     Al::Allreduce<Backend>(input.data(), recv.data(), input.size(),
                            Al::ReductionOperator::sum, comm, algo);
-    times.push_back(get_time() - start);
+    times.push_back(finish_timer<Backend>(comm));
     MPI_Barrier(MPI_COMM_WORLD);
-    start = get_time();
+    start_timer<Backend>(comm);
     Al::Allreduce<Backend>(in_place_input.data(), input.size(),
                            Al::ReductionOperator::sum, comm, algo);
-    in_place_times.push_back(get_time() - start);
+    in_place_times.push_back(finish_timer<Backend>(comm));
   }
   // Delete warmup trial.
   times.erase(times.begin());
