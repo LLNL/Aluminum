@@ -7,8 +7,9 @@ namespace Al {
 
 enum class MPICUDAAllreduceAlgorithm {
   automatic,
-  ring, 
-  bi_ring
+  ring,
+  bi_ring,
+  host_transfer
 };
 
 inline std::string allreduce_name(MPICUDAAllreduceAlgorithm algo) {
@@ -19,6 +20,8 @@ inline std::string allreduce_name(MPICUDAAllreduceAlgorithm algo) {
     return "ring";
   case MPICUDAAllreduceAlgorithm::bi_ring:
     return "bi-ring";
+  case MPICUDAAllreduceAlgorithm::host_transfer:
+    return "host-transfer";
   default:
     return "unknown";
   }
@@ -60,18 +63,22 @@ class MPICUDABackend {
   static void Allreduce(const T* sendbuf, T* recvbuf, size_t count,
                         ReductionOperator op, comm_type& comm,
                         algo_type algo) {
+    if (count == 0) return;
     switch (algo) {
-      case MPICUDAAllreduceAlgorithm::ring:
-        internal::mpi_cuda::ring_allreduce(sendbuf, recvbuf, count,
-                                           op, comm, comm.get_stream());
-        break;
-      case MPICUDAAllreduceAlgorithm::automatic:
-      case MPICUDAAllreduceAlgorithm::bi_ring:
-        internal::mpi_cuda::bi_ring_allreduce(sendbuf, recvbuf, count,
-                                              op, comm, comm.get_stream());
-        break;
-      default:
-        throw_al_exception("Invalid algorithm");
+    case MPICUDAAllreduceAlgorithm::ring:
+      internal::mpi_cuda::ring_allreduce(sendbuf, recvbuf, count,
+                                         op, comm, comm.get_stream());
+      break;
+    case MPICUDAAllreduceAlgorithm::automatic:
+    case MPICUDAAllreduceAlgorithm::bi_ring:
+      internal::mpi_cuda::bi_ring_allreduce(sendbuf, recvbuf, count,
+                                            op, comm, comm.get_stream());
+      break;
+    case MPICUDAAllreduceAlgorithm::host_transfer:
+      do_host_transfer_allreduce(sendbuf, recvbuf, count, op, comm);
+      break;
+    default:
+      throw_al_exception("Invalid algorithm");
     }
   }
   template <typename T>
@@ -88,22 +95,31 @@ class MPICUDABackend {
       comm_type& comm,
       req_type& req,
       algo_type algo) {
+    if (count == 0) return;
     cudaStream_t internal_stream = internal::cuda::get_internal_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     switch (algo) {
-      case MPICUDAAllreduceAlgorithm::ring:
-        internal::mpi_cuda::ring_allreduce(sendbuf, recvbuf, count,
-                                           op, comm, internal_stream);
-        break;
-      case MPICUDAAllreduceAlgorithm::automatic:        
-      case MPICUDAAllreduceAlgorithm::bi_ring:
-        internal::mpi_cuda::bi_ring_allreduce(sendbuf, recvbuf, count,
-                                              op, comm, internal_stream);
-        break;
-      default:
-        throw_al_exception("Invalid algorithm");
+    case MPICUDAAllreduceAlgorithm::ring:
+      internal::mpi_cuda::ring_allreduce(sendbuf, recvbuf, count,
+                                         op, comm, internal_stream);
+      break;
+    case MPICUDAAllreduceAlgorithm::automatic:
+    case MPICUDAAllreduceAlgorithm::bi_ring:
+      internal::mpi_cuda::bi_ring_allreduce(sendbuf, recvbuf, count,
+                                            op, comm, internal_stream);
+      break;
+    case MPICUDAAllreduceAlgorithm::host_transfer:
+      do_nonblocking_host_transfer_allreduce(
+        sendbuf, recvbuf, count, op, comm, req, internal_stream);
+      break;
+    default:
+      throw_al_exception("Invalid algorithm");
     }
-    setup_completion_event(internal_stream, comm, req);
+    if (algo != MPICUDAAllreduceAlgorithm::host_transfer) {
+      // Completion for host-transfer handled inside
+      // do_nonblocking_host_transfer_allreduce.
+      setup_completion_event(internal_stream, comm, req);
+    }
   }
 
   template <typename T>
@@ -140,6 +156,43 @@ class MPICUDABackend {
     cudaEvent_t event = internal::cuda::get_cuda_event();
     AL_CHECK_CUDA(cudaEventRecord(event, internal_stream));
     req = std::make_shared<internal::mpi_cuda::MPICUDARequest>(event, comm.get_stream());
+  }
+
+  /** Run a blocking host-transfer allreduce. */
+  template <typename T>
+  static void do_host_transfer_allreduce(
+    const T* sendbuf, T* recvbuf, size_t count, ReductionOperator op,
+    comm_type& comm) {
+    // Get pinned host memory.
+    T* host_mem = internal::get_pinned_memory<T>(count);
+    internal::mpi_cuda::host_transfer_allreduce(
+      sendbuf, recvbuf, host_mem, count, op, comm, comm.get_stream());
+    // We can only free the memory after the allreduce has completed, but don't
+    // want to block the user's stream to do so.
+    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+    sync_internal_stream_with_comm(internal_stream, comm);
+    AL_CHECK_CUDA(cudaStreamAddCallback(
+                    internal_stream,
+                    internal::mpi_cuda::host_transfer_allreduce_free_mem<T>,
+                    (void*) host_mem, 0));
+  }
+
+  /** Run a non-blocking host-transfer allreduce. */
+  template <typename T>
+  static void do_nonblocking_host_transfer_allreduce(
+    const T* sendbuf, T* recvbuf, size_t count, ReductionOperator op,
+    comm_type& comm, req_type& req, cudaStream_t internal_stream) {
+    // Get pinned host memory.
+    T* host_mem = internal::get_pinned_memory<T>(count);
+    internal::mpi_cuda::host_transfer_allreduce(
+      sendbuf, recvbuf, host_mem, count, op, comm, internal_stream);
+    // Set up the completion event before freeing memory.
+    setup_completion_event(internal_stream, comm, req);
+    // Now set up the callback to free memory.
+    AL_CHECK_CUDA(cudaStreamAddCallback(
+                    internal_stream,
+                    internal::mpi_cuda::host_transfer_allreduce_free_mem<T>,
+                    (void*) host_mem, 0));
   }
 
 };
