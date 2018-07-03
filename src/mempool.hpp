@@ -1,5 +1,9 @@
 #pragma once
 
+#ifdef AL_HAS_CUDA
+#include "cuda.hpp"
+#endif
+
 namespace Al {
 namespace internal {
 
@@ -27,6 +31,9 @@ Mempool<T>& get_mempool() {
   return mempool;
 }
 
+// WARNING: THESE ARE NOT THREAD SAFE.
+
+/** Get memory of type T with count elements. */
 template <typename T>
 T* get_memory(size_t count) {
   auto& pool = get_mempool<T>();
@@ -55,6 +62,7 @@ T* get_memory(size_t count) {
   }
 }
 
+/** Release memory that you got with get_memory. */
 template <typename T>
 void release_memory(T* mem) {
   auto& pool = get_mempool<T>();
@@ -68,6 +76,66 @@ void release_memory(T* mem) {
     }
   }
 }
+
+#ifdef AL_HAS_CUDA
+// Separate pools for CUDA-registered pinned memory.
+// It would be nice to unify these pools.
+
+/** Get the pinned memory pool for type T. */
+template <typename T>
+Mempool<T>& get_pinned_mempool() {
+  static Mempool<T> mempool;
+  return mempool;
+}
+
+/** Get pinned memory of type T. */
+template <typename T>
+T* get_pinned_memory(size_t count) {
+  auto& pool = get_pinned_mempool<T>();
+  // Try to find free memory.
+  if (pool.memmap.count(count)) {
+    // See if any memory of this size is free.
+    for (auto&& entry : pool.memmap[count]) {
+      if (!entry.second) {
+        entry.second = true;
+        pool.allocated[entry.first] = count;
+        return entry.first;
+      }
+    }
+    // No memory free, allocate some.
+    // TODO: Error checking for memory allocation.
+    T* mem;
+    cudaMallocHost(&mem, count*sizeof(T));
+    pool.memmap[count].emplace_back(mem, true);
+    pool.allocated[mem] = count;
+    return mem;
+  } else {
+    // No entry for this size; so no free memory.
+    pool.memmap.emplace(count, MempoolSizeList<T>());
+    T* mem;
+    cudaMallocHost(&mem, count*sizeof(T));
+    pool.memmap[count].emplace_back(mem, true);
+    pool.allocated[mem] = count;
+    return mem;
+  }
+}
+
+/** Release memory that you got with get_pinned_memory. */
+template <typename T>
+void release_pinned_memory(T* mem) {
+  auto& pool = get_pinned_mempool<T>();
+  size_t count = pool.allocated[mem];
+  pool.allocated.erase(mem);
+  // Find the entry.
+  for (auto&& entry : pool.memmap[count]) {
+    if (entry.first == mem) {
+      entry.second = false;
+      return;
+    }
+  }
+}
+
+#endif  // AL_HAS_CUDA
 
 }  // namespace internal
 }  // namespace Al

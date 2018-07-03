@@ -4,7 +4,60 @@
 #include <vector>
 #include <numeric>
 
+#include "internal.hpp"
+#include "progress.hpp"
+#include "mempool.hpp"
+
 namespace Al {
+
+/**
+ * Communicator for MPI-based collectives.
+ */
+class MPICommunicator : public Communicator {
+ public:
+  /** Default constructor; use MPI_COMM_WORLD. */
+  MPICommunicator() : MPICommunicator(MPI_COMM_WORLD) {}
+  /** Use a particular MPI communicator. */
+  MPICommunicator(MPI_Comm comm_) : Communicator() {
+    // Duplicate the communicator to avoid interference.
+    MPI_Comm_dup(comm_, &comm);
+    MPI_Comm_rank(comm, &rank_in_comm);
+    MPI_Comm_size(comm, &size_of_comm);
+    MPI_Comm_split_type(comm, MPI_COMM_TYPE_SHARED, 0, MPI_INFO_NULL,
+                        &local_comm);
+    MPI_Comm_rank(local_comm, &rank_in_local_comm);
+    MPI_Comm_size(local_comm, &size_of_local_comm);
+  }
+  virtual ~MPICommunicator() override {
+    // TODO: Fix; can't do this after finalization.
+    //MPI_Comm_free(&comm);
+  }
+  Communicator* copy() const override { return new MPICommunicator(comm); }
+  int rank() const override { return rank_in_comm; }
+  int size() const override { return size_of_comm; }
+  MPI_Comm get_comm() const { return comm; }
+  int local_rank() const override { return rank_in_local_comm; }
+  int local_size() const override { return size_of_local_comm; }
+  MPI_Comm get_local_comm() const { return local_comm; }
+  int get_free_tag() { return free_tag++; }
+
+ private:
+  /** Associated MPI communicator. */
+  MPI_Comm comm;
+  /** Rank in comm. */
+  int rank_in_comm;
+  /** Size of comm. */
+  int size_of_comm;
+  /** Communicator for the local node. */
+  MPI_Comm local_comm;
+  /** Rank in the local communicator. */
+  int rank_in_local_comm;
+  /** Size of the local communicator. */
+  int size_of_local_comm;
+  /** Free tag for communication. */
+  int free_tag = 1;
+};
+
 namespace internal {
 namespace mpi {
 

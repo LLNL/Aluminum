@@ -456,6 +456,10 @@ void test_correctness() {
 }
 
 int main(int argc, char** argv) {
+  // Need to set the CUDA device before initializing Aluminum.
+#ifdef AL_HAS_CUDA
+  set_device();
+#endif
   Al::Initialize(argc, argv);
 
   std::string backend = "";
@@ -463,7 +467,6 @@ int main(int argc, char** argv) {
 
 #ifdef AL_HAS_NCCL
   if (backend == "NCCL") {
-    set_device();
     test_correctness<Al::NCCLBackend>();
   }
 #endif
