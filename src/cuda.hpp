@@ -10,8 +10,6 @@
   do {                                                          \
     /* Synchronize GPU and check for errors. */                 \
     cudaError_t status_CUDA_SYNC = cudaDeviceSynchronize();     \
-    if (status_CUDA_SYNC == cudaSuccess)                        \
-      status_CUDA_SYNC = cudaGetLastError();                    \
     if (status_CUDA_SYNC != cudaSuccess) {                      \
       cudaDeviceReset();                                        \
       std::stringstream err_CUDA_SYNC;                          \
