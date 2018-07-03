@@ -17,6 +17,22 @@ gen_data<Al::NCCLBackend>(size_t count) {
 }
 
 template <>
+inline void start_timer<Al::NCCLBackend>(typename Al::NCCLBackend::comm_type& comm) {
+  cudaEvent_t start = get_timer_events().first;
+  AL_FORCE_CHECK_CUDA_NOSYNC(cudaEventRecord(start, comm.get_stream()));
+}
+
+template <>
+inline double finish_timer<Al::NCCLBackend>(typename Al::NCCLBackend::comm_type& comm) {
+  std::pair<cudaEvent_t, cudaEvent_t> events = get_timer_events();
+  AL_FORCE_CHECK_CUDA_NOSYNC(cudaEventRecord(events.second, comm.get_stream()));
+  AL_FORCE_CHECK_CUDA_NOSYNC(cudaEventSynchronize(events.second));
+  float elapsed;
+  AL_FORCE_CHECK_CUDA_NOSYNC(cudaEventElapsedTime(&elapsed, events.first, events.second));
+  return elapsed/1000.0;  // ms -> s
+}
+
+template <>
 inline typename Al::NCCLBackend::req_type
 get_request<Al::NCCLBackend>() {
   return Al::NCCLBackend::null_req;

@@ -1,22 +1,15 @@
 #pragma once
 
 #include <memory>
+#include <utility>
 #include <assert.h>
 #include <cuda_runtime.h>
 #include "test_utils.hpp"
 
 #define NCCL_THRESHOLD	1e-05
 
-#define CHECK_CUDA(cuda_call)                                           \
-  do {                                                                  \
-    const cudaError_t cuda_status = cuda_call;                          \
-    if (cuda_status != cudaSuccess) {                                   \
-      std::cerr << "CUDA error: " << cudaGetErrorString(cuda_status) << "\n"; \
-      std::cerr << "Error at " << __FILE__ << ":" << __LINE__ << "\n";  \
-      cudaDeviceReset();                                                \
-      abort();                                                          \
-    }                                                                   \
-  } while (0)
+// For macros.
+using al_exception = Al::al_exception;
 
 int get_number_of_gpus() {
   int num_gpus = 0;
@@ -25,7 +18,7 @@ int get_number_of_gpus() {
     std::cout << "Number of GPUs set by ALUMINUM_NUM_GPUS\n";
     num_gpus = atoi(env);
   } else {
-    CHECK_CUDA(cudaGetDeviceCount(&num_gpus));    
+    AL_FORCE_CHECK_CUDA_NOSYNC(cudaGetDeviceCount(&num_gpus));    
   }
   return num_gpus;
 }
@@ -61,7 +54,7 @@ inline int set_device() {
     abort();
   }    
   int device = local_rank;
-  CHECK_CUDA(cudaSetDevice(device));
+  AL_FORCE_CHECK_CUDA_NOSYNC(cudaSetDevice(device));
   return device;
 }
 
@@ -77,12 +70,12 @@ class CUDAVector {
   CUDAVector(const std::vector<T> &host_vector):
       m_count(host_vector.size()), m_ptr(nullptr) {
     allocate();
-    CHECK_CUDA(cudaMemcpy(m_ptr, host_vector.data(), get_bytes(), cudaMemcpyDefault));
+    AL_FORCE_CHECK_CUDA(cudaMemcpy(m_ptr, host_vector.data(), get_bytes(), cudaMemcpyDefault));
   }
 
   CUDAVector(const CUDAVector &v): m_count(v.m_count), m_ptr(nullptr) {
     allocate();
-    CHECK_CUDA(cudaMemcpy(m_ptr, v.data(), get_bytes(), cudaMemcpyDefault));
+    AL_FORCE_CHECK_CUDA(cudaMemcpy(m_ptr, v.data(), get_bytes(), cudaMemcpyDefault));
   }
 
   CUDAVector(CUDAVector &&v): CUDAVector() {
@@ -109,7 +102,7 @@ class CUDAVector {
 
   void clear() {
     if (m_count > 0) {
-      CHECK_CUDA(cudaFree(m_ptr));
+      AL_FORCE_CHECK_CUDA(cudaFree(m_ptr));
       m_ptr = nullptr;
       m_count = 0;
     }
@@ -119,7 +112,7 @@ class CUDAVector {
     assert(m_ptr == nullptr);
     if (m_count > 0) {
 #if 0
-      CHECK_CUDA(cudaMalloc(&m_ptr, get_bytes()));
+      AL_FORCE_CHECK_CUDA(cudaMalloc(&m_ptr, get_bytes()));
 #else
       cudaError_t e = cudaMalloc(&m_ptr, get_bytes());
       if (e != cudaSuccess) {
@@ -141,12 +134,12 @@ class CUDAVector {
     clear();
     m_count = v.m_count;
     allocate();
-    CHECK_CUDA(cudaMemcpy(m_ptr, v.m_ptr, get_bytes(), cudaMemcpyDefault));
+    AL_FORCE_CHECK_CUDA(cudaMemcpy(m_ptr, v.m_ptr, get_bytes(), cudaMemcpyDefault));
     return *this;
   }
 
   CUDAVector& move(const CUDAVector<T> &v) {
-    CHECK_CUDA(cudaMemcpy(m_ptr, v.m_ptr, v.get_bytes(), cudaMemcpyDefault));
+    AL_FORCE_CHECK_CUDA(cudaMemcpy(m_ptr, v.m_ptr, v.get_bytes(), cudaMemcpyDefault));
     return *this;
   }
 
@@ -160,12 +153,16 @@ class CUDAVector {
 
   std::vector<T> copyout() const {
     std::vector<T> hv(size());
-    CHECK_CUDA(cudaMemcpy(hv.data(), m_ptr, get_bytes(), cudaMemcpyDeviceToHost));
+    AL_FORCE_CHECK_CUDA(cudaMemcpy(hv.data(), m_ptr, get_bytes(), cudaMemcpyDeviceToHost));
     return hv;
+  }
+
+  void copyout(std::vector<T>& hv) const {
+    AL_FORCE_CHECK_CUDA(cudaMemcpy(hv.data(), m_ptr, get_bytes(), cudaMemcpyDeviceToHost));
   }
   
   void copyin(const T *hp) {
-    CHECK_CUDA(cudaMemcpy(m_ptr, hp, get_bytes(), cudaMemcpyHostToDevice));
+    AL_FORCE_CHECK_CUDA(cudaMemcpy(m_ptr, hp, get_bytes(), cudaMemcpyHostToDevice));
   }
 
   void copyin(const std::vector<T> &hv) {
@@ -189,11 +186,20 @@ bool check_vector(const CUDAVector<float>& expected,
 }
 
 void get_expected_result(CUDAVector<float>& expected) {
-
-
-
   std::vector<float> &&host_data = expected.copyout();
   MPI_Allreduce(MPI_IN_PLACE, host_data.data(), expected.size(),
                 MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
   expected.copyin(host_data);
+}
+
+inline std::pair<cudaEvent_t, cudaEvent_t> get_timer_events() {
+  static bool inited = false;
+  static cudaEvent_t start;
+  static cudaEvent_t end;
+  if (!inited) {
+    AL_FORCE_CHECK_CUDA(cudaEventCreate(&start));
+    AL_FORCE_CHECK_CUDA(cudaEventCreate(&end));
+    inited = true;
+  }
+  return std::make_pair(start, end);
 }
