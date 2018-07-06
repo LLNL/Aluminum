@@ -36,22 +36,12 @@ void Initialize(int& argc, char**& argv) {
   is_initialized = true;
 }
 
-void Finalize(bool mpi_final) {
+void Finalize() {
   progress_engine->stop();
   delete progress_engine;
   progress_engine = nullptr;
   is_initialized = false;
-  if( mpi_final )
-    internal::mpi::finalize();
-}
-
-void Finalize(bool mpi_final) {
-  progress_engine->stop();
-  delete progress_engine;
-  progress_engine = nullptr;
-  is_initialized = false;
-  if( mpi_final )
-    internal::mpi::finalize();
+  internal::mpi::finalize();
 }
 
 bool Initialized() {

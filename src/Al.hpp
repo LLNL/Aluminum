@@ -64,8 +64,7 @@ void Initialize(int& argc, char**& argv);
  * Clean up Aluminum.
  * Do not make any further calls to the library after calling this.
  */
-//void Finalize();
-void Finalize(bool mpi_final = true);
+void Finalize();
 
 /** Return true if Aluminum has been initialized. */
 bool Initialized();
@@ -73,7 +72,6 @@ bool Initialized();
 /**
  * Communicator for MPI-based collectives.
  */
-
 class MPICommunicator : public Communicator {
  public:
   /** Default constructor; use MPI_COMM_WORLD. */
@@ -126,24 +124,6 @@ class MPICommunicator : public Communicator {
 };
 
 /**
-<<<<<<< HEAD
-=======
- * Initialize Aluminum.
- * This must be called before any other calls to the library. It is safe to
- * call this multiple times.
- */
-void Initialize(int& argc, char**& argv);
-/**
- * Clean up Aluminum.
- * Do not make any further calls to the library after calling this.
- */
-void Finalize();
-void Finalize(bool mpi_final);
-/** Return true if Aluminum has been initialized. */
-bool Initialized();
-
-/**
->>>>>>> f181846f17c3546488402009a28870f199122125
  * Perform an allreduce.
  * @param sendbuf Input data.
  * @param recvbuf Output data; should already be allocated.

@@ -1,6 +1,5 @@
 #include "nccl_impl.hpp"
 
-
 // Error checking macros
 #define CUDACHECK(cmd) do {                     \
   cudaError_t e = cmd;                          \
