@@ -295,12 +295,12 @@ class RingMPICUDA {
 #endif          
           cudaError_t err = cudaDeviceEnablePeerAccess(m_neighbor_dev[i], 0);
           if (err != cudaSuccess && err != cudaErrorPeerAccessAlreadyEnabled) {
-            MPIPrintStream(std::cerr, m_pid)()
-                << "Enabling peer access failed; local: " << local_dev
-                << ", peer: " << m_neighbor_dev[i] << "\n";
-            abort();
+            cudaGetLastError();  // So we don't catch this error later.
+            // Fall back to host communication.
+            m_access_type[i] = HOST;
+          } else {
+            m_access_type[i] = PEER;
           }
-          m_access_type[i] = PEER;        
         } else {
           m_access_type[i] = HOST;        
         }

@@ -32,15 +32,15 @@ void time_allreduce_algo(typename VectorType<Backend>::type input,
     auto recv = get_vector<Backend>(input.size());
     auto in_place_input(input);
     MPI_Barrier(MPI_COMM_WORLD);
-    double start = get_time();
+    start_timer<Backend>(comm);
     Al::Allreduce<Backend>(input.data(), recv.data(), input.size(),
                            Al::ReductionOperator::sum, comm, algo);
-    times.push_back(get_time() - start);
+    times.push_back(finish_timer<Backend>(comm));
     MPI_Barrier(MPI_COMM_WORLD);
-    start = get_time();
+    start_timer<Backend>(comm);
     Al::Allreduce<Backend>(in_place_input.data(), input.size(),
                            Al::ReductionOperator::sum, comm, algo);
-    in_place_times.push_back(get_time() - start);
+    in_place_times.push_back(finish_timer<Backend>(comm));
   }
   // Delete warmup trial.
   times.erase(times.begin());
@@ -75,6 +75,10 @@ void do_benchmark() {
 }
 
 int main(int argc, char** argv) {
+  // Need to set the CUDA device before initializing Aluminum.
+#ifdef AL_HAS_CUDA
+  set_device();
+#endif
   Al::Initialize(argc, argv);
   // Add algorithms to test here.
 
@@ -87,12 +91,10 @@ int main(int argc, char** argv) {
     do_benchmark<Al::MPIBackend>();
 #ifdef AL_HAS_NCCL
   } else if (backend == "NCCL") {
-    set_device();        
     do_benchmark<Al::NCCLBackend>();
 #endif    
 #ifdef AL_HAS_MPI_CUDA
   } else if (backend == "MPI-CUDA") {
-    set_device();        
     do_benchmark<Al::MPICUDABackend>();
 #endif    
   } else {

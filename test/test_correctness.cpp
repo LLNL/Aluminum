@@ -118,6 +118,10 @@ void test_correctness() {
 }
 
 int main(int argc, char** argv) {
+  // Need to set the CUDA device before initializing Aluminum.
+#ifdef AL_HAS_CUDA
+  set_device();
+#endif
   Al::Initialize(argc, argv);
 
   std::string backend = "MPI";
@@ -132,12 +136,10 @@ int main(int argc, char** argv) {
     test_correctness<Al::MPIBackend>();
 #ifdef AL_HAS_NCCL
   } else if (backend == "NCCL") {
-    set_device();
     test_correctness<Al::NCCLBackend>();
 #endif
 #ifdef AL_HAS_MPI_CUDA
   } else if (backend == "MPI-CUDA") {
-    set_device();
     test_correctness<Al::MPICUDABackend>();
 #endif
   } else {
@@ -151,7 +153,6 @@ int main(int argc, char** argv) {
     std::cerr << "]" << std::endl;
     return -1;
   }
-
 
   Al::Finalize();
   return 0;

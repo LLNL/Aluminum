@@ -154,6 +154,29 @@ bool check_vector(const std::vector<float>& expected,
 }
 
 template <typename Backend>
+void start_timer(typename Backend::comm_type& comm);
+
+template <typename Backend>
+double finish_timer(typename Backend::comm_type& comm);
+
+inline double& get_cur_time() {
+  static double t = 0.0;
+  return t;
+}
+
+template <>
+inline void start_timer<Al::MPIBackend>(typename Al::MPIBackend::comm_type&) {
+  double& t = get_cur_time();
+  t = get_time();
+}
+
+template <>
+inline double finish_timer<Al::MPIBackend>(typename Al::MPIBackend::comm_type&) {
+  double& t = get_cur_time();
+  return get_time() - t;
+}
+
+template <typename Backend>
 typename Backend::req_type get_request();
 
 template <>
