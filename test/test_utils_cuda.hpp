@@ -181,7 +181,7 @@ class CUDAVector {
 bool check_vector(const CUDAVector<float>& expected,
                   const CUDAVector<float>& actual) {
   std::vector<float> &&expected_host = expected.copyout();
-  std::vector<float> &&actual_host= actual.copyout();
+  std::vector<float> &&actual_host = actual.copyout();
   return check_vector(expected_host, actual_host);
 }
 
