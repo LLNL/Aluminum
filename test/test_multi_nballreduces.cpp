@@ -11,6 +11,7 @@
 
 size_t max_size = 1<<20;
 const size_t num_concurrent = 1024;
+const size_t num_blocking = 8;
 
 void get_expected_result(std::vector<float>& expected) {
   MPI_Allreduce(MPI_IN_PLACE, expected.data(), expected.size(), MPI_FLOAT,
@@ -54,6 +55,15 @@ void test_multiple_nballreduces() {
                                           reqs[i],
                                           algo);
       }
+      // This is commented out because I don't have a good way to generalize it,
+      // but it can be used to reveal bugs in the MPI-CUDA host-transfer
+      // allreduce algorithm (see issue #40).
+      // Run dummy blocking allreduces concurrently. Don't check them.
+      /*typename VectorType<Al::MPIBackend>::type&& blocking_data = gen_data<Al::MPIBackend>(size);
+      for (size_t i = 0; i < num_blocking; ++i) {
+        Al::Allreduce<Al::MPIBackend>(blocking_data.data(), blocking_data.size(),
+                                      Al::ReductionOperator::sum, comm);
+      }*/
       // Complete and check them.
       for (size_t i = 0; i < num_concurrent; ++i) {
         Al::Wait<Backend>(reqs[i]);
