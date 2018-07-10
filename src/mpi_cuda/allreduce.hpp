@@ -66,8 +66,10 @@ void host_transfer_allreduce_callback(cudaStream_t, cudaError_t,
                                       void* data_) {
   host_transfer_allreduce_data* data =
     static_cast<host_transfer_allreduce_data*>(data_);
+  // Use tag 1 to prevent interference.
   MPIBackend::Allreduce<T>(IN_PLACE<T>(), (T*) data->data, data->count,
-                           data->op, data->comm, AllreduceAlgorithm::automatic);
+                           data->op, data->comm, AllreduceAlgorithm::automatic,
+                           1);
 }
 
 template <typename T> inline
