@@ -96,7 +96,12 @@ class MPICUDABackend {
       req_type& req,
       algo_type algo) {
     if (count == 0) return;
-    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+    cudaStream_t internal_stream;
+    if (algo != MPICUDAAllreduceAlgorithm::host_transfer) {
+      internal_stream = internal::cuda::get_internal_stream();
+    } else {
+      internal_stream = internal::cuda::get_internal_stream(0);
+    }
     sync_internal_stream_with_comm(internal_stream, comm);
     switch (algo) {
     case MPICUDAAllreduceAlgorithm::ring:
@@ -166,7 +171,7 @@ class MPICUDABackend {
     // Get pinned host memory.
     T* host_mem = internal::get_pinned_memory<T>(count);
     internal::mpi_cuda::host_transfer_allreduce(
-      sendbuf, recvbuf, host_mem, count, op, comm, comm.get_stream());
+      sendbuf, recvbuf, host_mem, count, op, comm, comm.get_stream(), 1);
     // We can only free the memory after the allreduce has completed, but don't
     // want to block the user's stream to do so.
     cudaStream_t internal_stream = internal::cuda::get_internal_stream();
@@ -185,7 +190,7 @@ class MPICUDABackend {
     // Get pinned host memory.
     T* host_mem = internal::get_pinned_memory<T>(count);
     internal::mpi_cuda::host_transfer_allreduce(
-      sendbuf, recvbuf, host_mem, count, op, comm, internal_stream);
+      sendbuf, recvbuf, host_mem, count, op, comm, internal_stream, 1);
     // Set up the completion event before freeing memory.
     setup_completion_event(internal_stream, comm, req);
     // Now set up the callback to free memory.

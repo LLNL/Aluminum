@@ -48,6 +48,10 @@ cudaStream_t get_internal_stream() {
   return internal_streams[cur_stream++ % num_internal_streams];
 }
 
+cudaStream_t get_internal_stream(size_t id) {
+  return internal_streams[id];
+}
+
 }  // namespace cuda
 }  // namespace internal
 }  // namespace Al
