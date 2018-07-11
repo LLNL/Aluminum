@@ -1,5 +1,6 @@
 #pragma once
 
+#include <utility>
 #include <sstream>
 #include <cuda.h>
 #include <cuda_runtime.h>
@@ -69,6 +70,8 @@ void release_cuda_event(cudaEvent_t event);
  * This may select among multiple internal streams.
  */
 cudaStream_t get_internal_stream();
+/** Get a specific internal stream. */
+cudaStream_t get_internal_stream(size_t id);
 
 }  // namespace cuda
 }  // namespace internal

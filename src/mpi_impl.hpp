@@ -54,8 +54,13 @@ class MPICommunicator : public Communicator {
   int rank_in_local_comm;
   /** Size of the local communicator. */
   int size_of_local_comm;
-  /** Free tag for communication. */
-  int free_tag = 1;
+  /**
+   * Free tag for communication.
+   * This is used by non-blocking operations. No other operations should use
+   * any tag greater than or equal to this one.
+   * TODO: This could possibly wrap around.
+   */
+  int free_tag = 10;
 };
 
 namespace internal {
@@ -202,6 +207,9 @@ inline MPI_Op ReductionOperator2MPI_Op(ReductionOperator op) {
   }
 }
 
+/** Default tag for blocking operations. */
+constexpr int default_tag = 0;
+
 /** Base state class for MPI allreduces. */
 template <typename T>
 class MPIAlState : public AlState {
@@ -347,7 +355,8 @@ void nb_passthrough_allreduce(const T* sendbuf, T* recvbuf, size_t count,
 /** Use a recursive-doubling algorithm to perform the allreduce. */
 template <typename T>
 void recursive_doubling_allreduce(const T* sendbuf, T* recvbuf, size_t count,
-                                  ReductionOperator op, Communicator& comm) {
+                                  ReductionOperator op, Communicator& comm,
+                                  const int tag = default_tag) {
   if (count == 0) return;  // Nothing to do.
   assert_count_fits_mpi(count);
   int rank = comm.rank();
@@ -377,10 +386,10 @@ void recursive_doubling_allreduce(const T* sendbuf, T* recvbuf, size_t count,
     // The even processes will not participate until the end.
     // There is a power-of-2 number of remaining processes.
     if (rank % 2 == 0) {
-      MPI_Send(recvbuf, count, type, rank + 1, 0, mpi_comm);
+      MPI_Send(recvbuf, count, type, rank + 1, tag, mpi_comm);
       rank = -1;  // Don't participate.
     } else {
-      MPI_Recv(recv_to, count, type, rank - 1, 0, mpi_comm, MPI_STATUS_IGNORE);
+      MPI_Recv(recv_to, count, type, rank - 1, tag, mpi_comm, MPI_STATUS_IGNORE);
       reduction_op(recv_to, recvbuf, count);
       rank /= 2;  // Change our rank.
     }
@@ -393,8 +402,8 @@ void recursive_doubling_allreduce(const T* sendbuf, T* recvbuf, size_t count,
     int partner = (adjusted_partner < pow2_remainder) ?
       adjusted_partner * 2 + 1 :
       adjusted_partner + pow2_remainder;
-    MPI_Sendrecv(recvbuf, count, type, partner, 0,
-                 recv_to, count, type, partner, 0,
+    MPI_Sendrecv(recvbuf, count, type, partner, tag,
+                 recv_to, count, type, partner, tag,
                  mpi_comm, MPI_STATUS_IGNORE);
     reduction_op(recv_to, recvbuf, count);
     mask <<= 1;
@@ -402,10 +411,10 @@ void recursive_doubling_allreduce(const T* sendbuf, T* recvbuf, size_t count,
   // In the non-power-of-2 case, the even ranks need to get their data.
   if (orig_rank < 2 * pow2_remainder) {
     if (orig_rank % 2 == 0) {
-      MPI_Recv(recvbuf, count, type, orig_rank + 1, 0, mpi_comm,
+      MPI_Recv(recvbuf, count, type, orig_rank + 1, tag, mpi_comm,
                MPI_STATUS_IGNORE);
     } else {
-      MPI_Send(recvbuf, count, type, orig_rank - 1, 0, mpi_comm);
+      MPI_Send(recvbuf, count, type, orig_rank - 1, tag, mpi_comm);
     }
   }
   release_memory(recv_to);
@@ -539,7 +548,7 @@ void nb_recursive_doubling_allreduce(const T* sendbuf, T* recvbuf, size_t count,
 template <typename T>
 void ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                     ReductionOperator op, Communicator& comm, const bool bidir,
-                    const size_t num_rings) {
+                    const size_t num_rings, const int tag = default_tag) {
   if (count == 0) return;  // Nothing to do.
   if (num_rings != 1) {
     throw_al_exception("Multiple rings not yet supported");
@@ -627,9 +636,9 @@ void ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
       const T* to_send = recvbuf + (slice_ends[ring][dir][send_idx] -
                                     slice_lengths[ring][dir][send_idx]);
       MPI_Irecv(recv_to[ring][dir], slice_lengths[ring][dir][recv_idx],
-                type, srcs[ring][dir], 0, mpi_comm, &(reqs[req_idx]));
+                type, srcs[ring][dir], tag, mpi_comm, &(reqs[req_idx]));
       MPI_Isend(to_send, slice_lengths[ring][dir][send_idx], type,
-                dsts[ring][dir], 0, mpi_comm, &(reqs[req_idx+1]));
+                dsts[ring][dir], tag, mpi_comm, &(reqs[req_idx+1]));
     }
   }
   while (completed_transfers < num_transfers) {
@@ -664,9 +673,9 @@ void ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
         const T* to_send = recvbuf + (slice_ends[ring][dir][send_idx] -
                                       slice_lengths[ring][dir][send_idx]);
         MPI_Irecv(recv_to[ring][dir], slice_lengths[ring][dir][recv_idx],
-                  type, srcs[ring][dir], 0, mpi_comm, &(reqs[req_idx]));
+                  type, srcs[ring][dir], tag, mpi_comm, &(reqs[req_idx]));
         MPI_Isend(to_send, slice_lengths[ring][dir][send_idx], type,
-                  dsts[ring][dir], 0, mpi_comm, &(reqs[req_idx+1]));
+                  dsts[ring][dir], tag, mpi_comm, &(reqs[req_idx+1]));
       }
     }
   }
@@ -691,9 +700,9 @@ void ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
       MPI_Irecv(recvbuf + (slice_ends[ring][dir][recv_idx]
                            - slice_lengths[ring][dir][recv_idx]),
                 slice_lengths[ring][dir][recv_idx],
-                type, srcs[ring][dir], 0, mpi_comm, &(reqs[req_idx]));
+                type, srcs[ring][dir], tag, mpi_comm, &(reqs[req_idx]));
       MPI_Isend(to_send, slice_lengths[ring][dir][send_idx], type,
-                dsts[ring][dir], 0, mpi_comm, &(reqs[req_idx+1]));
+                dsts[ring][dir], tag, mpi_comm, &(reqs[req_idx+1]));
     }
   }
   while (completed_transfers < num_transfers) {
@@ -720,9 +729,9 @@ void ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
         MPI_Irecv(recvbuf + (slice_ends[ring][dir][recv_idx]
                              - slice_lengths[ring][dir][recv_idx]),
                   slice_lengths[ring][dir][recv_idx],
-                  type, srcs[ring][dir], 0, mpi_comm, &(reqs[req_idx]));
+                  type, srcs[ring][dir], tag, mpi_comm, &(reqs[req_idx]));
         MPI_Isend(to_send, slice_lengths[ring][dir][send_idx], type,
-                  dsts[ring][dir], 0, mpi_comm, &(reqs[req_idx+1]));
+                  dsts[ring][dir], tag, mpi_comm, &(reqs[req_idx+1]));
       }
     }
   }
@@ -869,7 +878,8 @@ void nb_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
  */
 template <typename T>
 void rabenseifner_allreduce(const T* sendbuf, T* recvbuf, size_t count,
-                            ReductionOperator op, Communicator& comm) {
+                            ReductionOperator op, Communicator& comm,
+                            const int tag = default_tag) {
   if (count == 0) return;  // Nothing to do.
   assert_count_fits_mpi(count);
   int rank = comm.rank();
@@ -894,11 +904,11 @@ void rabenseifner_allreduce(const T* sendbuf, T* recvbuf, size_t count,
   T* recv_to = nullptr;
   if (rank < 2 * pow2_remainder) {
     if (rank % 2 == 0) {
-      MPI_Send(recvbuf, count, type, rank + 1, 0, mpi_comm);
+      MPI_Send(recvbuf, count, type, rank + 1, tag, mpi_comm);
       rank = -1;  // Don't participate.
     } else {
       recv_to = get_memory<T>(count);
-      MPI_Recv(recv_to, count, type, rank - 1, 0, mpi_comm, MPI_STATUS_IGNORE);
+      MPI_Recv(recv_to, count, type, rank - 1, tag, mpi_comm, MPI_STATUS_IGNORE);
       reduction_op(recv_to, recvbuf, count);
       rank /= 2;
     }
@@ -950,8 +960,8 @@ void rabenseifner_allreduce(const T* sendbuf, T* recvbuf, size_t count,
         recv_start = slice_ends[recv_idx] - slice_lengths[recv_idx];
         recv_end = slice_ends[last_idx - 1];
       }
-      MPI_Sendrecv(recvbuf + send_start, send_end - send_start, type, partner, 0,
-                   recv_to, recv_end - recv_start, type, partner, 0,
+      MPI_Sendrecv(recvbuf + send_start, send_end - send_start, type, partner, tag,
+                   recv_to, recv_end - recv_start, type, partner, tag,
                    mpi_comm, MPI_STATUS_IGNORE);
       reduction_op(recv_to, recvbuf + recv_start, recv_end - recv_start);
       // Update for the next iteration, except last_idx, which is needed by the
@@ -992,8 +1002,8 @@ void rabenseifner_allreduce(const T* sendbuf, T* recvbuf, size_t count,
         recv_start = slice_ends[recv_idx] - slice_lengths[recv_idx];
         recv_end = slice_ends[send_idx - 1];
       }
-      MPI_Sendrecv(recvbuf + send_start, send_end - send_start, type, partner, 0,
-                   recvbuf + recv_start, recv_end - recv_start, type, partner, 0,
+      MPI_Sendrecv(recvbuf + send_start, send_end - send_start, type, partner, tag,
+                   recvbuf + recv_start, recv_end - recv_start, type, partner, tag,
                    mpi_comm, MPI_STATUS_IGNORE);
       // Update for next iteration.
       if (rank > adjusted_partner) {  // Check on adjusted partner.
@@ -1006,10 +1016,10 @@ void rabenseifner_allreduce(const T* sendbuf, T* recvbuf, size_t count,
   // Send the excluded ranks their data in the non-power-of-2 case.
   if (orig_rank < 2 * pow2_remainder) {
     if (orig_rank % 2 == 0) {
-      MPI_Recv(recvbuf, count, type, orig_rank + 1, 0, mpi_comm,
+      MPI_Recv(recvbuf, count, type, orig_rank + 1, tag, mpi_comm,
                MPI_STATUS_IGNORE);
     } else {
-      MPI_Send(recvbuf, count, type, orig_rank - 1, 0, mpi_comm);
+      MPI_Send(recvbuf, count, type, orig_rank - 1, tag, mpi_comm);
     }
   }
   release_memory(recv_to);
@@ -1270,7 +1280,8 @@ void nb_rabenseifner_allreduce(const T* sendbuf, T* recvbuf, size_t count,
  */
 template <typename T>
 void pe_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
-                       ReductionOperator op, Communicator& comm) {
+                       ReductionOperator op, Communicator& comm,
+                       const int tag = default_tag) {
   if (count == 0) return;  // Nothing to do.
   assert_count_fits_mpi(count);
   int rank = comm.rank();
@@ -1303,8 +1314,8 @@ void pe_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
     const int dst = (rank + step) % nprocs;
     const T* to_send = recvbuf + (slice_ends[dst] - slice_lengths[dst]);
     // Note: We always receive to our local chunk.
-    MPI_Sendrecv(to_send, slice_lengths[dst], type, dst, 0,
-                 recv_to, slice_lengths[rank], type, src, 0,
+    MPI_Sendrecv(to_send, slice_lengths[dst], type, dst, tag,
+                 recv_to, slice_lengths[rank], type, src, tag,
                  mpi_comm, MPI_STATUS_IGNORE);
     reduction_op(recv_to, recvbuf + (slice_ends[rank] - slice_lengths[rank]),
                  slice_lengths[rank]);
@@ -1319,9 +1330,9 @@ void pe_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
     // This computes the location the data should lie based on the current step.
     const int recv_idx = (rank - step - 1 + nprocs) % nprocs;
     const T* to_send = recvbuf + (slice_ends[send_idx] - slice_lengths[send_idx]);
-    MPI_Sendrecv(to_send, slice_lengths[send_idx], type, dst, 0,
+    MPI_Sendrecv(to_send, slice_lengths[send_idx], type, dst, tag,
                  recvbuf + (slice_ends[recv_idx] - slice_lengths[recv_idx]),
-                 slice_lengths[recv_idx], type, src, 0,
+                 slice_lengths[recv_idx], type, src, tag,
                  mpi_comm, MPI_STATUS_IGNORE);
     send_idx = recv_idx;  // Forward the data received.
   }
@@ -1378,7 +1389,8 @@ class MPIBackend {
   template <typename T>
   static void Allreduce(const T* sendbuf, T* recvbuf, size_t count,
                         ReductionOperator op, comm_type& comm,
-                        algo_type algo) {
+                        algo_type algo,
+                        const int tag = internal::mpi::default_tag) {
     if (algo == AllreduceAlgorithm::automatic) {
       // TODO: Better algorithm selection/performance model.
       // TODO: Make tuneable.
@@ -1394,19 +1406,19 @@ class MPIBackend {
         break;
       case AllreduceAlgorithm::mpi_recursive_doubling:
         internal::mpi::recursive_doubling_allreduce(
-            sendbuf, recvbuf, count, op, comm);
+          sendbuf, recvbuf, count, op, comm, tag);
         break;
       case AllreduceAlgorithm::mpi_ring:
-        internal::mpi::ring_allreduce(sendbuf, recvbuf, count, op, comm, false, 1);
+        internal::mpi::ring_allreduce(sendbuf, recvbuf, count, op, comm, false, 1, tag);
         break;
       case AllreduceAlgorithm::mpi_rabenseifner:
-        internal::mpi::rabenseifner_allreduce(sendbuf, recvbuf, count, op, comm);
+        internal::mpi::rabenseifner_allreduce(sendbuf, recvbuf, count, op, comm, tag);
         break;
       case AllreduceAlgorithm::mpi_pe_ring:
-        internal::mpi::pe_ring_allreduce(sendbuf, recvbuf, count, op, comm);
+        internal::mpi::pe_ring_allreduce(sendbuf, recvbuf, count, op, comm, tag);
         break;
       case AllreduceAlgorithm::mpi_biring:
-        internal::mpi::ring_allreduce(sendbuf, recvbuf, count, op, comm, true, 1);
+        internal::mpi::ring_allreduce(sendbuf, recvbuf, count, op, comm, true, 1, tag);
         break;
       default:
         throw_al_exception("Invalid algorithm for Allreduce");
