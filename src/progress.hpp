@@ -131,6 +131,10 @@ class ProgressEngine {
    * World communicator.
    */
   Communicator* world_comm;
+#ifdef AL_HAS_CUDA
+  /** Used to pass the original CUDA device to the progress engine thread. */
+  std::atomic<int> cur_device;
+#endif
   /**
    * Bind the progress engine to a core.
    * This binds to the last core in the NUMA node the process is in.
