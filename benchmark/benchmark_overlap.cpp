@@ -6,18 +6,6 @@ const size_t max_size = 1<<22;
 const size_t num_trials = 10;
 const double sleep_time = 0.005;  // seconds
 
-void print_stats(std::vector<double>& times) {
-  double sum = std::accumulate(times.begin(), times.end(), 0.0);
-  double mean = sum / times.size();
-  std::nth_element(times.begin(), times.begin() + times.size() / 2, times.end());
-  double median = times[times.size() / 2];
-  auto minmax = std::minmax_element(times.begin(), times.end());
-  double min = *(minmax.first);
-  double max = *(minmax.second);
-  std::cout << "mean=" << mean << " median=" << median << " min=" << min <<
-    " max=" << max << std::endl;
-}
-
 /**
  * Instead of timing purely the runtime, this simulates doing some computation
  * to overlap the communication with. Therefore, the time reported is the

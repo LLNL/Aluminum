@@ -12,18 +12,6 @@ size_t start_size = 1;
 size_t max_size = 1<<28;
 const size_t num_trials = 10;
 
-void print_stats(std::vector<double>& times) {
-  double sum = std::accumulate(times.begin(), times.end(), 0.0);
-  double mean = sum / times.size();
-  std::nth_element(times.begin(), times.begin() + times.size() / 2, times.end());
-  double median = times[times.size() / 2];
-  auto minmax = std::minmax_element(times.begin(), times.end());
-  double min = *(minmax.first);
-  double max = *(minmax.second);
-  std::cout << "mean=" << mean << " median=" << median << " min=" << min <<
-    " max=" << max << std::endl;
-}
-
 template <typename Backend>
 void time_allreduce_algo(typename VectorType<Backend>::type input,
                          typename Backend::comm_type& comm,
@@ -106,7 +94,14 @@ int main(int argc, char** argv) {
     do_benchmark<Al::MPICUDABackend>();
 #endif    
   } else {
-    std::cerr << "usage: " << argv[0] << " [MPI | NCCL | MPI-CUDA]\n";
+    std::cerr << "usage: " << argv[0] << " [MPI";
+#ifdef AL_HAS_NCCL
+    std::cerr << " | NCCL";
+#endif
+#ifdef AL_HAS_MPI_CUDA
+    std::cerr << " | MPI-CUDA";
+#endif
+    std::cerr << "]" << std::endl;
     return -1;
   }
 

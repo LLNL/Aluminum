@@ -153,6 +153,18 @@ bool check_vector(const std::vector<float>& expected,
   return match;
 }
 
+void print_stats(std::vector<double>& times) {
+  double sum = std::accumulate(times.begin(), times.end(), 0.0);
+  double mean = sum / times.size();
+  std::nth_element(times.begin(), times.begin() + times.size() / 2, times.end());
+  double median = times[times.size() / 2];
+  auto minmax = std::minmax_element(times.begin(), times.end());
+  double min = *(minmax.first);
+  double max = *(minmax.second);
+  std::cout << "mean=" << mean << " median=" << median << " min=" << min <<
+    " max=" << max << std::endl;
+}
+
 template <typename Backend>
 void start_timer(typename Backend::comm_type& comm);
 
