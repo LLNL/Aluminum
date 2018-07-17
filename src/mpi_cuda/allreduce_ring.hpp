@@ -583,7 +583,7 @@ class RingMPICUDA {
         } else {
           void *dst_ptr = m_neighbor_work[dst];
           COLL_CHECK_CUDA(cudaMemcpyPeerAsync(
-              dst_ptr, m_neighbor_dev[dst], src_ptr, g,
+              dst_ptr, m_neighbor_dev[dst], src_ptr, m_gpus[g],
               send_count * sizeof(T), streams[g]));
           COLL_CHECK_CUDA(cudaEventRecord(m_ev_trans[trans][g], streams[g]));
           notify_next_rank(trans);
@@ -595,8 +595,8 @@ class RingMPICUDA {
         T *src_ptr = bufs[g] + send_offset;
         T *dst_ptr = work_bufs[next_dev];
         COLL_CHECK_CUDA(cudaMemcpyPeerAsync(
-            dst_ptr, next_dev, src_ptr, g, send_count * sizeof(T),
-            streams[g]));
+            dst_ptr, next_dev, src_ptr, m_gpus[g],
+            send_count * sizeof(T), streams[g]));
         COLL_CHECK_CUDA(cudaEventRecord(m_ev_trans[trans][g], streams[g]));
       }
       if (g != first_dev) {
