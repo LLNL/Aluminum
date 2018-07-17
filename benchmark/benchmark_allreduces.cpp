@@ -8,7 +8,8 @@
 #include "test_utils_mpi_cuda.hpp"
 #endif
 
-const size_t max_size = 1<<28;
+size_t start_size = 1;
+size_t max_size = 1<<28;
 const size_t num_trials = 10;
 
 void print_stats(std::vector<double>& times) {
@@ -61,7 +62,7 @@ void do_benchmark() {
       = get_allreduce_algorithms<Backend>();
   typename Backend::comm_type comm;  // Use COMM_WORLD.
   std::vector<size_t> sizes = {0};
-  for (size_t size = 1; size <= max_size; size *= 2) {
+  for (size_t size = start_size; size <= max_size; size *= 2) {
     sizes.push_back(size);
   }
   for (const auto& size : sizes) {
@@ -83,8 +84,15 @@ int main(int argc, char** argv) {
   // Add algorithms to test here.
 
   std::string backend = "MPI";
-  if (argc == 2) {
+  if (argc >= 2) {
     backend = argv[1];
+  }
+  if (argc == 3) {
+    max_size = std::atoi(argv[2]);
+  }
+  if (argc == 4) {
+    start_size = std::atoi(argv[2]);
+    max_size = std::atoi(argv[3]);
   }
   
   if (backend == "MPI") {
