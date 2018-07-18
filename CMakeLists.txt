@@ -31,6 +31,10 @@ if (ALUMINUM_ENABLE_NCCL AND NOT ALUMINUM_ENABLE_CUDA)
   set(ALUMINUM_ENABLE_CUDA ON)
 endif ()
 
+if (CMAKE_BUILD_TYPE MATCHES Debug)
+  set(AL_DEBUG ON)
+endif ()
+
 # Setup CXX requirements
 set(CMAKE_CXX_FLAGS "-Wall -Wextra -pedantic -g")
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
