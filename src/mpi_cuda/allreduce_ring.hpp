@@ -184,7 +184,7 @@ class RingMPICUDA {
   void build_ring() {
     COLL_CHECK_MPI(MPI_Comm_size(m_comm, &m_np));
     COLL_CHECK_MPI(MPI_Comm_rank(m_comm, &m_pid));  
-    get_ring_indices(m_pid, m_np, rid(), rid(LHS), rid(RHS));
+    get_ring_indices(m_pid, m_np, rid(), pid(LHS), pid(RHS));
     for (TransferDir dir: DIRECTIONS) {
       m_send_idx[dir] = m_rid;
       int recv_idx = dir == L2R ?
@@ -194,12 +194,12 @@ class RingMPICUDA {
     }
     // exchange device id with RHS
     COLL_CHECK_MPI(MPI_Sendrecv(
-        &m_gpu, 1, MPI_INT, rid(RHS), 0,
-        &neighbor_dev(LHS), 1, MPI_INT, rid(LHS), 0,
+        &m_gpu, 1, MPI_INT, pid(RHS), 0,
+        &neighbor_dev(LHS), 1, MPI_INT, pid(LHS), 0,
         m_comm, MPI_STATUS_IGNORE));
     COLL_CHECK_MPI(MPI_Sendrecv(
-        &m_gpu, 1, MPI_INT, rid(LHS), 0,
-        &neighbor_dev(RHS), 1, MPI_INT, rid(RHS), 0,
+        &m_gpu, 1, MPI_INT, pid(LHS), 0,
+        &neighbor_dev(RHS), 1, MPI_INT, pid(RHS), 0,
         m_comm, MPI_STATUS_IGNORE));
     setup_access_type();
   }
@@ -217,12 +217,12 @@ class RingMPICUDA {
     char proc_name_lhs[MPI_MAX_PROCESSOR_NAME];
     char proc_name_rhs[MPI_MAX_PROCESSOR_NAME];    
     COLL_CHECK_MPI(MPI_Sendrecv(
-        proc_name, MPI_MAX_PROCESSOR_NAME, MPI_CHAR, rid(RHS), 0,
-        proc_name_lhs, MPI_MAX_PROCESSOR_NAME, MPI_CHAR, rid(LHS), 0,
+        proc_name, MPI_MAX_PROCESSOR_NAME, MPI_CHAR, pid(RHS), 0,
+        proc_name_lhs, MPI_MAX_PROCESSOR_NAME, MPI_CHAR, pid(LHS), 0,
         m_comm, MPI_STATUS_IGNORE));
     COLL_CHECK_MPI(MPI_Sendrecv(
-        proc_name, MPI_MAX_PROCESSOR_NAME, MPI_CHAR, rid(LHS), 0,
-        proc_name_rhs, MPI_MAX_PROCESSOR_NAME, MPI_CHAR, rid(RHS), 0,
+        proc_name, MPI_MAX_PROCESSOR_NAME, MPI_CHAR, pid(LHS), 0,
+        proc_name_rhs, MPI_MAX_PROCESSOR_NAME, MPI_CHAR, pid(RHS), 0,
         m_comm, MPI_STATUS_IGNORE));
 
     // Check whether the neighbor devices can be accessed with CUDA
@@ -265,7 +265,7 @@ class RingMPICUDA {
     for (TransferDir dir: DIRECTIONS) {
       if (!m_trans_dir[dir]) continue;
       if (next_access_type(dir) != MPI) {
-        int peer_id = next_rid(dir);
+        int peer_id = next_pid(dir);
         COLL_CHECK_MPI(MPI_Irecv(&ipc_handles_next[dir],
                                  sizeof(cudaIpcEventHandle_t), MPI_BYTE,
                                  peer_id, 0, m_comm, &req[req_idx++]));
@@ -277,7 +277,7 @@ class RingMPICUDA {
                                  peer_id, 0, m_comm, &req[req_idx++]));
       }
       if (prev_access_type(dir) != MPI) {
-        int peer_id = prev_rid(dir);
+        int peer_id = prev_pid(dir);
         COLL_CHECK_MPI(MPI_Irecv(&ipc_handles_prev[dir],
                                  sizeof(cudaIpcEventHandle_t), MPI_BYTE,
                                  peer_id, 0, m_comm, &req[req_idx++]));
@@ -332,8 +332,8 @@ class RingMPICUDA {
       size_t recv_msg_size =
           next_access_type(dir) != MPI ? sizeof(cudaIpcMemHandle_t) : 0;
       COLL_CHECK_MPI(MPI_Sendrecv(
-          &local_ipc_h, send_msg_size,  MPI_BYTE, prev_rid(dir), 0,
-          &peer_ipc_h, recv_msg_size, MPI_BYTE, next_rid(dir), 0,
+          &local_ipc_h, send_msg_size,  MPI_BYTE, prev_pid(dir), 0,
+          &peer_ipc_h, recv_msg_size, MPI_BYTE, next_pid(dir), 0,
           m_comm, MPI_STATUS_IGNORE));
       if (next_access_type(dir) != MPI) {
         change_device_to_accessible_to_next(dir);
@@ -383,11 +383,11 @@ class RingMPICUDA {
   }
 
   void notify_next_rank(TransferDir dir) {
-    notify(next_rid(dir), notification_next_tag(dir));
+    notify(next_pid(dir), notification_next_tag(dir));
   }
   
   void notify_prev_rank(TransferDir dir) {
-    notify(prev_rid(dir), notification_prev_tag(dir));
+    notify(prev_pid(dir), notification_prev_tag(dir));
   }
 
   void wait_for_notification(int rank, int tag) {
@@ -398,11 +398,11 @@ class RingMPICUDA {
   }
 
   void wait_for_prev_rank(TransferDir dir) {
-    wait_for_notification(prev_rid(dir), notification_next_tag(dir));
+    wait_for_notification(prev_pid(dir), notification_next_tag(dir));
   }
 
   void wait_for_next_rank(TransferDir dir) {
-    wait_for_notification(next_rid(dir), notification_prev_tag(dir));
+    wait_for_notification(next_pid(dir), notification_prev_tag(dir));
   }
 
   template <typename T>
@@ -418,7 +418,7 @@ class RingMPICUDA {
     if (prev_access_type(dir) == MPI) {
       COLL_CHECK_CUDA(cudaEventSynchronize(comp_ev(dir)));
       COLL_CHECK_MPI(MPI_Irecv(
-          work_buf, recv_count, mpi_type, prev_rid(dir), tag,
+          work_buf, recv_count, mpi_type, prev_pid(dir), tag,
           m_comm, &requests[num_requests++]));
     }
     // Send to neighbor        
@@ -429,7 +429,7 @@ class RingMPICUDA {
       }
       COLL_CHECK_MPI(MPI_Isend(
           src_ptr, send_count, mpi_type,
-          next_rid(dir), tag, m_comm, &requests[num_requests++]));
+          next_pid(dir), tag, m_comm, &requests[num_requests++]));
     } else {
       // Make sure the completion event of computation was
       // recorded before sending the buffer
@@ -543,20 +543,20 @@ class RingMPICUDA {
     return m_rid;
   }
 
-  int &rid(Side s) {
+  int &pid(Side s) {
     if (s == LHS) {
-      return m_rid_lhs;
+      return m_pid_lhs;
     } else {
-      return m_rid_rhs;
+      return m_pid_rhs;
     }
   }
 
-  int &prev_rid(TransferDir dir) {
-    return rid(prev_side(dir));
+  int &prev_pid(TransferDir dir) {
+    return pid(prev_side(dir));
   }
 
-  int &next_rid(TransferDir dir) {
-    return rid(next_side(dir));
+  int &next_pid(TransferDir dir) {
+    return pid(next_side(dir));
   }
 
   AccessType &access_type(Side s) {
@@ -646,8 +646,8 @@ class RingMPICUDA {
   int m_np;
   int m_pid;
   int m_rid;
-  int m_rid_lhs;
-  int m_rid_rhs;
+  int m_pid_lhs;
+  int m_pid_rhs;
   int m_send_idx[2];
   int m_recv_idx[2];
 
