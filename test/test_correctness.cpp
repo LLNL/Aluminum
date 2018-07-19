@@ -43,6 +43,7 @@ void test_allreduce_algo(const typename VectorType<Backend>::type& expected,
   if (!check_vector(expected, input)) {
     std::cout << comm.rank() << ": in-place allreduce does not match" <<
       std::endl;
+    std::abort();
   }
 }
 
@@ -64,6 +65,7 @@ void test_nb_allreduce_algo(const typename VectorType<Backend>::type& expected,
   if (!check_vector(expected, recv)) {
     std::cout << comm.rank() << ": regular allreduce does not match" <<
       std::endl;
+    std::abort();
   }
   MPI_Barrier(MPI_COMM_WORLD);
   // Test in-place allreduce.
@@ -74,6 +76,7 @@ void test_nb_allreduce_algo(const typename VectorType<Backend>::type& expected,
   if (!check_vector(expected, input)) {
     std::cout << comm.rank() << ": in-place allreduce does not match" <<
       std::endl;
+    std::abort();
   }
 }
 
