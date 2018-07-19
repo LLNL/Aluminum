@@ -35,8 +35,7 @@ void ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
     COLL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, sendbuf, sizeof(T) * count,
                                     cudaMemcpyDefault, stream));
   }
-  std::vector<cudaStream_t> streams = {stream};
-  comm.get_ring().allreduce<T>({recvbuf}, count, op, &streams, false);
+  comm.get_ring().allreduce<T>(recvbuf, count, op, stream, false);
 }
 
 template <typename T> inline
@@ -47,8 +46,7 @@ void bi_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
     COLL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, sendbuf, sizeof(T) * count,
                                     cudaMemcpyDefault, stream));
   }
-  std::vector<cudaStream_t> streams = {stream};
-  comm.get_ring().allreduce<T>({recvbuf}, count, op, &streams, true);
+  comm.get_ring().allreduce<T>(recvbuf, count, op, stream, true);
 }
 
 struct host_transfer_allreduce_data {
