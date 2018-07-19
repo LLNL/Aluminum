@@ -110,42 +110,43 @@ class RingMPICUDA {
   template <typename T>
   void get_gpu_bufs(size_t count, T **bufs) {
     size_t real_size = sizeof(T) * count;
-    if (!(m_gpu_bufs[L2R] != nullptr && m_gpu_buf_size >= real_size
-          && (!m_trans_dir[R2L] || m_gpu_bufs[R2L] != nullptr))) {
-#ifdef AL_DEBUG
-      MPIPrintStream(std::cerr, m_pid)()
-          << "Setting up a new workspace buffer\n";
-#endif      
-      close_remote_buffer_mapping();
-      // Make sure everyone unmaps the IPC handle before actually
-      // freeing the memory
-      COLL_CHECK_MPI(MPI_Barrier(m_comm));
-      free_gpu_bufs();
-      void *p = nullptr;
-      COLL_CHECK_CUDA(cudaMalloc(&p, real_size));
-      COLL_ASSERT(p != nullptr);
-      m_gpu_bufs[L2R] = p;
-      if (m_trans_dir[R2L]) {
-        COLL_CHECK_CUDA(cudaMalloc(&p, real_size));
-        COLL_ASSERT(p != nullptr);
-        m_gpu_bufs[R2L] = p;
-      }
-      m_gpu_buf_size = real_size;
-      setup_remote_buffer_mapping(m_gpu_bufs[L2R], m_gpu_bufs[R2L]);
-    }
     for (TransferDir dir: DIRECTIONS) {
       if (!m_trans_dir[dir]) continue;
+      if (!(m_gpu_bufs[dir] != nullptr &&
+            m_gpu_buf_sizes[dir] >= real_size)) {
+#ifdef AL_DEBUG
+        MPIPrintStream(std::cerr, m_pid)()
+            << "Setting up a new workspace buffer for "
+            << (dir == L2R ? "L2R" : "R2L")
+            << ". current size: " << m_gpu_buf_sizes[dir]
+            << ", new size: " << real_size << "\n";
+#endif
+        close_remote_buffer_mapping(dir);
+        // Make sure everyone unmaps the IPC handle before actually
+        // freeing the memory
+        COLL_CHECK_MPI(MPI_Barrier(m_comm));
+        free_gpu_buf(dir);
+        void *p = nullptr;
+        COLL_CHECK_CUDA(cudaMalloc(&p, real_size));
+        COLL_ASSERT(p != nullptr);
+        m_gpu_bufs[dir] = p;
+        m_gpu_buf_sizes[dir] = real_size;
+        setup_remote_buffer_mapping(dir);
+      }
       bufs[dir] = static_cast<T*>(m_gpu_bufs[dir]);
     }
-    return;
+  }
+
+  void free_gpu_buf(TransferDir dir) {
+    if (m_gpu_bufs[dir] != nullptr) {
+      COLL_CHECK_CUDA(cudaFree(m_gpu_bufs[dir]));
+      m_gpu_bufs[dir] = nullptr;
+    }
   }
 
   void free_gpu_bufs() {
     for (TransferDir dir: DIRECTIONS) {
-      if (m_gpu_bufs[dir] != nullptr) {
-        COLL_CHECK_CUDA(cudaFree(m_gpu_bufs[dir]));
-        m_gpu_bufs[dir] = nullptr;
-      }
+      free_gpu_buf(dir);
     }
   }
 
@@ -315,43 +316,43 @@ class RingMPICUDA {
     }
   }
 
-  template <typename T>
-  void setup_remote_buffer_mapping(T *buf_l2r, T *buf_r2l) {
-    for (TransferDir dir: DIRECTIONS) {
-      if (!m_trans_dir[dir]) continue;
-      cudaIpcMemHandle_t local_ipc_h, peer_ipc_h;
-      // If the peer can access the local device with CUDA API, expose its buffer
-      // address as an IPC handle
-      size_t send_msg_size = 0;
-      if (prev_access_type(dir) != MPI) {
-        T *buf = dir == L2R ? buf_l2r : buf_r2l;
-        COLL_CHECK_CUDA(cudaIpcGetMemHandle(
-            &local_ipc_h, buf));
-        send_msg_size = sizeof(cudaIpcMemHandle_t);
-      }
-      size_t recv_msg_size =
-          next_access_type(dir) != MPI ? sizeof(cudaIpcMemHandle_t) : 0;
-      COLL_CHECK_MPI(MPI_Sendrecv(
-          &local_ipc_h, send_msg_size,  MPI_BYTE, prev_pid(dir), 0,
-          &peer_ipc_h, recv_msg_size, MPI_BYTE, next_pid(dir), 0,
-          m_comm, MPI_STATUS_IGNORE));
-      if (next_access_type(dir) != MPI) {
-        change_device_to_accessible_to_next(dir);
-        COLL_CHECK_CUDA(cudaIpcOpenMemHandle(&next_work(dir), peer_ipc_h,
-                                             cudaIpcMemLazyEnablePeerAccess));
-        reset_device();
-      }
+  void setup_remote_buffer_mapping(TransferDir dir) {
+    if (!m_trans_dir[dir]) return;
+    cudaIpcMemHandle_t local_ipc_h, peer_ipc_h;
+    // If the peer can access the local device with CUDA API, expose its buffer
+    // address as an IPC handle
+    size_t send_msg_size = 0;
+    if (prev_access_type(dir) != MPI) {
+      COLL_CHECK_CUDA(cudaIpcGetMemHandle(
+          &local_ipc_h, m_gpu_bufs[dir]));
+      send_msg_size = sizeof(cudaIpcMemHandle_t);
+    }
+    size_t recv_msg_size =
+        next_access_type(dir) != MPI ? sizeof(cudaIpcMemHandle_t) : 0;
+    COLL_CHECK_MPI(MPI_Sendrecv(
+        &local_ipc_h, send_msg_size,  MPI_BYTE, prev_pid(dir), 0,
+        &peer_ipc_h, recv_msg_size, MPI_BYTE, next_pid(dir), 0,
+        m_comm, MPI_STATUS_IGNORE));
+    if (next_access_type(dir) != MPI) {
+      change_device_to_accessible_to_next(dir);
+      COLL_CHECK_CUDA(cudaIpcOpenMemHandle(&next_work(dir), peer_ipc_h,
+                                           cudaIpcMemLazyEnablePeerAccess));
+      reset_device();
+    }
+  }
+
+  void close_remote_buffer_mapping(TransferDir dir) {
+    if (next_work(dir) != nullptr) {
+      change_device_to_accessible_to_next(dir);
+      COLL_CHECK_CUDA(cudaIpcCloseMemHandle(next_work(dir)));
+      next_work(dir) = nullptr;
+      reset_device();
     }
   }
 
   void close_remote_buffer_mapping() {
     for (TransferDir dir: DIRECTIONS) {
-      if (next_work(dir) != nullptr) {
-        change_device_to_accessible_to_next(dir);
-        COLL_CHECK_CUDA(cudaIpcCloseMemHandle(next_work(dir)));
-        next_work(dir) = nullptr;
-        reset_device();
-      }
+      close_remote_buffer_mapping(dir);
     }
   }
 
@@ -641,7 +642,7 @@ class RingMPICUDA {
   
   MPI_Comm m_comm;  
   void *m_gpu_bufs[2] = {nullptr, nullptr};
-  size_t m_gpu_buf_size = 0;
+  size_t m_gpu_buf_sizes[2] = {0, 0};
 
   int m_np;
   int m_pid;
