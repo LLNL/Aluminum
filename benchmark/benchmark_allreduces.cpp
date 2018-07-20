@@ -55,15 +55,19 @@ void time_allreduce_algo(typename VectorType<Backend>::type input,
   }
 }
 
-template <typename Backend>
-void do_benchmark() {
-  std::vector<typename Backend::algo_type> algos
-      = get_allreduce_algorithms<Backend>();
-  typename Backend::comm_type comm;  // Use COMM_WORLD.
+std::vector<size_t> get_sizes() {
   std::vector<size_t> sizes = {0};
   for (size_t size = 1; size <= max_size; size *= 2) {
     sizes.push_back(size);
   }
+  return sizes;
+}
+
+template <typename Backend>
+void do_benchmark(const std::vector<size_t> &sizes) {
+  std::vector<typename Backend::algo_type> algos
+      = get_allreduce_algorithms<Backend>();
+  typename Backend::comm_type comm;  // Use COMM_WORLD.
   for (const auto& size : sizes) {
     auto data = gen_data<Backend>(size);
     // Benchmark algorithms.
@@ -83,19 +87,26 @@ int main(int argc, char** argv) {
   // Add algorithms to test here.
 
   std::string backend = "MPI";
-  if (argc == 2) {
+  if (argc >= 2) {
     backend = argv[1];
+  }
+
+  std::vector<size_t> sizes;
+  if (argc == 3) {
+    sizes = std::vector<size_t>({static_cast<size_t>(std::atoi(argv[2]))});
+  } else {
+    sizes = get_sizes();
   }
   
   if (backend == "MPI") {
-    do_benchmark<Al::MPIBackend>();
+    do_benchmark<Al::MPIBackend>(sizes);
 #ifdef AL_HAS_NCCL
   } else if (backend == "NCCL") {
-    do_benchmark<Al::NCCLBackend>();
+    do_benchmark<Al::NCCLBackend>(sizes);
 #endif    
 #ifdef AL_HAS_MPI_CUDA
   } else if (backend == "MPI-CUDA") {
-    do_benchmark<Al::MPICUDABackend>();
+    do_benchmark<Al::MPICUDABackend>(sizes);
 #endif    
   } else {
     std::cerr << "usage: " << argv[0] << " [MPI | NCCL | MPI-CUDA]\n";
