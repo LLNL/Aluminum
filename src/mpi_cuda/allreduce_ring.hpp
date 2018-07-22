@@ -39,6 +39,7 @@ class RingMPICUDA {
     COLL_CHECK_CUDA(cudaGetDevice(&m_gpu));
     build_ring();
     setup_events();
+    COLL_CHECK_CUDA(cudaStreamCreate(&m_stream_r2l));
   }
   
   ~RingMPICUDA() {
@@ -358,20 +359,23 @@ class RingMPICUDA {
 
   size_t setup_pe_counts(size_t count, std::vector<size_t> *pe_counts,
                          std::vector<size_t> *pe_offsets) {
-    int num_directions = m_trans_dir[R2L] ? 2 : 1;
+    int num_directions = 0;
+    for (TransferDir dir: DIRECTIONS) {
+      if (m_trans_dir[dir]) ++num_directions;
+    }
     size_t pe_count_base = count / (m_np * num_directions);
     int rem = count % (m_np * num_directions);
-    pe_offsets[0].push_back(0);
+    int idx_offset = 0;
+    size_t cur_pe_offset = 0;
     for (TransferDir dir: DIRECTIONS) {
+      if (!m_trans_dir[dir]) continue;
       for (int j = 0; j < m_np; ++j) {
-        int idx = j + (dir == R2L ? m_np : 0);
+        int idx = j + idx_offset;
         pe_counts[dir].push_back(pe_count_base + ((idx < rem) ? 1 : 0));
-        if (j > 0) {
-          pe_offsets[dir].push_back(pe_offsets[dir][j-1] + pe_counts[dir][j-1]);
-        } else if (dir == R2L) {
-          pe_offsets[dir].push_back(pe_offsets[L2R][m_np-1] + pe_counts[L2R][m_np-1]);
-        }
+        pe_offsets[dir].push_back(cur_pe_offset);
+        cur_pe_offset += pe_counts[dir][j];
       }
+      idx_offset += m_np;
     }
     size_t max_count = pe_count_base + (rem > 0 ? 1 : 0);
     return max_count;
@@ -448,13 +452,13 @@ class RingMPICUDA {
   }
 
   void ensure_transfer(MPI_Request *requests, int num_requests,
-                       cudaStream_t stream) {
+                       cudaStream_t *streams) {
     // Set dependency for transfer from the neighbor device
     for (TransferDir dir: DIRECTIONS) {
       if (m_trans_dir[dir] && prev_access_type(dir) != MPI) {
         wait_for_prev_rank(dir);
         COLL_CHECK_CUDA(cudaStreamWaitEvent(
-            stream, prev_ev(dir), 0));
+            streams[dir], prev_ev(dir), 0));
       }
     }
     // Wait for completion of MPI transfer
@@ -472,10 +476,26 @@ class RingMPICUDA {
   // buf: GPU buffers
   template <typename T>
   int allreduce(T *buf, size_t count, ReductionOperator op,
-                cudaStream_t stream, bool bidirectional=true) {
+                cudaStream_t st, bool bidirectional=true) {
     if (count == 0) return 0;
     // Set whether the second direction is used
-    m_trans_dir[R2L] = bidirectional;
+    m_trans_dir[R2L] = bidirectional;    
+    //m_trans_dir[L2R] = bidirectional;
+
+    cudaStream_t streams[2] = {st, m_stream_r2l};
+
+    // Make sure the following operations happen after the completion
+    // of the operations at the user-given stream. Note that at each
+    // iteration, MPI_Isend will wait on comp_ev.  
+    COLL_CHECK_CUDA(cudaEventRecord(comp_ev(L2R), streams[L2R]));    
+
+    if (bidirectional) {
+      // Make sure the R2L stream does not go ahead until the L2R
+      // stream becomes empty. Uses comp_ev although this is not
+      // related to the reduction computation.
+      COLL_CHECK_CUDA(cudaStreamWaitEvent(
+          streams[R2L], comp_ev(L2R), 0));
+    }
     
     std::vector<size_t> pe_counts[2];
     std::vector<size_t> pe_offsets[2];
@@ -500,26 +520,26 @@ class RingMPICUDA {
                    pe_counts[dir][send_idx[dir]],
                    pe_counts[dir][recv_idx[dir]],
                    pe_offsets[dir][send_idx[dir]],
-                   stream, i, requests + num_requests, nr, dir);
+                   streams[dir], i, requests + num_requests, nr, dir);
           num_requests += nr;
         }
-        ensure_transfer(requests, num_requests, stream);
+        ensure_transfer(requests, num_requests, streams);
         for (TransferDir dir: DIRECTIONS) {
           if (!m_trans_dir[dir]) continue;
           if (step == 0) {
             reduce1(buf + pe_offsets[dir][recv_idx[dir]],
                     work_bufs[dir],
                     pe_counts[dir][recv_idx[dir]],
-                    stream, op,
+                    streams[dir], op,
                     GetReductionOperandType<T>::key);
           } else {
             COLL_CHECK_CUDA(cudaMemcpyAsync(
                 buf + pe_offsets[dir][recv_idx[dir]],
                 work_bufs[dir],
                 pe_counts[dir][recv_idx[dir]] * sizeof(T),
-                cudaMemcpyDeviceToDevice, stream));
+                cudaMemcpyDeviceToDevice, streams[dir]));
           }
-          COLL_CHECK_CUDA(cudaEventRecord(comp_ev(dir), stream));
+          COLL_CHECK_CUDA(cudaEventRecord(comp_ev(dir), streams[dir]));
           // notify prev rank for the recording of comp event if MPI
           // is not used
           if (prev_access_type(dir) != MPI) notify_prev_rank(dir);
@@ -534,7 +554,12 @@ class RingMPICUDA {
         }
       }
     }
-                                        
+
+    // Wait for completion of R2L
+    if (m_trans_dir[R2L]) {
+      COLL_CHECK_CUDA(cudaStreamWaitEvent(streams[L2R], comp_ev(R2L), 0));
+    }
+
     return 0;
   }
 
@@ -643,6 +668,7 @@ class RingMPICUDA {
   MPI_Comm m_comm;  
   void *m_gpu_bufs[2] = {nullptr, nullptr};
   size_t m_gpu_buf_sizes[2] = {0, 0};
+  cudaStream_t m_stream_r2l = 0;
 
   int m_np;
   int m_pid;
