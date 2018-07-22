@@ -67,7 +67,12 @@ class RingMPICUDA {
       }
 #endif        
       // this mapping assumes np is a multiple of 4.
-      COLL_ASSERT((num_procs % 4) == 0);
+      if ((num_procs % 4) != 0) {      
+        MPIPrintStream(std::cout, self)()
+            << "Topology optimization requires process counts to be a multiple of 4: "
+            << "#procs: " << num_procs << "\n";
+        MPI_Abort(MPI_COMM_WORLD, 1);
+      }
       // avoids conflicts on the Ray IB topology
       const int id_offset_map[] = {0, 0, 1, -1};    
       const int rhs_offset_map[] = {1, 2, 2, -1};
@@ -87,7 +92,12 @@ class RingMPICUDA {
             << "0-1-2-3-6-7-4-5" << std::endl;
       }
 #endif
-      COLL_ASSERT((num_procs % 8) == 0);
+      if ((num_procs % 8) != 0) {
+        MPIPrintStream(std::cout, self)()
+            << "Topology optimization requires process counts to be a multiple of 8: "
+            << "#procs: " << num_procs << "\n";
+        MPI_Abort(MPI_COMM_WORLD, 1);
+      }
       const int id_offset_map[] = {0, 0, 0, 0, 2, 2, -2, -2};
       const int rhs_offset_map[] = {1, 1, 1, 3, 1, 3, 1, -3};
       const int lhs_offset_map[] = {-3, -1, -1, -1, 3, -1, -3, -1};
