@@ -425,16 +425,18 @@ class RingMPICUDA {
                 size_t send_count, size_t recv_count,
                 size_t send_offset,
                 cudaStream_t stream, int iter_idx,
-                MPI_Request *requests, int &num_requests,
+                MPI_Request *send_requests, int &num_send_requests,
+                MPI_Request *recv_requests, int &num_recv_requests,
                 const TransferDir dir) {
     const int tag = 0;
     const MPI_Datatype mpi_type = get_mpi_data_type<T>();
-    num_requests = 0;
+    num_send_requests = 0;
+    num_recv_requests = 0;
     if (prev_access_type(dir) == MPI) {
       COLL_CHECK_CUDA(cudaEventSynchronize(comp_ev(dir)));
       COLL_CHECK_MPI(MPI_Irecv(
           work_buf, recv_count, mpi_type, prev_pid(dir), tag,
-          m_comm, &requests[num_requests++]));
+          m_comm, &recv_requests[num_recv_requests++]));
     }
     // Send to neighbor        
     T *src_ptr = buf + send_offset;
@@ -444,7 +446,7 @@ class RingMPICUDA {
       }
       COLL_CHECK_MPI(MPI_Isend(
           src_ptr, send_count, mpi_type,
-          next_pid(dir), tag, m_comm, &requests[num_requests++]));
+          next_pid(dir), tag, m_comm, &send_requests[num_send_requests++]));
     } else {
       // Make sure the completion event of computation was
       // recorded before sending the buffer
@@ -461,8 +463,8 @@ class RingMPICUDA {
     }
   }
 
-  void ensure_transfer(MPI_Request *requests, int num_requests,
-                       cudaStream_t *streams) {
+  void ensure_recv(MPI_Request *recv_requests, int num_requests,
+                   cudaStream_t *streams) {
     // Set dependency for transfer from the neighbor device
     for (TransferDir dir: DIRECTIONS) {
       if (m_trans_dir[dir] && prev_access_type(dir) != MPI) {
@@ -472,7 +474,26 @@ class RingMPICUDA {
       }
     }
     // Wait for completion of MPI transfer
-    COLL_CHECK_MPI(MPI_Waitall(num_requests, requests, MPI_STATUS_IGNORE));
+    COLL_CHECK_MPI(MPI_Waitall(num_requests, recv_requests, MPI_STATUS_IGNORE));
+  }
+
+  template <typename T>
+  void issue_local_reduction(int step, T *buf, T *work, size_t count,
+                             cudaStream_t stream, ReductionOperator op,
+                             TransferDir dir) {
+    if (step == 0) {
+      reduce1(buf, work, count, stream, op,
+              GetReductionOperandType<T>::key);
+    } else {
+      COLL_CHECK_CUDA(cudaMemcpyAsync(
+          buf, work, count * sizeof(T), cudaMemcpyDeviceToDevice, stream));
+    }
+    COLL_CHECK_CUDA(cudaEventRecord(comp_ev(dir), stream));
+    if (prev_access_type(dir) != MPI) notify_prev_rank(dir);
+  }
+
+  void ensure_send(MPI_Request *send_requests, int num_requests) {
+    COLL_CHECK_MPI(MPI_Waitall(num_requests, send_requests, MPI_STATUS_IGNORE));
   }
 
   void update_indices(int *send_idx, int *recv_idx) {
@@ -521,39 +542,60 @@ class RingMPICUDA {
     // Step 2: Allgather
     for (int step = 0; step < 2; ++step) {    
       for (int i = 0; i < m_np - 1; ++i) {
-        MPI_Request requests[4];
-        int num_requests = 0;
+        MPI_Request send_requests[2];
+        MPI_Request recv_requests[2];
+        int num_send_requests = 0;
+        int num_recv_requests = 0;
+        // Issue transfer operations, which can be cudaMemcpy or
+        // MPI_Isend
         for (TransferDir dir: DIRECTIONS) {
           if (!m_trans_dir[dir]) continue;          
-          int nr;
+          int nr_send, nr_recv;
           transfer(buf, work_bufs[dir],
                    pe_counts[dir][send_idx[dir]],
                    pe_counts[dir][recv_idx[dir]],
                    pe_offsets[dir][send_idx[dir]],
-                   streams[dir], i, requests + num_requests, nr, dir);
-          num_requests += nr;
+                   streams[dir], i,
+                   send_requests + num_send_requests, nr_send,
+                   recv_requests + num_recv_requests, nr_recv,
+                   dir);
+          num_send_requests += nr_send;
+          num_recv_requests += nr_recv;
         }
-        ensure_transfer(requests, num_requests, streams);
+
+        // First, issues local reductions that do not depend on
+        // MPI. MPI-dependent reductions require MPI_Wait, which
+        // blocks the host thread, they are taken care after issuing
+        // non MPI-dependent operations
         for (TransferDir dir: DIRECTIONS) {
           if (!m_trans_dir[dir]) continue;
-          if (step == 0) {
-            reduce1(buf + pe_offsets[dir][recv_idx[dir]],
-                    work_bufs[dir],
-                    pe_counts[dir][recv_idx[dir]],
-                    streams[dir], op,
-                    GetReductionOperandType<T>::key);
-          } else {
-            COLL_CHECK_CUDA(cudaMemcpyAsync(
-                buf + pe_offsets[dir][recv_idx[dir]],
-                work_bufs[dir],
-                pe_counts[dir][recv_idx[dir]] * sizeof(T),
-                cudaMemcpyDeviceToDevice, streams[dir]));
+          if (prev_access_type(dir) != MPI) {
+            wait_for_prev_rank(dir);
+            COLL_CHECK_CUDA(cudaStreamWaitEvent(
+                streams[dir], prev_ev(dir), 0));
+            issue_local_reduction(
+                step, buf + pe_offsets[dir][recv_idx[dir]],
+                work_bufs[dir], pe_counts[dir][recv_idx[dir]],
+                streams[dir], op, dir);
           }
-          COLL_CHECK_CUDA(cudaEventRecord(comp_ev(dir), streams[dir]));
-          // notify prev rank for the recording of comp event if MPI
-          // is not used
-          if (prev_access_type(dir) != MPI) notify_prev_rank(dir);
         }
+
+        // Issues local reductions that use data sent with MPI
+        COLL_CHECK_MPI(MPI_Waitall(
+            num_recv_requests, recv_requests, MPI_STATUS_IGNORE));
+        for (TransferDir dir: DIRECTIONS) {
+          if (!m_trans_dir[dir]) continue;
+          if (prev_access_type(dir) == MPI) {
+            issue_local_reduction(
+                step, buf + pe_offsets[dir][recv_idx[dir]],
+                work_bufs[dir], pe_counts[dir][recv_idx[dir]],
+                streams[dir], op, dir);
+          }
+        }
+
+        // Cleans up MPI_Isend requests
+        ensure_send(send_requests, num_send_requests);
+
         update_indices(send_idx, recv_idx);
       }
       // There remains an un-received notificaton
@@ -567,9 +609,10 @@ class RingMPICUDA {
 
     // Wait for completion of R2L
     if (m_trans_dir[R2L]) {
-      COLL_CHECK_CUDA(cudaStreamWaitEvent(streams[L2R], comp_ev(R2L), 0));
+      COLL_CHECK_CUDA(cudaStreamWaitEvent(
+          streams[L2R], comp_ev(R2L), 0));
     }
-
+    
     return 0;
   }
 
