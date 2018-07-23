@@ -50,7 +50,9 @@ inline int set_device() {
   int local_rank = get_local_rank();
   int local_size = get_local_size();
   if (num_gpus < local_size) {
-    std::cerr << "Number of available GPUs is smaller than the number of local MPI ranks\n";
+    std::cerr << "Number of available GPUs, " << num_gpus
+              << ", is smaller than the number of local MPI ranks, "
+              << local_size << "\n";
     abort();
   }    
   int device = local_rank;
