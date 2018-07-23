@@ -88,7 +88,7 @@ int main(int argc, char** argv) {
     start_size = std::atoi(argv[2]);
     max_size = std::atoi(argv[3]);
   }
-  sizes = get_sizes();
+  std::vector<size_t> sizes = get_sizes();
   
   if (backend == "MPI") {
     do_benchmark<Al::MPIBackend>(sizes);
