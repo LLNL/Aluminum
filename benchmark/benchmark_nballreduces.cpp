@@ -13,9 +13,68 @@ size_t max_size = 1<<30;
 const size_t num_trials = 10;
 
 template <typename Backend>
+typename Backend::comm_type get_comm();
+
+template <>
+typename Al::MPIBackend::comm_type get_comm<Al::MPIBackend>() {
+  return typename Al::MPIBackend::comm_type(MPI_COMM_WORLD);
+}
+
+#ifdef AL_HAS_CUDA
+// Stream for communicators.
+cudaStream_t bm_stream;
+#endif
+
+#ifdef AL_HAS_NCCL
+template <>
+typename Al::NCCLBackend::comm_type get_comm<Al::NCCLBackend>() {
+  return typename Al::NCCLBackend::comm_type(MPI_COMM_WORLD, bm_stream);
+}
+#endif
+
+#ifdef AL_HAS_MPI_CUDA
+template <>
+typename Al::MPICUDABackend::comm_type get_comm<Al::MPICUDABackend>() {
+  return typename Al::MPICUDABackend::comm_type(MPI_COMM_WORLD, bm_stream);
+}
+#endif
+
+template <typename Backend>
 void time_allreduce_algo(typename VectorType<Backend>::type input,
                          typename Backend::comm_type& comm,
                          typename Backend::algo_type algo) {
+  std::vector<double> times, in_place_times;
+  for (size_t trial = 0; trial < num_trials + 1; ++trial) {
+    auto recv = get_vector<Backend>(input.size());
+    auto in_place_input(input);
+    MPI_Barrier(MPI_COMM_WORLD);
+    start_timer<Backend>(comm);
+    Al::Allreduce<Backend>(input.data(), recv.data(), input.size(),
+                           Al::ReductionOperator::sum, comm, algo);
+    times.push_back(finish_timer<Backend>(comm));
+    MPI_Barrier(MPI_COMM_WORLD);
+    start_timer<Backend>(comm);
+    Al::Allreduce<Backend>(in_place_input.data(), input.size(),
+                           Al::ReductionOperator::sum, comm, algo);
+    in_place_times.push_back(finish_timer<Backend>(comm));
+  }
+  // Delete warmup trial.
+  times.erase(times.begin());
+  in_place_times.erase(in_place_times.begin());
+  if (comm.rank() == 0) {
+    std::cout << "size=" << input.size() << " algo=" << static_cast<int>(algo)
+              << " regular blocking ";
+    print_stats(times);
+    std::cout << "size=" << input.size() << " algo=" << static_cast<int>(algo)
+              << " inplace blocking ";
+    print_stats(in_place_times);
+  }
+}
+
+template <typename Backend>
+void time_nballreduce_algo(typename VectorType<Backend>::type input,
+                           typename Backend::comm_type& comm,
+                           typename Backend::algo_type algo) {
   std::vector<double> times, in_place_times;
   for (size_t trial = 0; trial < num_trials + 1; ++trial) {
     auto recv = get_vector<Backend>(input.size());
@@ -41,10 +100,10 @@ void time_allreduce_algo(typename VectorType<Backend>::type input,
   in_place_times.erase(in_place_times.begin());
   if (comm.rank() == 0) {
     std::cout << "size=" << input.size() << " algo=" << static_cast<int>(algo)
-              << " regular ";
+              << " regular nonblocking ";
     print_stats(times);
     std::cout << "size=" << input.size() << " algo=" << static_cast<int>(algo)
-              << " inplace ";
+              << " inplace nonblocking ";
     print_stats(in_place_times);
   }
 }
@@ -127,7 +186,7 @@ template <typename Backend>
 void do_benchmark() {
   std::vector<typename Backend::algo_type> algos
       = get_nb_allreduce_algorithms<Backend>();
-  typename Backend::comm_type comm;  // Use COMM_WORLD.
+  typename Backend::comm_type comm = get_comm<Backend>();
   std::vector<size_t> sizes = {0};
   for (size_t size = start_size; size <= max_size; size *= 2) {
     sizes.push_back(size);
@@ -137,6 +196,7 @@ void do_benchmark() {
     // Benchmark algorithms.
     for (auto&& algo : algos) {
       time_allreduce_algo<Backend>(data, comm, algo);
+      time_nballreduce_algo<Backend>(data, comm, algo);
       time_allreduce_algo_start<Backend>(data, comm, algo);
       time_allreduce_algo_wait<Backend>(data, comm, algo);
     }
@@ -147,6 +207,7 @@ void do_benchmark() {
 int main(int argc, char** argv) {
 #ifdef AL_HAS_CUDA
   set_device();
+  cudaStreamCreate(&bm_stream);
 #endif
   Al::Initialize(argc, argv);
 
