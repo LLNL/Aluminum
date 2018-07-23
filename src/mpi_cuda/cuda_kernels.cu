@@ -38,6 +38,48 @@ struct BinaryOp<T, ReductionOperator::max> {
   }
 };
 
+template <typename T>
+struct BinaryOp<T, ReductionOperator::lor> {
+  __device__ static T calc(const T& x, const T& y) {
+    return x || y;
+  }
+};
+
+template <typename T>
+struct BinaryOp<T, ReductionOperator::land> {
+  __device__ static T calc(const T& x, const T& y) {
+    return x && y;
+  }
+};
+
+template <typename T>
+struct BinaryOp<T, ReductionOperator::lxor> {
+  __device__ static T calc(const T& x, const T& y) {
+    return !x != !y;
+  }
+};
+
+template <typename T>
+struct BinaryOp<T, ReductionOperator::bor> {
+  __device__ static T calc(const T& x, const T& y) {
+    return x | y;
+  }
+};
+
+template <typename T>
+struct BinaryOp<T, ReductionOperator::band> {
+  __device__ static T calc(const T& x, const T& y) {
+    return x & y;
+  }
+};
+
+template <typename T>
+struct BinaryOp<T, ReductionOperator::bxor> {
+  __device__ static T calc(const T& x, const T& y) {
+    return x ^ y;
+  }
+};
+
 template <typename T, int len>
 struct ShortVectorType {
   using type = T;
