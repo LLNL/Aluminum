@@ -81,7 +81,8 @@ int main(int argc, char** argv) {
   }
 
   if (argc == 3) {
-    max_size = std::atoi(argv[2]);
+    start_size = std::atoi(argv[2]);
+    max_size = start_size;
   }
   if (argc == 4) {
     start_size = std::atoi(argv[2]);
