@@ -172,6 +172,151 @@ void max_reduction(const T* src, T* dest, size_t count) {
   }
 #endif
 }
+/** Basic logical OR reduction. */
+template <typename T>
+void lor_reduction(const T* src, T* dest, size_t count) {
+#if AL_MPI_USE_OPENMP
+  if (count >= AL_MPI_MULTITHREAD_LOGICAL_THRESH) {
+    #pragma omp parallel for
+    for (size_t i = 0; i < count; ++i) {
+      dest[i] = src[i] || dest[i];
+    }
+  } else {
+    for (size_t i = 0; i < count; ++i) {
+      dest[i] = src[i] || dest[i];
+    }
+  }
+#else
+  for (size_t i = 0; i < count; ++i) {
+    dest[i] = src[i] || dest[i];
+  }
+#endif
+}
+/** Basic logical AND reduction. */
+template <typename T>
+void land_reduction(const T* src, T* dest, size_t count) {
+#if AL_MPI_USE_OPENMP
+  if (count >= AL_MPI_MULTITHREAD_LOGICAL_THRESH) {
+    #pragma omp parallel for
+    for (size_t i = 0; i < count; ++i) {
+      dest[i] = src[i] && dest[i];
+    }
+  } else {
+    for (size_t i = 0; i < count; ++i) {
+      dest[i] = src[i] && dest[i];
+    }
+  }
+#else
+  for (size_t i = 0; i < count; ++i) {
+    dest[i] = src[i] && dest[i];
+  }
+#endif
+}
+/** Basic logical XOR reduction. */
+template <typename T>
+void lxor_reduction(const T* src, T* dest, size_t count) {
+#if AL_MPI_USE_OPENMP
+  if (count >= AL_MPI_MULTITHREAD_LOGICAL_THRESH) {
+    #pragma omp parallel for
+    for (size_t i = 0; i < count; ++i) {
+      dest[i] = !src[i] != !dest[i];
+    }
+  } else {
+    for (size_t i = 0; i < count; ++i) {
+      dest[i] = !src[i] != !dest[i];
+    }
+  }
+#else
+  for (size_t i = 0; i < count; ++i) {
+    dest[i] = !src[i] != !dest[i];
+  }
+#endif
+}
+/** Basic bitwise OR reduction. */
+template <typename T>
+void bor_reduction(const T* src, T* dest, size_t count) {
+#if AL_MPI_USE_OPENMP
+  if (count >= AL_MPI_MULTITHREAD_BITWISE_THRESH) {
+    #pragma omp parallel for
+    for (size_t i = 0; i < count; ++i) {
+      dest[i] = src[i] | dest[i];
+    }
+  } else {
+    for (size_t i = 0; i < count; ++i) {
+      dest[i] = src[i] | dest[i];
+    }
+  }
+#else
+  for (size_t i = 0; i < count; ++i) {
+    dest[i] = src[i] | dest[i];
+  }
+#endif
+}
+/** Basic bitwise AND reduction. */
+template <typename T>
+void band_reduction(const T* src, T* dest, size_t count) {
+#if AL_MPI_USE_OPENMP
+  if (count >= AL_MPI_MULTITHREAD_BITWISE_THRESH) {
+    #pragma omp parallel for
+    for (size_t i = 0; i < count; ++i) {
+      dest[i] = src[i] & dest[i];
+    }
+  } else {
+    for (size_t i = 0; i < count; ++i) {
+      dest[i] = src[i] & dest[i];
+    }
+  }
+#else
+  for (size_t i = 0; i < count; ++i) {
+    dest[i] = src[i] & dest[i];
+  }
+#endif
+}
+/** Basic bitwise XOR reduction. */
+template <typename T>
+void bxor_reduction(const T* src, T* dest, size_t count) {
+#if AL_MPI_USE_OPENMP
+  if (count >= AL_MPI_MULTITHREAD_BITWISE_THRESH) {
+    #pragma omp parallel for
+    for (size_t i = 0; i < count; ++i) {
+      dest[i] = src[i] ^ dest[i];
+    }
+  } else {
+    for (size_t i = 0; i < count; ++i) {
+      dest[i] = src[i] ^ dest[i];
+    }
+  }
+#else
+  for (size_t i = 0; i < count; ++i) {
+    dest[i] = src[i] ^ dest[i];
+  }
+#endif
+}
+// Binary operations are not supported on floating point types.
+template <>
+inline void bor_reduction<float>(const float*, float*, size_t) {
+  throw_al_exception("BOR not supported for float");
+}
+template <>
+inline void band_reduction<float>(const float*, float*, size_t) {
+  throw_al_exception("BAND not supported for float");
+}
+template <>
+inline void bxor_reduction<float>(const float*, float*, size_t) {
+  throw_al_exception("BXOR not supported for float");
+}
+template <>
+inline void bor_reduction<double>(const double*, double*, size_t) {
+  throw_al_exception("BOR not supported for double");
+}
+template <>
+inline void band_reduction<double>(const double*, double*, size_t) {
+  throw_al_exception("BAND not supported for double");
+}
+template <>
+inline void bxor_reduction<double>(const double*, double*, size_t) {
+  throw_al_exception("BXOR not supported for double");
+}
 
 /** Return the associated reduction function for an operator. */
 template <typename T>
@@ -186,6 +331,18 @@ inline std::function<void(const T*, T*, size_t)> ReductionMap(
     return min_reduction<T>;
   case ReductionOperator::max:
     return max_reduction<T>;
+  case ReductionOperator::lor:
+    return lor_reduction<T>;
+  case ReductionOperator::land:
+    return land_reduction<T>;
+  case ReductionOperator::lxor:
+    return lxor_reduction<T>;
+  case ReductionOperator::bor:
+    return bor_reduction<T>;
+  case ReductionOperator::band:
+    return band_reduction<T>;
+  case ReductionOperator::bxor:
+    return bxor_reduction<T>;
   default:
     throw_al_exception("Reduction operator not supported");
   }
@@ -202,6 +359,18 @@ inline MPI_Op ReductionOperator2MPI_Op(ReductionOperator op) {
     return MPI_MIN;
   case ReductionOperator::max:
     return MPI_MAX;
+  case ReductionOperator::lor:
+    return MPI_LOR;
+  case ReductionOperator::land:
+    return MPI_LAND;
+  case ReductionOperator::lxor:
+    return MPI_LXOR;
+  case ReductionOperator::bor:
+    return MPI_BOR;
+  case ReductionOperator::band:
+    return MPI_BAND;
+  case ReductionOperator::bxor:
+    return MPI_BXOR;
   default:
     throw_al_exception("Reduction operator not supported");
   }
