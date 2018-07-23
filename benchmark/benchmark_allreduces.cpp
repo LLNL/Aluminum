@@ -8,20 +8,9 @@
 #include "test_utils_mpi_cuda.hpp"
 #endif
 
-const size_t max_size = 1<<28;
+size_t start_size = 1;
+size_t max_size = 1<<28;
 const size_t num_trials = 10;
-
-void print_stats(std::vector<double>& times) {
-  double sum = std::accumulate(times.begin(), times.end(), 0.0);
-  double mean = sum / times.size();
-  std::nth_element(times.begin(), times.begin() + times.size() / 2, times.end());
-  double median = times[times.size() / 2];
-  auto minmax = std::minmax_element(times.begin(), times.end());
-  double min = *(minmax.first);
-  double max = *(minmax.second);
-  std::cout << "mean=" << mean << " median=" << median << " min=" << min <<
-    " max=" << max << std::endl;
-}
 
 template <typename Backend>
 void time_allreduce_algo(typename VectorType<Backend>::type input,
@@ -57,7 +46,7 @@ void time_allreduce_algo(typename VectorType<Backend>::type input,
 
 std::vector<size_t> get_sizes() {
   std::vector<size_t> sizes = {0};
-  for (size_t size = 1; size <= max_size; size *= 2) {
+  for (size_t size = start_size; size <= max_size; size *= 2) {
     sizes.push_back(size);
   }
   return sizes;
@@ -91,12 +80,15 @@ int main(int argc, char** argv) {
     backend = argv[1];
   }
 
-  std::vector<size_t> sizes;
   if (argc == 3) {
-    sizes = std::vector<size_t>({static_cast<size_t>(std::atoi(argv[2]))});
-  } else {
-    sizes = get_sizes();
+    start_size = std::atoi(argv[2]);
+    max_size = start_size;
   }
+  if (argc == 4) {
+    start_size = std::atoi(argv[2]);
+    max_size = std::atoi(argv[3]);
+  }
+  sizes = get_sizes();
   
   if (backend == "MPI") {
     do_benchmark<Al::MPIBackend>(sizes);
@@ -109,7 +101,14 @@ int main(int argc, char** argv) {
     do_benchmark<Al::MPICUDABackend>(sizes);
 #endif    
   } else {
-    std::cerr << "usage: " << argv[0] << " [MPI | NCCL | MPI-CUDA]\n";
+    std::cerr << "usage: " << argv[0] << " [MPI";
+#ifdef AL_HAS_NCCL
+    std::cerr << " | NCCL";
+#endif
+#ifdef AL_HAS_MPI_CUDA
+    std::cerr << " | MPI-CUDA";
+#endif
+    std::cerr << "]" << std::endl;
     return -1;
   }
 

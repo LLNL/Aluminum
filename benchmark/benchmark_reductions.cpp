@@ -87,18 +87,6 @@ void mt_max_reduction(const T* src, T* dest, size_t count) {
   }
 }
 
-void print_stats(std::vector<double>& times) {
-  double sum = std::accumulate(times.begin(), times.end(), 0.0);
-  double mean = sum / times.size();
-  std::nth_element(times.begin(), times.begin() + times.size() / 2, times.end());
-  double median = times[times.size() / 2];
-  auto minmax = std::minmax_element(times.begin(), times.end());
-  double min = *(minmax.first);
-  double max = *(minmax.second);
-  std::cout << "mean=" << mean << " median=" << median << " min=" << min <<
-    " max=" << max << std::endl;
-}
-
 void time_reduction(
   size_t count,
   std::function<void(const float*, float*, size_t)> single,
