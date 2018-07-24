@@ -43,8 +43,11 @@ endif()
 set_property(TARGET HWLOC::hwloc
   PROPERTY INTERFACE_LINK_LIBRARIES ${HWLOC_LIBRARY})
 
-set_property(TARGET HWLOC::hwloc
-  PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${HWLOC_INCLUDE_PATH})
+if (NOT "/usr/include" STREQUAL "${HWLOC_INCLUDE_PATH}")
+  set_property(TARGET HWLOC::hwloc
+    PROPERTY INTERFACE_INCLUDE_DIRECTORIES
+    ${HWLOC_INCLUDE_PATH})
+endif ()
 
 # Set the last of the output variables
 set(HWLOC_LIBRARIES HWLOC::hwloc)
