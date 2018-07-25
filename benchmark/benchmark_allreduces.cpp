@@ -8,20 +8,9 @@
 #include "test_utils_mpi_cuda.hpp"
 #endif
 
-const size_t max_size = 1<<28;
+size_t start_size = 1;
+size_t max_size = 1<<28;
 const size_t num_trials = 10;
-
-void print_stats(std::vector<double>& times) {
-  double sum = std::accumulate(times.begin(), times.end(), 0.0);
-  double mean = sum / times.size();
-  std::nth_element(times.begin(), times.begin() + times.size() / 2, times.end());
-  double median = times[times.size() / 2];
-  auto minmax = std::minmax_element(times.begin(), times.end());
-  double min = *(minmax.first);
-  double max = *(minmax.second);
-  std::cout << "mean=" << mean << " median=" << median << " min=" << min <<
-    " max=" << max << std::endl;
-}
 
 template <typename Backend>
 void time_allreduce_algo(typename VectorType<Backend>::type input,
@@ -55,15 +44,19 @@ void time_allreduce_algo(typename VectorType<Backend>::type input,
   }
 }
 
+std::vector<size_t> get_sizes() {
+  std::vector<size_t> sizes = {0};
+  for (size_t size = start_size; size <= max_size; size *= 2) {
+    sizes.push_back(size);
+  }
+  return sizes;
+}
+
 template <typename Backend>
-void do_benchmark() {
+void do_benchmark(const std::vector<size_t> &sizes) {
   std::vector<typename Backend::algo_type> algos
       = get_allreduce_algorithms<Backend>();
   typename Backend::comm_type comm;  // Use COMM_WORLD.
-  std::vector<size_t> sizes = {0};
-  for (size_t size = 1; size <= max_size; size *= 2) {
-    sizes.push_back(size);
-  }
   for (const auto& size : sizes) {
     auto data = gen_data<Backend>(size);
     // Benchmark algorithms.
@@ -83,22 +76,39 @@ int main(int argc, char** argv) {
   // Add algorithms to test here.
 
   std::string backend = "MPI";
-  if (argc == 2) {
+  if (argc >= 2) {
     backend = argv[1];
   }
+
+  if (argc == 3) {
+    start_size = std::atoi(argv[2]);
+    max_size = start_size;
+  }
+  if (argc == 4) {
+    start_size = std::atoi(argv[2]);
+    max_size = std::atoi(argv[3]);
+  }
+  std::vector<size_t> sizes = get_sizes();
   
   if (backend == "MPI") {
-    do_benchmark<Al::MPIBackend>();
+    do_benchmark<Al::MPIBackend>(sizes);
 #ifdef AL_HAS_NCCL
   } else if (backend == "NCCL") {
-    do_benchmark<Al::NCCLBackend>();
+    do_benchmark<Al::NCCLBackend>(sizes);
 #endif    
 #ifdef AL_HAS_MPI_CUDA
   } else if (backend == "MPI-CUDA") {
-    do_benchmark<Al::MPICUDABackend>();
+    do_benchmark<Al::MPICUDABackend>(sizes);
 #endif    
   } else {
-    std::cerr << "usage: " << argv[0] << " [MPI | NCCL | MPI-CUDA]\n";
+    std::cerr << "usage: " << argv[0] << " [MPI";
+#ifdef AL_HAS_NCCL
+    std::cerr << " | NCCL";
+#endif
+#ifdef AL_HAS_MPI_CUDA
+    std::cerr << " | MPI-CUDA";
+#endif
+    std::cerr << "]" << std::endl;
     return -1;
   }
 

@@ -36,6 +36,12 @@ ProgressEngine::~ProgressEngine() {
 }
 
 void ProgressEngine::run() {
+#ifdef AL_HAS_CUDA
+  // Capture the current CUDA device for the progress engine.
+  int device;
+  AL_CHECK_CUDA(cudaGetDevice(&device));
+  cur_device = device;
+#endif
   thread = std::thread(&ProgressEngine::engine, this);
   // Wait for the progress engine to start.
   std::unique_lock<std::mutex> lock(startup_mutex);
@@ -154,6 +160,10 @@ void ProgressEngine::bind() {
 }
 
 void ProgressEngine::engine() {
+#ifdef AL_HAS_CUDA
+  // Set the current CUDA device for the thread.
+  AL_CHECK_CUDA(cudaSetDevice(cur_device.load()));
+#endif
   bind();
   {
     std::unique_lock<std::mutex> lock(startup_mutex);

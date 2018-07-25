@@ -35,8 +35,7 @@ void ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
     COLL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, sendbuf, sizeof(T) * count,
                                     cudaMemcpyDefault, stream));
   }
-  std::vector<cudaStream_t> streams = {stream};
-  comm.get_ring().allreduce<T>({recvbuf}, count, op, &streams, false);
+  comm.get_ring().allreduce<T>(recvbuf, count, op, stream, false);
 }
 
 template <typename T> inline
@@ -47,18 +46,19 @@ void bi_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
     COLL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, sendbuf, sizeof(T) * count,
                                     cudaMemcpyDefault, stream));
   }
-  std::vector<cudaStream_t> streams = {stream};
-  comm.get_ring().allreduce<T>({recvbuf}, count, op, &streams, true);
+  comm.get_ring().allreduce<T>(recvbuf, count, op, stream, true);
 }
 
 struct host_transfer_allreduce_data {
   host_transfer_allreduce_data(void* data_, size_t count_,
-                               ReductionOperator op_, MPICommunicator& comm_) :
-    data(data_), count(count_), op(op_), comm(comm_) {}
+                               ReductionOperator op_, MPICommunicator& comm_,
+                               int tag_) :
+    data(data_), count(count_), op(op_), comm(comm_), tag(tag_) {}
   void* data;
   size_t count;
   ReductionOperator op;
   MPICommunicator& comm;
+  int tag;
 };
 
 template <typename T> inline
@@ -66,8 +66,10 @@ void host_transfer_allreduce_callback(cudaStream_t, cudaError_t,
                                       void* data_) {
   host_transfer_allreduce_data* data =
     static_cast<host_transfer_allreduce_data*>(data_);
+  // Use a tag to prevent interference.
   MPIBackend::Allreduce<T>(IN_PLACE<T>(), (T*) data->data, data->count,
-                           data->op, data->comm, AllreduceAlgorithm::automatic);
+                           data->op, data->comm, AllreduceAlgorithm::automatic,
+                           data->tag);
 }
 
 template <typename T> inline
@@ -79,7 +81,8 @@ void host_transfer_allreduce_free_mem(cudaStream_t, cudaError_t, void* data_) {
 template <typename T> inline
 void host_transfer_allreduce(const T* sendbuf, T* recvbuf, T* host_mem,
                              size_t count, ReductionOperator op,
-                             MPICUDACommunicator& comm, cudaStream_t stream) {
+                             MPICUDACommunicator& comm, cudaStream_t stream,
+                             int tag) {
   // If not in-place, transfer the sendbuf.
   if (sendbuf != recvbuf) {
     COLL_CHECK_CUDA(cudaMemcpyAsync(host_mem, sendbuf, sizeof(T)*count,
@@ -90,7 +93,7 @@ void host_transfer_allreduce(const T* sendbuf, T* recvbuf, T* host_mem,
   }
   // Launch callback to run allreduce.
   host_transfer_allreduce_data* data = new host_transfer_allreduce_data(
-    host_mem, count, op, comm);
+    host_mem, count, op, comm, tag);
   COLL_CHECK_CUDA(cudaStreamAddCallback(stream,
                                         host_transfer_allreduce_callback<T>,
                                         (void*) data, 0));
