@@ -15,11 +15,12 @@ internal::ProgressEngine* progress_engine = nullptr;
 }
 
 void Initialize(int& argc, char**& argv) {
+  // Avoid repeated initialization.
+  if (is_initialized) {
+    return;
+  }
+  internal::mpi::init(argc, argv);
 
-  int flag;
-  MPI_Initialized(&flag);
-  if(!flag)
-    internal::mpi::init(argc, argv);
   progress_engine = new internal::ProgressEngine();
   progress_engine->run();
   is_initialized = true;
@@ -35,6 +36,10 @@ void Initialize(int& argc, char**& argv) {
 }
 
 void Finalize() {
+  // Make calling Finalize multiple times safely.
+  if (!is_initialized) {
+    return;
+  }
   // Finalize in reverse order of initialization.
 #ifdef AL_HAS_MPI_CUDA
   internal::mpi_cuda::finalize();
