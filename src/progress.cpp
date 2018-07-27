@@ -1,4 +1,5 @@
 #include <hwloc.h>
+#include <cstdlib>
 #include "Al.hpp"
 #include "progress.hpp"
 
@@ -140,23 +141,38 @@ void ProgressEngine::bind() {
   if (numa_node == NULL) {
     throw_al_exception("Could not get NUMA node.");
   }
-  // Determine how many cores are in this NUMA node.
-  int num_cores = hwloc_get_nbobjs_inside_cpuset_by_type(
-    topo, numa_node->cpuset, HWLOC_OBJ_CORE);
-  if (num_cores <= 0) {
-    throw_al_exception("Could not determine number of cores.");
+  int core_to_bind = -1;
+  // Check if the core has been manually set.
+  char* env = std::getenv("AL_PROGRESS_CORE");
+  if (env) {
+    core_to_bind = std::atoi(env);
+  } else {
+    // Determine how many cores are in this NUMA node.
+    int num_cores = hwloc_get_nbobjs_inside_cpuset_by_type(
+      topo, numa_node->cpuset, HWLOC_OBJ_CORE);
+    if (num_cores <= 0) {
+      throw_al_exception("Could not determine number of cores.");
+    }
+    // Determine which core on this NUMA node to map us to.
+    // Support specifying this in the environment too.
+    int ranks_per_numa_node = -1;
+    env = std::getenv("AL_PROGRESS_RANKS_PER_NUMA_NODE");
+    if (env) {
+      ranks_per_numa_node = std::atoi(env);
+    } else {
+      // Note: This doesn't handle the case where things aren't evenly divisible.
+      ranks_per_numa_node = std::max(
+        1, world_comm->local_size() / num_numa_nodes);
+    }
+    int numa_rank = world_comm->local_rank() % ranks_per_numa_node;
+    if (numa_rank > num_cores) {
+      throw_al_exception("Not enough cores to bind to.");
+    }
+    // Pin to the last - numa_rank core.
+    core_to_bind = num_cores - 1 - numa_rank;
   }
-  // Determine which core on this NUMA node to map us to.
-  // Note: This doesn't handle the case where things aren't evenly divisible.
-  int ranks_per_numa_node = std::max(
-    1, world_comm->local_size() / num_numa_nodes);
-  int numa_rank = world_comm->local_rank() % ranks_per_numa_node;
-  if (numa_rank > num_cores) {
-    throw_al_exception("Not enough cores to bind to.");
-  }
-  // Pin to the last - numa_rank core.
   hwloc_obj_t core = hwloc_get_obj_inside_cpuset_by_type(
-    topo, numa_node->cpuset, HWLOC_OBJ_CORE, num_cores - 1 - numa_rank);
+    topo, numa_node->cpuset, HWLOC_OBJ_CORE, core_to_bind);
   if (core == NULL) {
     throw_al_exception("Could not get core.");
   }
