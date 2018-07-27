@@ -137,17 +137,29 @@ void ProgressEngine::bind() {
   hwloc_bitmap_singlify(nodeset);
   hwloc_obj_t numa_node = hwloc_get_numanode_obj_by_os_index(
     topo, hwloc_bitmap_first(nodeset));
+  if (numa_node == NULL) {
+    throw_al_exception("Could not get NUMA node.");
+  }
   // Determine how many cores are in this NUMA node.
   int num_cores = hwloc_get_nbobjs_inside_cpuset_by_type(
     topo, numa_node->cpuset, HWLOC_OBJ_CORE);
+  if (num_cores <= 0) {
+    throw_al_exception("Could not determine number of cores.");
+  }
   // Determine which core on this NUMA node to map us to.
   // Note: This doesn't handle the case where things aren't evenly divisible.
   int ranks_per_numa_node = std::max(
     1, world_comm->local_size() / num_numa_nodes);
   int numa_rank = world_comm->local_rank() % ranks_per_numa_node;
+  if (numa_rank > num_cores) {
+    throw_al_exception("Not enough cores to bind to.");
+  }
   // Pin to the last - numa_rank core.
   hwloc_obj_t core = hwloc_get_obj_inside_cpuset_by_type(
     topo, numa_node->cpuset, HWLOC_OBJ_CORE, num_cores - 1 - numa_rank);
+  if (core == NULL) {
+    throw_al_exception("Could not get core.");
+  }
   hwloc_cpuset_t coreset = hwloc_bitmap_dup(core->cpuset);
   hwloc_bitmap_singlify(coreset);
   if (hwloc_set_cpubind(topo, coreset, HWLOC_CPUBIND_THREAD) == -1) {
