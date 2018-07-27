@@ -145,6 +145,7 @@ void ProgressEngine::bind() {
   // Check if the core has been manually set.
   char* env = std::getenv("AL_PROGRESS_CORE");
   if (env) {
+    // Note: This still binds within the current NUMA node.
     core_to_bind = std::atoi(env);
   } else {
     // Determine how many cores are in this NUMA node.
@@ -168,8 +169,9 @@ void ProgressEngine::bind() {
     if (numa_rank > num_cores) {
       throw_al_exception("Not enough cores to bind to.");
     }
-    // Pin to the last - numa_rank core.
-    core_to_bind = num_cores - 1 - numa_rank;
+    // Assume the NUMA node is partitioned among the ranks on it, and bind to
+    // the last core in our chunk.
+    core_to_bind = (numa_rank + 1)*(num_cores / ranks_per_numa_node) - 1;
   }
   hwloc_obj_t core = hwloc_get_obj_inside_cpuset_by_type(
     topo, numa_node->cpuset, HWLOC_OBJ_CORE, core_to_bind);
