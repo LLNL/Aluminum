@@ -1,4 +1,5 @@
 #include <hwloc.h>
+#include <cstdlib>
 #include "Al.hpp"
 #include "progress.hpp"
 
@@ -137,17 +138,46 @@ void ProgressEngine::bind() {
   hwloc_bitmap_singlify(nodeset);
   hwloc_obj_t numa_node = hwloc_get_numanode_obj_by_os_index(
     topo, hwloc_bitmap_first(nodeset));
-  // Determine how many cores are in this NUMA node.
-  int num_cores = hwloc_get_nbobjs_inside_cpuset_by_type(
-    topo, numa_node->cpuset, HWLOC_OBJ_CORE);
-  // Determine which core on this NUMA node to map us to.
-  // Note: This doesn't handle the case where things aren't evenly divisible.
-  int ranks_per_numa_node = std::max(
-    1, world_comm->local_size() / num_numa_nodes);
-  int numa_rank = world_comm->local_rank() % ranks_per_numa_node;
-  // Pin to the last - numa_rank core.
+  if (numa_node == NULL) {
+    throw_al_exception("Could not get NUMA node.");
+  }
+  int core_to_bind = -1;
+  // Check if the core has been manually set.
+  char* env = std::getenv("AL_PROGRESS_CORE");
+  if (env) {
+    // Note: This still binds within the current NUMA node.
+    core_to_bind = std::atoi(env);
+  } else {
+    // Determine how many cores are in this NUMA node.
+    int num_cores = hwloc_get_nbobjs_inside_cpuset_by_type(
+      topo, numa_node->cpuset, HWLOC_OBJ_CORE);
+    if (num_cores <= 0) {
+      throw_al_exception("Could not determine number of cores.");
+    }
+    // Determine which core on this NUMA node to map us to.
+    // Support specifying this in the environment too.
+    int ranks_per_numa_node = -1;
+    env = std::getenv("AL_PROGRESS_RANKS_PER_NUMA_NODE");
+    if (env) {
+      ranks_per_numa_node = std::atoi(env);
+    } else {
+      // Note: This doesn't handle the case where things aren't evenly divisible.
+      ranks_per_numa_node = std::max(
+        1, world_comm->local_size() / num_numa_nodes);
+    }
+    int numa_rank = world_comm->local_rank() % ranks_per_numa_node;
+    if (numa_rank > num_cores) {
+      throw_al_exception("Not enough cores to bind to.");
+    }
+    // Assume the NUMA node is partitioned among the ranks on it, and bind to
+    // the last core in our chunk.
+    core_to_bind = (numa_rank + 1)*(num_cores / ranks_per_numa_node) - 1;
+  }
   hwloc_obj_t core = hwloc_get_obj_inside_cpuset_by_type(
-    topo, numa_node->cpuset, HWLOC_OBJ_CORE, num_cores - 1 - numa_rank);
+    topo, numa_node->cpuset, HWLOC_OBJ_CORE, core_to_bind);
+  if (core == NULL) {
+    throw_al_exception("Could not get core.");
+  }
   hwloc_cpuset_t coreset = hwloc_bitmap_dup(core->cpuset);
   hwloc_bitmap_singlify(coreset);
   if (hwloc_set_cpubind(topo, coreset, HWLOC_CPUBIND_THREAD) == -1) {
