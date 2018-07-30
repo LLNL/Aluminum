@@ -25,6 +25,9 @@ target_include_directories(
 
 add_executable(TestCorrectness.exe test_correctness.cpp ${TEST_HEADERS})
 target_link_libraries(TestCorrectness.exe PRIVATE Al)
+if (AL_HAS_CUDA)
+  target_link_libraries(TestCorrectness.exe PUBLIC cuda)
+endif ()
 
 # This is mostly a sanity check
 set(TEST_ARGS MPI 8)
@@ -42,6 +45,9 @@ endif ()
 add_executable(TestMultiNBAllReduces.exe
   test_multi_nballreduces.cpp ${TEST_HEADERS})
 target_link_libraries(TestMultiNBAllReduces.exe PRIVATE Al)
+if (AL_HAS_CUDA)
+  target_link_libraries(TestMultiNBAllReduces.exe PUBLIC cuda)
+endif ()
 
 set(TEST_ARGS "8")
 add_test(NAME TestMultiNBAllReduces
@@ -58,6 +64,9 @@ endif ()
 add_executable(TestNCCLCollectives.exe
   test_nccl_collectives.cpp ${TEST_HEADERS})
 target_link_libraries(TestNCCLCollectives.exe PRIVATE Al)
+if (AL_HAS_CUDA)
+  target_link_libraries(TestNCCLCollectives.exe PUBLIC cuda)
+endif ()
 
 set(TEST_ARGS "8")
 add_test(NAME TestNCCLCollectives
