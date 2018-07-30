@@ -39,7 +39,8 @@ get_allreduce_algorithms<Al::MPICUDABackend>() {
   std::vector<typename Al::MPICUDABackend::algo_type> algos = {
     Al::MPICUDABackend::algo_type::ring,    
     Al::MPICUDABackend::algo_type::bi_ring,
-    Al::MPICUDABackend::algo_type::host_transfer
+    Al::MPICUDABackend::algo_type::host_transfer,
+    Al::MPICUDABackend::algo_type::host_transfer2
   };
   return algos;
 }
@@ -50,7 +51,8 @@ get_nb_allreduce_algorithms<Al::MPICUDABackend>() {
   std::vector<typename Al::MPICUDABackend::algo_type> algos = {
     Al::MPICUDABackend::algo_type::ring,
     Al::MPICUDABackend::algo_type::bi_ring,
-    Al::MPICUDABackend::algo_type::host_transfer
+    Al::MPICUDABackend::algo_type::host_transfer,
+    Al::MPICUDABackend::algo_type::host_transfer2
   };
   return algos;
 }

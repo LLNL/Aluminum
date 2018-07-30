@@ -9,7 +9,8 @@ enum class MPICUDAAllreduceAlgorithm {
   automatic,
   ring,
   bi_ring,
-  host_transfer
+  host_transfer,
+  host_transfer2
 };
 
 inline std::string allreduce_name(MPICUDAAllreduceAlgorithm algo) {
@@ -22,6 +23,8 @@ inline std::string allreduce_name(MPICUDAAllreduceAlgorithm algo) {
     return "bi-ring";
   case MPICUDAAllreduceAlgorithm::host_transfer:
     return "host-transfer";
+  case MPICUDAAllreduceAlgorithm::host_transfer2:
+    return "host-transfer2";
   default:
     return "unknown";
   }
@@ -77,6 +80,10 @@ class MPICUDABackend {
     case MPICUDAAllreduceAlgorithm::host_transfer:
       do_host_transfer_allreduce(sendbuf, recvbuf, count, op, comm);
       break;
+    case MPICUDAAllreduceAlgorithm::host_transfer2:
+      do_host_transfer_allreduce2(sendbuf, recvbuf, count, op, comm,
+                                  comm.get_stream());
+      break;
     default:
       throw_al_exception("Invalid algorithm");
     }
@@ -116,6 +123,10 @@ class MPICUDABackend {
     case MPICUDAAllreduceAlgorithm::host_transfer:
       do_nonblocking_host_transfer_allreduce(
         sendbuf, recvbuf, count, op, comm, req, internal_stream);
+      break;
+    case MPICUDAAllreduceAlgorithm::host_transfer2:
+      do_host_transfer_allreduce2(sendbuf, recvbuf, count, op, comm,
+                                  internal_stream);
       break;
     default:
       throw_al_exception("Invalid algorithm");
@@ -198,6 +209,19 @@ class MPICUDABackend {
                     internal_stream,
                     internal::mpi_cuda::host_transfer_allreduce_free_mem<T>,
                     (void*) host_mem, 0));
+  }
+
+  /** Run a host-transfer allreduce. */
+  template <typename T>
+  static void do_host_transfer_allreduce2(
+    const T* sendbuf, T* recvbuf, size_t count, ReductionOperator op,
+    comm_type& comm, cudaStream_t internal_stream) {
+    if (!internal::cuda::stream_memory_operations_supported()) {
+      throw_al_exception("Host-transfer allreduce not supported without stream memory operations");
+    }
+    internal::mpi_cuda::HostTransferState<T>* state = new internal::mpi_cuda::HostTransferState<T>(
+      sendbuf, recvbuf, count, op, comm, internal_stream, internal::get_free_request());
+    internal::get_progress_engine()->enqueue(state);
   }
 
 };
