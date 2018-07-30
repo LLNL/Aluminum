@@ -232,8 +232,12 @@ void ProgressEngine::engine() {
     for (auto i = in_progress_reqs.begin(); i != in_progress_reqs.end();) {
       AlState* state = *i;
       if (state->step()) {
-        // Request completed, but don't try to block here.
-        completed.push_back(state);
+        if (state->needs_completion()) {
+          // Request completed, but don't try to block here.
+          completed.push_back(state);
+        } else {
+          delete state;  // Free here.
+        }
         i = in_progress_reqs.erase(i);
       } else {
         ++i;

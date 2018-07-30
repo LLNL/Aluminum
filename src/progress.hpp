@@ -51,6 +51,8 @@ class AlState {
   virtual bool step() = 0;
   /** Return the associated request. */
   AlRequest get_req() const { return req; }
+  /** True if this is meant ot be waited on by the user. */
+  virtual bool needs_completion() const { return true; }
  private:
   AlRequest req;
 };
