@@ -43,10 +43,42 @@
     }                                                           \
   } while (0)
 
+#define AL_FORCE_CHECK_CUDA_DRV(cuda_call)                      \
+  do {                                                          \
+    AL_CUDA_SYNC(true);                                         \
+    CUresult status_CHECK_CUDA_DRV = (cuda_call);               \
+    if (status_CHECK_CUDA_DRV != cudaSuccess) {                 \
+      const char* err_msg_CHECK_CUDA_DRV;                       \
+      cuGetErrorString(status_CHECK_CUDA_DRV,                   \
+                       &err_msg_CHECK_CUDA_DRV);                \
+      throw_al_exception(std::string("CUDA driver error: ")     \
+                         + err_msg_CHECK_CUDA_DRV);             \
+    }                                                           \
+    AL_CUDA_SYNC(false);                                        \
+  } while (0)
+
+#define AL_FORCE_CHECK_CUDA_DRV_NOSYNC(cuda_call)               \
+  do {                                                          \
+    CUresult status_CHECK_CUDA_DRV = (cuda_call);               \
+    if (status_CHECK_CUDA_DRV != cudaSuccess) {                 \
+      const char* err_msg_CHECK_CUDA_DRV;                       \
+      cuGetErrorString(status_CHECK_CUDA_DRV,                   \
+                       &err_msg_CHECK_CUDA_DRV);                \
+      throw_al_exception(std::string("CUDA driver error: ")     \
+                         + err_msg_CHECK_CUDA_DRV);             \
+    }                                                           \
+  } while (0)
+
 #ifdef AL_DEBUG
 #define AL_CHECK_CUDA(cuda_call) AL_FORCE_CHECK_CUDA(cuda_call)
+#define AL_CHECK_CUDA_NOSYNC(cuda_call) AL_FORCE_CHECK_CUDA_NOSYNC(cuda_call)
+#define AL_CHECK_CUDA_DRV(cuda_call) AL_FORCE_CHECK_CUDA_DRV(cuda_call)
+#define AL_CHECK_CUDA_DRV_NOSYNC(cuda_call) AL_FORCE_CHECK_CUDA_DRV_NOSYNC(cuda_call)
 #else
 #define AL_CHECK_CUDA(cuda_call) (cuda_call)
+#define AL_CHECK_CUDA_NOSYNC(cuda_call) (cuda_call)
+#define AL_CHECK_CUDA_DRV(cuda_call) (cuda_call)
+#define AL_CHECK_CUDA_DRV_NOSYNC(cuda_call) (cuda_call)
 #endif
 
 namespace Al {
@@ -72,6 +104,9 @@ void release_cuda_event(cudaEvent_t event);
 cudaStream_t get_internal_stream();
 /** Get a specific internal stream. */
 cudaStream_t get_internal_stream(size_t id);
+
+/** Return whether stream memory operations are supported. */
+bool stream_memory_operations_supported();
 
 }  // namespace cuda
 }  // namespace internal

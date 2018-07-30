@@ -11,6 +11,8 @@ std::vector<cudaEvent_t> cuda_events;
 // Internal CUDA streams.
 constexpr int num_internal_streams = 5;
 cudaStream_t internal_streams[num_internal_streams];
+// Whether stream memory operations are supported.
+bool stream_mem_ops_supported = false;
 }
 
 void init(int&, char**&) {
@@ -18,6 +20,13 @@ void init(int&, char**&) {
   for (int i = 0; i < num_internal_streams; ++i) {
     AL_CHECK_CUDA(cudaStreamCreate(&internal_streams[i]));
   }
+  // Check whether stream memory operations are supported.
+  CUdevice dev;
+  AL_CHECK_CUDA_DRV(cuCtxGetDevice(&dev));
+  int attr;
+  AL_CHECK_CUDA_DRV(cuDeviceGetAttribute(
+                      &attr, CU_DEVICE_ATTRIBUTE_CAN_USE_STREAM_MEM_OPS, dev));
+  stream_mem_ops_supported = attr;
 }
 void finalize() {
   for (auto&& event : cuda_events) {
@@ -50,6 +59,10 @@ cudaStream_t get_internal_stream() {
 
 cudaStream_t get_internal_stream(size_t id) {
   return internal_streams[id];
+}
+
+bool stream_memory_operations_supported() {
+  return stream_mem_ops_supported;
 }
 
 }  // namespace cuda
