@@ -20,6 +20,7 @@ void Initialize(int& argc, char**& argv) {
     return;
   }
   internal::mpi::init(argc, argv);
+
   progress_engine = new internal::ProgressEngine();
   progress_engine->run();
   is_initialized = true;

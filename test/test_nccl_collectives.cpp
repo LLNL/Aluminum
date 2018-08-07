@@ -456,26 +456,22 @@ void test_correctness() {
 }
 
 int main(int argc, char** argv) {
-  // Need to set the CUDA device before initializing Aluminum.
-#ifdef AL_HAS_CUDA
-  set_device();
-#endif
+#ifndef AL_HAS_NCCL
+  std::cerr << "Aluminum is not built with NCCL\n";
+#else
+  if(argc > 2) {
+    std::cerr << "usage: " << argv[0] << " [max_size] \n";
+    return 0;
+  }
+  if(argc == 2)
+    max_size = std::stoul(argv[1]);
+
   Al::Initialize(argc, argv);
-
-  std::string backend = "";
-  max_size = std::stoul(argv[1]);
-
-#ifdef AL_HAS_NCCL
-  if (backend == "NCCL") {
-    test_correctness<Al::NCCLBackend>();
-  }
-#endif
-  if (backend == "") {
-    std::cerr << "usage: " << argv[0] << " [NCCL] \n";
-    return -1;
-  }
-
+  set_device();
+  test_correctness<Al::NCCLBackend>();
   Al::Finalize();
+#endif
+
   return 0;
 }
   
