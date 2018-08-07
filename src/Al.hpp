@@ -45,6 +45,20 @@ class Communicator {
   /** Return the number of processes in the communicator on the same node. */
   virtual int local_size() const = 0;
 };
+ 
+/**
+ * Initialize Aluminum.
+ * This must be called before any other calls to the library. It is safe to
+ * call this multiple times.
+ */
+void Initialize(int& argc, char**& argv);
+/**
+ * Clean up Aluminum.
+ * Do not make any further calls to the library after calling this.
+ */
+void Finalize();
+/** Return true if Aluminum has been initialized. */
+bool Initialized();
 
 /**
  * Perform an allreduce.
