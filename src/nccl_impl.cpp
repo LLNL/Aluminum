@@ -11,26 +11,18 @@ NCCLCommunicator::NCCLCommunicator(MPI_Comm comm_, cudaStream_t stream_)
 }
 
 NCCLCommunicator::~NCCLCommunicator() {
-  int flag;
-  MPI_Initialized(&flag);
-  if(flag){
-    nccl_destroy();
-  }
+  nccl_destroy();
 }
 
 void NCCLCommunicator::nccl_setup() {
-  int flag;
-  MPI_Initialized(&flag);
-  if(flag){
-    // Get a unique ID for this communicator from NCCL and distribute it.
-    ncclUniqueId nccl_id;
-    if (rank() == 0) {
-      AL_CHECK_NCCL(ncclGetUniqueId(&nccl_id));
-    }
-    MPI_Bcast(&nccl_id, sizeof(nccl_id), MPI_BYTE, 0, get_comm());
-    // This uses the current CUDA device.
-    AL_CHECK_NCCL(ncclCommInitRank(&m_nccl_comm, size(), nccl_id, rank()));
+  // Get a unique ID for this communicator from NCCL and distribute it.
+  ncclUniqueId nccl_id;
+  if (rank() == 0) {
+    AL_CHECK_NCCL(ncclGetUniqueId(&nccl_id));
   }
+  MPI_Bcast(&nccl_id, sizeof(nccl_id), MPI_BYTE, 0, get_comm());
+  // This uses the current CUDA device.
+  AL_CHECK_NCCL(ncclCommInitRank(&m_nccl_comm, size(), nccl_id, rank()));
 }
 
 void NCCLCommunicator::nccl_destroy() {

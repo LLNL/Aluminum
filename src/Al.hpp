@@ -45,7 +45,7 @@ class Communicator {
   /** Return the number of processes in the communicator on the same node. */
   virtual int local_size() const = 0;
 };
- 
+
 /**
  * Initialize Aluminum.
  * This must be called before any other calls to the library. It is safe to

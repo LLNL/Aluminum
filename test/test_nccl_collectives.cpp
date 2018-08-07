@@ -457,17 +457,14 @@ void test_correctness() {
 
 int main(int argc, char** argv) {
 #ifndef AL_HAS_NCCL
-  std::cerr << "Aluminum is not built with NCCL\n";
+  std::cerr << "Aluminum is not built with NCCL" << std::endl;
 #else
-  if(argc > 2) {
-    std::cerr << "usage: " << argv[0] << " [max_size] \n";
-    return 0;
-  }
-  if(argc == 2)
+  if (argc == 2) {
     max_size = std::stoul(argv[1]);
+  }
 
-  Al::Initialize(argc, argv);
   set_device();
+  Al::Initialize(argc, argv);
   test_correctness<Al::NCCLBackend>();
   Al::Finalize();
 #endif
