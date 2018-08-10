@@ -18,10 +18,13 @@ __global__ void wait_kernel(long long int cycles) {
 void gpu_wait(double length, cudaStream_t stream) {
   // Need to figure out frequency to convert seconds to cycles.
   // Might not be exactly accurate (especially w/ dynamic frequencies).
-  int device;
-  cudaGetDevice(&device);
-  int freq_khz;  // Frequency is in KHz.
-  cudaDeviceGetAttribute(&freq_khz, cudaDevAttrClockRate, device);
+  // Cache this (unlikely we run on devices with different frequencies.)
+  static int freq_khz = 0;  // Frequency is in KHz.
+  if (freq_khz == 0) {
+    int device;
+    cudaGetDevice(&device);
+    cudaDeviceGetAttribute(&freq_khz, cudaDevAttrClockRate, device);
+  }
   double cycles = length * freq_khz*1000.0;
   wait_kernel<<<1, 1, 0, stream>>>((long long int) cycles);
 }
