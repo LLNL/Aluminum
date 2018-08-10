@@ -39,7 +39,13 @@ class MPICommunicator : public Communicator {
   int local_rank() const override { return rank_in_local_comm; }
   int local_size() const override { return size_of_local_comm; }
   MPI_Comm get_local_comm() const { return local_comm; }
-  int get_free_tag() { return free_tag++; }
+  int get_free_tag() {
+    int tag = free_tag++;
+    if (free_tag >= MPI_TAG_UB || free_tag < starting_free_tag) {
+      free_tag = 10;
+    }
+    return tag;
+  }
 
  private:
   /** Associated MPI communicator. */
@@ -55,12 +61,12 @@ class MPICommunicator : public Communicator {
   /** Size of the local communicator. */
   int size_of_local_comm;
   /**
-   * Free tag for communication.
-   * This is used by non-blocking operations. No other operations should use
-   * any tag greater than or equal to this one.
-   * TODO: This could possibly wrap around.
+   * Starting tag to use for non-blocking operations.
+   * No other operations should use any tag >= to this one.
    */
-  int free_tag = 10;
+  static constexpr int starting_free_tag = 10;
+  /** Free tag for communication. */
+  int free_tag = starting_free_tag;
 };
 
 namespace internal {
