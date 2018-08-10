@@ -47,7 +47,7 @@
   do {                                                          \
     AL_CUDA_SYNC(true);                                         \
     CUresult status_CHECK_CUDA_DRV = (cuda_call);               \
-    if (status_CHECK_CUDA_DRV != cudaSuccess) {                 \
+    if (status_CHECK_CUDA_DRV != CUDA_SUCCESS) {                \
       const char* err_msg_CHECK_CUDA_DRV;                       \
       cuGetErrorString(status_CHECK_CUDA_DRV,                   \
                        &err_msg_CHECK_CUDA_DRV);                \
@@ -60,7 +60,7 @@
 #define AL_FORCE_CHECK_CUDA_DRV_NOSYNC(cuda_call)               \
   do {                                                          \
     CUresult status_CHECK_CUDA_DRV = (cuda_call);               \
-    if (status_CHECK_CUDA_DRV != cudaSuccess) {                 \
+    if (status_CHECK_CUDA_DRV != CUDA_SUCCESS) {                \
       const char* err_msg_CHECK_CUDA_DRV;                       \
       cuGetErrorString(status_CHECK_CUDA_DRV,                   \
                        &err_msg_CHECK_CUDA_DRV);                \
@@ -90,8 +90,6 @@ void init(int& argc, char**& argv);
 /** Finalize CUDA. */
 void finalize();
 
-// Pool to re-use CUDA events. These are not thread-safe.
-// TODO: Figure out if we need to make these thread-safe.
 /** Return a currently unused CUDA event. */
 cudaEvent_t get_cuda_event();
 /** Release a finished CUDA event. */

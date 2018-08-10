@@ -1,4 +1,5 @@
 #include <vector>
+#include <mutex>
 #include "cuda.hpp"
 
 namespace Al {
@@ -8,6 +9,8 @@ namespace cuda {
 namespace {
 // Stack of CUDA events for reuse.
 std::vector<cudaEvent_t> cuda_events;
+// Lock to protect the CUDA events.
+std::mutex cuda_events_lock;
 // Internal CUDA streams.
 constexpr int num_internal_streams = 5;
 cudaStream_t internal_streams[num_internal_streams];
@@ -38,6 +41,7 @@ void finalize() {
 }
 
 cudaEvent_t get_cuda_event() {
+  std::lock_guard<std::mutex> lock(cuda_events_lock);
   cudaEvent_t event;
   if (cuda_events.empty()) {
     AL_CHECK_CUDA(cudaEventCreateWithFlags(&event, cudaEventDisableTiming));
@@ -49,6 +53,7 @@ cudaEvent_t get_cuda_event() {
 }
 
 void release_cuda_event(cudaEvent_t event) {
+  std::lock_guard<std::mutex> lock(cuda_events_lock);
   cuda_events.push_back(event);
 }
 
