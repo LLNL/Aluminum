@@ -106,6 +106,29 @@ cudaStream_t get_internal_stream(size_t id);
 /** Return whether stream memory operations are supported. */
 bool stream_memory_operations_supported();
 
+/**
+ * An optimized version of CUDA events.
+ * This essentially uses full/empty bit semantics to implement synchronization.
+ * A memory location is polled on by the host and written to by the device
+ * using the stream memory write operation.
+ */
+class FastEvent {
+ public:
+  /**
+   * Allocate the event.
+   * The event is in an undefined state until record has been called.
+   */
+  FastEvent();
+  ~FastEvent();
+  /** Record the event into stream. */
+  void record(cudaStream_t stream);
+  /** Return true if the event has completed. */
+  bool query();
+ private:
+  int32_t* sync_event __attribute__((aligned(64)));
+  CUdeviceptr sync_event_dev_ptr;
+};
+
 }  // namespace cuda
 }  // namespace internal
 }  // namespace Al

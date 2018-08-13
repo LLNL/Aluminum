@@ -336,6 +336,48 @@ void NonblockingBcast(
 }
 
 /**
+ * Send a point-to-point message.
+ * @param sendbuf The data to send.
+ * @param count Length of sendbuf.
+ * @param dest Rank in comm to send to.
+ * @param comm Communicator to send within.
+ */
+template <typename Backend, typename T>
+void Send(const T* sendbuf, size_t count, int dest,
+          typename Backend::comm_type& comm) {
+  Backend::template Send<T>(sendbuf, count, dest, comm);
+}
+
+/** Non-blocking version of Send. */
+template <typename Backend, typename T>
+void NonblockingSend(const T* sendbuf, size_t count, int dest,
+                     typename Backend::comm_type& comm,
+                     typename Backend::req_type& req) {
+  Backend::template NonblockingSend<T>(sendbuf, count, dest, comm, req);
+}
+
+/**
+ * Receive a point-to-point message.
+ * @param recvbuf Buffer to receive into.
+ * @param count Length of recvbuf.
+ * @param src Rank in comm to receive from.
+ * @param comm Communicator to receive within.
+ */
+template <typename Backend, typename T>
+void Recv(T* recvbuf, size_t count, int src,
+          typename Backend::comm_type& comm) {
+  Backend::template Recv<T>(recvbuf, count, src, comm);
+}
+
+/** Non-blocking version of Recv. */
+template <typename Backend, typename T>
+void NonblockingRecv(T* recvbuf, size_t count, int src,
+                     typename Backend::comm_type& comm,
+                     typename Backend::req_type& req) {
+  Backend::template NonblockingRecv<T>(recvbuf, count, src, comm, req);
+}
+
+/**
  * Test whether req has completed or not, returning true if it has.
  */
 template <typename Backend>

@@ -1,6 +1,8 @@
 #include <vector>
 #include <mutex>
+#include "Al.hpp"
 #include "cuda.hpp"
+#include "mempool.hpp"
 
 namespace Al {
 namespace internal {
@@ -68,6 +70,31 @@ cudaStream_t get_internal_stream(size_t id) {
 
 bool stream_memory_operations_supported() {
   return stream_mem_ops_supported;
+}
+
+FastEvent::FastEvent() {
+  if (!stream_memory_operations_supported()) {
+    throw_al_exception("FastEvent requires stream memory operations");
+  }
+  sync_event = get_pinned_memory<int32_t>(1);
+  AL_CHECK_CUDA_DRV(cuMemHostGetDevicePointer(
+                      &sync_event_dev_ptr, sync_event, 0));
+}
+
+FastEvent::~FastEvent() {
+  release_pinned_memory(sync_event);
+}
+
+void FastEvent::record(cudaStream_t stream) {
+  // We cannot use std::atomic because we need the actual address of the memory.
+  __atomic_store_n(sync_event, 0, __ATOMIC_SEQ_CST);
+  AL_CHECK_CUDA_DRV(cuStreamWriteValue32(
+                      stream, sync_event_dev_ptr, 1,
+                      CU_STREAM_WRITE_VALUE_DEFAULT));
+}
+
+bool FastEvent::query() {
+  return __atomic_load_n(sync_event, __ATOMIC_SEQ_CST);
 }
 
 }  // namespace cuda

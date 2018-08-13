@@ -2,6 +2,7 @@
 
 #include "Al.hpp"
 #include "mpi_cuda/allreduce.hpp"
+#include "mpi_cuda/pt2pt.hpp"
 
 namespace Al {
 
@@ -146,6 +147,22 @@ class MPICUDABackend {
       algo_type algo) {
     NonblockingAllreduce(recvbuf, recvbuf, count, op, comm,
                          req, algo);
+  }
+
+  template <typename T>
+  static void Send(const T* sendbuf, size_t count, int dest, comm_type& comm) {
+    internal::mpi_cuda::SendAlState<T>* state =
+      new internal::mpi_cuda::SendAlState<T>(
+        sendbuf, count, dest, comm, comm.get_stream());
+    internal::get_progress_engine()->enqueue(state);
+  }
+
+  template <typename T>
+  static void Recv(T* recvbuf, size_t count, int src, comm_type& comm) {
+    internal::mpi_cuda::RecvAlState<T>* state =
+      new internal::mpi_cuda::RecvAlState<T>(
+        recvbuf, count, src, comm, comm.get_stream());
+    internal::get_progress_engine()->enqueue(state);
   }
 
  private:

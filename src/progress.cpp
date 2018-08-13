@@ -166,11 +166,9 @@ void ProgressEngine::engine() {
   startup_cv.notify_one();
   while (!stop_flag.load(std::memory_order_acquire)) {
     // Check for newly-submitted requests, if we can take more.
-    while (num_in_progress_reqs < AL_PE_NUM_CONCURRENT_OPS) {
+    if (num_in_progress_reqs < AL_PE_NUM_CONCURRENT_OPS) {
       AlState* req = enqueued_reqs.pop();
-      if (req == nullptr) {
-        break;
-      } else {
+      if (req != nullptr) {
         // Find a free spot for the new request.
         for (size_t i = 0; i < AL_PE_NUM_CONCURRENT_OPS; ++i) {
           if (in_progress_reqs[i] == nullptr) {
