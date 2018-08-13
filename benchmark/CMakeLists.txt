@@ -22,3 +22,11 @@ if (AL_HAS_CUDA)
   target_link_libraries(benchmark_overlap.exe PUBLIC cuda)
 endif ()
 target_include_directories(benchmark_overlap.exe PRIVATE ${CMAKE_SOURCE_DIR}/test)
+
+add_executable(benchmark_pingpong.exe benchmark_pingpong.cpp
+  $<$<BOOL:${AL_HAS_CUDA}>:wait.cu>)
+target_link_libraries(benchmark_pingpong.exe PRIVATE Al aluminum_test_headers)
+if (AL_HAS_CUDA)
+  target_link_libraries(benchmark_pingpong.exe PUBLIC cuda)
+endif ()
+target_include_directories(benchmark_pingpong.exe PRIVATE ${CMAKE_SOURCE_DIR}/test)
