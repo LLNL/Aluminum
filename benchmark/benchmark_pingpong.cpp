@@ -53,37 +53,23 @@ void do_benchmark() {
     MPI_Barrier(MPI_COMM_WORLD);
     for (size_t trial = 0; trial < num_trials; ++trial) {
       // Launch a dummy kernel just to match what the GPU version does.
-      gpu_wait(0.001, stream);
-      MPI_Request req1, req2;
-      int flag1 = 0;
-      int flag2 = 0;
+      gpu_wait(0.0001, stream);
       start_timer<Al::MPIBackend>(comm);
-      // Using an Isend/Irecv style to better match what the GPU version uses.
       if (comm.rank() == 0) {
-        //MPI_Send(host_sendbuf.data(), size, MPI_FLOAT, 1, 1, MPI_COMM_WORLD);
-        //MPI_Recv(host_recvbuf.data(), size, MPI_FLOAT, 1, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        MPI_Isend(host_sendbuf.data(), size, MPI_FLOAT, 1, 1, MPI_COMM_WORLD, &req1);
-        MPI_Irecv(host_recvbuf.data(), size, MPI_FLOAT, 1, 1, MPI_COMM_WORLD, &req2);
-        while (!flag1 || !flag2) {
-          MPI_Test(&req1, &flag1, MPI_STATUS_IGNORE);
-          MPI_Test(&req2, &flag2, MPI_STATUS_IGNORE);
-        }
+        MPI_Send(host_sendbuf.data(), size, MPI_FLOAT, 1, 1, MPI_COMM_WORLD);
+        MPI_Recv(host_recvbuf.data(), size, MPI_FLOAT, 1, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
       } else if (comm.rank() == 1) {
-        //MPI_Recv(host_recvbuf.data(), size, MPI_FLOAT, 0, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        //MPI_Send(host_sendbuf.data(), size, MPI_FLOAT, 0, 1, MPI_COMM_WORLD);
-        MPI_Irecv(host_recvbuf.data(), size, MPI_FLOAT, 0, 1, MPI_COMM_WORLD, &req1);
-        MPI_Isend(host_sendbuf.data(), size, MPI_FLOAT, 0, 1, MPI_COMM_WORLD, &req2);
-        while (!flag1 || !flag2) {
-          MPI_Test(&req1, &flag1, MPI_STATUS_IGNORE);
-          MPI_Test(&req2, &flag2, MPI_STATUS_IGNORE);
-        }
+        MPI_Recv(host_recvbuf.data(), size, MPI_FLOAT, 0, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        MPI_Send(host_sendbuf.data(), size, MPI_FLOAT, 0, 1, MPI_COMM_WORLD);
       }
       host_times.push_back(finish_timer<Al::MPIBackend>(comm) / 2);
-      cudaStreamSynchronize(stream);
+      if (trial % 4 == 0) {
+        cudaStreamSynchronize(stream);
+      }
     }
     MPI_Barrier(MPI_COMM_WORLD);
     for (size_t trial = 0; trial < num_trials; ++trial) {
-      gpu_wait(0.001, stream);
+      gpu_wait(0.0001, stream);
       start_timer<Al::MPICUDABackend>(comm);
       if (comm.rank() == 0) {
         Al::Send<Al::MPICUDABackend>(sendbuf.data(), size, 1, comm);
