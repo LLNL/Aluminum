@@ -133,9 +133,11 @@ class CUDAVector {
   }
 
   CUDAVector &operator=(const CUDAVector<T> &v) {
-    clear();
-    m_count = v.m_count;
-    allocate();
+    if (size() != v.size()) {
+      clear();
+      m_count = v.m_count;
+      allocate();
+    }
     AL_FORCE_CHECK_CUDA(cudaMemcpy(m_ptr, v.m_ptr, get_bytes(), cudaMemcpyDefault));
     return *this;
   }

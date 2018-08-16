@@ -17,14 +17,15 @@ void time_allreduce_algo(typename VectorType<Backend>::type input,
                          typename Backend::comm_type& comm,
                          typename Backend::algo_type algo) {
   std::vector<double> times, in_place_times;
+  auto recv = get_vector<Backend>(input.size());
+  auto in_place_input(input);
   for (size_t trial = 0; trial < num_trials + 1; ++trial) {
-    auto recv = get_vector<Backend>(input.size());
-    auto in_place_input(input);
     MPI_Barrier(MPI_COMM_WORLD);
     start_timer<Backend>(comm);
     Al::Allreduce<Backend>(input.data(), recv.data(), input.size(),
                            Al::ReductionOperator::sum, comm, algo);
     times.push_back(finish_timer<Backend>(comm));
+    in_place_input = input;
     MPI_Barrier(MPI_COMM_WORLD);
     start_timer<Backend>(comm);
     Al::Allreduce<Backend>(in_place_input.data(), input.size(),
