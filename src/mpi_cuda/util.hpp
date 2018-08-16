@@ -113,6 +113,9 @@ inline int get_mpi_comm_local_size() {
     env = getenv("OMPI_COMM_WORLD_LOCAL_SIZE");
   }
   if (env == nullptr) {
+    env = getenv("SLURM_NTASKS_PER_NODE");
+  }
+  if (env == nullptr) {
     std::cerr << "Failed to determine the number of ranks per node" << std::endl;
     abort();
   }

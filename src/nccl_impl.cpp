@@ -21,7 +21,6 @@ void NCCLCommunicator::nccl_setup() {
     AL_CHECK_NCCL(ncclGetUniqueId(&nccl_id));
   }
   MPI_Bcast(&nccl_id, sizeof(nccl_id), MPI_BYTE, 0, get_comm());
-
   // This uses the current CUDA device.
   AL_CHECK_NCCL(ncclCommInitRank(&m_nccl_comm, size(), nccl_id, rank()));
 }
