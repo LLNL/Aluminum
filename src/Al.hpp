@@ -378,6 +378,34 @@ void NonblockingRecv(T* recvbuf, size_t count, int src,
 }
 
 /**
+ * Perform a simultaneous send and recv.
+ * @param sendbuf The data to send.
+ * @param send_count Length of sendbuf.
+ * @param dest Rank in comm to send to.
+ * @param recvbuf Buffer to receive into.
+ * @param recv_count Length of recvbuf.
+ * @param src Rank in comm to receive from.
+ * @param comm Communicator to send/recv within.
+ */
+template <typename Backend, typename T>
+void SendRecv(const T* sendbuf, size_t send_count, int dest,
+              T* recvbuf, size_t recv_count, int src,
+              typename Backend::comm_type& comm) {
+  Backend::template SendRecv<T>(sendbuf, send_count, dest,
+                                recvbuf, recv_count, src, comm);
+}
+
+template <typename Backend, typename T>
+void NonblockingSendRecv(const T* sendbuf, size_t send_count, int dest,
+                         T* recvbuf, size_t recv_count, int src,
+                         typename Backend::comm_type& comm,
+                         typename Backend::req_type& req) {
+  Backend::template NonblockingSendRecv<T>(sendbuf, send_count, dest,
+                                           recvbuf, recv_count, src,
+                                           comm, req);
+}
+
+/**
  * Test whether req has completed or not, returning true if it has.
  */
 template <typename Backend>

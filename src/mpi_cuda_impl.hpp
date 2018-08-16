@@ -165,6 +165,16 @@ class MPICUDABackend {
     internal::get_progress_engine()->enqueue(state);
   }
 
+  template <typename T>
+  static void SendRecv(const T* sendbuf, size_t send_count, int dest,
+                       T* recvbuf, size_t recv_count, int src, comm_type& comm) {
+    internal::mpi_cuda::SendRecvAlState<T>* state =
+      new internal::mpi_cuda::SendRecvAlState<T>(
+        sendbuf, send_count, dest, recvbuf, recv_count, src, comm,
+        comm.get_stream());
+    internal::get_progress_engine()->enqueue(state);
+  }
+
  private:
   /** Event for synchronizing between streams. */
   static cudaEvent_t sync_event;

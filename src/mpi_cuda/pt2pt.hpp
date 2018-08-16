@@ -100,6 +100,32 @@ class RecvAlState : public AlState {
   bool recv_done = false;
 };
 
+template <typename T>
+class SendRecvAlState : public AlState {
+ public:
+  SendRecvAlState(const T* sendbuf, size_t send_count, int dest,
+                  T* recvbuf, size_t recv_count, int src,
+                  MPICUDACommunicator& comm, cudaStream_t stream) :
+    AlState(nullptr),
+    send_state(sendbuf, send_count, dest, comm, stream),
+    recv_state(recvbuf, recv_count, src, comm, stream) {}
+  bool step() override {
+    if (!send_done) {
+      send_done = send_state.step();
+    }
+    if (!recv_done) {
+      recv_done = recv_state.step();
+    }
+    return send_done && recv_done;
+  }
+  bool needs_completion() const override { return false; }
+ private:
+  SendAlState<T> send_state;
+  RecvAlState<T> recv_state;
+  bool send_done = false;
+  bool recv_done = false;
+};
+
 }  // namespace mpi_cuda
 }  // namespace internal
 }  // namespace Al

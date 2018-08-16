@@ -23,6 +23,8 @@ void test_correctness() {
     if (comm.rank() == 0) std::cout << "Testing size " << human_readable_size(size) << std::endl;
     std::vector<float> host_data(size, 1);
     CUDAVector<float> data(host_data);
+    std::vector<float> expected_host_data(size, 1);
+    CUDAVector<float> expected(expected_host_data);
     MPI_Barrier(MPI_COMM_WORLD);
     if (comm.rank() == 0) {
       Al::Send<Al::MPICUDABackend>(data.data(), data.size(), 1, comm);
@@ -31,10 +33,21 @@ void test_correctness() {
     }
     cudaStreamSynchronize(stream);
     if (comm.rank() == 1) {
-      std::vector<float> expected_host_data(size, 1);
-      CUDAVector<float> expected(expected_host_data);
       check_vector(expected, data);
     }
+    CUDAVector<float> recv_data(host_data);
+    MPI_Barrier(MPI_COMM_WORLD);
+    if (comm.rank() == 0) {
+      Al::SendRecv<Al::MPICUDABackend>(data.data(), data.size(), 1,
+                                       recv_data.data(), data.size(), 1,
+                                       comm);
+    } else {
+      Al::SendRecv<Al::MPICUDABackend>(data.data(), data.size(), 0,
+                                       recv_data.data(), data.size(), 0,
+                                       comm);
+    }
+    cudaStreamSynchronize(stream);
+    check_vector(expected, recv_data);
   }
   cudaStreamDestroy(stream);
 }
@@ -45,7 +58,7 @@ void do_benchmark() {
   typename Al::MPICUDABackend::comm_type comm(MPI_COMM_WORLD, stream);
   for (size_t size = start_size; size <= max_size; size *= 2) {
     if (comm.rank() == 0) std::cout << "Benchmarking size " << human_readable_size(size) << std::endl;
-    std::vector<double> times, host_times;
+    std::vector<double> times, sendrecv_times, host_times;
     std::vector<float> host_sendbuf(size, comm.rank());
     std::vector<float> host_recvbuf(size, 0);
     CUDAVector<float> sendbuf(host_sendbuf);
@@ -80,13 +93,29 @@ void do_benchmark() {
       }
       times.push_back(finish_timer<Al::MPICUDABackend>(comm) / 2);
     }
+    MPI_Barrier(MPI_COMM_WORLD);
+    for (size_t trial = 0; trial < num_trials; ++trial) {
+      gpu_wait(0.0001, stream);
+      start_timer<Al::MPICUDABackend>(comm);
+      if (comm.rank() == 0) {
+        Al::SendRecv<Al::MPICUDABackend>(
+          sendbuf.data(), size, 1, recvbuf.data(), size, 1, comm);
+      } else if (comm.rank() == 1) {
+        Al::SendRecv<Al::MPICUDABackend>(
+          sendbuf.data(), size, 0, recvbuf.data(), size, 0, comm);
+      }
+      sendrecv_times.push_back(finish_timer<Al::MPICUDABackend>(comm) / 2);
+    }
     times.erase(times.begin());
     host_times.erase(host_times.begin());
+    sendrecv_times.erase(sendrecv_times.begin());
     if (comm.rank() == 0) {
       std::cout << "Rank 0:" << std::endl;
       std::cout << "host ";
       print_stats(host_times);
       std::cout << "mpicuda ";
+      print_stats(times);
+      std::cout << "mpicuda SR ";
       print_stats(times);
     }
     MPI_Barrier(MPI_COMM_WORLD);
@@ -95,6 +124,8 @@ void do_benchmark() {
       std::cout << "host ";
       print_stats(host_times);
       std::cout << "mpicuda ";
+      print_stats(times);
+      std::cout << "mpicuda SR ";
       print_stats(times);
     }
     MPI_Barrier(MPI_COMM_WORLD);
