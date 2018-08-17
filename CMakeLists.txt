@@ -46,6 +46,27 @@ endif ()
 # Dependencies
 
 find_package(MPI 3.0 REQUIRED COMPONENTS CXX)
+
+# Fix the imported target
+get_property(_TMP_MPI_LINK_LIBRARIES TARGET MPI::MPI_CXX
+  PROPERTY INTERFACE_LINK_LIBRARIES)
+foreach(lib IN LISTS _TMP_MPI_LINK_LIBRARIES)
+  if ("${lib}" MATCHES "-Wl*")
+    list(APPEND _MPI_LINK_FLAGS "${lib}")
+  else()
+    list(APPEND _MPI_LINK_LIBRARIES "${lib}")
+  endif ()
+endforeach()
+
+# The link flags *should* be propagated into this target somehow, but
+# "LINK_FLAGS" is not a "whitelisted" property, so the INTERFACE
+# target MPI::MPI_CXX cannot set them. But there's a clash with CUDA
+# if they're added as "libraries".
+
+#set_property(TARGET MPI::MPI_CXX PROPERTY LINK_FLAGS ${_MPI_LINK_FLAGS})
+set_property(TARGET MPI::MPI_CXX
+  PROPERTY INTERFACE_LINK_LIBRARIES ${_MPI_LINK_LIBRARIES})
+
 find_package(OpenMP REQUIRED COMPONENTS CXX)
 find_package(HWLOC REQUIRED)
 
