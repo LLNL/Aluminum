@@ -151,28 +151,19 @@ class MPICUDABackend {
 
   template <typename T>
   static void Send(const T* sendbuf, size_t count, int dest, comm_type& comm) {
-    internal::mpi_cuda::SendAlState<T>* state =
-      new internal::mpi_cuda::SendAlState<T>(
-        sendbuf, count, dest, comm, comm.get_stream());
-    internal::get_progress_engine()->enqueue(state);
+    do_send(sendbuf, count, dest, comm, comm.get_stream());
   }
 
   template <typename T>
   static void Recv(T* recvbuf, size_t count, int src, comm_type& comm) {
-    internal::mpi_cuda::RecvAlState<T>* state =
-      new internal::mpi_cuda::RecvAlState<T>(
-        recvbuf, count, src, comm, comm.get_stream());
-    internal::get_progress_engine()->enqueue(state);
+    do_recv(recvbuf, count, src, comm, comm.get_stream());
   }
 
   template <typename T>
   static void SendRecv(const T* sendbuf, size_t send_count, int dest,
                        T* recvbuf, size_t recv_count, int src, comm_type& comm) {
-    internal::mpi_cuda::SendRecvAlState<T>* state =
-      new internal::mpi_cuda::SendRecvAlState<T>(
-        sendbuf, send_count, dest, recvbuf, recv_count, src, comm,
-        comm.get_stream());
-    internal::get_progress_engine()->enqueue(state);
+    do_sendrecv(sendbuf, send_count, dest, recvbuf, recv_count, src, comm,
+                comm.get_stream());
   }
 
  private:
@@ -248,6 +239,37 @@ class MPICUDABackend {
     }
     internal::mpi_cuda::HostTransferState<T>* state = new internal::mpi_cuda::HostTransferState<T>(
       sendbuf, recvbuf, count, op, comm, internal_stream, internal::get_free_request());
+    internal::get_progress_engine()->enqueue(state);
+  }
+
+  template <typename T>
+  static void do_send(
+    const T* sendbuf, size_t count, int dest, comm_type& comm,
+    cudaStream_t stream) {
+    internal::mpi_cuda::SendAlState<T>* state =
+      new internal::mpi_cuda::SendAlState<T>(
+        sendbuf, count, dest, comm, stream);
+    internal::get_progress_engine()->enqueue(state);
+  }
+
+  template <typename T>
+  static void do_recv(
+    T* recvbuf, size_t count, int src, comm_type& comm,
+    cudaStream_t stream) {
+    internal::mpi_cuda::RecvAlState<T>* state =
+      new internal::mpi_cuda::RecvAlState<T>(
+        recvbuf, count, src, comm, stream);
+    internal::get_progress_engine()->enqueue(state);
+  }
+
+  template <typename T>
+  static void do_sendrecv(
+    const T* sendbuf, size_t send_count, int dest,
+    T* recvbuf, size_t recv_count, int src, comm_type& comm,
+    cudaStream_t stream) {
+    internal::mpi_cuda::SendRecvAlState<T>* state =
+      new internal::mpi_cuda::SendRecvAlState<T>(
+        sendbuf, send_count, dest, recvbuf, recv_count, src, comm, stream);
     internal::get_progress_engine()->enqueue(state);
   }
 
