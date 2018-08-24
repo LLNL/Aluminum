@@ -185,7 +185,11 @@ void NonblockingReduce(
 }
 
 /**
- * Perform a reduce-scatter.
+ * @brief Perform a reduce-scatter.
+ *
+ * This is analogous to "MPI_Reduce_scatter_block" and matches NCCL's
+ * interface.
+ *
  * @param sendbuf Input data.
  * @param recvbuf Output data; should already be allocated.
  * @param count Length of recvbuf.
@@ -194,14 +198,19 @@ void NonblockingReduce(
  * @param algo Request a particular reduce-scatter algorithm.
  */
 template <typename Backend, typename T>
-void Reduce_scatter(const T* sendbuf, T* recvbuf, size_t *count,
-            ReductionOperator op, typename Backend::comm_type& comm,
-            typename Backend::algo_type algo = Backend::algo_type::automatic) {
+void Reduce_scatter(
+  const T* sendbuf, T* recvbuf, size_t count,
+  ReductionOperator op, typename Backend::comm_type& comm,
+  typename Backend::algo_type algo = Backend::algo_type::automatic) {
   Backend::template Reduce_scatter<T>(sendbuf, recvbuf, count, op, comm, algo);
 }
 
 /**
- * Perform an in-place reduce-scatter.
+ * @brief Perform an in-place reduce-scatter.
+ *
+ * This is analogous to "MPI_Reduce_scatter_block" and matches NCCL's
+ * interface.
+ *
  * @param recvbuf Input and output data; input will be overwritten.
  * @param count Length of data to be received.
  * @param op The reduction operation to perform.
@@ -209,10 +218,80 @@ void Reduce_scatter(const T* sendbuf, T* recvbuf, size_t *count,
  * @param algo Request a particular reduce-scatter algorithm.
  */
 template <typename Backend, typename T>
-void Reduce_scatter(T* recvbuf, size_t *count,
-            ReductionOperator op, typename Backend::comm_type& comm,
-            typename Backend::algo_type algo = Backend::algo_type::automatic) {
+void Reduce_scatter(
+  T* recvbuf, size_t count,
+  ReductionOperator op, typename Backend::comm_type& comm,
+  typename Backend::algo_type algo = Backend::algo_type::automatic) {
   Backend::template Reduce_scatter<T>(recvbuf, count, op, comm, algo);
+}
+
+/**
+ * Perform a reduce-scatter.
+ * @param sendbuf Input data.
+ * @param recvbuf Output data; should already be allocated.
+ * @param counts Length of recvbuf.
+ * @param op The reduction operation to perform.
+ * @param comm The communicator to reduce/scatter over.
+ * @param algo Request a particular reduce-scatter algorithm.
+ */
+template <typename Backend, typename T>
+void Reduce_scatter(
+  const T* sendbuf, T* recvbuf, size_t *counts,
+  ReductionOperator op, typename Backend::comm_type& comm,
+  typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  Backend::template Reduce_scatter<T>(sendbuf, recvbuf, counts, op, comm, algo);
+}
+
+/**
+ * Perform an in-place reduce-scatter.
+ * @param recvbuf Input and output data; input will be overwritten.
+ * @param counts Length of data to be received.
+ * @param op The reduction operation to perform.
+ * @param comm The communicator to reduce/scatter over.
+ * @param algo Request a particular reduce-scatter algorithm.
+ */
+template <typename Backend, typename T>
+void Reduce_scatter(
+  T* recvbuf, size_t *counts,
+  ReductionOperator op, typename Backend::comm_type& comm,
+  typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  Backend::template Reduce_scatter<T>(recvbuf, counts, op, comm, algo);
+}
+
+/**
+ * @brief Non-blocking version of Reduce_scatter.
+ *
+ * This is analogous to "MPI_Ireduce_scatter_block" and matches NCCL's
+ * interface.
+ *
+ * This returns immediately (i.e. does only local operations) and starts the
+ * reduce-scatter asynchronously.
+ * It is not safe to modify sendbuf or recvbuf until the request indicates that
+ * the operation has completed.
+ */
+template <typename Backend, typename T>
+void NonblockingReduce_scatter(
+  const T* sendbuf, T* recvbuf, size_t count,
+  ReductionOperator op,
+  typename Backend::comm_type& comm,
+  typename Backend::req_type& req,
+  typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  Backend::template NonblockingReduce_scatter<T>(
+    sendbuf, recvbuf, count, op, comm, req, algo);
+}
+
+/** @brief In-place version of NonblockingReduce_scatter.
+ *
+ *  The same semantics apply.
+ */
+template <typename Backend, typename T>
+void NonblockingReduce_scatter(
+  T* recvbuf, size_t count,
+  ReductionOperator op,
+  typename Backend::comm_type& comm,
+  typename Backend::req_type& req,
+  typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  Backend::template NonblockingReduce_scatter<T>(recvbuf, count, op, comm, req, algo);
 }
 
 /**
@@ -224,23 +303,24 @@ void Reduce_scatter(T* recvbuf, size_t *count,
  */
 template <typename Backend, typename T>
 void NonblockingReduce_scatter(
-  const T* sendbuf, T* recvbuf, size_t *count,
+  const T* sendbuf, T* recvbuf, size_t *counts,
   ReductionOperator op,
   typename Backend::comm_type& comm,
   typename Backend::req_type& req,
   typename Backend::algo_type algo = Backend::algo_type::automatic) {
-  Backend::template NonblockingReduce_scatter<T>(sendbuf, recvbuf, count, op, comm, req, algo);
+  Backend::template NonblockingReduce_scatter<T>(
+    sendbuf, recvbuf, counts, op, comm, req, algo);
 }
 
 /** In-place version of NonblockingReduce_scatter; same semantics apply. */
 template <typename Backend, typename T>
 void NonblockingReduce_scatter(
-  T* recvbuf, size_t *count,
+  T* recvbuf, size_t *counts,
   ReductionOperator op,
   typename Backend::comm_type& comm,
   typename Backend::req_type& req,
   typename Backend::algo_type algo = Backend::algo_type::automatic) {
-  Backend::template NonblockingReduce_scatter<T>(recvbuf, count, op, comm, req, algo);
+  Backend::template NonblockingReduce_scatter<T>(recvbuf, counts, op, comm, req, algo);
 }
 
 /**

@@ -170,7 +170,7 @@ class NCCLBackend {
   }
 
   template <typename T>
-  static void Bcast(T* buf, size_t count, int root, comm_type& comm, 
+  static void Bcast(T* buf, size_t count, int root, comm_type& comm,
                     algo_type) {
     do_broadcast(buf, count, root, comm, comm.get_stream());
   }
@@ -247,37 +247,37 @@ class NCCLBackend {
   }
 
   template <typename T>
-  static void Reduce_scatter(const T* sendbuf, T* recvbuf, size_t* recv_counts,
+  static void Reduce_scatter(const T* sendbuf, T* recvbuf, size_t count,
                              ReductionOperator op, comm_type& comm,
                              algo_type) {
-    do_reduce_scatter(sendbuf, recvbuf, recv_counts, op, comm,
+    do_reduce_scatter(sendbuf, recvbuf, count, op, comm,
                       comm.get_stream());
   }
 
   template <typename T>
-  static void Reduce_scatter(T* recvbuf, size_t* recv_counts,
+  static void Reduce_scatter(T* recvbuf, size_t count,
                              ReductionOperator op, comm_type& comm,
                              algo_type algo) {
-    Reduce_scatter(internal::IN_PLACE<T>(), recvbuf, recv_counts, op, comm,
+    Reduce_scatter(internal::IN_PLACE<T>(), recvbuf, count, op, comm,
                    algo);
   }
 
   template <typename T>
   static void NonblockingReduce_scatter(const T* sendbuf, T* recvbuf,
-                                        size_t* recv_counts,
+                                        size_t count,
                                         ReductionOperator op, comm_type& comm,
                                         req_type& req, algo_type) {
     cudaStream_t internal_stream = internal::cuda::get_internal_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
-    do_reduce_scatter(sendbuf, recvbuf, recv_counts, op, comm, internal_stream);
+    do_reduce_scatter(sendbuf, recvbuf, count, op, comm, internal_stream);
     setup_completion_event(internal_stream, comm, req);
   }
 
   template <typename T>
-  static void NonblockingReduce_scatter(T* recvbuf, size_t* recv_counts,
+  static void NonblockingReduce_scatter(T* recvbuf, size_t count,
                                         ReductionOperator op, comm_type& comm,
                                         req_type& req, algo_type algo) {
-    NonblockingReduce_scatter(internal::IN_PLACE<T>(), recvbuf, recv_counts, op,
+    NonblockingReduce_scatter(internal::IN_PLACE<T>(), recvbuf, count, op,
                               comm, req, algo);
   }
 
@@ -367,16 +367,8 @@ class NCCLBackend {
   /** Do a NCCL reduce-scatter. */
   template <typename T>
   static void do_reduce_scatter(const T* sendbuf, T* recvbuf,
-                                size_t* recv_counts, ReductionOperator op,
+                                size_t recv_count, ReductionOperator op,
                                 comm_type& comm, cudaStream_t stream) {
-    // NCCL expects an identical recv_count on every node.
-    size_t recv_count = recv_counts[0];
-    for (int i = 1; i < comm.size(); ++i) {
-      if (recv_counts[i] != recv_count) {
-        throw_al_exception(
-          "NCCL reduce scatter requires identical recv_counts on every rank");
-      }
-    }
     if (recv_count == 0) {
       return;
     }
