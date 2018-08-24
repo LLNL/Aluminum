@@ -129,6 +129,25 @@ class FastEvent {
   CUdeviceptr sync_event_dev_ptr;
 };
 
+/**
+ * Have a GPU stream block until signalled.
+ * This essentially uses full/empty bit semantics to implement synchronization.
+ * The GPU will wait on a memory location until the host writes to it using the
+ * stream memory wait operation.
+ */
+class GPUWait {
+ public:
+  GPUWait();
+  ~GPUWait();
+  /** Enqueue a wait onto stream. */
+  void wait(cudaStream_t stream);
+  /** Signal the stream to continue. */
+  void signal();
+ private:
+  int32_t* wait_sync __attribute__((aligned(64)));
+  CUdeviceptr wait_sync_dev_ptr;
+};
+
 }  // namespace cuda
 }  // namespace internal
 }  // namespace Al

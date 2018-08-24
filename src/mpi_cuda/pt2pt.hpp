@@ -55,21 +55,15 @@ class RecvAlState : public AlState {
               MPICUDACommunicator& comm_, cudaStream_t stream) :
     AlState(nullptr), count(count_), src(src_), comm(comm_.get_comm()) {
     mem = get_pinned_memory<T>(count);
-    wait_sync = get_pinned_memory<int32_t>(1);
-    __atomic_store_n(wait_sync, 0, __ATOMIC_SEQ_CST);
-    AL_CHECK_CUDA_DRV(cuMemHostGetDevicePointer(
-                        &wait_sync_dev_ptr, wait_sync, 0));
-    AL_CHECK_CUDA_DRV(cuStreamWaitValue32(
-                        stream, wait_sync_dev_ptr, 1, CU_STREAM_WAIT_VALUE_EQ));
+    wait_sync.wait(stream);
     AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, mem, sizeof(T)*count,
                                   cudaMemcpyHostToDevice, stream));
     sync_event.record(stream);
   }
   ~RecvAlState() override {
     release_pinned_memory(mem);
-    release_pinned_memory(wait_sync);
   }
-  void setup() override {
+  void start() override {
     MPI_Irecv(mem, count, mpi::TypeMap<T>(), src, pt2pt_tag, comm, &req);
   }
   bool step() override {
@@ -79,7 +73,7 @@ class RecvAlState : public AlState {
       if (flag) {
         recv_done = true;
         // Signal the device that the memcpy can start.
-        __atomic_store_n(wait_sync, 1, __ATOMIC_SEQ_CST);
+        wait_sync.signal();
       }
     }
     // Wait until the memcpy has completed so everything can be safely freed.
@@ -93,8 +87,7 @@ class RecvAlState : public AlState {
   MPI_Comm comm;
   MPI_Request req = MPI_REQUEST_NULL;
   cuda::FastEvent sync_event;
-  int32_t* wait_sync __attribute__((aligned(64)));
-  CUdeviceptr wait_sync_dev_ptr;
+  cuda::GPUWait wait_sync;
   bool recv_done = false;
 };
 

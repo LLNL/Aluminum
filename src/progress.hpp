@@ -49,7 +49,7 @@ class AlState {
    * Perform initial setup of the algorithm.
    * This is called by the progress engine when the operation begins execution.
    */
-  virtual void setup() {}
+  virtual void start() {}
   /**
    * Run one step of the algorithm.
    * Return true if the operation has completed, false if it has more steps

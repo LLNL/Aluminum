@@ -97,6 +97,28 @@ bool FastEvent::query() {
   return __atomic_load_n(sync_event, __ATOMIC_SEQ_CST);
 }
 
+GPUWait::GPUWait() {
+  wait_sync = get_pinned_memory<int32_t>(1);
+  // An atomic here may be overkill.
+  // Can't use std::atomic because we need the actual address.
+  __atomic_store_n(wait_sync, 0, __ATOMIC_SEQ_CST);
+  AL_CHECK_CUDA_DRV(cuMemHostGetDevicePointer(
+                      &wait_sync_dev_ptr, wait_sync, 0));
+}
+
+GPUWait::~GPUWait() {
+  release_pinned_memory(wait_sync);
+}
+
+void GPUWait::wait(cudaStream_t stream) {
+  AL_CHECK_CUDA_DRV(cuStreamWaitValue32(
+                      stream, wait_sync_dev_ptr, 1, CU_STREAM_WAIT_VALUE_EQ));
+}
+
+void GPUWait::signal() {
+  __atomic_store_n(wait_sync, 1, __ATOMIC_SEQ_CST);
+}
+
 }  // namespace cuda
 }  // namespace internal
 }  // namespace Al
