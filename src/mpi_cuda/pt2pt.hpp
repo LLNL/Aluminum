@@ -69,11 +69,10 @@ class RecvAlState : public AlState {
     release_pinned_memory(mem);
     release_pinned_memory(wait_sync);
   }
+  void setup() override {
+    MPI_Irecv(mem, count, mpi::TypeMap<T>(), src, pt2pt_tag, comm, &req);
+  }
   bool step() override {
-    if (!recv_started) {
-      MPI_Irecv(mem, count, mpi::TypeMap<T>(), src, pt2pt_tag, comm, &req);
-      recv_started = true;
-    }
     if (!recv_done) {
       int flag;
       MPI_Test(&req, &flag, MPI_STATUS_IGNORE);
@@ -96,7 +95,6 @@ class RecvAlState : public AlState {
   cuda::FastEvent sync_event;
   int32_t* wait_sync __attribute__((aligned(64)));
   CUdeviceptr wait_sync_dev_ptr;
-  bool recv_started = false;
   bool recv_done = false;
 };
 

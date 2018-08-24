@@ -46,7 +46,12 @@ class AlState {
   AlState(AlRequest req_) : req(req_) {}
   virtual ~AlState() {}
   /**
-   * Start one step of the algorithm.
+   * Perform initial setup of the algorithm.
+   * This is called by the progress engine when the operation begins execution.
+   */
+  virtual void setup() {}
+  /**
+   * Run one step of the algorithm.
    * Return true if the operation has completed, false if it has more steps
    * remaining.
    */

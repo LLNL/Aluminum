@@ -177,6 +177,7 @@ void ProgressEngine::engine() {
           }
         }
         ++num_in_progress_reqs;
+        req->setup();
       }
     }
     // Process one step of each in-progress request.
