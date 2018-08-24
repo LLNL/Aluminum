@@ -75,7 +75,7 @@ void test_reduce_algo(const typename VectorType<Backend>::type& expected,
                       typename Backend::comm_type& comm,
                       typename Backend::algo_type algo) {
   auto recv = get_vector<Backend>(input.size());
-  
+
   Al::Reduce<Backend>(input.data(), recv.data(), input.size(), Al::ReductionOperator::sum, 0, comm, algo);
   if(comm.rank() == 0){
     if (!check_vector(expected, recv)) {
@@ -138,12 +138,12 @@ void test_reduce_scatter_algo(const typename VectorType<Backend>::type& expected
                          typename Backend::algo_type algo) {
 
   auto recv = get_vector<Backend>(expected.size());
-  std::vector<size_t> recv_count(comm.size());
-  for(int i=0; i<comm.size(); i++){
-    recv_count[i] = expected.size();
-  }
 
-  Al::Reduce_scatter<Backend>(input.data(), recv.data(), recv_count.data(), Al::ReductionOperator::sum, comm, algo);
+  size_t recv_count = expected.size();
+
+  Al::Reduce_scatter<Backend>(
+    input.data(), recv.data(), recv_count,
+    Al::ReductionOperator::sum, comm, algo);
 
   if (!check_vector(expected, recv)) {
     std::cout << comm.rank() << ": regular reduce_scatter does not match" <<
@@ -152,7 +152,8 @@ void test_reduce_scatter_algo(const typename VectorType<Backend>::type& expected
   }
 
   auto input_copy (input);
-  Al::Reduce_scatter<Backend>(input_copy.data(), recv_count.data(), Al::ReductionOperator::sum, comm, algo);
+  Al::Reduce_scatter<Backend>(input_copy.data(), recv_count,
+                              Al::ReductionOperator::sum, comm, algo);
   if (!check_vector(expected, input_copy)) {
     std::cout << comm.rank() << ": in-place reduce_scatter does not match" <<
       std::endl;
@@ -169,13 +170,13 @@ void test_nb_reduce_scatter_algo(const typename VectorType<Backend>::type& expec
 
   typename Backend::req_type req = get_request<Backend>();
   auto recv = get_vector<Backend>(expected.size());
-  std::vector<size_t> recv_count(comm.size());
-  for(int i=0; i<comm.size(); i++){
-    recv_count[i] = expected.size();
-  }
+
+  size_t recv_count = expected.size();
 
   /// Test regular reduce_scatter
-  Al::NonblockingReduce_scatter<Backend>(input.data(), recv.data(), recv_count.data(), Al::ReductionOperator::sum, comm, req, algo);
+  Al::NonblockingReduce_scatter<Backend>(
+    input.data(), recv.data(), recv_count,
+    Al::ReductionOperator::sum, comm, req, algo);
   Al::Wait<Backend>(req);
 
   if (!check_vector(expected, recv)) {
@@ -186,7 +187,9 @@ void test_nb_reduce_scatter_algo(const typename VectorType<Backend>::type& expec
 
   /// Test in-place reduce_scatter
   auto input_copy (input);
-  Al::NonblockingReduce_scatter<Backend>(input_copy.data(), recv_count.data(), Al::ReductionOperator::sum, comm, req,  algo);
+  Al::NonblockingReduce_scatter<Backend>(
+    input_copy.data(), recv_count,
+    Al::ReductionOperator::sum, comm, req,  algo);
   if (!check_vector(expected, input_copy)) {
     std::cout << comm.rank() << ": non-blocking in-place reduce_scatter does not match" <<
       std::endl;
@@ -206,7 +209,7 @@ void test_allgather_algo(const typename VectorType<Backend>::type& expected,
         std::endl;
     std::abort();
   }
-  
+
   // Copy input to recv
   recv.move(input);
   Al::Allgather<Backend>(recv.data(), input.size(), comm, algo);
@@ -274,7 +277,7 @@ void test_nb_bcast_algo(const typename VectorType<Backend>::type& expected,
         std::endl;
     std::abort();
   }
-  
+
   /// Bcast is by default an in-place collective, so no need for a separate in-place test
 }
 
@@ -389,7 +392,7 @@ void test_correctness() {
       test_nb_allgather_algo<Backend>(expected, data, comm, algo);
     }
   }
-  
+
   /// Reduce_scatter Testing
   if(comm.rank() == 0){
     std::cout << "======================================" << std::endl;
@@ -421,7 +424,7 @@ void test_correctness() {
       test_nb_reduce_scatter_algo<Backend>(expected, data, comm, algo);
     }
   }
-  
+
   /// Bcast Testing
   if(comm.rank() == 0){
     std::cout << "======================================" << std::endl;
@@ -471,4 +474,3 @@ int main(int argc, char** argv) {
 
   return 0;
 }
-  
