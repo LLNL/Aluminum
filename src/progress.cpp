@@ -29,9 +29,6 @@ ProgressEngine::ProgressEngine() : enqueued_reqs(1<<16) {
   stop_flag = false;
   started_flag = false;
   world_comm = new MPICommunicator(MPI_COMM_WORLD);
-  for (size_t i = 0; i < AL_PE_NUM_CONCURRENT_OPS; ++i) {
-    in_progress_reqs[i] = nullptr;
-  }
 }
 
 ProgressEngine::~ProgressEngine() {
@@ -166,30 +163,29 @@ void ProgressEngine::engine() {
   startup_cv.notify_one();
   while (!stop_flag.load(std::memory_order_acquire)) {
     // Check for newly-submitted requests, if we can take more.
-    if (num_in_progress_reqs < AL_PE_NUM_CONCURRENT_OPS) {
+    if (!in_progress_reqs.full()) {
       AlState* req = enqueued_reqs.pop();
       if (req != nullptr) {
-        // Find a free spot for the new request.
-        for (size_t i = 0; i < AL_PE_NUM_CONCURRENT_OPS; ++i) {
-          if (in_progress_reqs[i] == nullptr) {
-            in_progress_reqs[i] = req;
-            break;
-          }
-        }
-        ++num_in_progress_reqs;
+        in_progress_reqs.push(req);
         req->start();
       }
     }
     // Process one step of each in-progress request.
-    for (int i = 0; i < AL_PE_NUM_CONCURRENT_OPS; ++i) {
-      if (in_progress_reqs[i] != nullptr && in_progress_reqs[i]->step()) {
-        if (in_progress_reqs[i]->needs_completion()) {
-          in_progress_reqs[i]->get_req()->store(true, std::memory_order_release);
+    bool any_completed = false;
+    for (size_t i = 0; i < in_progress_reqs.cur_size; ++i) {
+      if (in_progress_reqs.l[i]->step()) {
+        if (in_progress_reqs.l[i]->needs_completion()) {
+          // Mark the request as completed.
+          in_progress_reqs.l[i]->get_req()->store(true, std::memory_order_release);
         }
-        delete in_progress_reqs[i];
-        in_progress_reqs[i] = nullptr;
-        --num_in_progress_reqs;
+        delete in_progress_reqs.l[i];
+        // Mark slot for compaction.
+        in_progress_reqs.l[i] = nullptr;
+        any_completed = true;
       }
+    }
+    if (any_completed) {
+      in_progress_reqs.compact();
     }
   }
 }

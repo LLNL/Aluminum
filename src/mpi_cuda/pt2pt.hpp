@@ -28,10 +28,15 @@ class SendAlState : public AlState {
     if (!mem_transfer_done) {
       if (sync_event.query()) {
         mem_transfer_done = true;
-        MPI_Isend(mem, count, mpi::TypeMap<T>(), dest, pt2pt_tag, comm, &req);
-      } else {
-        return false;
       }
+      // Always return false here so the send is not started until the next
+      // pass through the in-progress requests.
+      // This ensures that sends always start in the order they were posted.
+      return false;
+    }
+    if (!send_started) {
+      MPI_Isend(mem, count, mpi::TypeMap<T>(), dest, pt2pt_tag, comm, &req);
+      send_started = true;
     }
     int flag;
     MPI_Test(&req, &flag, MPI_STATUS_IGNORE);
@@ -46,6 +51,7 @@ class SendAlState : public AlState {
   MPI_Request req = MPI_REQUEST_NULL;
   cuda::FastEvent sync_event;
   bool mem_transfer_done = false;
+  bool send_started = false;
 };
 
 template <typename T>
@@ -100,6 +106,10 @@ class SendRecvAlState : public AlState {
     AlState(nullptr),
     send_state(sendbuf, send_count, dest, comm, stream),
     recv_state(recvbuf, recv_count, src, comm, stream) {}
+  void start() override {
+    send_state.start();
+    recv_state.start();
+  }
   bool step() override {
     if (!send_done) {
       send_done = send_state.step();
