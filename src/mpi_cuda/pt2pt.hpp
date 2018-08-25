@@ -1,7 +1,7 @@
 #pragma once
 
 #include "cuda.hpp"
-#include "mpi_cuda/allreduce.hpp"
+#include "mpi_cuda/communicator.hpp"
 
 namespace Al {
 namespace internal {
