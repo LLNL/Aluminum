@@ -1,6 +1,6 @@
 # Aluminum
 
-**Aluminum** provides a generic interface to high-performance allreduce algorithms, with support for additional collective operations in progress. Blocking and non-blocking algorithms and GPU-aware algorithms are supported. Aluminum contains custom implementations and interfaces to existing optimized communication libraries, exposed through a generic API.
+**Aluminum** provides a generic interface to high-performance communication libraries, with a focus on allreduce algorithms. Blocking and non-blocking algorithms and GPU-aware algorithms are supported. Aluminum also contains custom implementations of select algorithms to optimize for certain situations.
 
 ## Features
 
@@ -21,9 +21,7 @@
 
 ### Building
 
-#### CMake method
-CMake 3.9 or newer is required. Due to the Makefile-based build system
-that is also available, an out-of-source build is required:
+CMake 3.9 or newer is required. An out-of-source build is required:
 ```
 mkdir build && cd build
 cmake <options> /path/to/aluminum/source
@@ -54,22 +52,10 @@ For the `MPI-CUDA` backend:
 
 The `NCCL` and `MPI-CUDA` backends can be combined.
 
-#### Makefile-based method
-This method is deprecated. Prefer the CMake method.
-
-This is currently ad-hoc. You may need to edit `Makefile` to adjust paths. Run `make` to build the `libAl` library and associated tests and benchmarks. This will build the `MPI` backend.
-
-For the `NCCL` backend:
+Here is a complete example:
 ```
-ENABLE_NCCL_CUDA=YES make
+CMAKE_PREFIX_PATH=/path/to/your/MPI:$CMAKE_PREFIX_PATH cmake -D ALUMINUM_ENABLE_NCCL=YES -D ALUMINUM_ENABLE_MPI_CUDA=YES -D NCCL_DIR=/path/to/NCCL ..
 ```
-
-For the `MPI-CUDA` backend:
-```
-ENABLE_MPI_CUDA=YES make
-```
-
-The `NCCL` and `MPI-CUDA` backends can be combined.
 
 ## Tests and benchmarks
 
@@ -98,6 +84,7 @@ Coming soon...
 * [Nikoli Dryden](https://github.com/ndryden)
 * [Naoya Maruyama](https://github.com/naoyam)
 * Andy Yoo
+* Tom Benson
 
 See also [contributors](https://github.com/ndryden/Aluminum/graphs/contributors).
 
