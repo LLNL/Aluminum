@@ -194,6 +194,5 @@ typename Backend::req_type get_request();
 template <>
 inline typename Al::MPIBackend::req_type
 get_request<Al::MPIBackend>() {
-  int req = 0;
-  return req;
+  return Al::MPIBackend::null_req;
 }

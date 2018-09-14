@@ -43,10 +43,42 @@
     }                                                           \
   } while (0)
 
+#define AL_FORCE_CHECK_CUDA_DRV(cuda_call)                      \
+  do {                                                          \
+    AL_CUDA_SYNC(true);                                         \
+    CUresult status_CHECK_CUDA_DRV = (cuda_call);               \
+    if (status_CHECK_CUDA_DRV != CUDA_SUCCESS) {                \
+      const char* err_msg_CHECK_CUDA_DRV;                       \
+      cuGetErrorString(status_CHECK_CUDA_DRV,                   \
+                       &err_msg_CHECK_CUDA_DRV);                \
+      throw_al_exception(std::string("CUDA driver error: ")     \
+                         + err_msg_CHECK_CUDA_DRV);             \
+    }                                                           \
+    AL_CUDA_SYNC(false);                                        \
+  } while (0)
+
+#define AL_FORCE_CHECK_CUDA_DRV_NOSYNC(cuda_call)               \
+  do {                                                          \
+    CUresult status_CHECK_CUDA_DRV = (cuda_call);               \
+    if (status_CHECK_CUDA_DRV != CUDA_SUCCESS) {                \
+      const char* err_msg_CHECK_CUDA_DRV;                       \
+      cuGetErrorString(status_CHECK_CUDA_DRV,                   \
+                       &err_msg_CHECK_CUDA_DRV);                \
+      throw_al_exception(std::string("CUDA driver error: ")     \
+                         + err_msg_CHECK_CUDA_DRV);             \
+    }                                                           \
+  } while (0)
+
 #ifdef AL_DEBUG
 #define AL_CHECK_CUDA(cuda_call) AL_FORCE_CHECK_CUDA(cuda_call)
+#define AL_CHECK_CUDA_NOSYNC(cuda_call) AL_FORCE_CHECK_CUDA_NOSYNC(cuda_call)
+#define AL_CHECK_CUDA_DRV(cuda_call) AL_FORCE_CHECK_CUDA_DRV(cuda_call)
+#define AL_CHECK_CUDA_DRV_NOSYNC(cuda_call) AL_FORCE_CHECK_CUDA_DRV_NOSYNC(cuda_call)
 #else
 #define AL_CHECK_CUDA(cuda_call) (cuda_call)
+#define AL_CHECK_CUDA_NOSYNC(cuda_call) (cuda_call)
+#define AL_CHECK_CUDA_DRV(cuda_call) (cuda_call)
+#define AL_CHECK_CUDA_DRV_NOSYNC(cuda_call) (cuda_call)
 #endif
 
 namespace Al {
@@ -58,8 +90,6 @@ void init(int& argc, char**& argv);
 /** Finalize CUDA. */
 void finalize();
 
-// Pool to re-use CUDA events. These are not thread-safe.
-// TODO: Figure out if we need to make these thread-safe.
 /** Return a currently unused CUDA event. */
 cudaEvent_t get_cuda_event();
 /** Release a finished CUDA event. */
@@ -72,6 +102,51 @@ void release_cuda_event(cudaEvent_t event);
 cudaStream_t get_internal_stream();
 /** Get a specific internal stream. */
 cudaStream_t get_internal_stream(size_t id);
+
+/** Return whether stream memory operations are supported. */
+bool stream_memory_operations_supported();
+
+/**
+ * An optimized version of CUDA events.
+ * This essentially uses full/empty bit semantics to implement synchronization.
+ * A memory location is polled on by the host and written to by the device
+ * using the stream memory write operation.
+ */
+class FastEvent {
+ public:
+  /**
+   * Allocate the event.
+   * The event is in an undefined state until record has been called.
+   */
+  FastEvent();
+  ~FastEvent();
+  /** Record the event into stream. */
+  void record(cudaStream_t stream);
+  /** Return true if the event has completed. */
+  bool query();
+ private:
+  int32_t* sync_event __attribute__((aligned(64)));
+  CUdeviceptr sync_event_dev_ptr;
+};
+
+/**
+ * Have a GPU stream block until signalled.
+ * This essentially uses full/empty bit semantics to implement synchronization.
+ * The GPU will wait on a memory location until the host writes to it using the
+ * stream memory wait operation.
+ */
+class GPUWait {
+ public:
+  GPUWait();
+  ~GPUWait();
+  /** Enqueue a wait onto stream. */
+  void wait(cudaStream_t stream);
+  /** Signal the stream to continue. */
+  void signal();
+ private:
+  int32_t* wait_sync __attribute__((aligned(64)));
+  CUdeviceptr wait_sync_dev_ptr;
+};
 
 }  // namespace cuda
 }  // namespace internal

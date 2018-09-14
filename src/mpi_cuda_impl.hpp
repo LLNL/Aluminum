@@ -2,6 +2,7 @@
 
 #include "Al.hpp"
 #include "mpi_cuda/allreduce.hpp"
+#include "mpi_cuda/pt2pt.hpp"
 
 namespace Al {
 
@@ -75,7 +76,8 @@ class MPICUDABackend {
                                             op, comm, comm.get_stream());
       break;
     case MPICUDAAllreduceAlgorithm::host_transfer:
-      do_host_transfer_allreduce(sendbuf, recvbuf, count, op, comm);
+      do_host_transfer_allreduce(sendbuf, recvbuf, count, op, comm,
+                                 comm.get_stream());
       break;
     default:
       throw_al_exception("Invalid algorithm");
@@ -96,12 +98,7 @@ class MPICUDABackend {
       req_type& req,
       algo_type algo) {
     if (count == 0) return;
-    cudaStream_t internal_stream;
-    if (algo != MPICUDAAllreduceAlgorithm::host_transfer) {
-      internal_stream = internal::cuda::get_internal_stream();
-    } else {
-      internal_stream = internal::cuda::get_internal_stream(0);
-    }
+    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     switch (algo) {
     case MPICUDAAllreduceAlgorithm::ring:
@@ -114,17 +111,13 @@ class MPICUDABackend {
                                             op, comm, internal_stream);
       break;
     case MPICUDAAllreduceAlgorithm::host_transfer:
-      do_nonblocking_host_transfer_allreduce(
-        sendbuf, recvbuf, count, op, comm, req, internal_stream);
+      do_host_transfer_allreduce(sendbuf, recvbuf, count, op, comm,
+                                 internal_stream);
       break;
     default:
       throw_al_exception("Invalid algorithm");
     }
-    if (algo != MPICUDAAllreduceAlgorithm::host_transfer) {
-      // Completion for host-transfer handled inside
-      // do_nonblocking_host_transfer_allreduce.
-      setup_completion_event(internal_stream, comm, req);
-    }
+    setup_completion_event(internal_stream, comm, req);
   }
 
   template <typename T>
@@ -135,6 +128,23 @@ class MPICUDABackend {
       algo_type algo) {
     NonblockingAllreduce(recvbuf, recvbuf, count, op, comm,
                          req, algo);
+  }
+
+  template <typename T>
+  static void Send(const T* sendbuf, size_t count, int dest, comm_type& comm) {
+    do_send(sendbuf, count, dest, comm, comm.get_stream());
+  }
+
+  template <typename T>
+  static void Recv(T* recvbuf, size_t count, int src, comm_type& comm) {
+    do_recv(recvbuf, count, src, comm, comm.get_stream());
+  }
+
+  template <typename T>
+  static void SendRecv(const T* sendbuf, size_t send_count, int dest,
+                       T* recvbuf, size_t recv_count, int src, comm_type& comm) {
+    do_sendrecv(sendbuf, send_count, dest, recvbuf, recv_count, src, comm,
+                comm.get_stream());
   }
 
  private:
@@ -163,41 +173,48 @@ class MPICUDABackend {
     req = std::make_shared<internal::mpi_cuda::MPICUDARequest>(event, comm.get_stream());
   }
 
-  /** Run a blocking host-transfer allreduce. */
+  /** Run a host-transfer allreduce. */
   template <typename T>
   static void do_host_transfer_allreduce(
     const T* sendbuf, T* recvbuf, size_t count, ReductionOperator op,
-    comm_type& comm) {
-    // Get pinned host memory.
-    T* host_mem = internal::get_pinned_memory<T>(count);
-    internal::mpi_cuda::host_transfer_allreduce(
-      sendbuf, recvbuf, host_mem, count, op, comm, comm.get_stream(), 1);
-    // We can only free the memory after the allreduce has completed, but don't
-    // want to block the user's stream to do so.
-    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
-    sync_internal_stream_with_comm(internal_stream, comm);
-    AL_CHECK_CUDA(cudaStreamAddCallback(
-                    internal_stream,
-                    internal::mpi_cuda::host_transfer_allreduce_free_mem<T>,
-                    (void*) host_mem, 0));
+    comm_type& comm, cudaStream_t internal_stream) {
+    if (!internal::cuda::stream_memory_operations_supported()) {
+      throw_al_exception("Host-transfer allreduce not supported without stream memory operations");
+    }
+    internal::mpi_cuda::HostTransferState<T>* state = new internal::mpi_cuda::HostTransferState<T>(
+      sendbuf, recvbuf, count, op, comm, internal_stream, internal::get_free_request());
+    internal::get_progress_engine()->enqueue(state);
   }
 
-  /** Run a non-blocking host-transfer allreduce. */
   template <typename T>
-  static void do_nonblocking_host_transfer_allreduce(
-    const T* sendbuf, T* recvbuf, size_t count, ReductionOperator op,
-    comm_type& comm, req_type& req, cudaStream_t internal_stream) {
-    // Get pinned host memory.
-    T* host_mem = internal::get_pinned_memory<T>(count);
-    internal::mpi_cuda::host_transfer_allreduce(
-      sendbuf, recvbuf, host_mem, count, op, comm, internal_stream, 1);
-    // Set up the completion event before freeing memory.
-    setup_completion_event(internal_stream, comm, req);
-    // Now set up the callback to free memory.
-    AL_CHECK_CUDA(cudaStreamAddCallback(
-                    internal_stream,
-                    internal::mpi_cuda::host_transfer_allreduce_free_mem<T>,
-                    (void*) host_mem, 0));
+  static void do_send(
+    const T* sendbuf, size_t count, int dest, comm_type& comm,
+    cudaStream_t stream) {
+    internal::mpi_cuda::SendAlState<T>* state =
+      new internal::mpi_cuda::SendAlState<T>(
+        sendbuf, count, dest, comm, stream);
+    internal::get_progress_engine()->enqueue(state);
+  }
+
+  template <typename T>
+  static void do_recv(
+    T* recvbuf, size_t count, int src, comm_type& comm,
+    cudaStream_t stream) {
+    internal::mpi_cuda::RecvAlState<T>* state =
+      new internal::mpi_cuda::RecvAlState<T>(
+        recvbuf, count, src, comm, stream);
+    internal::get_progress_engine()->enqueue(state);
+  }
+
+  template <typename T>
+  static void do_sendrecv(
+    const T* sendbuf, size_t send_count, int dest,
+    T* recvbuf, size_t recv_count, int src, comm_type& comm,
+    cudaStream_t stream) {
+    internal::mpi_cuda::SendRecvAlState<T>* state =
+      new internal::mpi_cuda::SendRecvAlState<T>(
+        sendbuf, send_count, dest, recvbuf, recv_count, src, comm, stream);
+    internal::get_progress_engine()->enqueue(state);
   }
 
 };

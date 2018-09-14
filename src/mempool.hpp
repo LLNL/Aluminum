@@ -1,6 +1,9 @@
 #pragma once
 
 #include <mutex>
+#include <vector>
+#include <unordered_map>
+#include <utility>
 #ifdef AL_HAS_CUDA
 #include "cuda.hpp"
 #endif

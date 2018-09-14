@@ -25,14 +25,13 @@
  * Sleeping will reduce unneeded CPU usage (probably helps if you're also doing
  * compute on the same core) but probably increases latency a little bit.
  */
-#define AL_PE_SLEEPS 1
+#define AL_PE_SLEEPS 0
 
 /**
- * This controls how many allreduces the progress engine will allow to be in
- * progress at one time.
- * Set to 0 to have no limit.
+ * Number of concurrent operations the progress engine will perform.
+ * This must be a positive number.
  */
-#define AL_PE_NUM_CONCURRENT_ALLREDUCES 3
+#define AL_PE_NUM_CONCURRENT_OPS 4
 
 /** Whether to protect memory pools with locks. */
 #define AL_LOCK_MEMPOOL 1

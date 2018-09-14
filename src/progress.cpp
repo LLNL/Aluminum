@@ -22,11 +22,10 @@ namespace Al {
 namespace internal {
 
 AlRequest get_free_request() {
-  static AlRequest cur_req = 1;
-  return cur_req++;
+  return std::make_shared<std::atomic<bool>>(false);
 }
 
-ProgressEngine::ProgressEngine() {
+ProgressEngine::ProgressEngine() : enqueued_reqs(1<<16) {
   stop_flag = false;
   started_flag = false;
   world_comm = new MPICommunicator(MPI_COMM_WORLD);
@@ -53,38 +52,21 @@ void ProgressEngine::stop() {
   if (stop_flag.load()) {
     throw_al_exception("Stop called twice on progress engine");
   }
-  stop_flag = true;
-#if AL_PE_SLEEPS
-  enqueue_cv.notify_one();  // Wake up the engine if needed.
-#endif
+  stop_flag.store(true, std::memory_order_release);
   thread.join();
 }
 
 void ProgressEngine::enqueue(AlState* state) {
-  enqueue_mutex.lock();
   enqueued_reqs.push(state);
-  enqueue_mutex.unlock();
-#if AL_PE_SLEEPS
-  enqueue_cv.notify_one();  // Wake up the engine if needed.
-#endif
 }
 
 bool ProgressEngine::is_complete(AlRequest& req) {
   if (req == NULL_REQUEST) {
     return true;
   }
-  if (completed_mutex.try_lock()) {
-    auto i = completed_reqs.find(req);
-    if (i != completed_reqs.end()) {
-      AlState* state = i->second;
-      completed_reqs.erase(i);
-      completed_mutex.unlock();
-      delete state;
-      req = NULL_REQUEST;
-      return true;
-    } else {
-      completed_mutex.unlock();
-    }
+  if (req->load(std::memory_order_acquire)) {
+    req = NULL_REQUEST;
+    return true;
   }
   return false;
 }
@@ -93,31 +75,9 @@ void ProgressEngine::wait_for_completion(AlRequest& req) {
   if (req == NULL_REQUEST) {
     return;
   }
-  // First check if the request is already complete.
-  std::unique_lock<std::mutex> lock(completed_mutex);
-  auto i = completed_reqs.find(req);
-  if (i != completed_reqs.end()) {
-    AlState* state = i->second;
-    completed_reqs.erase(i);
-    lock.unlock();
-    delete state;
-    req = NULL_REQUEST;
-    return;
-  }
-  // Request not complete, wait on the cv until something completes and see
-  // if it is req.
-  while (true) {
-    completion_cv.wait(lock);
-    i = completed_reqs.find(req);
-    if (i != completed_reqs.end()) {
-      AlState* state = i->second;
-      completed_reqs.erase(i);
-      lock.unlock();
-      delete state;
-      req = NULL_REQUEST;
-      return;
-    }
-  }
+  // Spin until the request has completed.
+  while (!req->load(std::memory_order_acquire)) {}
+  req = NULL_REQUEST;
 }
 
 void ProgressEngine::bind() {
@@ -192,61 +152,40 @@ void ProgressEngine::bind() {
 void ProgressEngine::engine() {
 #ifdef AL_HAS_CUDA
   // Set the current CUDA device for the thread.
-  AL_CHECK_CUDA(cudaSetDevice(cur_device.load()));
+  AL_CHECK_CUDA_NOSYNC(cudaSetDevice(cur_device.load()));
 #endif
   bind();
+  // Notify the main thread we're now running.
   {
     std::unique_lock<std::mutex> lock(startup_mutex);
     started_flag = true;
   }
   startup_cv.notify_one();
-  while (!stop_flag.load()) {
+  while (!stop_flag.load(std::memory_order_acquire)) {
     // Check for newly-submitted requests, if we can take more.
-    if (AL_PE_NUM_CONCURRENT_ALLREDUCES == 0 ||
-         in_progress_reqs.size() < AL_PE_NUM_CONCURRENT_ALLREDUCES) {
-      // Don't block if someone else has the lock.
-      std::unique_lock<std::mutex> lock(enqueue_mutex, std::try_to_lock);
-      if (lock) {
-#if AL_PE_SLEEPS
-        // If there's no work, we sleep.
-        if (in_progress_reqs.empty() && enqueued_reqs.empty()) {
-          enqueue_cv.wait(
-            lock, [this] {
-              return (!enqueued_reqs.empty() &&
-                      (AL_PE_NUM_CONCURRENT_ALLREDUCES == 0 ||
-                       in_progress_reqs.size() < AL_PE_NUM_CONCURRENT_ALLREDUCES)) ||
-                stop_flag.load();
-            });
-        }
-#endif
-        while (!enqueued_reqs.empty() &&
-               (AL_PE_NUM_CONCURRENT_ALLREDUCES == 0 ||
-                in_progress_reqs.size() < AL_PE_NUM_CONCURRENT_ALLREDUCES)) {
-          in_progress_reqs.push_back(enqueued_reqs.front());
-          enqueued_reqs.pop();
-        }
+    if (!in_progress_reqs.full()) {
+      AlState* req = enqueued_reqs.pop();
+      if (req != nullptr) {
+        in_progress_reqs.push(req);
+        req->start();
       }
     }
-    std::vector<AlState*> completed;
     // Process one step of each in-progress request.
-    for (auto i = in_progress_reqs.begin(); i != in_progress_reqs.end();) {
-      AlState* state = *i;
-      if (state->step()) {
-        // Request completed, but don't try to block here.
-        completed.push_back(state);
-        i = in_progress_reqs.erase(i);
-      } else {
-        ++i;
+    bool any_completed = false;
+    for (size_t i = 0; i < in_progress_reqs.cur_size; ++i) {
+      if (in_progress_reqs.l[i]->step()) {
+        if (in_progress_reqs.l[i]->needs_completion()) {
+          // Mark the request as completed.
+          in_progress_reqs.l[i]->get_req()->store(true, std::memory_order_release);
+        }
+        delete in_progress_reqs.l[i];
+        // Mark slot for compaction.
+        in_progress_reqs.l[i] = nullptr;
+        any_completed = true;
       }
     }
-    // Shift over completed requests.
-    if (!completed.empty()) {
-      completed_mutex.lock();
-      for (AlState* state : completed) {
-        completed_reqs[state->get_req()] = state;
-      }
-      completed_mutex.unlock();
-      completion_cv.notify_all();
+    if (any_completed) {
+      in_progress_reqs.compact();
     }
   }
 }

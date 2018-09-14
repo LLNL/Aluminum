@@ -20,13 +20,15 @@ class Communicator;
 
 namespace internal {
 
-/** Request handle for non-blocking operations.. */
-using AlRequest = int;  // TODO: This is a placeholder.
-
+/**
+ * Request handle for non-blocking operations.
+ * The atomic flag is used to check for completion.
+ */
+using AlRequest = std::shared_ptr<std::atomic<bool>>;
 /** Return a free request for use. */
 AlRequest get_free_request();
 /** Special marker for null requests. */
-static const AlRequest NULL_REQUEST = 0;
+static constexpr std::nullptr_t NULL_REQUEST = nullptr;
 
 /**
  * Represents the state and algorithm for an asynchronous operation.
@@ -44,15 +46,138 @@ class AlState {
   AlState(AlRequest req_) : req(req_) {}
   virtual ~AlState() {}
   /**
-   * Start one step of the algorithm.
+   * Perform initial setup of the algorithm.
+   * This is called by the progress engine when the operation begins execution.
+   */
+  virtual void start() {}
+  /**
+   * Run one step of the algorithm.
    * Return true if the operation has completed, false if it has more steps
    * remaining.
    */
   virtual bool step() = 0;
   /** Return the associated request. */
-  AlRequest get_req() const { return req; }
+  AlRequest& get_req() { return req; }
+  /** True if this is meant ot be waited on by the user. */
+  virtual bool needs_completion() const { return true; }
  private:
   AlRequest req;
+};
+
+/**
+ * Lock-free single-producer, single-consumer queue.
+ * This is Lamport's classic SPSC queue, with memory order optimizations
+ * (see Le, et al. "Correct and Efficient Bounded FIFO Queues").
+ */
+class SPSCQueue {
+ public:
+  /**
+   * Initialize the queue.
+   * size_ must be a power of 2.
+   */
+  SPSCQueue(size_t size_) :
+    front(0), back(0), size(size_) {
+    data = new AlState*[size];
+    std::fill_n(data, size, nullptr);
+  }
+  ~SPSCQueue() {
+    delete[] data;
+  }
+  /**
+   * Add v to the queue.
+   * This will throw an exception if the queue is full.
+   * @todo We can elide the capacity check to save an atomic load.
+   * @todo If we elide the capacity check, this can be reformulated to use
+   * just a single fetch-and-add.
+   */
+  void push(AlState* v) {
+    size_t b = back.load(std::memory_order_relaxed);
+    size_t f = front.load(std::memory_order_acquire);
+    size_t bmod = (b+1) & (size-1);
+    if (bmod == f) {
+      throw_al_exception("Queue full");
+    }
+    data[b] = v;
+    back.store(bmod, std::memory_order_release);
+  }
+  /**
+   * Remove an element from the queue.
+   * If the queue is empty, this returns nullptr.
+   */
+  AlState* pop() {
+    size_t f = front.load(std::memory_order_relaxed);
+    size_t b = back.load(std::memory_order_acquire);
+    if (b == f) {
+      return nullptr;
+    }
+    AlState* v = data[f];
+    front.store((f+1) & (size-1), std::memory_order_release);
+    return v;
+  }
+ private:
+  /** Index for the current front of the queue. */
+  std::atomic<size_t> front;
+  /** Index for the current back of the queue. */
+  std::atomic<size_t> back;
+  /** Number of elements the queue can store. */
+  const size_t size;
+  /** Buffer for data in the queue. */
+  AlState** data;
+};
+
+/**
+ * An fixed-length ordered array that allows arbitrary elements to be removed.
+ * This is meant to be used for small N.
+ */
+template <size_t N>
+struct OrderedArray {
+  OrderedArray() {
+    std::fill_n(l, N, nullptr);
+  }
+  ~OrderedArray() {}
+  /** Whether the array is currently full. */
+  bool full() const { return cur_size == N; }
+  /**
+   * Add an element to the end of the array.
+   * This assumes the array is not full.
+   */
+  void push(AlState* v) {
+    l[cur_size] = v;
+    ++cur_size;
+  }
+  /**
+   * Delete an entry.
+   * This assumes idx exists.
+   */
+  void del(size_t idx) {
+    // Just copy the elements over.
+    for (size_t i = idx; i < cur_size - 1; ++i) {
+      l[i] = l[i+1];
+    }
+    --cur_size;
+  }
+  /**
+   * Fill "holes" created by marking elements null.
+   */
+  void compact() {
+    size_t free_slot = 0;
+    for (size_t i = 0; i < cur_size; ++i) {
+      if (l[i] != nullptr) {
+        // l[i] has something, see if we can move it into the free slot.
+        if (free_slot < i) {
+          l[free_slot] = l[i];
+        }
+        // Advance the free slot. If we copied something over, everything after
+        // should be shifted too.
+        ++free_slot;
+      }
+    }
+    cur_size = free_slot;
+  }
+  /** Underlying data store. */
+  AlState* l[N];
+  /** Number of elements currently present. */
+  size_t cur_size = 0;
 };
 
 /**
@@ -99,37 +224,14 @@ class ProgressEngine {
    * that it has not yet begun to process. Threads may add states for
    * asynchronous execution, and the progress engine will dequeue them when it
    * begins to run them.
-   * This is protected by the enqueue_mutex.
    */
-  std::queue<AlState*> enqueued_reqs;
-  /** Protects enqueued_reqs. */
-  std::mutex enqueue_mutex;
-#if AL_PE_SLEEPS
-  /**
-   * The progress engine will sleep on this when there is otherwise no work to
-   * do.
-   */
-  std::condition_variable enqueue_cv;
-#endif
+  SPSCQueue enqueued_reqs;
   /**
    * Requests the progress engine is currently processing.
    * This should be accessed only by the progress engine (it is not protected).
    */
-  std::list<AlState*> in_progress_reqs;
-  /**
-   * Requests that have been completed.
-   * The request is added by the progress engine once it has been completed.
-   * States should be deallocated by whatever removes them from this.
-   * This is protected by the completed_mutex.
-   */
-  std::unordered_map<AlRequest, AlState*> completed_reqs;
-  /** Protects completed_reqs. */
-  std::mutex completed_mutex;
-  /** Used to notify any thread waiting for completion. */
-  std::condition_variable completion_cv;
-  /**
-   * World communicator.
-   */
+  OrderedArray<AL_PE_NUM_CONCURRENT_OPS> in_progress_reqs;
+  /** World communicator. */
   Communicator* world_comm;
 #ifdef AL_HAS_CUDA
   /** Used to pass the original CUDA device to the progress engine thread. */
