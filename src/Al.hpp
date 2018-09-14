@@ -443,6 +443,59 @@ void NonblockingBcast(
 }
 
 /**
+ * All-to-all scatter/gather operation.
+ * @param sendbuf The source data buffer.
+ * @param recvbuf The destination data buffer.
+ * @param count The per-rank data count.
+ * @param comm The communicator for this all-to-all operation.
+ * @param algo Request a particular all-to-all algorithm.
+ */
+template <typename Backend, typename T>
+void Alltoall(
+    const T* sendbuf, T* recvbuf, size_t count,
+    typename Backend::comm_type& comm,
+    typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  Backend::template Alltoall<T>(sendbuf, recvbuf, count, comm, algo);
+}
+
+/**
+ * In-place all-to-all scatter/gather operation.
+ * @param buffer The data buffer; overwritten on completion.
+ * @param count The per-rank data count.
+ * @param comm The communicator fo this all-to-all operation.
+ * @param algo Request a particular all-to-all algorithm.
+ */
+template <typename Backend, typename T>
+void Alltoall(
+    T* buffer, size_t count, typename Backend::comm_type& comm,
+    typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  Backend::template Alltoall<T>(buffer, count, comm, algo);
+}
+
+/**
+ * Non-blocking version of Alltoall.
+ * This returns immediately (i.e. does only local operations) and
+ * starts the all-to-all asynchronously.
+ * It is not safe to modify sendbuf or recvbuf until the request
+ * indicates that the operation has completed.
+ */
+template <typename Backend, typename T>
+void NonblockingAlltoall(
+    const T* sendbuf, T* recvbuf, size_t count,
+    typename Backend::comm_type& comm,
+    typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  Backend::template NonblockingAlltoall<T>(sendbuf, recvbuf, count, comm, algo);
+}
+
+/** In-place version of NonblockingAlltoall; same semantics apply. */
+template <typename Backend, typename T>
+void NonblockingAlltoall(
+    T* buffer, size_t count, typename Backend::comm_type& comm,
+    typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  Backend::template NonblockingAlltoall<T>(buffer, count, comm, algo);
+}
+
+/**
  * Send a point-to-point message.
  * @param sendbuf The data to send.
  * @param count Length of sendbuf.
