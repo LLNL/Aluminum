@@ -483,16 +483,19 @@ template <typename Backend, typename T>
 void NonblockingAlltoall(
     const T* sendbuf, T* recvbuf, size_t count,
     typename Backend::comm_type& comm,
+    typename Backend::req_type& req,
     typename Backend::algo_type algo = Backend::algo_type::automatic) {
-  Backend::template NonblockingAlltoall<T>(sendbuf, recvbuf, count, comm, algo);
+  Backend::template NonblockingAlltoall<T>(sendbuf, recvbuf, count,
+                                           comm, req, algo);
 }
 
 /** In-place version of NonblockingAlltoall; same semantics apply. */
 template <typename Backend, typename T>
 void NonblockingAlltoall(
     T* buffer, size_t count, typename Backend::comm_type& comm,
+    typename Backend::req_type& req,
     typename Backend::algo_type algo = Backend::algo_type::automatic) {
-  Backend::template NonblockingAlltoall<T>(buffer, count, comm, algo);
+  Backend::template NonblockingAlltoall<T>(buffer, count, comm, req, algo);
 }
 
 /**

@@ -29,6 +29,7 @@
 
 #include "Al.hpp"
 #include "mpi_cuda/allreduce.hpp"
+#include "mpi_cuda/alltoall.hpp"
 #include "mpi_cuda/pt2pt.hpp"
 
 namespace Al {
@@ -174,6 +175,50 @@ class MPICUDABackend {
                 comm.get_stream());
   }
 
+  template <typename T>
+  static void Alltoall(
+    const T* sendbuf, T* recvbuf, size_t count,
+    comm_type& comm, algo_type algo) {
+    if (count == 0) return;
+    switch (algo) {
+    case MPICUDAAllreduceAlgorithm::automatic:
+      do_alltoall(sendbuf, recvbuf, count, comm, comm.get_stream());
+      break;
+    default:
+      throw_al_exception("MPICUDAAlltoall: Invalid algorithm");
+    }
+  }
+
+  template <typename T>
+  static void Alltoall(
+    T* buffer, size_t count, comm_type& comm, algo_type algo) {
+    Alltoall(buffer, buffer, count, comm, algo);
+  }
+
+  template <typename T>
+  static void NonblockingAlltoall(
+    const T* sendbuf, T* recvbuf, size_t count,
+    comm_type& comm, req_type& req, algo_type algo) {
+    if (count == 0) return;
+    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+    sync_internal_stream_with_comm(internal_stream, comm);
+    switch (algo) {
+    case MPICUDAAllreduceAlgorithm::automatic:
+      do_alltoall(sendbuf, recvbuf, count, comm, internal_stream);
+      break;
+    default:
+      throw_al_exception("Invalid algorithm");
+    }
+    setup_completion_event(internal_stream, comm, req);
+  }
+
+  template <typename T>
+  static void NonblockingAlltoall(
+    T* buffer, size_t count,
+    comm_type& comm, req_type& req, algo_type algo) {
+    NonblockingAlltoall<T>(buffer, count, comm, req, algo);
+  }
+
  private:
   /** Event for synchronizing between streams. */
   static cudaEvent_t sync_event;
@@ -244,6 +289,15 @@ class MPICUDABackend {
     internal::get_progress_engine()->enqueue(state);
   }
 
+  template <typename T>
+  static void do_alltoall(
+    const T* sendbuf, T* recvbuf, size_t count, comm_type& comm,
+    cudaStream_t stream) {
+    internal::mpi_cuda::AlltoallAlState<T>* state =
+      new internal::mpi_cuda::AlltoallAlState<T>(
+        sendbuf, recvbuf, count, comm, stream);
+    internal::get_progress_engine()->enqueue(state);
+  }
 };
 
 template <>
