@@ -79,3 +79,22 @@ if (MPIEXEC_EXECUTABLE)
     $<TARGET_FILE:TestNCCLCollectives.exe>
     ${MPIEXEC_POSTFLAGS} ${TEST_ARGS})
 endif ()
+
+if (AL_HAS_CUDA)
+  add_executable(TestStreamMemOps.exe
+  test_stream_mem_ops.cpp ${TEST_HEADERS})
+  target_link_libraries(TestStreamMemOps.exe PRIVATE Al)
+  target_link_libraries(TestStreamMemOps.exe PUBLIC cuda)
+
+  set(TEST_ARGS "8")
+  add_test(NAME TestStreamMemOps
+    COMMAND $<TARGET_FILE:TestStreamMemOps.exe> ${TEST_ARGS})
+
+  if (MPIEXEC_EXECUTABLE)
+    add_test(NAME TestStreamMemOps_np4
+      COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 4
+      ${MPIEXEC_PREFLAGS}
+      $<TARGET_FILE:TestStreamMemOps.exe>
+      ${MPIEXEC_POSTFLAGS} ${TEST_ARGS})
+  endif ()
+endif ()
