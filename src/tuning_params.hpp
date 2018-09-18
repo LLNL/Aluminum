@@ -47,14 +47,6 @@
 #define AL_MPI_MULTITHREAD_BITWISE_THRESH 262144
 
 /**
- * Whether the progress engine just polls constantly or sleeps when there is no
- * work to do.
- * Sleeping will reduce unneeded CPU usage (probably helps if you're also doing
- * compute on the same core) but probably increases latency a little bit.
- */
-#define AL_PE_SLEEPS 0
-
-/**
  * Number of concurrent operations the progress engine will perform.
  * This must be a positive number.
  */
