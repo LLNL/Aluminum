@@ -79,6 +79,8 @@ void reduce_thrust(void *dst, const void *src, size_t count,
 
 void launch_wait_kernel(cudaStream_t stream, int32_t wait_value,
                         volatile int32_t* wait_mem);
+void launch_wait_kernel(cudaStream_t stream, int32_t wait_value,
+                        CUdeviceptr wait_mem);
 
 } // namespace mpi_cuda
 } // namespace internal
