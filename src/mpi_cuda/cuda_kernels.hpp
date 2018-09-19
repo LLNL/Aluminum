@@ -28,6 +28,7 @@
 #pragma once
 
 #include "base.hpp"
+#include "cuda.hpp"
 
 namespace Al {
 namespace internal {
@@ -75,6 +76,9 @@ void reduce4(void *dst, const void *src, size_t count,
 void reduce_thrust(void *dst, const void *src, size_t count,
                    cudaStream_t s, ReductionOperator op);
 #endif
+
+void launch_wait_kernel(cudaStream_t stream, int32_t wait_value,
+                        volatile int32_t* wait_mem);
 
 } // namespace mpi_cuda
 } // namespace internal
