@@ -44,22 +44,11 @@ public:
     AlState(nullptr),
     host_mem_(get_pinned_memory<T>(comm.size()*count)),
     count_(count),
-    sync_(get_pinned_memory<int32_t>(1)),
-    sync_dev_ptr_no_mem_ops_(nullptr),
-    sync_dev_ptr_(0U),
     d2h_event_(cuda::get_cuda_event()),
     h2d_event_(cuda::get_cuda_event()),
     comm_(comm.get_comm()) {
 
     bool const use_stream_ops = cuda::stream_memory_operations_supported();
-
-    // Setup the watched memory
-    *sync_ = 0;
-
-    if (use_stream_ops)
-      AL_CHECK_CUDA_DRV(cuMemHostGetDevicePointer(&sync_dev_ptr_, sync_, 0));
-    else
-      AL_CHECK_CUDA(cudaHostGetDevicePointer(&sync_dev_ptr_no_mem_ops_, sync_, 0));
 
     // Transfer data from device to host and use an event to determine when it
     // completes.
@@ -67,11 +56,8 @@ public:
                                   cudaMemcpyDeviceToHost, stream));
     AL_CHECK_CUDA(cudaEventRecord(d2h_event_, stream));
 
-    // Have the device wait on the host.
-    if (use_stream_ops)
-      launch_wait_kernel(stream, 1, sync_dev_ptr_);
-    else
-      launch_wait_kernel(stream, 1, sync_dev_ptr_no_mem_ops_);
+    // Enqueue the kernel to wait on the host
+    gpuwait_.wait(stream);
 
     // Transfer completed buffer back to device.
     AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, host_mem_, sizeof(T)*count*comm.size(),
@@ -82,7 +68,6 @@ public:
 
   ~AlltoallAlState() override {
     release_pinned_memory(host_mem_);
-    release_pinned_memory(sync_);
     cuda::release_cuda_event(h2d_event_);
     cuda::release_cuda_event(d2h_event_);
   }
@@ -110,7 +95,7 @@ public:
       MPI_Test(&req_, &flag, MPI_STATUS_IGNORE);
       if (flag) {
         a2a_done_ = true;
-        *sync_ = 1; // Mark the sync as done to wake device
+        gpuwait_.signal();
       }
       else {
         return false;
@@ -135,8 +120,8 @@ private:
   T* host_mem_;
   size_t count_;
 
-  int32_t* sync_, * sync_dev_ptr_no_mem_ops_;
-  CUdeviceptr sync_dev_ptr_;
+  cuda::GPUWait gpuwait_;
+
   cudaEvent_t d2h_event_, h2d_event_;
 
   MPI_Comm comm_;

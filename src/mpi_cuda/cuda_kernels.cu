@@ -324,23 +324,6 @@ void reduce_thrust(float *dst, const float *src, size_t count,
 }
 #endif
 
-__global__ void spin_wait_kernel(int32_t wait_value, volatile int32_t* wait_mem) {
-  for (;;)
-  {
-    int32_t value = *wait_mem;
-    if (value == wait_value) break;
-  }
-}
-
-void launch_wait_kernel(cudaStream_t stream, int32_t wait_value, volatile int32_t* wait_mem) {
-  spin_wait_kernel<<<1,1,0,stream>>>(wait_value, wait_mem);
-}
-
-void launch_wait_kernel(cudaStream_t stream, int32_t wait_value, CUdeviceptr wait_mem) {
-  AL_CHECK_CUDA_DRV(cuStreamWaitValue32(
-                      stream, wait_mem, wait_value, CU_STREAM_WAIT_VALUE_EQ));
-}
-
 } // namespace mpi_cuda
 } // namespace internal
 } // namespace Al
