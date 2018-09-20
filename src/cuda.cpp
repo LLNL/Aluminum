@@ -59,6 +59,14 @@ void init(int&, char**&) {
   AL_CHECK_CUDA_DRV(cuDeviceGetAttribute(
                       &attr, CU_DEVICE_ATTRIBUTE_CAN_USE_STREAM_MEM_OPS, dev));
   stream_mem_ops_supported = attr;
+  // Preallocate memory for synchronization operations.
+  std::vector<int32_t*> prealloc_mem;
+  for (int i = 0; i < AL_SYNC_MEM_PREALLOC; ++i) {
+    prealloc_mem.push_back(get_pinned_memory<int32_t>(1));
+  }
+  for (int i = 0; i < AL_SYNC_MEM_PREALLOC; ++i) {
+    release_pinned_memory(prealloc_mem[i]);
+  }
 }
 void finalize() {
   for (auto&& event : cuda_events) {
