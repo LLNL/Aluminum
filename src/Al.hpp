@@ -452,9 +452,9 @@ void NonblockingBcast(
  */
 template <typename Backend, typename T>
 void Alltoall(
-    const T* sendbuf, T* recvbuf, size_t count,
-    typename Backend::comm_type& comm,
-    typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  const T* sendbuf, T* recvbuf, size_t count,
+  typename Backend::comm_type& comm,
+  typename Backend::algo_type algo = Backend::algo_type::automatic) {
   Backend::template Alltoall<T>(sendbuf, recvbuf, count, comm, algo);
 }
 
@@ -467,8 +467,8 @@ void Alltoall(
  */
 template <typename Backend, typename T>
 void Alltoall(
-    T* buffer, size_t count, typename Backend::comm_type& comm,
-    typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  T* buffer, size_t count, typename Backend::comm_type& comm,
+  typename Backend::algo_type algo = Backend::algo_type::automatic) {
   Backend::template Alltoall<T>(buffer, count, comm, algo);
 }
 
@@ -481,10 +481,10 @@ void Alltoall(
  */
 template <typename Backend, typename T>
 void NonblockingAlltoall(
-    const T* sendbuf, T* recvbuf, size_t count,
-    typename Backend::comm_type& comm,
-    typename Backend::req_type& req,
-    typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  const T* sendbuf, T* recvbuf, size_t count,
+  typename Backend::comm_type& comm,
+  typename Backend::req_type& req,
+  typename Backend::algo_type algo = Backend::algo_type::automatic) {
   Backend::template NonblockingAlltoall<T>(sendbuf, recvbuf, count,
                                            comm, req, algo);
 }
@@ -492,10 +492,72 @@ void NonblockingAlltoall(
 /** In-place version of NonblockingAlltoall; same semantics apply. */
 template <typename Backend, typename T>
 void NonblockingAlltoall(
-    T* buffer, size_t count, typename Backend::comm_type& comm,
-    typename Backend::req_type& req,
-    typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  T* buffer, size_t count, typename Backend::comm_type& comm,
+  typename Backend::req_type& req,
+  typename Backend::algo_type algo = Backend::algo_type::automatic) {
   Backend::template NonblockingAlltoall<T>(buffer, count, comm, req, algo);
+}
+
+/**
+ * Gather-to-one operation.
+ * @param sendbuf The source data buffer.
+ * @param recvbuf The destination data buffer.
+ * @param count The per-rank data count.
+ * @param root The root process to which data is gathered.
+ * @param comm The communicator for this gather operation.
+ * @param algo Request a particular gather algorithm.
+ */
+template <typename Backend, typename T>
+void Gather(
+  const T* sendbuf, T* recvbuf, size_t count, int root,
+  typename Backend::comm_type& comm,
+  typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  Backend::template Gather<T>(sendbuf, recvbuf, count, root, comm, algo);
+}
+
+/**
+ * In-place gather-to-one operation.
+
+ * @param buffer The data buffer; overwritten on completion. For root
+ *               processes, has size count*comm.size() and acts as
+ *               recvbuf above. For nonroot processes, has size count
+ *               and acts as sendbuf above.
+ * @param count The per-rank data count.
+ * @param root The root process to which data is gathered.
+ * @param comm The communicator fo this all-to-all operation.
+ * @param algo Request a particular all-to-all algorithm.
+ */
+template <typename Backend, typename T>
+void Gather(
+  T* buffer, size_t count, int root, typename Backend::comm_type& comm,
+  typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  Backend::template Gather<T>(buffer, count, root, comm, algo);
+}
+
+/**
+ * Non-blocking version of Gather.
+ * This returns immediately (i.e. does only local operations) and
+ * starts the gather asynchronously.
+ * It is not safe to modify sendbuf or recvbuf until the request
+ * indicates that the operation has completed.
+ */
+template <typename Backend, typename T>
+void NonblockingGather(
+  const T* sendbuf, T* recvbuf, size_t count, int root,
+  typename Backend::comm_type& comm,
+  typename Backend::req_type& req,
+  typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  Backend::template NonblockingGather<T>(sendbuf, recvbuf, count,
+                                         comm, req, algo);
+}
+
+/** In-place version of NonblockingGather; same semantics apply. */
+template <typename Backend, typename T>
+void NonblockingGather(
+  T* buffer, size_t count, int root, typename Backend::comm_type& comm,
+  typename Backend::req_type& req,
+  typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  Backend::template NonblockingGather<T>(buffer, count, root, comm, req, algo);
 }
 
 /**
