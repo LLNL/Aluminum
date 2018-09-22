@@ -48,8 +48,6 @@ public:
     h2d_event_(cuda::get_cuda_event()),
     comm_(comm.get_comm()) {
 
-    bool const use_stream_ops = cuda::stream_memory_operations_supported();
-
     // Transfer data from device to host and use an event to determine when it
     // completes.
     AL_CHECK_CUDA(cudaMemcpyAsync(host_mem_,sendbuf, sizeof(T)*count*comm.size(),
