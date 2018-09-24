@@ -67,7 +67,8 @@ class HostTransferState : public AlState {
  public:
   HostTransferState(const T* sendbuf, T* recvbuf, size_t count,
                     ReductionOperator op, MPICUDACommunicator& comm,
-                    cudaStream_t stream, AlRequest req_) : AlState(req_) {
+                    cudaStream_t stream, AlRequest req_) :
+    AlState(req_), compute_stream(comm.get_stream()) {
     host_mem = get_pinned_memory<T>(count);
     if (count <= 1<<9) {
       host_ar = new mpi::MPIRecursiveDoublingAlState<T>(
@@ -143,6 +144,7 @@ class HostTransferState : public AlState {
     return false;
   }
   bool needs_completion() const override { return false; }
+  void* get_compute_stream() const override { return compute_stream; }
  private:
   cudaEvent_t sync_event;
   cudaEvent_t sync_event2;
@@ -152,6 +154,7 @@ class HostTransferState : public AlState {
   T* host_mem;
   int32_t* sync;
   CUdeviceptr sync_dev_ptr;
+  cudaStream_t compute_stream;
 };
 
 } // namespace mpi_cuda

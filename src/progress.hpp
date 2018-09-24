@@ -56,6 +56,15 @@ using AlRequest = std::shared_ptr<std::atomic<bool>>;
 AlRequest get_free_request();
 /** Special marker for null requests. */
 static constexpr std::nullptr_t NULL_REQUEST = nullptr;
+/** Special marker for the default compute stream. */
+static constexpr std::nullptr_t DEFAULT_STREAM = nullptr;
+/** Run queue types for the progress engine. */
+enum class RunType {
+  /** Only a limited number of ops will be run at a time. */
+  bounded,
+  /** There cannot be a limit on how many ops of this type will run. */
+  unbounded
+};
 
 /**
  * Represents the state and algorithm for an asynchronous operation.
@@ -85,8 +94,12 @@ class AlState {
   virtual bool step() = 0;
   /** Return the associated request. */
   AlRequest& get_req() { return req; }
-  /** True if this is meant ot be waited on by the user. */
+  /** True if this is meant to be waited on by the user. */
   virtual bool needs_completion() const { return true; }
+  /** Return the compute stream associated with this operation. */
+  virtual void* get_compute_stream() const { return DEFAULT_STREAM; }
+  /** Return the run queue type this operation should use. */
+  virtual RunType get_run_type() const { return RunType::bounded; }
  private:
   AlRequest req;
 };
@@ -141,6 +154,27 @@ class SPSCQueue {
     front.store((f+1) & (size-1), std::memory_order_release);
     return v;
   }
+  /**
+   * Discard the element at the front of the queue.
+   * This always advances the front, even if nothing is present. The user must
+   * ensure that something was actually there (via peek).
+   */
+  void pop_always() {
+    size_t f = front.load(std::memory_order_relaxed);
+    front.store((f+1) & (size-1), std::memory_order_release);
+  }
+  /**
+   * Return the element at the front of the queue without removing it.
+   * If the queue is empty, this returns nullptr.
+   */
+  AlState* peek() {
+    size_t f = front.load(std::memory_order_relaxed);
+    size_t b = back.load(std::memory_order_acquire);
+    if (b == f) {
+      return nullptr;
+    }
+    return data[f];
+  }
  private:
   /** Index for the current front of the queue. */
   std::atomic<size_t> front;
@@ -150,6 +184,17 @@ class SPSCQueue {
   const size_t size;
   /** Buffer for data in the queue. */
   AlState** data;
+};
+
+/** Input request queue. */
+struct InputQueue {
+  InputQueue() : q(1<<13) {}
+  /** Input queue. */
+  SPSCQueue q;
+  /** Whether a blocking operation is being executed. */
+  bool blocked = false;
+  /** Associated compute stream. */
+  void* compute_stream = DEFAULT_STREAM;
 };
 
 /**
@@ -247,17 +292,34 @@ class ProgressEngine {
   /** Atomic flag indicating that the progress engine has completed startup. */
   std::atomic<bool> started_flag;
   /**
-   * The list of requests that have been enqueued to the progress engine, but
-   * that it has not yet begun to process. Threads may add states for
-   * asynchronous execution, and the progress engine will dequeue them when it
-   * begins to run them.
+   * Per-stream request queues.
+   * Each queue contains requests that have been enqueued to the progress
+   * engine but that it has not yet begun to process.
+   * Queues can be "added" to this by incrementing cur_streams. The calling
+   * thread sets up the queue, then increments cur_streams. (Note that this is
+   * only safe with one user thread.)
    */
-  SPSCQueue enqueued_reqs;
+  InputQueue request_queues[AL_PE_NUM_STREAMS];
+  /** Current number of streams. */
+  std::atomic<size_t> num_input_streams;
   /**
-   * Requests the progress engine is currently processing.
+   * Compute streams that currently have InputQueues.
+   * Only the user thread accesses this.
+   */
+  std::unordered_map<void*, InputQueue*> stream_to_queue;
+  /**
+   * Fixed-length run queue.
+   * This is for in-progress requests when there is a bounded number running at
+   * a time.
    * This should be accessed only by the progress engine (it is not protected).
    */
-  OrderedArray<AL_PE_NUM_CONCURRENT_OPS> in_progress_reqs;
+  OrderedArray<AL_PE_NUM_CONCURRENT_OPS> bounded_run_queue;
+  /**
+   * Arbitrary-length run queue.
+   * This is for in-progress requests that cannot have bounded length.
+   * This should be accessed only by the progress engine.
+   */
+  std::list<AlState*> unbounded_run_queue;
   /** World communicator. */
   Communicator* world_comm;
 #ifdef AL_HAS_CUDA

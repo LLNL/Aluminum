@@ -42,7 +42,8 @@ class SendAlState : public AlState {
  public:
   SendAlState(const T* sendbuf, size_t count_, int dest_,
               MPICUDACommunicator& comm_, cudaStream_t stream) :
-    AlState(nullptr), count(count_), dest(dest_), comm(comm_.get_comm()) {
+    AlState(nullptr), count(count_), dest(dest_), comm(comm_.get_comm()),
+    compute_stream(comm_.get_stream()) {
     mem = get_pinned_memory<T>(count);
     AL_CHECK_CUDA(cudaMemcpyAsync(mem, sendbuf, sizeof(T)*count,
                                   cudaMemcpyDeviceToHost, stream));
@@ -70,6 +71,8 @@ class SendAlState : public AlState {
     return flag;
   }
   bool needs_completion() const override { return false; }
+  void* get_compute_stream() const override { return compute_stream; }
+  RunType get_run_type() const override { return RunType::unbounded; }
  private:
   T* mem;
   size_t count;
@@ -79,6 +82,7 @@ class SendAlState : public AlState {
   cuda::FastEvent sync_event;
   bool mem_transfer_done = false;
   bool send_started = false;
+  cudaStream_t compute_stream;
 };
 
 template <typename T>
@@ -86,7 +90,8 @@ class RecvAlState : public AlState {
  public:
   RecvAlState(T* recvbuf, size_t count_, int src_,
               MPICUDACommunicator& comm_, cudaStream_t stream) :
-    AlState(nullptr), count(count_), src(src_), comm(comm_.get_comm()) {
+    AlState(nullptr), count(count_), src(src_), comm(comm_.get_comm()),
+    compute_stream(comm_.get_stream()) {
     mem = get_pinned_memory<T>(count);
     wait_sync.wait(stream);
     AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, mem, sizeof(T)*count,
@@ -113,6 +118,8 @@ class RecvAlState : public AlState {
     return sync_event.query();
   }
   bool needs_completion() const override { return false; }
+  void* get_compute_stream() const override { return compute_stream; }
+  RunType get_run_type() const override { return RunType::unbounded; }
  private:
   T* mem;
   size_t count;
@@ -122,6 +129,7 @@ class RecvAlState : public AlState {
   cuda::FastEvent sync_event;
   cuda::GPUWait wait_sync;
   bool recv_done = false;
+  cudaStream_t compute_stream;
 };
 
 template <typename T>
@@ -147,6 +155,10 @@ class SendRecvAlState : public AlState {
     return send_done && recv_done;
   }
   bool needs_completion() const override { return false; }
+  void* get_compute_stream() const override {
+    return send_state.get_compute_stream();
+  }
+  RunType get_run_type() const override { return RunType::unbounded; }
  private:
   SendAlState<T> send_state;
   RecvAlState<T> recv_state;
