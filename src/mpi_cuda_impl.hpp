@@ -296,9 +296,11 @@ class MPICUDABackend {
   static void do_host_transfer_allreduce(
     const T* sendbuf, T* recvbuf, size_t count, ReductionOperator op,
     comm_type& comm, cudaStream_t internal_stream) {
+#if 0
     if (!internal::cuda::stream_memory_operations_supported()) {
       throw_al_exception("Host-transfer allreduce not supported without stream memory operations");
     }
+#endif // 0
     internal::mpi_cuda::HostTransferState<T>* state = new internal::mpi_cuda::HostTransferState<T>(
       sendbuf, recvbuf, count, op, comm, internal_stream, internal::get_free_request());
     internal::get_progress_engine()->enqueue(state);
