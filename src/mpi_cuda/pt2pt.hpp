@@ -64,7 +64,7 @@ class SendAlState : public AlState {
         }
       }
       else {
-        cudaError_t r = cudaEventQuery(d2h_event_);
+        cudaError_t r = cudaEventQuery(d2h_event);
         if (r == cudaSuccess) {
           mem_transfer_done = true;
         }
