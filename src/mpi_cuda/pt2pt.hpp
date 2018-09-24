@@ -44,18 +44,35 @@ class SendAlState : public AlState {
               MPICUDACommunicator& comm_, cudaStream_t stream) :
     AlState(nullptr), count(count_), dest(dest_), comm(comm_.get_comm()) {
     mem = get_pinned_memory<T>(count);
+    if (!cuda::stream_memory_operations_supported())
+      d2h_event = cuda::get_cuda_event();
     AL_CHECK_CUDA(cudaMemcpyAsync(mem, sendbuf, sizeof(T)*count,
                                   cudaMemcpyDeviceToHost, stream));
-    sync_event.record(stream);
+    if (cuda::stream_memory_operations_supported())
+      sync_event.record(stream);
+    else
+      AL_CHECK_CUDA(cudaEventRecord(d2h_event, stream));
   }
   ~SendAlState() override {
     release_pinned_memory(mem);
   }
   bool step() override {
     if (!mem_transfer_done) {
-      if (sync_event.query()) {
-        mem_transfer_done = true;
+      if (cuda::stream_memory_operations_supported()) {
+        if (sync_event.query()) {
+          mem_transfer_done = true;
+        }
       }
+      else {
+        cudaError_t r = cudaEventQuery(d2h_event_);
+        if (r == cudaSuccess) {
+          mem_transfer_done = true;
+        }
+        else if (r != cudaErrorNotReady) {
+          throw_al_exception("sendrecv: cudaEventQuery error");
+        }
+      }
+
       // Always return false here so the send is not started until the next
       // pass through the in-progress requests.
       // This ensures that sends always start in the order they were posted.
@@ -77,6 +94,7 @@ class SendAlState : public AlState {
   MPI_Comm comm;
   MPI_Request req = MPI_REQUEST_NULL;
   cuda::FastEvent sync_event;
+  cudaEvent_t d2h_event;
   bool mem_transfer_done = false;
   bool send_started = false;
 };
@@ -87,11 +105,17 @@ class RecvAlState : public AlState {
   RecvAlState(T* recvbuf, size_t count_, int src_,
               MPICUDACommunicator& comm_, cudaStream_t stream) :
     AlState(nullptr), count(count_), src(src_), comm(comm_.get_comm()) {
+    if (!cuda::stream_memory_operations_supported())
+      h2d_event = cuda::get_cuda_event();
+
     mem = get_pinned_memory<T>(count);
     wait_sync.wait(stream);
     AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, mem, sizeof(T)*count,
                                   cudaMemcpyHostToDevice, stream));
-    sync_event.record(stream);
+    if (cuda::stream_memory_operations_supported())
+      sync_event.record(stream);
+    else
+      AL_CHECK_CUDA(cudaEventRecord(h2d_event, stream));
   }
   ~RecvAlState() override {
     release_pinned_memory(mem);
@@ -110,7 +134,16 @@ class RecvAlState : public AlState {
       }
     }
     // Wait until the memcpy has completed so everything can be safely freed.
-    return sync_event.query();
+    if (cuda::stream_memory_operations_supported())
+      return sync_event.query();
+    else {
+      cudaError_t r = cudaEventQuery(h2d_event);
+      if (r == cudaSuccess)
+        return true;
+      else if (r != cudaErrorNotReady)
+        throw_al_exception("sendrecv: cudaEventQuery error");
+      return false;
+    }
   }
   bool needs_completion() const override { return false; }
  private:
@@ -120,6 +153,7 @@ class RecvAlState : public AlState {
   MPI_Comm comm;
   MPI_Request req = MPI_REQUEST_NULL;
   cuda::FastEvent sync_event;
+  cudaEvent_t h2d_event;
   cuda::GPUWait wait_sync;
   bool recv_done = false;
 };
@@ -153,6 +187,7 @@ class SendRecvAlState : public AlState {
   bool send_done = false;
   bool recv_done = false;
 };
+
 
 }  // namespace mpi_cuda
 }  // namespace internal

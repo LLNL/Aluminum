@@ -101,9 +101,11 @@ bool stream_memory_operations_supported() {
 }
 
 FastEvent::FastEvent() {
+#if 0
   if (!stream_memory_operations_supported()) {
     throw_al_exception("FastEvent requires stream memory operations");
   }
+#endif // 0
   sync_event = get_pinned_memory<int32_t>(1);
   AL_CHECK_CUDA_DRV(cuMemHostGetDevicePointer(
                       &sync_event_dev_ptr, sync_event, 0));
