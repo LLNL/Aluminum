@@ -101,30 +101,50 @@ bool stream_memory_operations_supported() {
 }
 
 FastEvent::FastEvent() {
-#if 0
-  if (!stream_memory_operations_supported()) {
-    throw_al_exception("FastEvent requires stream memory operations");
+  if (stream_memory_operations_supported()) {
+    sync_event = get_pinned_memory<int32_t>(1);
+    AL_CHECK_CUDA_DRV(cuMemHostGetDevicePointer(
+                        &sync_event_dev_ptr, sync_event, 0));
   }
-#endif // 0
-  sync_event = get_pinned_memory<int32_t>(1);
-  AL_CHECK_CUDA_DRV(cuMemHostGetDevicePointer(
-                      &sync_event_dev_ptr, sync_event, 0));
+  else {
+    slow_event = get_cuda_event();
+  }
 }
 
 FastEvent::~FastEvent() {
-  release_pinned_memory(sync_event);
+  if (stream_memory_operations_supported()) {
+    release_pinned_memory(slow_event);
+  }
+  else {
+    cudaEventDestroy(slow_event);
+  }
 }
 
 void FastEvent::record(cudaStream_t stream) {
-  // We cannot use std::atomic because we need the actual address of the memory.
-  __atomic_store_n(sync_event, 0, __ATOMIC_SEQ_CST);
-  AL_CHECK_CUDA_DRV(cuStreamWriteValue32(
-                      stream, sync_event_dev_ptr, 1,
-                      CU_STREAM_WRITE_VALUE_DEFAULT));
+  if (stream_memory_operations_supported()) {
+    // We cannot use std::atomic because we need the actual address of the memory.
+    __atomic_store_n(sync_event, 0, __ATOMIC_SEQ_CST);
+    AL_CHECK_CUDA_DRV(cuStreamWriteValue32(
+                        stream, sync_event_dev_ptr, 1,
+                        CU_STREAM_WRITE_VALUE_DEFAULT));
+  }
+  else {
+    cudaEventRecord(slow_event, stream);
+  }
 }
 
 bool FastEvent::query() {
-  return __atomic_load_n(sync_event, __ATOMIC_SEQ_CST);
+  if (stream_memory_operations_supported())
+    return __atomic_load_n(sync_event, __ATOMIC_SEQ_CST);
+  else {
+    cudaError_t r = cudaEventQuery(slow_event);
+    if (r == cudaSuccess)
+      return true;
+    else if (r != cudaErrorNotReady)
+      throw_al_exception("FastEvent::query: cudaEventQuery error");
+    else
+      return false;
+  }
 }
 
 GPUWait::GPUWait()
