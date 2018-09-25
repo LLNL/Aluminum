@@ -116,7 +116,7 @@ FastEvent::~FastEvent() {
     release_pinned_memory(slow_event);
   }
   else {
-    cudaEventDestroy(slow_event);
+    release_cuda_event(slow_event);
   }
 }
 
