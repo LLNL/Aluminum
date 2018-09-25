@@ -524,8 +524,8 @@ void Gather(
  *               and acts as sendbuf above.
  * @param count The per-rank data count.
  * @param root The root process to which data is gathered.
- * @param comm The communicator fo this all-to-all operation.
- * @param algo Request a particular all-to-all algorithm.
+ * @param comm The communicator fo this gather operation.
+ * @param algo Request a particular gather algorithm.
  */
 template <typename Backend, typename T>
 void Gather(
@@ -558,6 +558,68 @@ void NonblockingGather(
   typename Backend::req_type& req,
   typename Backend::algo_type algo = Backend::algo_type::automatic) {
   Backend::template NonblockingGather<T>(buffer, count, root, comm, req, algo);
+}
+
+/**
+ * Scatter-to-all operation.
+ * @param sendbuf The source data buffer.
+ * @param recvbuf The destination data buffer.
+ * @param count The per-rank data count.
+ * @param root The root process from which data is scattered.
+ * @param comm The communicator for this scatter operation.
+ * @param algo Request a particular scatter algorithm.
+ */
+template <typename Backend, typename T>
+void Scatter(
+  const T* sendbuf, T* recvbuf, size_t count, int root,
+  typename Backend::comm_type& comm,
+  typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  Backend::template Scatter<T>(sendbuf, recvbuf, count, root, comm, algo);
+}
+
+/**
+ * In-place scatter-to-all operation.
+
+ * @param buffer The data buffer; overwritten on completion. For root
+ *               processes, has size count*comm.size() and acts as
+ *               sendbuf above. For nonroot processes, has size count
+ *               and acts as recvbuf above.
+ * @param count The per-rank data count.
+ * @param root The root process from which data is scattered.
+ * @param comm The communicator fo this scatter operation.
+ * @param algo Request a particular scatter algorithm.
+ */
+template <typename Backend, typename T>
+void Scatter(
+  T* buffer, size_t count, int root, typename Backend::comm_type& comm,
+  typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  Backend::template Scatter<T>(buffer, count, root, comm, algo);
+}
+
+/**
+ * Non-blocking version of Scatter.
+ * This returns immediately (i.e. does only local operations) and
+ * starts the scatter asynchronously.
+ * It is not safe to modify sendbuf or recvbuf until the request
+ * indicates that the operation has completed.
+ */
+template <typename Backend, typename T>
+void NonblockingScatter(
+  const T* sendbuf, T* recvbuf, size_t count, int root,
+  typename Backend::comm_type& comm,
+  typename Backend::req_type& req,
+  typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  Backend::template NonblockingScatter<T>(sendbuf, recvbuf, count,
+                                         comm, req, algo);
+}
+
+/** In-place version of NonblockingScatter; same semantics apply. */
+template <typename Backend, typename T>
+void NonblockingScatter(
+  T* buffer, size_t count, int root, typename Backend::comm_type& comm,
+  typename Backend::req_type& req,
+  typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  Backend::template NonblockingScatter<T>(buffer, count, root, comm, req, algo);
 }
 
 /**

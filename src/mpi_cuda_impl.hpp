@@ -31,6 +31,7 @@
 #include "mpi_cuda/allreduce.hpp"
 #include "mpi_cuda/alltoall.hpp"
 #include "mpi_cuda/gather.hpp"
+#include "mpi_cuda/scatter.hpp"
 
 #include "mpi_cuda/pt2pt.hpp"
 
@@ -218,7 +219,7 @@ class MPICUDABackend {
   static void NonblockingAlltoall(
     T* buffer, size_t count,
     comm_type& comm, req_type& req, algo_type algo) {
-    NonblockingAlltoall<T>(buffer, count, comm, req, algo);
+    NonblockingAlltoall<T>(buffer, buffer, count, comm, req, algo);
   }
 
   template <typename T>
@@ -262,8 +263,53 @@ class MPICUDABackend {
   static void NonblockingGather(
     T* buffer, size_t count, int root,
     comm_type& comm, req_type& req, algo_type algo) {
-    NonblockingGather<T>(buffer, count, root, comm, req, algo);
+    NonblockingGather<T>(buffer, buffer, count, root, comm, req, algo);
   }
+
+  template <typename T>
+  static void Scatter(
+    const T* sendbuf, T* recvbuf, size_t count, int root,
+    comm_type& comm, algo_type algo) {
+    if (count == 0) return;
+    switch (algo) {
+    case MPICUDAAllreduceAlgorithm::automatic:
+      do_scatter(sendbuf, recvbuf, count, root, comm, comm.get_stream());
+      break;
+    default:
+      throw_al_exception("MPICUDAScatter: Invalid algorithm");
+    }
+  }
+
+  template <typename T>
+  static void Scatter(
+    T* buffer, size_t count, int root, comm_type& comm, algo_type algo) {
+    Scatter(buffer, buffer, count, root, comm, algo);
+  }
+
+  template <typename T>
+  static void NonblockingScatter(
+    const T* sendbuf, T* recvbuf, size_t count, int root,
+    comm_type& comm, req_type& req, algo_type algo) {
+    if (count == 0) return;
+    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+    sync_internal_stream_with_comm(internal_stream, comm);
+    switch (algo) {
+    case MPICUDAAllreduceAlgorithm::automatic:
+      do_scatter(sendbuf, recvbuf, count, root, comm, internal_stream);
+      break;
+    default:
+      throw_al_exception("Invalid algorithm");
+    }
+    setup_completion_event(internal_stream, comm, req);
+  }
+
+  template <typename T>
+  static void NonblockingScatter(
+    T* buffer, size_t count, int root,
+    comm_type& comm, req_type& req, algo_type algo) {
+    NonblockingScatter<T>(buffer, buffer, count, root, comm, req, algo);
+  }
+
 
  private:
   /** Event for synchronizing between streams. */
@@ -353,6 +399,16 @@ class MPICUDABackend {
     cudaStream_t stream) {
     internal::mpi_cuda::GatherAlState<T>* state =
       new internal::mpi_cuda::GatherAlState<T>(
+        sendbuf, recvbuf, count, root, comm, stream);
+    internal::get_progress_engine()->enqueue(state);
+  }
+
+  template <typename T>
+  static void do_scatter(
+    const T* sendbuf, T* recvbuf, size_t count, int root, comm_type& comm,
+    cudaStream_t stream) {
+    internal::mpi_cuda::ScatterAlState<T>* state =
+      new internal::mpi_cuda::ScatterAlState<T>(
         sendbuf, recvbuf, count, root, comm, stream);
     internal::get_progress_engine()->enqueue(state);
   }
