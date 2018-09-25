@@ -122,7 +122,6 @@ class RecvAlState : public AlState {
   MPI_Comm comm;
   MPI_Request req = MPI_REQUEST_NULL;
   cuda::FastEvent sync_event;
-  cudaEvent_t h2d_event;
   cuda::GPUWait wait_sync;
   bool recv_done = false;
 };
