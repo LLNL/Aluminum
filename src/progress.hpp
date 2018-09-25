@@ -308,18 +308,14 @@ class ProgressEngine {
    */
   std::unordered_map<void*, InputQueue*> stream_to_queue;
   /**
-   * Fixed-length run queue.
-   * This is for in-progress requests when there is a bounded number running at
-   * a time.
-   * This should be accessed only by the progress engine (it is not protected).
-   */
-  OrderedArray<AL_PE_NUM_CONCURRENT_OPS> bounded_run_queue;
-  /**
    * Arbitrary-length run queue.
-   * This is for in-progress requests that cannot have bounded length.
    * This should be accessed only by the progress engine.
+   * Using a vector for compactness and to avoid repeated memory allocations.
+   * @todo May extend OrderedArray to handle this.
    */
-  std::list<AlState*> unbounded_run_queue;
+  std::vector<AlState*> run_queue;
+  /** Number of currently-active bounded-length operations. */
+  size_t num_bounded = 0;
   /** World communicator. */
   Communicator* world_comm;
 #ifdef AL_HAS_CUDA

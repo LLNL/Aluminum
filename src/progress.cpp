@@ -214,14 +214,15 @@ void ProgressEngine::engine() {
           // Add to the correct run queue if one is available.
           switch (req->get_run_type()) {
           case RunType::bounded:
-            if (!bounded_run_queue.full()) {
-              bounded_run_queue.push(req);
+            if (num_bounded < AL_PE_NUM_CONCURRENT_OPS) {
+              ++num_bounded;
+              run_queue.push_back(req);
               req->start();
               request_queues[i].q.pop_always();
             }
             break;
           case RunType::unbounded:
-            unbounded_run_queue.push_back(req);
+            run_queue.push_back(req);
             req->start();
             request_queues[i].q.pop_always();
             break;
@@ -229,34 +230,18 @@ void ProgressEngine::engine() {
         }
       }
     }
-    // Process one step of each in-progress request in the bounded queue.
-    bool any_completed = false;
-    for (size_t i = 0; i < bounded_run_queue.cur_size; ++i) {
-      AlState* req = bounded_run_queue.l[i];
-      if (req->step()) {
-        if (req->needs_completion()) {
-          // Mark the request as completed.
-          req->get_req()->store(true, std::memory_order_release);
-        }
-        delete req;
-        // Mark slot for compaction.
-        bounded_run_queue.l[i] = nullptr;
-        any_completed = true;
-      }
-    }
-    if (any_completed) {
-      bounded_run_queue.compact();
-    }
-    // Process one step of each in-progress request in the unbounded queue.
-    for (auto i = unbounded_run_queue.begin();
-         i != unbounded_run_queue.end();) {
+    // Process one step of each in-progress request.
+    for (auto i = run_queue.begin(); i != run_queue.end();) {
       AlState* req = *i;
       if (req->step()) {
         if (req->needs_completion()) {
           req->get_req()->store(true, std::memory_order_release);
         }
+        if (req->get_run_type() == RunType::bounded) {
+          --num_bounded;
+        }
         delete req;
-        i = unbounded_run_queue.erase(i);
+        i = run_queue.erase(i);
       } else {
         ++i;
       }
