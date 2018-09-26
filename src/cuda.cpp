@@ -115,16 +115,16 @@ FastEvent::FastEvent() {
                         &sync_event_dev_ptr, sync_event, 0));
   }
   else {
-    slow_event = get_cuda_event();
+    plain_event = get_cuda_event();
   }
 }
 
 FastEvent::~FastEvent() {
   if (stream_memory_operations_supported()) {
-    release_pinned_memory(slow_event);
+    release_pinned_memory(sync_event);
   }
   else {
-    release_cuda_event(slow_event);
+    release_cuda_event(plain_event);
   }
 }
 
@@ -137,7 +137,7 @@ void FastEvent::record(cudaStream_t stream) {
                         CU_STREAM_WRITE_VALUE_DEFAULT));
   }
   else {
-    cudaEventRecord(slow_event, stream);
+    AL_CHECK_CUDA(cudaEventRecord(plain_event, stream));
   }
 }
 
@@ -145,7 +145,7 @@ bool FastEvent::query() {
   if (stream_memory_operations_supported())
     return __atomic_load_n(sync_event, __ATOMIC_SEQ_CST);
   else {
-    cudaError_t r = cudaEventQuery(slow_event);
+    cudaError_t r = cudaEventQuery(plain_event);
     if (r == cudaSuccess)
       return true;
     else if (r != cudaErrorNotReady)

@@ -154,7 +154,7 @@ class FastEvent {
  private:
   int32_t* sync_event __attribute__((aligned(64)));
   CUdeviceptr sync_event_dev_ptr;
-  cudaEvent_t slow_event;
+  cudaEvent_t plain_event;
 };
 
 /**

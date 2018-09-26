@@ -76,8 +76,10 @@ public:
 
   ~GatherAlState() override {
     release_pinned_memory(host_mem_);
-    cuda::release_cuda_event(h2d_event_);
     cuda::release_cuda_event(d2h_event_);
+    if (h2d_event_) {
+      cuda::release_cuda_event(h2d_event_);
+    }
   }
 
   bool step() override {

@@ -45,8 +45,8 @@ public:
     rank_(comm.rank()), root_(root), count_(count),
     host_mem_(get_pinned_memory<T>(rank_ == root_
                                    ? comm.size()*count_ : count_)),
-    d2h_event_(cuda::get_cuda_event()),
-    h2d_event_(rank_ == root_ ? cuda::get_cuda_event() : nullptr),
+    d2h_event_(rank_ == root_ ? cuda::get_cuda_event() : nullptr),
+    h2d_event_(cuda::get_cuda_event()),
     comm_(comm.get_comm()) {
 
     bool const i_am_root = rank_ == root_;
@@ -82,7 +82,9 @@ public:
   ~ScatterAlState() override {
     release_pinned_memory(host_mem_);
     cuda::release_cuda_event(h2d_event_);
-    cuda::release_cuda_event(d2h_event_);
+    if (d2h_event_) {
+      cuda::release_cuda_event(d2h_event_);
+    }
   }
 
   bool step() override {
