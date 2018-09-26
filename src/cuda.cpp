@@ -160,7 +160,6 @@ GPUWait::GPUWait()
     wait_sync_dev_ptr_no_stream_mem_ops(nullptr),
     wait_sync_dev_ptr(0U)
 {
-  wait_sync = get_pinned_memory<int32_t>(1);
   // An atomic here may be overkill.
   // Can't use std::atomic because we need the actual address.
   __atomic_store_n(wait_sync, 0, __ATOMIC_SEQ_CST);
