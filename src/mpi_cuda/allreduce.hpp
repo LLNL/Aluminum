@@ -131,7 +131,6 @@ class HostTransferState : public AlState {
     cudaError_t r = cudaEventQuery(sync_event2);
     if (r == cudaSuccess) {
       release_pinned_memory(host_mem);  // TODO: Maybe move this.
-      release_pinned_memory(sync);
       cuda::release_cuda_event(sync_event);
       cuda::release_cuda_event(sync_event2);
       return true;
