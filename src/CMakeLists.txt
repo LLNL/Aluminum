@@ -15,8 +15,7 @@ set_full_path(THIS_DIR_CXX_SOURCES
 
 if (AL_HAS_CUDA)
   list(APPEND THIS_DIR_HEADERS
-    "${CMAKE_CURRENT_SOURCE_DIR}/cuda.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/helper_kernels.hpp")
+    "${CMAKE_CURRENT_SOURCE_DIR}/cuda.hpp")
   list(APPEND THIS_DIR_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/cudacommunicator.hpp")
   list(APPEND THIS_DIR_CXX_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/cuda.cpp")
 endif ()
