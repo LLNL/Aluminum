@@ -28,6 +28,7 @@
 #pragma once
 
 #include "cudacommunicator.hpp"
+#include "mpi_cuda/allreduce_ring.hpp"
 
 namespace Al {
 namespace internal {
