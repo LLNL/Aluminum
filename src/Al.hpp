@@ -517,7 +517,6 @@ void Gather(
 
 /**
  * In-place gather-to-one operation.
-
  * @param buffer The data buffer; overwritten on completion. For root
  *               processes, has size count*comm.size() and acts as
  *               recvbuf above. For nonroot processes, has size count
@@ -579,7 +578,6 @@ void Scatter(
 
 /**
  * In-place scatter-to-all operation.
-
  * @param buffer The data buffer; overwritten on completion. For root
  *               processes, has size count*comm.size() and acts as
  *               sendbuf above. For nonroot processes, has size count
