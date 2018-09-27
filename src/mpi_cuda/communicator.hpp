@@ -41,7 +41,9 @@ class MPICUDACommunicator: public CUDACommunicator {
   MPICUDACommunicator() : MPICUDACommunicator(MPI_COMM_WORLD, 0) {}
   MPICUDACommunicator(cudaStream_t stream_) :
     MPICUDACommunicator(MPI_COMM_WORLD, stream_) {}
-  MPICUDACommunicator(MPI_Comm comm_, cudaStream_t stream_);
+  MPICUDACommunicator(MPI_Comm comm_, cudaStream_t stream_)
+    : CUDACommunicator(comm_, stream_), m_ring(nullptr) {
+  }
 
   RingMPICUDA &get_ring() {
     if (!m_ring)
