@@ -43,7 +43,14 @@ class MPICUDACommunicator: public CUDACommunicator {
   MPICUDACommunicator(MPI_Comm comm_, cudaStream_t stream_);
 
   RingMPICUDA &get_ring() {
+    if (!m_ring)
+      m_ring = new RingMPICUDA(this->get_comm());
     return *m_ring;
+  }
+
+  ~MPICUDACommunicator() {
+    if (m_ring)
+      delete m_ring;
   }
 
  protected:
