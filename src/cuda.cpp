@@ -30,6 +30,7 @@
 #include "Al.hpp"
 #include "cuda.hpp"
 #include "mempool.hpp"
+#include "helper_kernels.hpp"
 
 namespace Al {
 namespace internal {
@@ -108,37 +109,67 @@ bool stream_memory_operations_supported() {
 }
 
 FastEvent::FastEvent() {
-  if (!stream_memory_operations_supported()) {
-    throw_al_exception("FastEvent requires stream memory operations");
+  if (stream_memory_operations_supported()) {
+    sync_event = get_pinned_memory<int32_t>(1);
+    AL_CHECK_CUDA_DRV(cuMemHostGetDevicePointer(
+                        &sync_event_dev_ptr, sync_event, 0));
   }
-  sync_event = get_pinned_memory<int32_t>(1);
-  AL_CHECK_CUDA_DRV(cuMemHostGetDevicePointer(
-                      &sync_event_dev_ptr, sync_event, 0));
+  else {
+    plain_event = get_cuda_event();
+  }
 }
 
 FastEvent::~FastEvent() {
-  release_pinned_memory(sync_event);
+  if (stream_memory_operations_supported()) {
+    release_pinned_memory(sync_event);
+  }
+  else {
+    release_cuda_event(plain_event);
+  }
 }
 
 void FastEvent::record(cudaStream_t stream) {
-  // We cannot use std::atomic because we need the actual address of the memory.
-  __atomic_store_n(sync_event, 0, __ATOMIC_SEQ_CST);
-  AL_CHECK_CUDA_DRV(cuStreamWriteValue32(
-                      stream, sync_event_dev_ptr, 1,
-                      CU_STREAM_WRITE_VALUE_DEFAULT));
+  if (stream_memory_operations_supported()) {
+    // We cannot use std::atomic because we need the actual address of the memory.
+    __atomic_store_n(sync_event, 0, __ATOMIC_SEQ_CST);
+    AL_CHECK_CUDA_DRV(cuStreamWriteValue32(
+                        stream, sync_event_dev_ptr, 1,
+                        CU_STREAM_WRITE_VALUE_DEFAULT));
+  }
+  else {
+    AL_CHECK_CUDA(cudaEventRecord(plain_event, stream));
+  }
 }
 
 bool FastEvent::query() {
-  return __atomic_load_n(sync_event, __ATOMIC_SEQ_CST);
+  if (stream_memory_operations_supported())
+    return __atomic_load_n(sync_event, __ATOMIC_SEQ_CST);
+  else {
+    cudaError_t r = cudaEventQuery(plain_event);
+    if (r == cudaSuccess)
+      return true;
+    else if (r != cudaErrorNotReady)
+      throw_al_exception("FastEvent::query: cudaEventQuery error");
+    else
+      return false;
+  }
 }
 
-GPUWait::GPUWait() {
-  wait_sync = get_pinned_memory<int32_t>(1);
+GPUWait::GPUWait()
+  : wait_sync(get_pinned_memory<int32_t>(1)),
+    wait_sync_dev_ptr_no_stream_mem_ops(nullptr),
+    wait_sync_dev_ptr(0U)
+{
   // An atomic here may be overkill.
   // Can't use std::atomic because we need the actual address.
   __atomic_store_n(wait_sync, 0, __ATOMIC_SEQ_CST);
-  AL_CHECK_CUDA_DRV(cuMemHostGetDevicePointer(
-                      &wait_sync_dev_ptr, wait_sync, 0));
+
+  if (stream_memory_operations_supported())
+    AL_CHECK_CUDA_DRV(cuMemHostGetDevicePointer(
+                        &wait_sync_dev_ptr, wait_sync, 0));
+  else
+    AL_CHECK_CUDA(cudaHostGetDevicePointer(
+                    &wait_sync_dev_ptr_no_stream_mem_ops, wait_sync, 0));
 }
 
 GPUWait::~GPUWait() {
@@ -146,8 +177,10 @@ GPUWait::~GPUWait() {
 }
 
 void GPUWait::wait(cudaStream_t stream) {
-  AL_CHECK_CUDA_DRV(cuStreamWaitValue32(
-                      stream, wait_sync_dev_ptr, 1, CU_STREAM_WAIT_VALUE_EQ));
+  if (stream_memory_operations_supported())
+    launch_wait_kernel(stream, 1, wait_sync_dev_ptr);
+  else
+    launch_wait_kernel(stream, 1, wait_sync_dev_ptr_no_stream_mem_ops);
 }
 
 void GPUWait::signal() {

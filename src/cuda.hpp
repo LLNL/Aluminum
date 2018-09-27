@@ -154,6 +154,7 @@ class FastEvent {
  private:
   int32_t* sync_event __attribute__((aligned(64)));
   CUdeviceptr sync_event_dev_ptr;
+  cudaEvent_t plain_event;
 };
 
 /**
@@ -161,6 +162,11 @@ class FastEvent {
  * This essentially uses full/empty bit semantics to implement synchronization.
  * The GPU will wait on a memory location until the host writes to it using the
  * stream memory wait operation.
+ *
+ * If stream memory operations are not available, this will use a
+ * spinning wait kernel. This can cause problems. It has a tendency to
+ * lead to deadlock, especially in "debug" mode. Also, if kernel
+ * timeout is enabled, this is likely to error out.
  */
 class GPUWait {
  public:
@@ -172,6 +178,7 @@ class GPUWait {
   void signal();
  private:
   int32_t* wait_sync __attribute__((aligned(64)));
+  int32_t* wait_sync_dev_ptr_no_stream_mem_ops __attribute__((aligned(64)));
   CUdeviceptr wait_sync_dev_ptr;
 };
 
