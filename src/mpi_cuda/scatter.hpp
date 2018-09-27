@@ -45,8 +45,6 @@ public:
     rank_(comm.rank()), root_(root), count_(count),
     host_mem_(get_pinned_memory<T>(rank_ == root_
                                    ? comm.size()*count_ : count_)),
-    d2h_event_(rank_ == root_ ? cuda::get_cuda_event() : nullptr),
-    h2d_event_(cuda::get_cuda_event()),
     comm_(comm.get_comm()) {
 
     bool const i_am_root = rank_ == root_;
@@ -58,7 +56,7 @@ public:
       AL_CHECK_CUDA(cudaMemcpyAsync(
                       host_mem_, sendbuf+count_*comm.size(),
                       sizeof(T)*count_, cudaMemcpyDeviceToHost, stream));
-      AL_CHECK_CUDA(cudaEventRecord(d2h_event_, stream));
+      d2h_event_.record(stream);
 
       // Copy to self
       if (!inplace_operation) {
@@ -75,23 +73,18 @@ public:
       AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, host_mem_, sizeof(T)*count,
                                     cudaMemcpyHostToDevice, stream));
 
-      AL_CHECK_CUDA(cudaEventRecord(h2d_event_, stream));
+      h2d_event_.record(stream);
     }
   }
 
   ~ScatterAlState() override {
     release_pinned_memory(host_mem_);
-    cuda::release_cuda_event(h2d_event_);
-    if (d2h_event_) {
-      cuda::release_cuda_event(d2h_event_);
-    }
   }
 
   bool step() override {
     if (!scatter_started_) {
       // Check if mem xfer complete
-      cudaError_t r = cudaEventQuery(d2h_event_);
-      if (r == cudaSuccess) {
+      if (d2h_event_.query()) {
         if (root_ == rank_)
           MPI_Iscatter(host_mem_, count_, mpi::TypeMap<T>(),
                        MPI_IN_PLACE, count_, mpi::TypeMap<T>(),
@@ -102,16 +95,13 @@ public:
                        root_, comm_, &req_);
         scatter_started_ = true;
       }
-      else if (r == cudaErrorNotReady) {
-        return false;
-      }
       else {
-        throw_al_exception("Alltoall: cudaEventQuery error");
+        return false;
       }
     }
 
     if (!scatter_done_) {
-      // Wait for the all2all to complete
+      // Wait for the scatter to complete
       int flag;
       MPI_Test(&req_, &flag, MPI_STATUS_IGNORE);
       if (flag) {
@@ -125,20 +115,15 @@ public:
         return false;
       }
     }
-    else if (rank_ != root_) {
+    else if (rank_ == root_) {
       // Paranoia, in case step() is ever called again after returning
       // 'true' for the first time.
       return true;
     }
 
     // Wait for host-to-device memcopy; cleanup
-    cudaError_t r = cudaEventQuery(h2d_event_);
-    if (r == cudaSuccess) {
+    if (h2d_event_.query())
       return true;
-    }
-    else if (r != cudaErrorNotReady) {
-      throw_al_exception("Alltoall: cudaEventQuery error");
-    }
 
     return false;
   }
@@ -153,7 +138,7 @@ private:
 
   cuda::GPUWait gpuwait_;
 
-  cudaEvent_t d2h_event_, h2d_event_;
+  cuda::FastEvent d2h_event_, h2d_event_;
 
   MPI_Comm comm_;
   MPI_Request req_ = MPI_REQUEST_NULL;

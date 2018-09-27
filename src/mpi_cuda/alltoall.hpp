@@ -44,15 +44,13 @@ public:
     AlState(nullptr),
     host_mem_(get_pinned_memory<T>(comm.size()*count)),
     count_(count),
-    d2h_event_(cuda::get_cuda_event()),
-    h2d_event_(cuda::get_cuda_event()),
     comm_(comm.get_comm()) {
 
     // Transfer data from device to host and use an event to determine when it
     // completes.
     AL_CHECK_CUDA(cudaMemcpyAsync(host_mem_,sendbuf, sizeof(T)*count*comm.size(),
                                   cudaMemcpyDeviceToHost, stream));
-    AL_CHECK_CUDA(cudaEventRecord(d2h_event_, stream));
+    d2h_event_.record(stream);
 
     // Enqueue the kernel to wait on the host
     gpuwait_.wait(stream);
@@ -60,30 +58,23 @@ public:
     // Transfer completed buffer back to device.
     AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, host_mem_, sizeof(T)*count*comm.size(),
                                   cudaMemcpyHostToDevice, stream));
-    AL_CHECK_CUDA(cudaEventRecord(h2d_event_, stream));
-
+    h2d_event_.record(stream);
   }
 
   ~AlltoallAlState() override {
     release_pinned_memory(host_mem_);
-    cuda::release_cuda_event(h2d_event_);
-    cuda::release_cuda_event(d2h_event_);
   }
 
   bool step() override {
     if (!a2a_started_) {
       // Check if mem xfer complete
-      cudaError_t r = cudaEventQuery(d2h_event_);
-      if (r == cudaSuccess) {
+      if (d2h_event_.query()) {
         MPI_Ialltoall(MPI_IN_PLACE, count_, mpi::TypeMap<T>(),
                       host_mem_, count_, mpi::TypeMap<T>(), comm_, &req_);
         a2a_started_ = true;
       }
-      else if (r == cudaErrorNotReady) {
-        return false;
-      }
       else {
-        throw_al_exception("Alltoall: cudaEventQuery error");
+        return false;
       }
     }
 
@@ -101,12 +92,8 @@ public:
     }
 
     // Wait for host-to-device memcopy; cleanup
-    cudaError_t r = cudaEventQuery(h2d_event_);
-    if (r == cudaSuccess) {
+    if (h2d_event_.query()) {
       return true;
-    }
-    else if (r != cudaErrorNotReady) {
-      throw_al_exception("Alltoall: cudaEventQuery error");
     }
 
     return false;
@@ -120,7 +107,7 @@ private:
 
   cuda::GPUWait gpuwait_;
 
-  cudaEvent_t d2h_event_, h2d_event_;
+  cuda::FastEvent d2h_event_, h2d_event_;
 
   MPI_Comm comm_;
   MPI_Request req_ = MPI_REQUEST_NULL;
