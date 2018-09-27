@@ -100,6 +100,8 @@ class AlState {
   virtual void* get_compute_stream() const { return DEFAULT_STREAM; }
   /** Return the run queue type this operation should use. */
   virtual RunType get_run_type() const { return RunType::bounded; }
+  /** True if this is meant to block operations until completion. */
+  virtual bool blocks() const { return false; }
  private:
   AlRequest req;
 };
@@ -316,6 +318,11 @@ class ProgressEngine {
   std::vector<AlState*> run_queue;
   /** Number of currently-active bounded-length operations. */
   size_t num_bounded = 0;
+  /**
+   * Map requests that are currently blocking to the associated input queue.
+   * This should be accessed only by the progress engine.
+   */
+  std::unordered_map<AlState*, size_t> blocking_reqs;
   /** World communicator. */
   Communicator* world_comm;
 #ifdef AL_HAS_CUDA

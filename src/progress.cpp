@@ -227,6 +227,10 @@ void ProgressEngine::engine() {
             request_queues[i].q.pop_always();
             break;
           }
+          if (req->blocks()) {
+            request_queues[i].blocked = true;
+            blocking_reqs[req] = i;
+          }
         }
       }
     }
@@ -239,6 +243,11 @@ void ProgressEngine::engine() {
         }
         if (req->get_run_type() == RunType::bounded) {
           --num_bounded;
+        }
+        if (req->blocks()) {
+          // Unblock the associated input queue.
+          request_queues[blocking_reqs[req]].blocked = false;
+          blocking_reqs.erase(req);
         }
         delete req;
         i = run_queue.erase(i);
