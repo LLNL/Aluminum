@@ -95,7 +95,7 @@ inline void *malloc_aligned(size_t s) {
     std::cerr << "posix_memalign failed\n";
     abort();
   }
-  return p;  
+  return p;
 #else
   return malloc(s);
 #endif
@@ -127,11 +127,8 @@ void destroy_streams(std::vector<cudaStream_t> &streams,
 }
 
 template <typename T>
-MPI_Datatype get_mpi_data_type();
-
-template <> inline
-MPI_Datatype get_mpi_data_type<float>() {
-  return MPI_FLOAT;
+MPI_Datatype get_mpi_data_type() {
+  return mpi::TypeMap<T>();
 }
 
 inline int get_mpi_comm_local_size() {
@@ -161,7 +158,7 @@ class MPIPrintStream {
   std::stringstream &operator()() {
     return ss;
   }
-  
+
  protected:
   std::ostream &m_os;
   std::stringstream ss;

@@ -56,6 +56,7 @@ class SendAlState : public AlState {
       if (sync_event.query()) {
         mem_transfer_done = true;
       }
+
       // Always return false here so the send is not started until the next
       // pass through the in-progress requests.
       // This ensures that sends always start in the order they were posted.
@@ -87,6 +88,7 @@ class RecvAlState : public AlState {
   RecvAlState(T* recvbuf, size_t count_, int src_,
               MPICUDACommunicator& comm_, cudaStream_t stream) :
     AlState(nullptr), count(count_), src(src_), comm(comm_.get_comm()) {
+
     mem = get_pinned_memory<T>(count);
     wait_sync.wait(stream);
     AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, mem, sizeof(T)*count,
@@ -153,6 +155,7 @@ class SendRecvAlState : public AlState {
   bool send_done = false;
   bool recv_done = false;
 };
+
 
 }  // namespace mpi_cuda
 }  // namespace internal

@@ -67,8 +67,9 @@ class HostTransferState : public AlState {
  public:
   HostTransferState(const T* sendbuf, T* recvbuf, size_t count,
                     ReductionOperator op, MPICUDACommunicator& comm,
-                    cudaStream_t stream, AlRequest req_) : AlState(req_) {
-    host_mem = get_pinned_memory<T>(count);
+                    cudaStream_t stream, AlRequest req_)
+    : AlState(req_),
+      host_mem(get_pinned_memory<T>(count)) {
     if (count <= 1<<9) {
       host_ar = new mpi::MPIRecursiveDoublingAlState<T>(
         IN_PLACE<T>(), host_mem, count, op, comm, get_free_request());
@@ -76,12 +77,7 @@ class HostTransferState : public AlState {
       host_ar = new mpi::MPIRabenseifnerAlState<T>(
         IN_PLACE<T>(), host_mem, count, op, comm, get_free_request());
     }
-    sync_event = cuda::get_cuda_event();
-    sync_event2 = cuda::get_cuda_event();
-    // The device will sync on this memory location.
-    sync = get_pinned_memory<int32_t>(1);
-    *sync = 0;
-    AL_CHECK_CUDA_DRV(cuMemHostGetDevicePointer(&sync_dev_ptr, sync, 0));
+
     // Transfer data from device to host and use an event to determine when it
     // completes. Handle in-place vs non-in-place.
     if (sendbuf != recvbuf) {
@@ -91,31 +87,29 @@ class HostTransferState : public AlState {
       AL_CHECK_CUDA(cudaMemcpyAsync(host_mem, recvbuf, sizeof(T)*count,
                                     cudaMemcpyDeviceToHost, stream));
     }
-    AL_CHECK_CUDA(cudaEventRecord(sync_event, stream));
+    d2h_event.record(stream);
+
     // Have the device wait on the host.
-    AL_CHECK_CUDA_DRV(cuStreamWaitValue32(stream, sync_dev_ptr, 1,
-                                          CU_STREAM_WAIT_VALUE_EQ));
+    gpu_wait.wait(stream);
+
     // Transfer completed buffer back to device.
     AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, host_mem, sizeof(T)*count,
                                   cudaMemcpyHostToDevice, stream));
-    AL_CHECK_CUDA(cudaEventRecord(sync_event2, stream));
+    h2d_event.record(stream);
   }
 
   ~HostTransferState() {
-    
+    release_pinned_memory(host_mem);
   }
 
   bool step() override {
     if (!ar_started) {
       // Wait for memory to get to the host.
-      cudaError_t r = cudaEventQuery(sync_event);
-      if (r == cudaSuccess) {
+      if (d2h_event.query()) {
         host_ar->setup();
         ar_started = true;
-      } else if (r == cudaErrorNotReady) {
-        return false;
       } else {
-        throw_al_exception("cudaEventQuery error");
+        return false;
       }
     }
     if (!ar_done) {
@@ -124,34 +118,25 @@ class HostTransferState : public AlState {
         ar_done = true;
         delete host_ar;  // TODO: Maybe move this.
         // Mark the sync as done to wake up the device.
-        *sync = 1;
+        gpu_wait.signal();
       } else {
         return false;
       }
     }
     // Wait for the memcpy back to device to complete so we can clean up.
-    cudaError_t r = cudaEventQuery(sync_event2);
-    if (r == cudaSuccess) {
-      release_pinned_memory(host_mem);  // TODO: Maybe move this.
-      release_pinned_memory(sync);
-      cuda::release_cuda_event(sync_event);
-      cuda::release_cuda_event(sync_event2);
+    if (h2d_event.query()) {
       return true;
-    } else if (r != cudaErrorNotReady) {
-      throw_al_exception("cudaEventQuery error");
     }
     return false;
   }
   bool needs_completion() const override { return false; }
  private:
-  cudaEvent_t sync_event;
-  cudaEvent_t sync_event2;
+  T* host_mem;
+  mpi::MPIAlState<T>* host_ar;
+  cuda::FastEvent d2h_event, h2d_event;
+  cuda::GPUWait gpu_wait;
   bool ar_started = false;
   bool ar_done = false;
-  mpi::MPIAlState<T>* host_ar;
-  T* host_mem;
-  int32_t* sync;
-  CUdeviceptr sync_dev_ptr;
 };
 
 } // namespace mpi_cuda

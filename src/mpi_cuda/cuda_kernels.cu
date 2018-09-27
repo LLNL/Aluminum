@@ -189,7 +189,7 @@ struct ReduceKernel<op, T, 2> {
     VectorT d = dst_vector[offset];
     VectorT s = src_vector[offset];
     d.x = BinaryOp<T, op>::calc(d.x, s.x);
-    d.y = BinaryOp<T, op>::calc(d.y, s.y);  
+    d.y = BinaryOp<T, op>::calc(d.y, s.y);
     dst_vector[offset] = d;
   }
 };
@@ -198,7 +198,7 @@ template <ReductionOperator op, typename T>
 struct ReduceKernel<op, T, 4> {
   __device__ static void kernel(void *dst, const void *src,
                                 size_t count) {
-    using VectorT = typename ShortVectorType<T, 4>::type;    
+    using VectorT = typename ShortVectorType<T, 4>::type;
     size_t offset = blockIdx.x * blockDim.x + threadIdx.x;
     if (offset >= count) return;
     VectorT *dst_vector = static_cast<VectorT*>(dst);
@@ -206,9 +206,9 @@ struct ReduceKernel<op, T, 4> {
     VectorT d = dst_vector[offset];
     VectorT s = src_vector[offset];
     d.x = BinaryOp<T, op>::calc(d.x, s.x);
-    d.y = BinaryOp<T, op>::calc(d.y, s.y);  
+    d.y = BinaryOp<T, op>::calc(d.y, s.y);
     d.z = BinaryOp<T, op>::calc(d.z, s.z);
-    d.w = BinaryOp<T, op>::calc(d.w, s.w);  
+    d.w = BinaryOp<T, op>::calc(d.w, s.w);
     dst_vector[offset] = d;
   }
 };
@@ -217,7 +217,7 @@ template <ReductionOperator op, typename T, int VectorLen>
 __global__ void reduce_kernel(void *dst, const void *src, size_t count) {
   ReduceKernel<op, T, VectorLen>::kernel(dst, src, count);
 }
-  
+
 
 template <ReductionOperator op, typename T, int VectorLen>
 void reduce_v(void *dst, const void *src, size_t count, cudaStream_t s) {
@@ -229,7 +229,7 @@ void reduce_v(void *dst, const void *src, size_t count, cudaStream_t s) {
 #ifdef AL_MPI_CUDA_DEBUG
   // clear remaining error flag
   cudaGetLastError();
-#endif  
+#endif
   reduce_kernel<op, T, VectorLen><<<grid_dim, tb_dim, 0, s>>>(
       dst, src, count);
 #ifdef AL_MPI_CUDA_DEBUG
@@ -237,7 +237,7 @@ void reduce_v(void *dst, const void *src, size_t count, cudaStream_t s) {
   if (e != cudaSuccess) {
     throw_al_exception(cudaGetErrorString(e));
   }
-#endif  
+#endif
 }
 
 // Passing each function argument to a template parameter
@@ -323,7 +323,6 @@ void reduce_thrust(float *dst, const float *src, size_t count,
                     thrust::plus<float>());
 }
 #endif
-
 
 } // namespace mpi_cuda
 } // namespace internal
