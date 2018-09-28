@@ -34,8 +34,6 @@
 #include <cstring>
 #include <cuda_runtime.h>
 
-#define COLL_TOPOLOGY_OPT
-
 namespace Al {
 namespace internal {
 namespace mpi_cuda {
@@ -84,20 +82,20 @@ class RingMPICUDA {
   // Rank reordering 
   void get_ring_indices() {
     const int local_size = m_comm.local_size();
-#if defined(COLL_TOPOLOGY_OPT)
-    if (local_size == 2 && m_np % 4 == 0) {
-      get_ring_indices_topo_lp2();
-      return;
-    } else if (local_size == 4 && m_np % 8 == 0) {
-      get_ring_indices_topo_lp4();
-      return;
-    } else {
-      MPIPrintStream(std::cerr, m_pid)()
-          << "Topology optimization is not supported for this number of processes per node: "
-          << local_size << std::endl;
-      // fall through to the default case below
+    if (std::getenv("AL_MPI_CUDA_RING_TOPO_OPT")) {
+      if (local_size == 2 && m_np % 4 == 0) {
+        get_ring_indices_topo_lp2();
+        return;
+      } else if (local_size == 4 && m_np % 8 == 0) {
+        get_ring_indices_topo_lp4();
+        return;
+      } else {
+        MPIPrintStream(std::cerr, m_pid)()
+            << "Ring topology optimization is requested but not supported for this number of processes per node: "
+            << local_size << std::endl;
+        // fall through to the default case below
+      }
     }
-#else // default
     rid(L2R) = m_pid;
     prev_pid(L2R) = dec(m_pid, m_np);
     next_pid(L2R) = inc(m_pid, m_np);
@@ -123,7 +121,6 @@ class RingMPICUDA {
       next_pid(R2L) = prev_pid(L2R);
       prev_pid(R2L) = next_pid(L2R);
     }
-#endif    
   }
 
   void get_ring_indices_topo_lp2() {
