@@ -25,32 +25,24 @@
 // permissions and limitations under the license.
 ////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "cudacommunicator.hpp"
+#include "Al.hpp"
+#include "mpi_cuda/communicator.hpp"
+#include "mpi_cuda/allreduce_ring.hpp"
 
 namespace Al {
 namespace internal {
 namespace mpi_cuda {
 
-class RingMPICUDA;
+RingMPICUDA &MPICUDACommunicator::get_ring() {
+  if (!m_ring)
+    m_ring = new RingMPICUDA(*this);
+  return *m_ring;
+}
 
-class MPICUDACommunicator: public CUDACommunicator {
- public:
-  MPICUDACommunicator() : MPICUDACommunicator(MPI_COMM_WORLD, 0) {}
-  MPICUDACommunicator(cudaStream_t stream_) :
-    MPICUDACommunicator(MPI_COMM_WORLD, stream_) {}
-  MPICUDACommunicator(MPI_Comm comm_, cudaStream_t stream_)
-    : CUDACommunicator(comm_, stream_), m_ring(nullptr) {
-  }
-
-  RingMPICUDA &get_ring();
-
-  ~MPICUDACommunicator();
-
- protected:
-  RingMPICUDA *m_ring;
-};
+MPICUDACommunicator::~MPICUDACommunicator() {
+  if (m_ring)
+    delete m_ring;
+}
 
 } // namespace mpi_cuda
 } // namespace internal
