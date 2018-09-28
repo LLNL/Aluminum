@@ -29,6 +29,7 @@
 
 #include "mpi_cuda/util.hpp"
 #include "mpi_cuda/cuda_kernels.hpp"
+#include "mpi_cuda/communicator.hpp"
 #include <vector>
 #include <cstring>
 #include <cuda_runtime.h>
@@ -65,7 +66,7 @@ class RingMPICUDA {
   }
   
  public:
-  RingMPICUDA(MPI_Comm comm): m_comm(comm) {
+  RingMPICUDA(MPICUDACommunicator &comm): m_comm(comm) {
     COLL_CHECK_CUDA(cudaGetDevice(&m_gpu));
     build_ring();
     setup_events();
@@ -80,10 +81,9 @@ class RingMPICUDA {
 
  protected:
 
-
   // Rank reordering 
   void get_ring_indices() {
-    const int local_size = get_mpi_comm_local_size();
+    const int local_size = m_comm.local_size();
 #if defined(COLL_TOPOLOGY_OPT)
     if (local_size == 2 && m_np % 4 == 0) {
       get_ring_indices_topo_lp2();
@@ -227,7 +227,7 @@ class RingMPICUDA {
     destroy_inter_process_events();
     // make sure exported events are first destroyed at remote
     // processes, though it may not be necessary.
-    COLL_CHECK_MPI(MPI_Barrier(m_comm));
+    COLL_CHECK_MPI(MPI_Barrier(m_comm.get_comm()));
     for (TransferDir dir: DIRECTIONS) {
       COLL_CHECK_CUDA(cudaEventDestroy(ready_ev(dir)));
       COLL_CHECK_CUDA(cudaEventDestroy(trans_ev(dir)));
@@ -246,7 +246,7 @@ class RingMPICUDA {
           int peer_id = neighbor_pid(dir, side);
           COLL_CHECK_MPI(MPI_Irecv(&ipc_handles_peer[dir][side],
                                    sizeof(cudaIpcEventHandle_t),
-                                   MPI_BYTE, peer_id, 0, m_comm,
+                                   MPI_BYTE, peer_id, 0, m_comm.get_comm(),
                                    &req[req_idx++]));
           cudaIpcEventHandle_t local_event_h;
           cudaEvent_t local_event = side == NEXT ?
@@ -255,7 +255,7 @@ class RingMPICUDA {
                                                 local_event));
           COLL_CHECK_MPI(MPI_Isend(&local_event_h,
                                    sizeof(cudaIpcEventHandle_t),
-                                   MPI_BYTE, peer_id, 0, m_comm,
+                                   MPI_BYTE, peer_id, 0, m_comm.get_comm(),
                                    &req[req_idx++]));
         }
       }
@@ -282,8 +282,8 @@ class RingMPICUDA {
   }
 
   void build_ring() {
-    COLL_CHECK_MPI(MPI_Comm_size(m_comm, &m_np));
-    COLL_CHECK_MPI(MPI_Comm_rank(m_comm, &m_pid));  
+    m_np = m_comm.size();
+    m_pid = m_comm.rank();
     get_ring_indices();
     for (TransferDir dir: DIRECTIONS) {
       m_send_idx[dir] = rid(dir);
@@ -295,11 +295,11 @@ class RingMPICUDA {
       COLL_CHECK_MPI(MPI_Sendrecv(
           &m_gpu, 1, MPI_INT, next_pid(dir), 0,
           &prev_dev(dir), 1, MPI_INT, prev_pid(dir), 0,
-          m_comm, MPI_STATUS_IGNORE));
+          m_comm.get_comm(), MPI_STATUS_IGNORE));
       COLL_CHECK_MPI(MPI_Sendrecv(
           &m_gpu, 1, MPI_INT, prev_pid(dir), 0,
           &next_dev(dir), 1, MPI_INT, next_pid(dir), 0,
-          m_comm, MPI_STATUS_IGNORE));
+          m_comm.get_comm(), MPI_STATUS_IGNORE));
       setup_access_type(dir);
     }
   }
@@ -321,7 +321,7 @@ class RingMPICUDA {
           neighbor_pid(dir, get_opposite(side)), 0,
           proc_name_peer[side], MPI_MAX_PROCESSOR_NAME, MPI_CHAR,
           neighbor_pid(dir, side), 0,
-          m_comm, MPI_STATUS_IGNORE));
+          m_comm.get_comm(), MPI_STATUS_IGNORE));
     }
 
     // Check whether the neighbor devices can be accessed with CUDA
@@ -380,7 +380,7 @@ class RingMPICUDA {
         close_remote_buffer_mapping(dir);
         // Make sure everyone unmaps the IPC handle before actually
         // freeing the memory
-        COLL_CHECK_MPI(MPI_Barrier(m_comm));
+        COLL_CHECK_MPI(MPI_Barrier(m_comm.get_comm()));
         free_gpu_buf(dir);
         void *p = nullptr;
         COLL_CHECK_CUDA(cudaMalloc(&p, real_size));
@@ -422,7 +422,7 @@ class RingMPICUDA {
     COLL_CHECK_MPI(MPI_Sendrecv(
         &local_ipc_h, send_msg_size,  MPI_BYTE, prev_pid(dir), 0,
         &peer_ipc_h, recv_msg_size, MPI_BYTE, next_pid(dir), 0,
-        m_comm, MPI_STATUS_IGNORE));
+        m_comm.get_comm(), MPI_STATUS_IGNORE));
     if (next_access_type(dir) != MPI) {
       change_cur_device_to_accessible_to_next_dev(dir);
       COLL_CHECK_CUDA(cudaIpcOpenMemHandle(
@@ -474,7 +474,7 @@ class RingMPICUDA {
   void notify(int rank, int tag) {
     char x = 0;
     COLL_CHECK_MPI(MPI_Send(
-        &x, 1, MPI_CHAR, rank, tag, m_comm));
+        &x, 1, MPI_CHAR, rank, tag, m_comm.get_comm()));
   }
 
   void notify_next_proc(TransferDir dir) {
@@ -489,7 +489,7 @@ class RingMPICUDA {
     char x;
     COLL_CHECK_MPI(MPI_Recv(
         &x, 1, MPI_CHAR, rank, tag,
-        m_comm, MPI_STATUS_IGNORE));
+        m_comm.get_comm(), MPI_STATUS_IGNORE));
   }
 
   void wait_for_prev_proc(TransferDir dir) {
@@ -516,7 +516,7 @@ class RingMPICUDA {
       COLL_CHECK_CUDA(cudaEventSynchronize(ready_ev(dir)));
       COLL_CHECK_MPI(MPI_Irecv(
           work_buf, recv_count, mpi_type, prev_pid(dir), tag,
-          m_comm, &recv_requests[num_recv_requests++]));
+          m_comm.get_comm(), &recv_requests[num_recv_requests++]));
     }
     // Send to neighbor        
     T *src_ptr = buf + send_offset;
@@ -527,7 +527,7 @@ class RingMPICUDA {
       }
       COLL_CHECK_MPI(MPI_Isend(
           src_ptr, send_count, mpi_type,
-          next_pid(dir), tag, m_comm,
+          next_pid(dir), tag, m_comm.get_comm(),
           &send_requests[num_send_requests++]));
     } else {
       // Make sure the completion event of computation was
@@ -802,7 +802,7 @@ class RingMPICUDA {
     }
   }
 
-  MPI_Comm m_comm;  
+  MPICUDACommunicator &m_comm;
   void *m_gpu_bufs[2] = {nullptr, nullptr};
   size_t m_gpu_buf_sizes[2] = {0, 0};
   cudaStream_t m_stream_r2l = 0;

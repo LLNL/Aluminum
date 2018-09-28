@@ -131,22 +131,6 @@ MPI_Datatype get_mpi_data_type() {
   return mpi::TypeMap<T>();
 }
 
-inline int get_mpi_comm_local_size() {
-  char *env = getenv("MV2_COMM_WORLD_LOCAL_SIZE");
-  if (env == nullptr) {
-    env = getenv("OMPI_COMM_WORLD_LOCAL_SIZE");
-  }
-  if (env == nullptr) {
-    env = getenv("SLURM_NTASKS_PER_NODE");
-  }
-  if (env == nullptr) {
-    std::cerr << "Failed to determine the number of ranks per node" << std::endl;
-    abort();
-  }
-  int size = atoi(env);
-  return size;
-}
-
 class MPIPrintStream {
  public:
   MPIPrintStream(std::ostream &os, int rank): m_os(os) {

@@ -11,6 +11,10 @@ set_full_path(THIS_DIR_HEADERS
   util.hpp
   )
 
+set_full_path(THIS_DIR_CXX_SOURCES
+  communicator.cpp
+  )
+
 set_full_path(THIS_DIR_CUDA_SOURCES
   cuda_kernels.cu
   )
