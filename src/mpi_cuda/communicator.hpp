@@ -28,6 +28,7 @@
 #pragma once
 
 #include "cudacommunicator.hpp"
+#include "mpi_cuda/allreduce_ring.hpp"
 
 namespace Al {
 namespace internal {
@@ -40,10 +41,19 @@ class MPICUDACommunicator: public CUDACommunicator {
   MPICUDACommunicator() : MPICUDACommunicator(MPI_COMM_WORLD, 0) {}
   MPICUDACommunicator(cudaStream_t stream_) :
     MPICUDACommunicator(MPI_COMM_WORLD, stream_) {}
-  MPICUDACommunicator(MPI_Comm comm_, cudaStream_t stream_);
+  MPICUDACommunicator(MPI_Comm comm_, cudaStream_t stream_)
+    : CUDACommunicator(comm_, stream_), m_ring(nullptr) {
+  }
 
   RingMPICUDA &get_ring() {
+    if (!m_ring)
+      m_ring = new RingMPICUDA(this->get_comm());
     return *m_ring;
+  }
+
+  ~MPICUDACommunicator() {
+    if (m_ring)
+      delete m_ring;
   }
 
  protected:
