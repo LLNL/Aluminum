@@ -68,7 +68,9 @@ class RingMPICUDA {
     COLL_CHECK_CUDA(cudaGetDevice(&m_gpu));
     build_ring();
     setup_events();
-    COLL_CHECK_CUDA(cudaStreamCreate(&m_stream_r2l));
+    for (TransferDir dir: DIRECTIONS) {
+      COLL_CHECK_CUDA(cudaStreamCreate(&stream(dir)));
+    }
   }
   
   ~RingMPICUDA() {
@@ -217,7 +219,7 @@ class RingMPICUDA {
     }
     setup_inter_process_events();
     COLL_CHECK_CUDA(cudaEventCreateWithFlags(
-        &r2l_ev(), cudaEventDisableTiming));
+        &m_ev, cudaEventDisableTiming));
   }
 
   void destroy_events() {
@@ -229,7 +231,7 @@ class RingMPICUDA {
       COLL_CHECK_CUDA(cudaEventDestroy(ready_ev(dir)));
       COLL_CHECK_CUDA(cudaEventDestroy(trans_ev(dir)));
     }
-    COLL_CHECK_CUDA(cudaEventDestroy(r2l_ev()));
+    COLL_CHECK_CUDA(cudaEventDestroy(m_ev));
   }
 
   void setup_inter_process_events() {
@@ -605,15 +607,12 @@ class RingMPICUDA {
     int send_idx[2] = {m_send_idx[0], m_send_idx[1]};
     int recv_idx[2] = {m_recv_idx[0], m_recv_idx[1]};
 
-    
-    cudaStream_t streams[2] = {st, m_stream_r2l};
-    if (bidirectional) {
-      // Make sure the R2L stream does not go ahead until the pending
-      // L2R operations are done.
-      COLL_CHECK_CUDA(cudaEventRecord(
-          r2l_ev(), streams[L2R]));
-      COLL_CHECK_CUDA(cudaStreamWaitEvent(
-          streams[R2L], r2l_ev(), 0));
+    // Make sure the internal streams (m_streams) do not go ahead
+    // until the pending operations on the user stream are done.
+    for (TransferDir dir: DIRECTIONS) {
+      if (!m_trans_dir[dir]) continue;
+      COLL_CHECK_CUDA(cudaEventRecord(m_ev, st));
+      COLL_CHECK_CUDA(cudaStreamWaitEvent(stream(dir), m_ev, 0));
     }
 
     // Make sure transfer with MPI waits for pending tasks on the
@@ -621,7 +620,7 @@ class RingMPICUDA {
     // the stream
     for (TransferDir dir: DIRECTIONS) {
       if (next_access_type(dir) == MPI) {
-        COLL_CHECK_CUDA(cudaEventRecord(ready_ev(dir), streams[dir]));
+        COLL_CHECK_CUDA(cudaEventRecord(ready_ev(dir), stream(dir)));
       }
     }
 
@@ -642,7 +641,7 @@ class RingMPICUDA {
                    pe_counts[dir][send_idx[dir]],
                    pe_counts[dir][recv_idx[dir]],
                    pe_offsets[dir][send_idx[dir]],
-                   streams[dir], i,
+                   stream(dir), i,
                    send_requests + num_send_requests, nr_send,
                    recv_requests + num_recv_requests, nr_recv,
                    dir);
@@ -659,11 +658,11 @@ class RingMPICUDA {
               prev_access_type(dir) == MPI) continue;
           wait_for_prev_proc(dir);
           COLL_CHECK_CUDA(cudaStreamWaitEvent(
-              streams[dir], prev_ev(dir), 0));
+              stream(dir), prev_ev(dir), 0));
           issue_local_reduction(
               step, buf + pe_offsets[dir][recv_idx[dir]],
               work_bufs[dir], pe_counts[dir][recv_idx[dir]],
-              streams[dir], op, dir);
+              stream(dir), op, dir);
         }
 
         // Issues local reductions that use data sent with MPI
@@ -675,7 +674,7 @@ class RingMPICUDA {
           issue_local_reduction(
               step, buf + pe_offsets[dir][recv_idx[dir]],
               work_bufs[dir], pe_counts[dir][recv_idx[dir]],
-              streams[dir], op, dir);
+              stream(dir), op, dir);
         }
 
         // Cleans up MPI_Isend requests
@@ -692,18 +691,20 @@ class RingMPICUDA {
       }
     }
 
-    // Wait for completion of R2L
-    if (m_trans_dir[R2L]) {
-      COLL_CHECK_CUDA(cudaEventRecord(
-          r2l_ev(), streams[R2L]));
-      COLL_CHECK_CUDA(cudaStreamWaitEvent(
-          streams[L2R], r2l_ev(), 0));
+    for (TransferDir dir: DIRECTIONS) {
+      if (!m_trans_dir[dir]) continue;
+      COLL_CHECK_CUDA(cudaEventRecord(m_ev, stream(dir)));
+      COLL_CHECK_CUDA(cudaStreamWaitEvent(st, m_ev, 0));
     }
 
     return 0;
   }
 
  protected:
+
+  cudaStream_t &stream(TransferDir dir) {
+    return m_streams[dir];
+  }
 
   int &rid(TransferDir dir) {
     return m_rid[dir];
@@ -753,10 +754,6 @@ class RingMPICUDA {
     return m_ev_ready[dir];
   }
 
-  cudaEvent_t &r2l_ev() {
-    return m_ev_r2l;
-  }
-
   cudaEvent_t &trans_ev(TransferDir dir) {
     return m_ev_trans[dir];
   }
@@ -802,8 +799,8 @@ class RingMPICUDA {
   MPICUDACommunicator &m_comm;
   void *m_gpu_bufs[2] = {nullptr, nullptr};
   size_t m_gpu_buf_sizes[2] = {0, 0};
-  cudaStream_t m_stream_r2l = 0;
-  cudaEvent_t m_ev_r2l;
+  cudaStream_t m_streams[2];
+  cudaEvent_t m_ev;
 
   int m_gpu;
   int m_np;
