@@ -56,8 +56,12 @@ class MPICommunicator : public Communicator {
     MPI_Comm_size(local_comm, &size_of_local_comm);
   }
   virtual ~MPICommunicator() override {
-    // TODO: Fix; can't do this after finalization.
-    //MPI_Comm_free(&comm);
+    int finalized;
+    MPI_Finalized(&finalized);
+    if (!finalized) {
+      MPI_Comm_free(&comm);
+      MPI_Comm_free(&local_comm);
+    }
   }
   Communicator* copy() const override { return new MPICommunicator(comm); }
   int rank() const override { return rank_in_comm; }
