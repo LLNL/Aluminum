@@ -102,10 +102,10 @@
 #define AL_CHECK_CUDA_DRV(cuda_call) AL_FORCE_CHECK_CUDA_DRV(cuda_call)
 #define AL_CHECK_CUDA_DRV_NOSYNC(cuda_call) AL_FORCE_CHECK_CUDA_DRV_NOSYNC(cuda_call)
 #else
-#define AL_CHECK_CUDA(cuda_call) (cuda_call)
-#define AL_CHECK_CUDA_NOSYNC(cuda_call) (cuda_call)
-#define AL_CHECK_CUDA_DRV(cuda_call) (cuda_call)
-#define AL_CHECK_CUDA_DRV_NOSYNC(cuda_call) (cuda_call)
+#define AL_CHECK_CUDA(cuda_call) AL_FORCE_CHECK_CUDA_NOSYNC(cuda_call)
+#define AL_CHECK_CUDA_NOSYNC(cuda_call) AL_FORCE_CHECK_CUDA_NOSYNC(cuda_call)
+#define AL_CHECK_CUDA_DRV(cuda_call) AL_FORCE_CHECK_CUDA_DRV_NOSYNC(cuda_call)
+#define AL_CHECK_CUDA_DRV_NOSYNC(cuda_call) AL_FORCE_CHECK_CUDA_DRV_NOSYNC(cuda_call)
 #endif
 
 namespace Al {
