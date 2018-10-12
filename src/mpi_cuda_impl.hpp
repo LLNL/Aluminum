@@ -28,9 +28,12 @@
 #pragma once
 
 #include "Al.hpp"
+#include "mpi_cuda/allgather.hpp"
 #include "mpi_cuda/allreduce.hpp"
 #include "mpi_cuda/alltoall.hpp"
+#include "mpi_cuda/bcast.hpp"
 #include "mpi_cuda/gather.hpp"
+#include "mpi_cuda/reduce.hpp"
 #include "mpi_cuda/reduce_scatter.hpp"
 #include "mpi_cuda/scatter.hpp"
 
@@ -180,6 +183,50 @@ class MPICUDABackend {
   }
 
   template <typename T>
+  static void Allgather(
+    const T* sendbuf, T* recvbuf, size_t count,
+    comm_type& comm, algo_type algo) {
+    if (count == 0) return;
+    switch (algo) {
+    case MPICUDAAllreduceAlgorithm::automatic:
+      do_allgather(sendbuf, recvbuf, count, comm, comm.get_stream());
+      break;
+    default:
+      throw_al_exception("MPICUDAAllgather: Invalid algorithm");
+    }
+  }
+
+  template <typename T>
+  static void Allgather(
+    T* buffer, size_t count, comm_type& comm, algo_type algo) {
+    Allgather(buffer, buffer, count, comm, algo);
+  }
+
+  template <typename T>
+  static void NonblockingAllgather(
+    const T* sendbuf, T* recvbuf, size_t count,
+    comm_type& comm, req_type& req, algo_type algo) {
+    if (count == 0) return;
+    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+    sync_internal_stream_with_comm(internal_stream, comm);
+    switch (algo) {
+    case MPICUDAAllreduceAlgorithm::automatic:
+      do_allgather(sendbuf, recvbuf, count, comm, internal_stream);
+      break;
+    default:
+      throw_al_exception("MPICUDAAllgather: Invalid algorithm");
+    }
+    setup_completion_event(internal_stream, comm, req);
+  }
+
+  template <typename T>
+  static void NonblockingAllgather(
+    T* buffer, size_t count,
+    comm_type& comm, req_type& req, algo_type algo) {
+    NonblockingAllgather<T>(buffer, buffer, count, comm, req, algo);
+  }
+
+  template <typename T>
   static void Alltoall(
     const T* sendbuf, T* recvbuf, size_t count,
     comm_type& comm, algo_type algo) {
@@ -224,6 +271,36 @@ class MPICUDABackend {
   }
 
   template <typename T>
+  static void Bcast(T* buf, size_t count, int root, comm_type& comm,
+                    algo_type algo) {
+    if (count == 0) return;
+    switch (algo) {
+    case MPICUDAAllreduceAlgorithm::automatic:
+      do_bcast(buf, count, root, comm, comm.get_stream());
+      break;
+    default:
+      throw_al_exception("MPICUDABcast: Invalid algorithm");
+    }
+  }
+
+  template <typename T>
+  static void NonblockingBcast(
+    T* buf, size_t count, int root,
+    comm_type& comm, req_type& req, algo_type algo) {
+    if (count == 0) return;
+    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+    sync_internal_stream_with_comm(internal_stream, comm);
+    switch (algo) {
+    case MPICUDAAllreduceAlgorithm::automatic:
+      do_bcast(buf, count, root, comm, internal_stream);
+      break;
+    default:
+      throw_al_exception("MPICUDABcast: Invalid algorithm");
+    }
+    setup_completion_event(internal_stream, comm, req);
+  }
+
+  template <typename T>
   static void Gather(
     const T* sendbuf, T* recvbuf, size_t count, int root,
     comm_type& comm, algo_type algo) {
@@ -265,6 +342,51 @@ class MPICUDABackend {
     T* buffer, size_t count, int root,
     comm_type& comm, req_type& req, algo_type algo) {
     NonblockingGather<T>(buffer, buffer, count, root, comm, req, algo);
+  }
+
+  template <typename T>
+  static void Reduce(
+    const T* sendbuf, T* recvbuf, size_t count, ReductionOperator op, int root,
+    comm_type& comm, algo_type algo) {
+    if (count == 0) return;
+    switch (algo) {
+    case MPICUDAAllreduceAlgorithm::automatic:
+      do_reduce(sendbuf, recvbuf, count, op, root, comm, comm.get_stream());
+      break;
+    default:
+      throw_al_exception("MPICUDAReduce: Invalid algorithm");
+    }
+  }
+
+  template <typename T>
+  static void Reduce(
+    T* buffer, size_t count, ReductionOperator op, int root, comm_type& comm,
+    algo_type algo) {
+    Reduce(buffer, buffer, count, op, root, comm, algo);
+  }
+
+  template <typename T>
+  static void NonblockingReduce(
+    const T* sendbuf, T* recvbuf, size_t count, ReductionOperator op, int root,
+    comm_type& comm, req_type& req, algo_type algo) {
+    if (count == 0) return;
+    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+    sync_internal_stream_with_comm(internal_stream, comm);
+    switch (algo) {
+    case MPICUDAAllreduceAlgorithm::automatic:
+      do_reduce(sendbuf, recvbuf, count, op, root, comm, internal_stream);
+      break;
+    default:
+      throw_al_exception("Invalid algorithm");
+    }
+    setup_completion_event(internal_stream, comm, req);
+  }
+
+  template <typename T>
+  static void NonblockingReduce(
+    T* buffer, size_t count, ReductionOperator op, int root,
+    comm_type& comm, req_type& req, algo_type algo) {
+    NonblockingReduce<T>(buffer, buffer, count, op, root, comm, req, algo);
   }
 
   template <typename T>
@@ -430,6 +552,16 @@ class MPICUDABackend {
   }
 
   template <typename T>
+  static void do_allgather(
+    const T* sendbuf, T* recvbuf, size_t count, comm_type& comm,
+    cudaStream_t stream) {
+    internal::mpi_cuda::AllgatherAlState<T>* state =
+      new internal::mpi_cuda::AllgatherAlState<T>(
+        sendbuf, recvbuf, count, comm, stream);
+    internal::get_progress_engine()->enqueue(state);
+  }
+
+  template <typename T>
   static void do_alltoall(
     const T* sendbuf, T* recvbuf, size_t count, comm_type& comm,
     cudaStream_t stream) {
@@ -440,12 +572,33 @@ class MPICUDABackend {
   }
 
   template <typename T>
+  static void do_bcast(
+    T* buf, size_t count, int root, comm_type& comm,
+    cudaStream_t stream) {
+    internal::mpi_cuda::BcastAlState<T>* state =
+      new internal::mpi_cuda::BcastAlState<T>(
+        buf, count, root, comm, stream);
+    internal::get_progress_engine()->enqueue(state);
+  }
+
+  template <typename T>
   static void do_gather(
     const T* sendbuf, T* recvbuf, size_t count, int root, comm_type& comm,
     cudaStream_t stream) {
     internal::mpi_cuda::GatherAlState<T>* state =
       new internal::mpi_cuda::GatherAlState<T>(
         sendbuf, recvbuf, count, root, comm, stream);
+    internal::get_progress_engine()->enqueue(state);
+  }
+
+  template <typename T>
+  static void do_reduce(
+    const T* sendbuf, T* recvbuf, size_t count, ReductionOperator op,
+    int root, comm_type& comm,
+    cudaStream_t stream) {
+    internal::mpi_cuda::ReduceAlState<T>* state =
+      new internal::mpi_cuda::ReduceAlState<T>(
+        sendbuf, recvbuf, count, op, root, comm, stream);
     internal::get_progress_engine()->enqueue(state);
   }
 
