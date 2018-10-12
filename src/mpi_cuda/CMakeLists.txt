@@ -6,6 +6,7 @@ set_full_path(THIS_DIR_HEADERS
   cuda_kernels.hpp
   cuda_local_transfer.hpp
   gather.hpp
+  reduce_scatter.hpp
   scatter.hpp
   pt2pt.hpp
   util.hpp
