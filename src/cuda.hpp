@@ -138,12 +138,13 @@ bool stream_memory_operations_supported();
  * This essentially uses full/empty bit semantics to implement synchronization.
  * A memory location is polled on by the host and written to by the device
  * using the stream memory write operation.
+ * This falls back to the usual CUDA events when stream memory operations are
+ * not available.
  */
 class FastEvent {
  public:
   /**
    * Allocate the event.
-   * The event is in an undefined state until record has been called.
    */
   FastEvent();
   ~FastEvent();

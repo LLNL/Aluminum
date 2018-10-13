@@ -111,6 +111,8 @@ bool stream_memory_operations_supported() {
 FastEvent::FastEvent() {
   if (stream_memory_operations_supported()) {
     sync_event = get_pinned_memory<int32_t>(1);
+    // Initialize to completed to match CUDA event semantics.
+    __atomic_store_n(sync_event, 1, __ATOMIC_SEQ_CST);
     AL_CHECK_CUDA_DRV(cuMemHostGetDevicePointer(
                         &sync_event_dev_ptr, sync_event, 0));
   }
