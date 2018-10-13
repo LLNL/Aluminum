@@ -55,15 +55,15 @@ public:
                       host_mem_, buf, sizeof(T)*count_,
                       cudaMemcpyDeviceToHost, stream));
     }
-    else {
-      // Non-root ranks need to wait.
-      gpuwait_.wait(stream);
+    d2h_event_.record(stream);
+    gpuwait_.wait(stream);
 
+    if (!i_am_root) {
       // Transfer completed buffer back to device.
       AL_CHECK_CUDA(cudaMemcpyAsync(buf, host_mem_, sizeof(T)*count_,
                                     cudaMemcpyHostToDevice, stream));
+      h2d_event_.record(stream);
     }
-    sync_event_.record(stream);
   }
 
   ~BcastAlState() override {
@@ -72,20 +72,15 @@ public:
 
   bool step() override {
     if (!bcast_started_) {
-      if (root_ == rank_) {
-        // Root waits for mem transfer.
-        if (sync_event_.query()) {
-          MPI_Ibcast(host_mem_, count_, mpi::TypeMap<T>(),
-                     root_, comm_, &req_);
-          bcast_started_ = true;
-        } else {
-          return false;
-        }
-      } else {
-        // Non-roots start bcast immediately.
+      if (d2h_event_.query()) {
         MPI_Ibcast(host_mem_, count_, mpi::TypeMap<T>(),
-                   root_, comm_, &req_);
+                     root_, comm_, &req_);
+        if (rank_ == root_) {
+          gpuwait_.signal();
+        }
         bcast_started_ = true;
+      } else {
+        return false;
       }
     }
 
@@ -107,7 +102,7 @@ public:
     }
 
     // Wait for host-to-device memcopy; cleanup
-    if (sync_event_.query()) {
+    if (h2d_event_.query()) {
       return true;
     }
     return false;
@@ -123,7 +118,7 @@ private:
 
   cuda::GPUWait gpuwait_;
 
-  cuda::FastEvent sync_event_;
+  cuda::FastEvent d2h_event_, h2d_event_;
 
   MPI_Comm comm_;
   MPI_Request req_ = MPI_REQUEST_NULL;
