@@ -54,11 +54,9 @@ public:
     AL_CHECK_CUDA(cudaMemcpyAsync(host_mem_, sendbuf, sizeof(T)*count_,
                                   cudaMemcpyDeviceToHost, stream));
     d2h_event_.record(stream);
+    gpuwait_.wait(stream);
 
-    // Enqueue the kernel to wait on the host; root only
     if (i_am_root) {
-      gpuwait_.wait(stream);
-
       // Transfer completed buffer back to device.
       AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, host_mem_, sizeof(T)*count,
                                     cudaMemcpyHostToDevice, stream));
@@ -80,6 +78,7 @@ public:
         } else {
           MPI_Ireduce(host_mem_, host_mem_, count_, mpi::TypeMap<T>(),
                       op_, root_, comm_, &req_);
+          gpuwait_.signal();
         }
         reduce_started_ = true;
       }

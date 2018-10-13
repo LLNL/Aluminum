@@ -50,29 +50,27 @@ public:
     bool const i_am_root = rank_ == root_;
     bool const inplace_operation = sendbuf == recvbuf;
 
-    // Transfer data from device to host and use an event to determine when it
-    // completes.
     if (i_am_root) {
+      // Transfer the data to scatter from device to host.
       AL_CHECK_CUDA(cudaMemcpyAsync(
-                      host_mem_, sendbuf+count_*comm.size(),
-                      sizeof(T)*count_, cudaMemcpyDeviceToHost, stream));
+                      host_mem_, sendbuf, sizeof(T)*count_*comm.size(),
+                      cudaMemcpyDeviceToHost, stream));
       d2h_event_.record(stream);
-
-      // Copy to self
+      // Root only needs to copy its data to its final destination on the
+      // device when it's not in place.
       if (!inplace_operation) {
         AL_CHECK_CUDA(cudaMemcpyAsync(
                         recvbuf, sendbuf + rank_*count_,
                         count_*sizeof(T), cudaMemcpyDeviceToDevice, stream));
       }
-    }
-    else {
-      // Enqueue the kernel to wait on the host; root only
+      gpuwait_.wait(stream);  // Block until comm is initiated.
+    } else {
+      d2h_event_.record(stream);  // Ensure comm not started early.
+      // Block device until data can be transferred.
       gpuwait_.wait(stream);
-
       // Transfer completed buffer back to device.
       AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, host_mem_, sizeof(T)*count,
                                     cudaMemcpyHostToDevice, stream));
-
       h2d_event_.record(stream);
     }
   }
@@ -85,14 +83,17 @@ public:
     if (!scatter_started_) {
       // Check if mem xfer complete
       if (d2h_event_.query()) {
-        if (root_ == rank_)
+        if (root_ == rank_) {
           MPI_Iscatter(host_mem_, count_, mpi::TypeMap<T>(),
                        MPI_IN_PLACE, count_, mpi::TypeMap<T>(),
                        root_, comm_, &req_);
-        else
+          // Root can unblock the device here.
+          gpuwait_.signal();
+        } else {
           MPI_Iscatter(host_mem_, count_, mpi::TypeMap<T>(),
                        host_mem_, count_, mpi::TypeMap<T>(),
                        root_, comm_, &req_);
+        }
         scatter_started_ = true;
       }
       else {
@@ -106,25 +107,21 @@ public:
       MPI_Test(&req_, &flag, MPI_STATUS_IGNORE);
       if (flag) {
         scatter_done_ = true;
-        if (rank_ == root_)
-          gpuwait_.signal();
-        else
+        if (rank_ == root_) {
           return true;
+        } else {
+          gpuwait_.signal();
+        }
       }
       else {
         return false;
       }
     }
-    else if (rank_ == root_) {
-      // Paranoia, in case step() is ever called again after returning
-      // 'true' for the first time.
-      return true;
-    }
 
     // Wait for host-to-device memcopy; cleanup
-    if (h2d_event_.query())
+    if (h2d_event_.query()) {
       return true;
-
+    }
     return false;
   }
 

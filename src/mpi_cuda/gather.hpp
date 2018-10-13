@@ -60,11 +60,9 @@ public:
       AL_CHECK_CUDA(cudaMemcpyAsync(host_mem_, sendbuf, sizeof(T)*count_,
                                     cudaMemcpyDeviceToHost, stream));
     d2h_event_.record(stream);
+    gpuwait_.wait(stream);
 
-    // Enqueue the kernel to wait on the host; root only
     if (i_am_root) {
-      gpuwait_.wait(stream);
-
       // Transfer completed buffer back to device.
       AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, host_mem_, sizeof(T)*count*comm.size(),
                                     cudaMemcpyHostToDevice, stream));
@@ -80,14 +78,16 @@ public:
     if (!gather_started_) {
       // Check if mem xfer complete
       if (d2h_event_.query()) {
-        if (root_ == rank_)
+        if (root_ == rank_) {
           MPI_Igather(MPI_IN_PLACE, count_, mpi::TypeMap<T>(),
                       host_mem_, count_, mpi::TypeMap<T>(),
                       root_, comm_, &req_);
-        else
+        } else {
           MPI_Igather(host_mem_, count_, mpi::TypeMap<T>(),
                       host_mem_, count_, mpi::TypeMap<T>(),
                       root_, comm_, &req_);
+          gpuwait_.signal();
+        }
         gather_started_ = true;
       }
       else {
