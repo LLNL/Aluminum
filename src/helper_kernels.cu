@@ -25,33 +25,30 @@
 // permissions and limitations under the license.
 ////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "cudacommunicator.hpp"
+#include <cuda_runtime.h>
+#include "helper_kernels.hpp"
 
 namespace Al {
 namespace internal {
-namespace mpi_cuda {
+namespace cuda {
 
-class RingMPICUDA;
-
-class MPICUDACommunicator: public CUDACommunicator {
- public:
-  MPICUDACommunicator() : MPICUDACommunicator(MPI_COMM_WORLD, 0) {}
-  MPICUDACommunicator(cudaStream_t stream_) :
-    MPICUDACommunicator(MPI_COMM_WORLD, stream_) {}
-  MPICUDACommunicator(MPI_Comm comm_, cudaStream_t stream_)
-    : CUDACommunicator(comm_, stream_), m_ring(nullptr) {
+__global__ void spin_wait_kernel(int32_t wait_value, volatile int32_t* wait_mem) {
+  for (;;)
+  {
+    int32_t value = *wait_mem;
+    if (value == wait_value) break;
   }
+}
 
-  RingMPICUDA &get_ring();
+void launch_wait_kernel(cudaStream_t stream, int32_t wait_value, volatile int32_t* wait_mem) {
+  spin_wait_kernel<<<1,1,0,stream>>>(wait_value, wait_mem);
+}
 
-  ~MPICUDACommunicator();
+void launch_wait_kernel(cudaStream_t stream, int32_t wait_value, CUdeviceptr wait_mem) {
+  AL_CHECK_CUDA_DRV(cuStreamWaitValue32(
+                      stream, wait_mem, wait_value, CU_STREAM_WAIT_VALUE_EQ));
+}
 
- protected:
-  RingMPICUDA *m_ring;
-};
-
-} // namespace mpi_cuda
+} // namespace cuda
 } // namespace internal
 } // namespace Al

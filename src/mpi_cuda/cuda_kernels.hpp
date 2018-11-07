@@ -28,6 +28,7 @@
 #pragma once
 
 #include "base.hpp"
+#include "cuda.hpp"
 
 namespace Al {
 namespace internal {

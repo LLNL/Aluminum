@@ -27,31 +27,18 @@
 
 #pragma once
 
-#include "cudacommunicator.hpp"
+#include "base.hpp"
+#include "cuda.hpp"
 
 namespace Al {
 namespace internal {
-namespace mpi_cuda {
+namespace cuda {
 
-class RingMPICUDA;
+void launch_wait_kernel(cudaStream_t stream, int32_t wait_value,
+                        volatile int32_t* wait_mem);
+void launch_wait_kernel(cudaStream_t stream, int32_t wait_value,
+                        CUdeviceptr wait_mem);
 
-class MPICUDACommunicator: public CUDACommunicator {
- public:
-  MPICUDACommunicator() : MPICUDACommunicator(MPI_COMM_WORLD, 0) {}
-  MPICUDACommunicator(cudaStream_t stream_) :
-    MPICUDACommunicator(MPI_COMM_WORLD, stream_) {}
-  MPICUDACommunicator(MPI_Comm comm_, cudaStream_t stream_)
-    : CUDACommunicator(comm_, stream_), m_ring(nullptr) {
-  }
-
-  RingMPICUDA &get_ring();
-
-  ~MPICUDACommunicator();
-
- protected:
-  RingMPICUDA *m_ring;
-};
-
-} // namespace mpi_cuda
+} // namespace cuda
 } // namespace internal
 } // namespace Al

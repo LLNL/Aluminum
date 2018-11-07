@@ -34,7 +34,7 @@ set(_NCCL_VERSION_TEST_SRC "
 
 int main()
 {
-    std::cout << NCCL_MAJOR << \".\" << NCCL_MINOR << \".\" << NCCL_PATCH << std::endl;
+    std::cout << NCCL_MAJOR << \".\" << NCCL_MINOR << \".\" << NCCL_PATCH;
     return 0;
 }
 ")

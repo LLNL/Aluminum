@@ -102,10 +102,10 @@
 #define AL_CHECK_CUDA_DRV(cuda_call) AL_FORCE_CHECK_CUDA_DRV(cuda_call)
 #define AL_CHECK_CUDA_DRV_NOSYNC(cuda_call) AL_FORCE_CHECK_CUDA_DRV_NOSYNC(cuda_call)
 #else
-#define AL_CHECK_CUDA(cuda_call) (cuda_call)
-#define AL_CHECK_CUDA_NOSYNC(cuda_call) (cuda_call)
-#define AL_CHECK_CUDA_DRV(cuda_call) (cuda_call)
-#define AL_CHECK_CUDA_DRV_NOSYNC(cuda_call) (cuda_call)
+#define AL_CHECK_CUDA(cuda_call) AL_FORCE_CHECK_CUDA_NOSYNC(cuda_call)
+#define AL_CHECK_CUDA_NOSYNC(cuda_call) AL_FORCE_CHECK_CUDA_NOSYNC(cuda_call)
+#define AL_CHECK_CUDA_DRV(cuda_call) AL_FORCE_CHECK_CUDA_DRV_NOSYNC(cuda_call)
+#define AL_CHECK_CUDA_DRV_NOSYNC(cuda_call) AL_FORCE_CHECK_CUDA_DRV_NOSYNC(cuda_call)
 #endif
 
 namespace Al {
@@ -138,12 +138,13 @@ bool stream_memory_operations_supported();
  * This essentially uses full/empty bit semantics to implement synchronization.
  * A memory location is polled on by the host and written to by the device
  * using the stream memory write operation.
+ * This falls back to the usual CUDA events when stream memory operations are
+ * not available.
  */
 class FastEvent {
  public:
   /**
    * Allocate the event.
-   * The event is in an undefined state until record has been called.
    */
   FastEvent();
   ~FastEvent();
@@ -154,6 +155,7 @@ class FastEvent {
  private:
   int32_t* sync_event __attribute__((aligned(64)));
   CUdeviceptr sync_event_dev_ptr;
+  cudaEvent_t plain_event;
 };
 
 /**
@@ -161,6 +163,11 @@ class FastEvent {
  * This essentially uses full/empty bit semantics to implement synchronization.
  * The GPU will wait on a memory location until the host writes to it using the
  * stream memory wait operation.
+ *
+ * If stream memory operations are not available, this will use a
+ * spinning wait kernel. This can cause problems. It has a tendency to
+ * lead to deadlock, especially in "debug" mode. Also, if kernel
+ * timeout is enabled, this is likely to error out.
  */
 class GPUWait {
  public:
@@ -172,6 +179,7 @@ class GPUWait {
   void signal();
  private:
   int32_t* wait_sync __attribute__((aligned(64)));
+  int32_t* wait_sync_dev_ptr_no_stream_mem_ops __attribute__((aligned(64)));
   CUdeviceptr wait_sync_dev_ptr;
 };
 

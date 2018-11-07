@@ -95,7 +95,7 @@ inline void *malloc_aligned(size_t s) {
     std::cerr << "posix_memalign failed\n";
     abort();
   }
-  return p;  
+  return p;
 #else
   return malloc(s);
 #endif
@@ -127,27 +127,8 @@ void destroy_streams(std::vector<cudaStream_t> &streams,
 }
 
 template <typename T>
-MPI_Datatype get_mpi_data_type();
-
-template <> inline
-MPI_Datatype get_mpi_data_type<float>() {
-  return MPI_FLOAT;
-}
-
-inline int get_mpi_comm_local_size() {
-  char *env = getenv("MV2_COMM_WORLD_LOCAL_SIZE");
-  if (env == nullptr) {
-    env = getenv("OMPI_COMM_WORLD_LOCAL_SIZE");
-  }
-  if (env == nullptr) {
-    env = getenv("SLURM_NTASKS_PER_NODE");
-  }
-  if (env == nullptr) {
-    std::cerr << "Failed to determine the number of ranks per node" << std::endl;
-    abort();
-  }
-  int size = atoi(env);
-  return size;
+MPI_Datatype get_mpi_data_type() {
+  return mpi::TypeMap<T>();
 }
 
 class MPIPrintStream {
@@ -161,7 +142,7 @@ class MPIPrintStream {
   std::stringstream &operator()() {
     return ss;
   }
-  
+
  protected:
   std::ostream &m_os;
   std::stringstream ss;

@@ -57,6 +57,7 @@ class SendAlState : public AlState {
       if (sync_event.query()) {
         mem_transfer_done = true;
       }
+
       // Always return false here so the send is not started until the next
       // pass through the in-progress requests.
       // This ensures that sends always start in the order they were posted.
@@ -165,6 +166,7 @@ class SendRecvAlState : public AlState {
   bool send_done = false;
   bool recv_done = false;
 };
+
 
 }  // namespace mpi_cuda
 }  // namespace internal

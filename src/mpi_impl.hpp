@@ -37,6 +37,12 @@
 
 namespace Al {
 
+namespace internal {
+namespace mpi{
+int get_max_tag();
+}
+}
+
 /**
  * Communicator for MPI-based collectives.
  */
@@ -56,8 +62,12 @@ class MPICommunicator : public Communicator {
     MPI_Comm_size(local_comm, &size_of_local_comm);
   }
   virtual ~MPICommunicator() override {
-    // TODO: Fix; can't do this after finalization.
-    //MPI_Comm_free(&comm);
+    int finalized;
+    MPI_Finalized(&finalized);
+    if (!finalized) {
+      MPI_Comm_free(&comm);
+      MPI_Comm_free(&local_comm);
+    }
   }
   Communicator* copy() const override { return new MPICommunicator(comm); }
   int rank() const override { return rank_in_comm; }
@@ -68,7 +78,8 @@ class MPICommunicator : public Communicator {
   MPI_Comm get_local_comm() const { return local_comm; }
   int get_free_tag() {
     int tag = free_tag++;
-    if (free_tag >= MPI_TAG_UB || free_tag < starting_free_tag) {
+    if (free_tag >= internal::mpi::get_max_tag()
+        || free_tag < starting_free_tag) {
       free_tag = 10;
     }
     return tag;

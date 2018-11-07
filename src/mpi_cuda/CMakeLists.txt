@@ -1,11 +1,18 @@
 set_full_path(THIS_DIR_HEADERS
+  allgather.hpp
   allreduce.hpp
-  pt2pt.hpp
   allreduce_ring.hpp
+  alltoall.hpp
+  bcast.hpp
+  communicator.hpp
   cuda_kernels.hpp
   cuda_local_transfer.hpp
+  gather.hpp
+  reduce.hpp
+  reduce_scatter.hpp
+  scatter.hpp
+  pt2pt.hpp
   util.hpp
-  communicator.hpp
   )
 
 set_full_path(THIS_DIR_CXX_SOURCES

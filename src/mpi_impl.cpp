@@ -34,6 +34,8 @@ namespace mpi {
 namespace {
 // Whether we initialized MPI, or it was already initialized.
 bool initialized_mpi = false;
+// Maximum tag value in MPI.
+int max_tag = 0;
 }
 
 void init(int& argc, char**& argv) {
@@ -47,6 +49,8 @@ void init(int& argc, char**& argv) {
     }
     initialized_mpi = true;
   }
+  // Get the upper bound for tags; this is always set in MPI_COMM_WORLD.
+  MPI_Comm_get_attr(MPI_COMM_WORLD, MPI_TAG_UB, &max_tag, &flag);
 }
 
 void finalize() {
@@ -56,6 +60,8 @@ void finalize() {
     MPI_Finalize();
   }
 }
+
+int get_max_tag() { return max_tag; }
 
 }  // namespace mpi
 }  // namespace internal
