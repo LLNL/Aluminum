@@ -44,7 +44,8 @@ public:
     AlState(nullptr),
     host_mem_(get_pinned_memory<T>(comm.size()*count)),
     count_(count),
-    comm_(comm.get_comm()) {
+    comm_(comm.get_comm()),
+    compute_stream(comm.get_stream()) {
 
     // Transfer data from device to host and use an event to determine when it
     // completes.
@@ -100,6 +101,7 @@ public:
   }
 
   bool needs_completion() const override { return false; }
+  void* get_compute_stream() const override { return compute_stream; }
 
 private:
   T* host_mem_;
@@ -114,6 +116,8 @@ private:
 
   bool a2a_started_ = false;
   bool a2a_done_ = false;
+
+  cudaStream_t compute_stream;
 };
 
 }  // namespace mpi_cuda

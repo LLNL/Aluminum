@@ -44,7 +44,8 @@ public:
     AlState(nullptr),
     host_mem_(get_pinned_memory<T>(comm.size()*count)),
     count_(count),
-    comm_(comm.get_comm()) {
+    comm_(comm.get_comm()),
+    compute_stream(comm.get_stream()) {
 
     int const rank = comm.rank();
     bool const inplace_operation = sendbuf == recvbuf;
@@ -111,6 +112,7 @@ public:
   }
 
   bool needs_completion() const override { return false; }
+  void* get_compute_stream() const override { return compute_stream; }
 
 private:
   T* host_mem_;
@@ -125,6 +127,8 @@ private:
 
   bool ag_started_ = false;
   bool ag_done_ = false;
+
+  cudaStream_t compute_stream;
 };
 
 }  // namespace mpi_cuda
