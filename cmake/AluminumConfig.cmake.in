@@ -39,11 +39,17 @@ if (AL_HAS_CUDA)
     PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${CUDA_INCLUDE_DIRS})
 
   if (AL_HAS_NCCL)
-    if (NOT NCCL_DIR)
-      set(NCCL_DIR "@NCCL_DIR@")
-    endif()
-
-    find_package(NCCL 2.0.0 REQUIRED)
+    find_package(NCCL 2.0.0)
+    if (NOT NCCL_FOUND)
+      if (NOT NCCL_DIR)
+        set(NCCL_DIR "@NCCL_DIR@")
+      endif()
+      if (NOT NCCL_DIR AND NOT NCCL_LIBRARY AND NOT NCCL_INCLUDE_PATH)
+        set(NCCL_LIBRARY "@NCCL_LIBRARY@")
+        set(NCCL_INCLUDE_PATH "@NCCL_INCLUDE_PATH@")
+      endif ()
+      find_package(NCCL 2.0.0 REQUIRED)
+    endif (NOT NCCL_FOUND)
 
     set_property(TARGET cuda::cuda APPEND
       PROPERTY INTERFACE_LINK_LIBRARIES cuda::nccl)
