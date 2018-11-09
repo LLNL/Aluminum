@@ -13,10 +13,13 @@ set_full_path(THIS_DIR_HEADERS
   scatter.hpp
   pt2pt.hpp
   util.hpp
+  rma.hpp
+  rma_ipc.hpp
   )
 
 set_full_path(THIS_DIR_CXX_SOURCES
   communicator.cpp
+  rma.cpp
   )
 
 set_full_path(THIS_DIR_CUDA_SOURCES

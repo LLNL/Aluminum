@@ -39,6 +39,8 @@
 
 #include "mpi_cuda/pt2pt.hpp"
 
+#include "mpi_cuda/rma.hpp"
+
 namespace Al {
 
 enum class MPICUDAAllreduceAlgorithm {
@@ -180,6 +182,40 @@ class MPICUDABackend {
                        T* recvbuf, size_t recv_count, int src, comm_type& comm) {
     do_sendrecv(sendbuf, send_count, dest, recvbuf, recv_count, src, comm,
                 comm.get_stream());
+  }
+
+  template <typename T>
+  static T *AttachRemoteBuffer(T *local_buf, int peer, comm_type& comm) {
+    return static_cast<T*>(
+        comm.get_rma().attach_remote_buffer(local_buf, peer));
+  }
+
+  template <typename T>
+  static void DetachRemoteBuffer(T *remote_buf, int peer, comm_type& comm) {
+    comm.get_rma().detach_remote_buffer(remote_buf, peer);
+  }
+
+  static void Notify(int peer, comm_type& comm) {
+    comm.get_rma().notify(peer);
+  }
+
+  static void Wait(int peer, comm_type& comm) {
+    comm.get_rma().wait(peer);
+  }
+
+  static void Sync(int peer, comm_type& comm) {
+    comm.get_rma().sync(peer);
+  }
+
+  static void Sync(const int *peers, int num_peers, comm_type& comm) {
+    comm.get_rma().sync(peers, num_peers);
+  }
+
+  template <typename T>
+  static void Put(
+      const T* srcbuf, int dest, T * destbuf, size_t count,
+      comm_type& comm) {
+    comm.get_rma().put(srcbuf, dest, destbuf, sizeof(T) * count);
   }
 
   template <typename T>

@@ -27,33 +27,35 @@
 
 #pragma once
 
-#include "cudacommunicator.hpp"
-#include <memory>
+#include "mpi_cuda/communicator.hpp"
+#include "mpi_cuda/rma.hpp"
 
 namespace Al {
 namespace internal {
 namespace mpi_cuda {
 
-class RingMPICUDA;
-class RMA;
-
-class MPICUDACommunicator: public CUDACommunicator {
+class ConnectionNULL: public Connection {
  public:
-  MPICUDACommunicator() : MPICUDACommunicator(MPI_COMM_WORLD, 0) {}
-  MPICUDACommunicator(cudaStream_t stream_) :
-    MPICUDACommunicator(MPI_COMM_WORLD, stream_) {}
-  MPICUDACommunicator(MPI_Comm comm_, cudaStream_t stream_)
-    : CUDACommunicator(comm_, stream_), m_ring(nullptr), m_rma(nullptr) {
+  ConnectionNULL(MPICUDACommunicator &comm, int peer):
+      Connection(comm, peer) {}
+  ~ConnectionNULL() {}
+  void connect() {}
+  void disconnect() {}
+  void *attach_remote_buffer(void *) {
+    return nullptr;
   }
-
-  RingMPICUDA &get_ring();
-  RMA &get_rma();
-
-  ~MPICUDACommunicator();
-
- protected:
-  RingMPICUDA *m_ring;
-  std::shared_ptr<RMA> m_rma;
+  void detach_remote_buffer(void *) {}
+  void detach_all_remote_buffers() {}
+  void notify(AlRequest &req) {
+    req->store(true, std::memory_order_release);
+  }
+  void wait(AlRequest &req) {
+    req->store(true, std::memory_order_release);
+  }
+  void sync(AlRequest &req) {
+    req->store(true, std::memory_order_release);
+  }
+  void put(const void *, void *, size_t) {}
 };
 
 } // namespace mpi_cuda

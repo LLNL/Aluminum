@@ -27,33 +27,47 @@
 
 #pragma once
 
-#include "cudacommunicator.hpp"
-#include <memory>
+#include "mpi_cuda/communicator.hpp"
+#include "mpi_cuda/rma.hpp"
 
 namespace Al {
 namespace internal {
 namespace mpi_cuda {
 
-class RingMPICUDA;
-class RMA;
-
-class MPICUDACommunicator: public CUDACommunicator {
+class ConnectionSelf: public Connection {
  public:
-  MPICUDACommunicator() : MPICUDACommunicator(MPI_COMM_WORLD, 0) {}
-  MPICUDACommunicator(cudaStream_t stream_) :
-    MPICUDACommunicator(MPI_COMM_WORLD, stream_) {}
-  MPICUDACommunicator(MPI_Comm comm_, cudaStream_t stream_)
-    : CUDACommunicator(comm_, stream_), m_ring(nullptr), m_rma(nullptr) {
+  ConnectionSelf(MPICUDACommunicator &comm, int peer):
+      Connection(comm, peer) {}
+  ~ConnectionSelf() {}
+  void connect() {}
+  void disconnect() {}
+  void *attach_remote_buffer(void *local_addr) {
+    return local_addr;
   }
-
-  RingMPICUDA &get_ring();
-  RMA &get_rma();
-
-  ~MPICUDACommunicator();
-
- protected:
-  RingMPICUDA *m_ring;
-  std::shared_ptr<RMA> m_rma;
+  void detach_remote_buffer(void *) {}
+  void detach_all_remote_buffers() {}
+  void notify(AlRequest &req) {
+    req->store(true, std::memory_order_release);
+  }
+  void wait(AlRequest &req) {
+    req->store(true, std::memory_order_release);
+  }
+  void sync(AlRequest &req) {
+    req->store(true, std::memory_order_release);
+  }
+  void put(const void *src, void *dst,
+           size_t size) {
+    if (size > 0) {
+      if (src == nullptr) {
+        throw_al_exception("Source buffer is null");
+      }
+      if (dst == nullptr) {
+        throw_al_exception("Destination buffer is null");
+      }
+      AL_CHECK_CUDA(cudaMemcpyAsync(
+          dst, src, size, cudaMemcpyDefault, m_comm.get_stream()));
+    }
+  }
 };
 
 } // namespace mpi_cuda
