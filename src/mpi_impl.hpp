@@ -65,8 +65,9 @@ class MPICommunicator : public Communicator {
     int finalized;
     MPI_Finalized(&finalized);
     if (!finalized) {
-      MPI_Comm_free(&comm);
-      MPI_Comm_free(&local_comm);
+      // TODO: temporary skipping deleting comm
+      //MPI_Comm_free(&comm);
+      //MPI_Comm_free(&local_comm);
     }
   }
   Communicator* copy() const override { return new MPICommunicator(comm); }
