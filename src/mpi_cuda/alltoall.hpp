@@ -48,7 +48,7 @@ public:
 
     // Transfer data from device to host and use an event to determine when it
     // completes.
-    AL_CHECK_CUDA(cudaMemcpyAsync(host_mem_,sendbuf, sizeof(T)*count*comm.size(),
+    AL_CHECK_CUDA(cudaMemcpyAsync(host_mem_, sendbuf, sizeof(T)*count*comm.size(),
                                   cudaMemcpyDeviceToHost, stream));
     d2h_event_.record(stream);
 
