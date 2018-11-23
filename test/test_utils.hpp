@@ -392,6 +392,22 @@ get_request<Al::MPIBackend>() {
   return Al::MPIBackend::null_req;
 }
 
+template <typename Backend>
+typename Backend::comm_type get_comm_with_stream(MPI_Comm c);
+
+template <typename Backend>
+void free_comm_with_stream(typename Backend::comm_type& c);
+
+template <>
+inline typename Al::MPIBackend::comm_type get_comm_with_stream<Al::MPIBackend>(
+  MPI_Comm c) {
+  return Al::MPIBackend::comm_type(c);
+}
+
+template <>
+inline void free_comm_with_stream<Al::MPIBackend>(
+  typename Al::MPIBackend::comm_type&) {}
+
 void get_expected_allreduce_result(std::vector<float>& expected) {
   MPI_Allreduce(MPI_IN_PLACE, expected.data(), expected.size(),
                 MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);

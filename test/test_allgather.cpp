@@ -115,7 +115,7 @@ template <typename Backend>
 void test_correctness() {
   auto algos = get_allgather_algorithms<Backend>();
   auto nb_algos = get_nb_allgather_algorithms<Backend>();
-  typename Backend::comm_type comm;  // Use COMM_WORLD.
+  typename Backend::comm_type comm = get_comm_with_stream<Backend>(MPI_COMM_WORLD);
   // Compute sizes to test.
   std::vector<size_t> sizes = get_sizes(start_size, max_size, true);
   for (const auto& size : sizes) {
@@ -148,6 +148,7 @@ void test_correctness() {
                                       data, data_inplace, comm, algo);
     }
   }
+  free_comm_with_stream<Backend>(comm);
 }
 
 int main(int argc, char** argv) {
