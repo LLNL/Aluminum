@@ -27,6 +27,7 @@ set(TEST_SRCS
   test_bcast.cpp
   test_gather.cpp
   test_scatter.cpp
+  test_pt2pt.cpp
   test_multi_nballreduces.cpp
   test_nccl_collectives.cpp)
 
