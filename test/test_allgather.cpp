@@ -63,10 +63,6 @@ void test_allgather_algo(const typename VectorType<Backend>::type& expected,
   }
   MPI_Barrier(MPI_COMM_WORLD);
   // Test in-place allgather.
-  std::stringstream ss;
-  ss << comm.rank() << ": input: ";
-  for (const auto& v : input_inplace.copyout()) ss << v << " ";
-  std::cout << ss.str() << std::endl;
   Al::Allgather<Backend>(input_inplace.data(), input_inplace.size() / comm.size(),
                          comm, algo);
   MPI_Barrier(MPI_COMM_WORLD);
