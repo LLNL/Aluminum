@@ -28,8 +28,7 @@ set(TEST_SRCS
   test_gather.cpp
   test_scatter.cpp
   test_pt2pt.cpp
-  test_multi_nballreduces.cpp
-  test_nccl_collectives.cpp)
+  test_multi_nballreduces.cpp)
 
 foreach(src ${TEST_SRCS})
   string(REPLACE ".cpp" ".exe" _test_exe_name "${src}")
