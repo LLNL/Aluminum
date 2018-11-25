@@ -49,7 +49,7 @@ template <typename Backend>
 void test_bcast_algo(const typename VectorType<Backend>::type& expected,
                      typename VectorType<Backend>::type input,
                      typename Backend::comm_type& comm,
-                     typename Backend::algo_type algo) {
+                     typename Backend::bcast_algo_type algo) {
   // Test in-place bcast (bcast is always in-place).
   Al::Bcast<Backend>(input.data(), input.size(),
                      0, comm, algo);
@@ -67,7 +67,7 @@ template <typename Backend>
 void test_nb_bcast_algo(const typename VectorType<Backend>::type& expected,
                          typename VectorType<Backend>::type input,
                          typename Backend::comm_type& comm,
-                         typename Backend::algo_type algo) {
+                         typename Backend::bcast_algo_type algo) {
   typename Backend::req_type req = get_request<Backend>();
   // Test in-place bcast (bcast is always in-place).
   Al::NonblockingBcast<Backend>(input.data(), input.size(),
@@ -100,14 +100,14 @@ void test_correctness() {
       MPI_Barrier(MPI_COMM_WORLD);
       if (comm.rank() == 0) {
         // TODO: Update when we have real algorithm sets for each op.
-        std::cout << " Algo: " << Al::allreduce_name(algo) << std::endl;
+        std::cout << " Algo: " << Al::algorithm_name(algo) << std::endl;
       }
       test_bcast_algo<Backend>(expected, data, comm, algo);
     }
     for (auto&& algo : nb_algos) {
       MPI_Barrier(MPI_COMM_WORLD);
       if (comm.rank() == 0) {
-        std::cout << " Algo: NB " << Al::allreduce_name(algo) << std::endl;
+        std::cout << " Algo: NB " << Al::algorithm_name(algo) << std::endl;
       }
       test_nb_bcast_algo<Backend>(expected, data, comm, algo);
     }

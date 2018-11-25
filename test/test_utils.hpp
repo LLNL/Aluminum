@@ -172,144 +172,142 @@ std::string human_readable_size(size_t size_) {
 }
 
 template <typename Backend>
-std::vector<typename Backend::algo_type> get_allreduce_algorithms() {
-  std::vector<typename Backend::algo_type> algos = {
-    Backend::algo_type::automatic};
-  return algos;
-}
-
-// TODO: Update these once we have real algorithm sets for each op.
-
-template <typename Backend>
-std::vector<typename Backend::algo_type> get_reduce_algorithms() {
-  std::vector<typename Backend::algo_type> algos = {
-    Backend::algo_type::automatic};
+std::vector<typename Backend::allreduce_algo_type> get_allreduce_algorithms() {
+  std::vector<typename Backend::allreduce_algo_type> algos = {
+    Backend::allreduce_algo_type::automatic};
   return algos;
 }
 
 template <typename Backend>
-std::vector<typename Backend::algo_type> get_reduce_scatter_algorithms() {
-  std::vector<typename Backend::algo_type> algos = {
-    Backend::algo_type::automatic};
+std::vector<typename Backend::reduce_algo_type> get_reduce_algorithms() {
+  std::vector<typename Backend::reduce_algo_type> algos = {
+    Backend::reduce_algo_type::automatic};
   return algos;
 }
 
 template <typename Backend>
-std::vector<typename Backend::algo_type> get_allgather_algorithms() {
-  std::vector<typename Backend::algo_type> algos = {
-    Backend::algo_type::automatic};
+std::vector<typename Backend::reduce_scatter_algo_type> get_reduce_scatter_algorithms() {
+  std::vector<typename Backend::reduce_scatter_algo_type> algos = {
+    Backend::reduce_scatter_algo_type::automatic};
   return algos;
 }
 
 template <typename Backend>
-std::vector<typename Backend::algo_type> get_bcast_algorithms() {
-  std::vector<typename Backend::algo_type> algos = {
-    Backend::algo_type::automatic};
+std::vector<typename Backend::allgather_algo_type> get_allgather_algorithms() {
+  std::vector<typename Backend::allgather_algo_type> algos = {
+    Backend::allgather_algo_type::automatic};
   return algos;
 }
 
 template <typename Backend>
-std::vector<typename Backend::algo_type> get_alltoall_algorithms() {
-  std::vector<typename Backend::algo_type> algos = {
-    Backend::algo_type::automatic};
+std::vector<typename Backend::bcast_algo_type> get_bcast_algorithms() {
+  std::vector<typename Backend::bcast_algo_type> algos = {
+    Backend::bcast_algo_type::automatic};
   return algos;
 }
 
 template <typename Backend>
-std::vector<typename Backend::algo_type> get_gather_algorithms() {
-  std::vector<typename Backend::algo_type> algos = {
-    Backend::algo_type::automatic};
+std::vector<typename Backend::alltoall_algo_type> get_alltoall_algorithms() {
+  std::vector<typename Backend::alltoall_algo_type> algos = {
+    Backend::alltoall_algo_type::automatic};
   return algos;
 }
 
 template <typename Backend>
-std::vector<typename Backend::algo_type> get_scatter_algorithms() {
-  std::vector<typename Backend::algo_type> algos = {
-    Backend::algo_type::automatic};
+std::vector<typename Backend::gather_algo_type> get_gather_algorithms() {
+  std::vector<typename Backend::gather_algo_type> algos = {
+    Backend::gather_algo_type::automatic};
+  return algos;
+}
+
+template <typename Backend>
+std::vector<typename Backend::scatter_algo_type> get_scatter_algorithms() {
+  std::vector<typename Backend::scatter_algo_type> algos = {
+    Backend::scatter_algo_type::automatic};
   return algos;
 }
 
 template <>
-std::vector<Al::MPIBackend::algo_type>
+std::vector<Al::MPIBackend::allreduce_algo_type>
 get_allreduce_algorithms<Al::MPIBackend>() {  
-   std::vector<Al::AllreduceAlgorithm> algos = {
-     Al::AllreduceAlgorithm::automatic,
-     Al::AllreduceAlgorithm::mpi_passthrough,
-     Al::AllreduceAlgorithm::mpi_recursive_doubling,
-     Al::AllreduceAlgorithm::mpi_ring,
-     Al::AllreduceAlgorithm::mpi_rabenseifner,
-     Al::AllreduceAlgorithm::mpi_pe_ring,
-     Al::AllreduceAlgorithm::mpi_biring
+   std::vector<Al::MPIAllreduceAlgorithm> algos = {
+     Al::MPIAllreduceAlgorithm::automatic,
+     Al::MPIAllreduceAlgorithm::mpi_passthrough,
+     Al::MPIAllreduceAlgorithm::mpi_recursive_doubling,
+     Al::MPIAllreduceAlgorithm::mpi_ring,
+     Al::MPIAllreduceAlgorithm::mpi_rabenseifner,
+     Al::MPIAllreduceAlgorithm::mpi_pe_ring,
+     Al::MPIAllreduceAlgorithm::mpi_biring
   };
   return algos;
 }
 
 template <typename Backend>
-std::vector<typename Backend::algo_type> get_nb_allreduce_algorithms() {
-  std::vector<typename Backend::algo_type> algos = {
-    Backend::algo_type::automatic};
+std::vector<typename Backend::allreduce_algo_type> get_nb_allreduce_algorithms() {
+  std::vector<typename Backend::allreduce_algo_type> algos = {
+    Backend::allreduce_algo_type::automatic};
   return algos;
 }
 
 template <typename Backend>
-std::vector<typename Backend::algo_type> get_nb_reduce_algorithms() {
-  std::vector<typename Backend::algo_type> algos = {
-    Backend::algo_type::automatic};
+std::vector<typename Backend::reduce_algo_type> get_nb_reduce_algorithms() {
+  std::vector<typename Backend::reduce_algo_type> algos = {
+    Backend::reduce_algo_type::automatic};
   return algos;
 }
 
 template <typename Backend>
-std::vector<typename Backend::algo_type> get_nb_reduce_scatter_algorithms() {
-  std::vector<typename Backend::algo_type> algos = {
-    Backend::algo_type::automatic};
+std::vector<typename Backend::reduce_scatter_algo_type> get_nb_reduce_scatter_algorithms() {
+  std::vector<typename Backend::reduce_scatter_algo_type> algos = {
+    Backend::reduce_scatter_algo_type::automatic};
   return algos;
 }
 
 template <typename Backend>
-std::vector<typename Backend::algo_type> get_nb_allgather_algorithms() {
-  std::vector<typename Backend::algo_type> algos = {
-    Backend::algo_type::automatic};
+std::vector<typename Backend::allgather_algo_type> get_nb_allgather_algorithms() {
+  std::vector<typename Backend::allgather_algo_type> algos = {
+    Backend::allgather_algo_type::automatic};
   return algos;
 }
 
 template <typename Backend>
-std::vector<typename Backend::algo_type> get_nb_bcast_algorithms() {
-  std::vector<typename Backend::algo_type> algos = {
-    Backend::algo_type::automatic};
+std::vector<typename Backend::bcast_algo_type> get_nb_bcast_algorithms() {
+  std::vector<typename Backend::bcast_algo_type> algos = {
+    Backend::bcast_algo_type::automatic};
   return algos;
 }
 
 template <typename Backend>
-std::vector<typename Backend::algo_type> get_nb_alltoall_algorithms() {
-  std::vector<typename Backend::algo_type> algos = {
-    Backend::algo_type::automatic};
+std::vector<typename Backend::alltoall_algo_type> get_nb_alltoall_algorithms() {
+  std::vector<typename Backend::alltoall_algo_type> algos = {
+    Backend::alltoall_algo_type::automatic};
   return algos;
 }
 
 template <typename Backend>
-std::vector<typename Backend::algo_type> get_nb_gather_algorithms() {
-  std::vector<typename Backend::algo_type> algos = {
-    Backend::algo_type::automatic};
+std::vector<typename Backend::gather_algo_type> get_nb_gather_algorithms() {
+  std::vector<typename Backend::gather_algo_type> algos = {
+    Backend::gather_algo_type::automatic};
   return algos;
 }
 
 template <typename Backend>
-std::vector<typename Backend::algo_type> get_nb_scatter_algorithms() {
-  std::vector<typename Backend::algo_type> algos = {
-    Backend::algo_type::automatic};
+std::vector<typename Backend::scatter_algo_type> get_nb_scatter_algorithms() {
+  std::vector<typename Backend::scatter_algo_type> algos = {
+    Backend::scatter_algo_type::automatic};
   return algos;
 }
  
 template <>
-std::vector<Al::MPIBackend::algo_type>
+std::vector<Al::MPIBackend::allreduce_algo_type>
 get_nb_allreduce_algorithms<Al::MPIBackend>() {  
-  std::vector<Al::AllreduceAlgorithm> algos = {
-    Al::AllreduceAlgorithm::automatic,
-    Al::AllreduceAlgorithm::mpi_passthrough,
-    Al::AllreduceAlgorithm::mpi_recursive_doubling,
-    Al::AllreduceAlgorithm::mpi_ring,
-    Al::AllreduceAlgorithm::mpi_rabenseifner
-    //Al::AllreduceAlgorithm::mpi_pe_ring
+  std::vector<Al::MPIAllreduceAlgorithm> algos = {
+    Al::MPIAllreduceAlgorithm::automatic,
+    Al::MPIAllreduceAlgorithm::mpi_passthrough,
+    Al::MPIAllreduceAlgorithm::mpi_recursive_doubling,
+    Al::MPIAllreduceAlgorithm::mpi_ring,
+    Al::MPIAllreduceAlgorithm::mpi_rabenseifner
+    //Al::MPIAllreduceAlgorithm::mpi_pe_ring
   };
   return algos;
 }

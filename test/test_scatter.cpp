@@ -50,7 +50,7 @@ template <typename Backend>
 void test_scatter_algo(const typename VectorType<Backend>::type& expected,
                        typename VectorType<Backend>::type input,
                        typename Backend::comm_type& comm,
-                       typename Backend::algo_type algo) {
+                       typename Backend::scatter_algo_type algo) {
   auto recv = get_vector<Backend>(input.size() / comm.size());
   // Test regular scatter.
   Al::Scatter<Backend>(input.data(), recv.data(),
@@ -79,7 +79,7 @@ template <typename Backend>
 void test_nb_scatter_algo(const typename VectorType<Backend>::type& expected,
                          typename VectorType<Backend>::type input,
                          typename Backend::comm_type& comm,
-                         typename Backend::algo_type algo) {
+                         typename Backend::scatter_algo_type algo) {
   typename Backend::req_type req = get_request<Backend>();
   auto recv = get_vector<Backend>(input.size() / comm.size());
   // Test regular scatter.
@@ -124,14 +124,14 @@ void test_correctness() {
       MPI_Barrier(MPI_COMM_WORLD);
       if (comm.rank() == 0) {
         // TODO: Update when we have real algorithm sets for each op.
-        std::cout << " Algo: " << Al::allreduce_name(algo) << std::endl;
+        std::cout << " Algo: " << Al::algorithm_name(algo) << std::endl;
       }
       test_scatter_algo<Backend>(expected, data, comm, algo);
     }
     for (auto&& algo : nb_algos) {
       MPI_Barrier(MPI_COMM_WORLD);
       if (comm.rank() == 0) {
-        std::cout << " Algo: NB " << Al::allreduce_name(algo) << std::endl;
+        std::cout << " Algo: NB " << Al::algorithm_name(algo) << std::endl;
       }
       test_nb_scatter_algo<Backend>(expected, data, comm, algo);
     }
