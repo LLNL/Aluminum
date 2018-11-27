@@ -393,7 +393,7 @@ class NCCLBackend {
       return;
     }
     if (sendbuf == internal::IN_PLACE<T>()) {
-      sendbuf = recvbuf;
+      sendbuf = recvbuf + comm.rank()*send_count;
     }
     AL_CHECK_NCCL(ncclAllGather((const void*) sendbuf, (void*) recvbuf,
                                 send_count, internal::nccl::TypeMap<T>(),
