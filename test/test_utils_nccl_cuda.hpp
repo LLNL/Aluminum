@@ -65,6 +65,20 @@ get_request<Al::NCCLBackend>() {
   return Al::NCCLBackend::null_req;
 }
 
+template <>
+inline typename Al::NCCLBackend::comm_type get_comm_with_stream<Al::NCCLBackend>(
+  MPI_Comm c) {
+  cudaStream_t stream;
+  AL_FORCE_CHECK_CUDA_NOSYNC(cudaStreamCreate(&stream));
+  return Al::NCCLBackend::comm_type(c, stream);
+}
+
+template <>
+inline void free_comm_with_stream<Al::NCCLBackend>(
+  typename Al::NCCLBackend::comm_type& c) {
+  AL_FORCE_CHECK_CUDA_NOSYNC(cudaStreamDestroy(c.get_stream()));
+}
+
 void get_expected_nccl_result_allreduce(CUDAVector<float>& input){
   std::vector<float> &&host_data = input.copyout();
   std::vector<float> recv(input.size());

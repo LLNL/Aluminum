@@ -42,43 +42,6 @@ size_t num_trials = 10000;
 
 #ifdef AL_HAS_MPI_CUDA
 
-void test_correctness() {
-  cudaStream_t stream;
-  cudaStreamCreate(&stream);
-  typename Al::MPICUDABackend::comm_type comm(MPI_COMM_WORLD, stream);
-  for (size_t size = start_size; size <= max_size; size *= 2) {
-    if (comm.rank() == 0) std::cout << "Testing size " << human_readable_size(size) << std::endl;
-    std::vector<float> host_data(size, 1);
-    CUDAVector<float> data(host_data);
-    std::vector<float> expected_host_data(size, 1);
-    CUDAVector<float> expected(expected_host_data);
-    MPI_Barrier(MPI_COMM_WORLD);
-    if (comm.rank() == 0) {
-      Al::Send<Al::MPICUDABackend>(data.data(), data.size(), 1, comm);
-    } else if (comm.rank() == 1) {
-      Al::Recv<Al::MPICUDABackend>(data.data(), data.size(), 0, comm);
-    }
-    cudaStreamSynchronize(stream);
-    if (comm.rank() == 1) {
-      check_vector(expected, data);
-    }
-    CUDAVector<float> recv_data(host_data);
-    MPI_Barrier(MPI_COMM_WORLD);
-    if (comm.rank() == 0) {
-      Al::SendRecv<Al::MPICUDABackend>(data.data(), data.size(), 1,
-                                       recv_data.data(), data.size(), 1,
-                                       comm);
-    } else {
-      Al::SendRecv<Al::MPICUDABackend>(data.data(), data.size(), 0,
-                                       recv_data.data(), data.size(), 0,
-                                       comm);
-    }
-    cudaStreamSynchronize(stream);
-    check_vector(expected, recv_data);
-  }
-  cudaStreamDestroy(stream);
-}
-
 void do_benchmark() {
   cudaStream_t stream;
   cudaStreamCreate(&stream);
@@ -166,7 +129,6 @@ int main(int argc, char** argv) {
 #ifdef AL_HAS_MPI_CUDA
   set_device();
   Al::Initialize(argc, argv);
-  test_correctness();
   do_benchmark();
   Al::Finalize();
 #else

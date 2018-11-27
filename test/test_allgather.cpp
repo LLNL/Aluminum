@@ -39,69 +39,69 @@
 #include <math.h>
 #include <string>
 
+// Size is the per-rank send size.
+size_t start_size = 1;
 size_t max_size = 1<<30;
 
-void get_expected_result(std::vector<float>& expected) {
-  MPI_Allreduce(MPI_IN_PLACE, expected.data(), expected.size(),
-                MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
-}
-
 /**
- * Test allreduce algo on input, check with expected.
+ * Test allgather algo on input, check with expected.
  */
 template <typename Backend>
-void test_allreduce_algo(const typename VectorType<Backend>::type& expected,
+void test_allgather_algo(const typename VectorType<Backend>::type& expected,
+                         const typename VectorType<Backend>::type& expected_inplace,
                          typename VectorType<Backend>::type input,
+                         typename VectorType<Backend>::type input_inplace,
                          typename Backend::comm_type& comm,
                          typename Backend::algo_type algo) {
-  auto recv = get_vector<Backend>(input.size());
-  // Test regular allreduce.
-  Al::Allreduce<Backend>(input.data(), recv.data(), input.size(),
-                         Al::ReductionOperator::sum, comm, algo);
+  auto recv = get_vector<Backend>(input.size() * comm.size());
+  // Test regular allgather.
+  Al::Allgather<Backend>(input.data(), recv.data(), input.size(), comm, algo);
   if (!check_vector(expected, recv)) {
-    std::cout << comm.rank() << ": regular allreduce does not match" <<
+    std::cout << comm.rank() << ": regular allgather does not match" <<
         std::endl;
     std::abort();
   }
   MPI_Barrier(MPI_COMM_WORLD);
-  // Test in-place allreduce.
-  Al::Allreduce<Backend>(input.data(), input.size(),
-                         Al::ReductionOperator::sum, comm, algo);
-  if (!check_vector(expected, input)) {
-    std::cout << comm.rank() << ": in-place allreduce does not match" <<
+  // Test in-place allgather.
+  Al::Allgather<Backend>(input_inplace.data(), input_inplace.size() / comm.size(),
+                         comm, algo);
+  MPI_Barrier(MPI_COMM_WORLD);
+  if (!check_vector(expected_inplace, input_inplace)) {
+    std::cout << comm.rank() << ": in-place allgather does not match" <<
       std::endl;
     std::abort();
   }
 }
 
 /**
- * Test non-blocking allreduce algo on input, check with expected.
+ * Test non-blocking allgather algo on input, check with expected.
  */
 template <typename Backend>
-void test_nb_allreduce_algo(const typename VectorType<Backend>::type& expected,
+void test_nb_allgather_algo(const typename VectorType<Backend>::type& expected,
+                            const typename VectorType<Backend>::type& expected_inplace,
                             typename VectorType<Backend>::type input,
+                            typename VectorType<Backend>::type input_inplace,
                             typename Backend::comm_type& comm,
                             typename Backend::algo_type algo) {
   typename Backend::req_type req = get_request<Backend>();
-  auto recv = get_vector<Backend>(input.size());
-  // Test regular allreduce.
-  Al::NonblockingAllreduce<Backend>(input.data(), recv.data(), input.size(),
-                                    Al::ReductionOperator::sum, comm,
-                                    req, algo);
+  auto recv = get_vector<Backend>(input.size() * comm.size());
+  // Test regular allgather.
+  Al::NonblockingAllgather<Backend>(input.data(), recv.data(),
+                                    input.size(), comm, req, algo);
   Al::Wait<Backend>(req);
   if (!check_vector(expected, recv)) {
-    std::cout << comm.rank() << ": regular allreduce does not match" <<
+    std::cout << comm.rank() << ": regular allgather does not match" <<
       std::endl;
     std::abort();
   }
   MPI_Barrier(MPI_COMM_WORLD);
-  // Test in-place allreduce.
-  Al::NonblockingAllreduce<Backend>(input.data(), input.size(),
-                                    Al::ReductionOperator::sum, comm,
-                                    req, algo);
+  // Test in-place allgather.
+  Al::NonblockingAllgather<Backend>(input_inplace.data(),
+                                    input_inplace.size() / comm.size(),
+                                    comm, req, algo);
   Al::Wait<Backend>(req);
-  if (!check_vector(expected, input)) {
-    std::cout << comm.rank() << ": in-place allreduce does not match" <<
+  if (!check_vector(expected_inplace, input_inplace)) {
+    std::cout << comm.rank() << ": in-place allgather does not match" <<
       std::endl;
     std::abort();
   }
@@ -109,42 +109,42 @@ void test_nb_allreduce_algo(const typename VectorType<Backend>::type& expected,
 
 template <typename Backend>
 void test_correctness() {
-  auto algos = get_allreduce_algorithms<Backend>();
-  auto nb_algos = get_nb_allreduce_algorithms<Backend>();
-  typename Backend::comm_type comm;  // Use COMM_WORLD.
+  auto algos = get_allgather_algorithms<Backend>();
+  auto nb_algos = get_nb_allgather_algorithms<Backend>();
+  typename Backend::comm_type comm = get_comm_with_stream<Backend>(MPI_COMM_WORLD);
   // Compute sizes to test.
-  std::vector<size_t> sizes = {0};
-  for (size_t size = 1; size <= max_size; size *= 2) {
-    sizes.push_back(size);
-    // Avoid duplicating 2.
-    if (size > 1) {
-      sizes.push_back(size + 1);
-    }
-  }
+  std::vector<size_t> sizes = get_sizes(start_size, max_size, true);
   for (const auto& size : sizes) {
     if (comm.rank() == 0) {
       std::cout << "Testing size " << human_readable_size(size) << std::endl;
     }
     // Compute true value.
+    size_t global_size = size * comm.size();
     typename VectorType<Backend>::type &&data = gen_data<Backend>(size);
-    auto expected(data);
-    get_expected_result(expected);
+    auto expected = get_vector<Backend>(global_size);
+    get_expected_allgather_result(data, expected);
+    typename VectorType<Backend>::type &&data_inplace = gen_data<Backend>(global_size);
+    auto expected_inplace(data_inplace);
+    get_expected_allgather_inplace_result(expected_inplace);
     // Test algorithms.
     for (auto&& algo : algos) {
       MPI_Barrier(MPI_COMM_WORLD);
       if (comm.rank() == 0) {
         std::cout << " Algo: " << Al::allreduce_name(algo) << std::endl;
       }
-      test_allreduce_algo<Backend>(expected, data, comm, algo);
+      test_allgather_algo<Backend>(expected, expected_inplace,
+                                   data, data_inplace, comm, algo);
     }
     for (auto&& algo : nb_algos) {
       MPI_Barrier(MPI_COMM_WORLD);
       if (comm.rank() == 0) {
         std::cout << " Algo: NB " << Al::allreduce_name(algo) << std::endl;
       }
-      test_nb_allreduce_algo<Backend>(expected, data, comm, algo);
+      test_nb_allgather_algo<Backend>(expected, expected_inplace,
+                                      data, data_inplace, comm, algo);
     }
   }
+  free_comm_with_stream<Backend>(comm);
 }
 
 int main(int argc, char** argv) {
@@ -155,15 +155,11 @@ int main(int argc, char** argv) {
   Al::Initialize(argc, argv);
 
   std::string backend = "MPI";
-  if (argc >= 2) {
-    backend = argv[1];
-  }
-  if (argc == 3) {
-    max_size = std::stoul(argv[2]);
-  }
+  parse_args(argc, argv, backend, start_size, max_size);
 
   if (backend == "MPI") {
-    test_correctness<Al::MPIBackend>();
+    std::cerr << "Allgather not supported on MPI backend." << std::endl;
+    std::abort();
 #ifdef AL_HAS_NCCL
   } else if (backend == "NCCL") {
     test_correctness<Al::NCCLBackend>();
@@ -172,16 +168,6 @@ int main(int argc, char** argv) {
   } else if (backend == "MPI-CUDA") {
     test_correctness<Al::MPICUDABackend>();
 #endif
-  } else {
-    std::cerr << "usage: " << argv[0] << " [MPI";
-#ifdef AL_HAS_NCCL
-    std::cerr << " | NCCL";
-#endif
-#ifdef AL_HAS_MPI_CUDA
-    std::cerr << " | MPI-CUDA";
-#endif
-    std::cerr << "]" << std::endl;
-    return -1;
   }
 
   Al::Finalize();

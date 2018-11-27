@@ -43,10 +43,18 @@
     }                                                                 \
     AL_CUDA_SYNC(false);                                              \
   } while (0)
+#define AL_FORCE_CHECK_NCCL_NOSYNC(nccl_call)                         \
+  do {                                                                \
+    ncclResult_t result_CHECK_NCCL = (nccl_call);                     \
+    if (result_CHECK_NCCL != ncclSuccess) {                           \
+      throw_al_exception(std::string("NCCL error: ")                  \
+                         + ncclGetErrorString(result_CHECK_NCCL));    \
+    }                                                                 \
+  } while (0)
 #ifdef AL_DEBUG
-#define AL_CHECK_NCCL(nccl_call) AL_FORCE_CHECK_NCCL(nccl_call)
+#define AL_CHECK_NCCL(nccl_call) AL_FORCE_CHECK_NCCL_NOSYNC(nccl_call)
 #else
-#define AL_CHECK_NCCL(nccl_call) (nccl_call)
+#define AL_CHECK_NCCL(nccl_call) AL_FORCE_CHECK_NCCL_NOSYNC(nccl_call)
 #endif
 
 namespace Al {

@@ -546,7 +546,7 @@ void NonblockingGather(
   typename Backend::comm_type& comm,
   typename Backend::req_type& req,
   typename Backend::algo_type algo = Backend::algo_type::automatic) {
-  Backend::template NonblockingGather<T>(sendbuf, recvbuf, count,
+  Backend::template NonblockingGather<T>(sendbuf, recvbuf, count, root,
                                          comm, req, algo);
 }
 
@@ -607,7 +607,7 @@ void NonblockingScatter(
   typename Backend::comm_type& comm,
   typename Backend::req_type& req,
   typename Backend::algo_type algo = Backend::algo_type::automatic) {
-  Backend::template NonblockingScatter<T>(sendbuf, recvbuf, count,
+  Backend::template NonblockingScatter<T>(sendbuf, recvbuf, count, root,
                                          comm, req, algo);
 }
 

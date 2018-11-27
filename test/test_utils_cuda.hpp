@@ -210,16 +210,67 @@ class CUDAVector {
 
 
 bool check_vector(const CUDAVector<float>& expected,
-                  const CUDAVector<float>& actual) {
+                  const CUDAVector<float>& actual,
+                  size_t start = 0,
+                  size_t end = std::numeric_limits<size_t>::max()) {
   std::vector<float> &&expected_host = expected.copyout();
   std::vector<float> &&actual_host = actual.copyout();
-  return check_vector(expected_host, actual_host);
+  return check_vector(expected_host, actual_host, start, end);
 }
 
-void get_expected_result(CUDAVector<float>& expected) {
+void get_expected_allreduce_result(CUDAVector<float>& expected) {
   std::vector<float> &&host_data = expected.copyout();
-  MPI_Allreduce(MPI_IN_PLACE, host_data.data(), expected.size(),
-                MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
+  get_expected_allreduce_result(host_data);
+  expected.copyin(host_data);
+}
+
+void get_expected_reduce_scatter_result(CUDAVector<float>& expected) {
+  std::vector<float> &&host_data = expected.copyout();
+  get_expected_reduce_scatter_result(host_data);
+  expected.copyin(host_data);
+}
+
+void get_expected_allgather_result(CUDAVector<float>& input,
+                                   CUDAVector<float>& expected) {
+  std::vector<float> &&host_input = input.copyout();
+  std::vector<float> &&host_data = expected.copyout();
+  get_expected_allgather_result(host_input, host_data);
+  expected.copyin(host_data);
+}
+
+void get_expected_allgather_inplace_result(CUDAVector<float>& expected) {
+  std::vector<float> &&host_data = expected.copyout();
+  get_expected_allgather_inplace_result(host_data);
+  expected.copyin(host_data);
+}
+
+void get_expected_alltoall_result(CUDAVector<float>& expected) {
+  std::vector<float> &&host_data = expected.copyout();
+  get_expected_alltoall_result(host_data);
+  expected.copyin(host_data);
+}
+
+void get_expected_reduce_result(CUDAVector<float>& expected) {
+  std::vector<float> &&host_data = expected.copyout();
+  get_expected_reduce_result(host_data);
+  expected.copyin(host_data);
+}
+
+void get_expected_bcast_result(CUDAVector<float>& expected) {
+  std::vector<float> &&host_data = expected.copyout();
+  get_expected_bcast_result(host_data);
+  expected.copyin(host_data);
+}
+
+void get_expected_gather_result(CUDAVector<float>& expected) {
+  std::vector<float> &&host_data = expected.copyout();
+  get_expected_gather_result(host_data);
+  expected.copyin(host_data);
+}
+
+void get_expected_scatter_result(CUDAVector<float>& expected) {
+  std::vector<float> &&host_data = expected.copyout();
+  get_expected_scatter_result(host_data);
   expected.copyin(host_data);
 }
 

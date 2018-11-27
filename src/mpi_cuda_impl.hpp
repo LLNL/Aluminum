@@ -430,8 +430,8 @@ class MPICUDABackend {
   template <typename T>
   static void NonblockingReduce_scatter(
     T* buffer, size_t count, ReductionOperator op,
-    comm_type& comm, algo_type algo) {
-    NonblockingReduce_scatter(buffer, buffer, count, op, comm, algo);
+    comm_type& comm, req_type& req, algo_type algo) {
+    NonblockingReduce_scatter(buffer, buffer, count, op, comm, req, algo);
   }
 
   template <typename T>
