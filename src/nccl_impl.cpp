@@ -38,7 +38,12 @@ NCCLCommunicator::NCCLCommunicator(MPI_Comm comm_, cudaStream_t stream_)
 }
 
 NCCLCommunicator::~NCCLCommunicator() {
-  nccl_destroy();
+  int d;
+  // Only destroy resources if the driver is still loaded.
+  if (cudaGetDevice(&d) == cudaSuccess)
+      nccl_destroy();
+  // FIXME: This is just awful. We need a more rigorous approach to
+  // these resources.
 }
 
 void NCCLCommunicator::nccl_setup() {
