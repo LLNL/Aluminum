@@ -38,8 +38,9 @@
 #include "mpi_cuda/scatter.hpp"
 
 #include "mpi_cuda/pt2pt.hpp"
-
+#ifdef AL_HAS_MPI_CUDA_RMA
 #include "mpi_cuda/rma.hpp"
+#endif
 
 namespace Al {
 
@@ -184,6 +185,7 @@ class MPICUDABackend {
                 comm.get_stream());
   }
 
+#ifdef AL_HAS_MPI_CUDA_RMA
   template <typename T>
   static T *AttachRemoteBuffer(T *local_buf, int peer, comm_type& comm) {
     return static_cast<T*>(
@@ -217,6 +219,7 @@ class MPICUDABackend {
       comm_type& comm) {
     comm.get_rma().put(srcbuf, dest, destbuf, sizeof(T) * count);
   }
+#endif // AL_HAS_MPI_CUDA_RMA
 
   template <typename T>
   static void Allgather(

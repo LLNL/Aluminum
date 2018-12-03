@@ -4,4 +4,8 @@
 #cmakedefine AL_HAS_MPI_CUDA
 #cmakedefine AL_HAS_NCCL
 
+#ifdef AL_HAS_MPI_CUDA
+#cmakedefine AL_HAS_MPI_CUDA_RMA
+#endif
+
 #cmakedefine AL_DEBUG

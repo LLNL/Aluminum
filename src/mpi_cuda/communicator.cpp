@@ -28,7 +28,9 @@
 #include "Al.hpp"
 #include "mpi_cuda/communicator.hpp"
 #include "mpi_cuda/allreduce_ring.hpp"
+#ifdef AL_HAS_MPI_CUDA_RMA
 #include "mpi_cuda/rma.hpp"
+#endif
 
 namespace Al {
 namespace internal {
@@ -40,11 +42,13 @@ RingMPICUDA &MPICUDACommunicator::get_ring() {
   return *m_ring;
 }
 
+#ifdef AL_HAS_MPI_CUDA_RMA
 RMA &MPICUDACommunicator::get_rma() {
   if (!m_rma)
     m_rma = std::make_shared<RMA>(*this);
   return *m_rma;
 }
+#endif
 
 MPICUDACommunicator::~MPICUDACommunicator() {
   if (m_ring)

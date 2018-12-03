@@ -45,8 +45,10 @@ if (AL_HAS_CUDA)
   test_stream_mem_ops.cpp ${TEST_HEADERS})
   target_link_libraries(test_stream_mem_ops.exe PRIVATE Al)
   target_link_libraries(test_stream_mem_ops.exe PUBLIC cuda)
-  add_executable(test_rma_ring.exe
-    test_rma_ring.cpp ${TEST_HEADERS})
+endif ()
+
+if (AL_HAS_MPI_CUDA_RMA)
+  add_executable(test_rma_ring.exe test_rma_ring.cpp ${TEST_HEADERS})
   target_link_libraries(test_rma_ring.exe PRIVATE Al)
   target_link_libraries(test_rma_ring.exe PUBLIC cuda)
   add_executable(test_rma_halo_exchange.exe

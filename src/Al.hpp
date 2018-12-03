@@ -701,6 +701,7 @@ void Wait(typename Backend::req_type& req);
 
 namespace ext {
 
+#ifdef AL_HAS_MPI_CUDA_RMA
 /**
  * Attach a remote buffer to local memory space for RMA.
  * @param local_buf Local buffer attached by remote rank.
@@ -781,7 +782,9 @@ void Put(const T* srcbuf, int dest, T *destbuf,
          size_t count, typename Backend::comm_type& comm) {
   Backend::template Put<T>(srcbuf, dest, destbuf, count, comm);
 }
-}
+#endif // AL_HAS_MPI_CUDA_RMA
+
+} // namespace ext
 
 }  // namespace Al
 
