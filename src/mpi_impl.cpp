@@ -50,7 +50,9 @@ void init(int& argc, char**& argv) {
     initialized_mpi = true;
   }
   // Get the upper bound for tags; this is always set in MPI_COMM_WORLD.
-  MPI_Comm_get_attr(MPI_COMM_WORLD, MPI_TAG_UB, &max_tag, &flag);
+  int* p;
+  MPI_Comm_get_attr(MPI_COMM_WORLD, MPI_TAG_UB, &p, &flag);
+  max_tag = *p;
 }
 
 void finalize() {
