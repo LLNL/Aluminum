@@ -42,7 +42,7 @@ const size_t num_trials = 10;
 template <typename Backend>
 void time_allreduce_algo(typename VectorType<Backend>::type input,
                          typename Backend::comm_type& comm,
-                         typename Backend::algo_type algo) {
+                         typename Backend::allreduce_algo_type algo) {
   std::vector<double> times, in_place_times;
   auto recv = get_vector<Backend>(input.size());
   auto in_place_input(input);
@@ -72,17 +72,9 @@ void time_allreduce_algo(typename VectorType<Backend>::type input,
   }
 }
 
-std::vector<size_t> get_sizes() {
-  std::vector<size_t> sizes = {0};
-  for (size_t size = start_size; size <= max_size; size *= 2) {
-    sizes.push_back(size);
-  }
-  return sizes;
-}
-
 template <typename Backend>
 void do_benchmark(const std::vector<size_t> &sizes) {
-  std::vector<typename Backend::algo_type> algos
+  std::vector<typename Backend::allreduce_algo_type> algos
       = get_allreduce_algorithms<Backend>();
   typename Backend::comm_type comm;  // Use COMM_WORLD.
   for (const auto& size : sizes) {
@@ -116,7 +108,7 @@ int main(int argc, char** argv) {
     start_size = std::atoi(argv[2]);
     max_size = std::atoi(argv[3]);
   }
-  std::vector<size_t> sizes = get_sizes();
+  std::vector<size_t> sizes = get_sizes(start_size, max_size);
   
   if (backend == "MPI") {
     do_benchmark<Al::MPIBackend>(sizes);

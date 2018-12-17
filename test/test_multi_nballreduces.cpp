@@ -66,7 +66,7 @@ void test_multiple_nballreduces() {
       }
       MPI_Barrier(MPI_COMM_WORLD);
       if (comm.rank() == 0) {
-        std::cout << " Algo: " << Al::allreduce_name(algo) << std::endl;
+        std::cout << " Algo: " << Al::algorithm_name(algo) << std::endl;
       }
       // Start each allreduce.
       for (size_t i = 0; i < num_concurrent; ++i) {

@@ -69,7 +69,7 @@ typename Al::MPICUDABackend::comm_type get_comm<Al::MPICUDABackend>() {
 template <typename Backend>
 void time_allreduce_algo(typename VectorType<Backend>::type input,
                          typename Backend::comm_type& comm,
-                         typename Backend::algo_type algo) {
+                         typename Backend::allreduce_algo_type algo) {
   std::vector<double> times, in_place_times;
   for (size_t trial = 0; trial < num_trials + 1; ++trial) {
     auto recv = get_vector<Backend>(input.size());
@@ -101,7 +101,7 @@ void time_allreduce_algo(typename VectorType<Backend>::type input,
 template <typename Backend>
 void time_nballreduce_algo(typename VectorType<Backend>::type input,
                            typename Backend::comm_type& comm,
-                           typename Backend::algo_type algo) {
+                           typename Backend::allreduce_algo_type algo) {
   std::vector<double> times, in_place_times;
   for (size_t trial = 0; trial < num_trials + 1; ++trial) {
     auto recv = get_vector<Backend>(input.size());
@@ -138,7 +138,7 @@ void time_nballreduce_algo(typename VectorType<Backend>::type input,
 template <typename Backend>
 void time_allreduce_algo_start(typename VectorType<Backend>::type input,
                                typename Backend::comm_type& comm,
-                               typename Backend::algo_type algo) {
+                               typename Backend::allreduce_algo_type algo) {
   std::vector<double> times, in_place_times;
   for (size_t trial = 0; trial < num_trials + 1; ++trial) {
     auto recv = get_vector<Backend>(input.size());
@@ -175,7 +175,7 @@ void time_allreduce_algo_start(typename VectorType<Backend>::type input,
 template <typename Backend>
 void time_allreduce_algo_wait(typename VectorType<Backend>::type input,
                               typename Backend::comm_type& comm,
-                              typename Backend::algo_type algo) {
+                              typename Backend::allreduce_algo_type algo) {
   std::vector<double> times, in_place_times;
   for (size_t trial = 0; trial < num_trials + 1; ++trial) {
     auto recv = get_vector<Backend>(input.size());
@@ -211,7 +211,7 @@ void time_allreduce_algo_wait(typename VectorType<Backend>::type input,
 
 template <typename Backend>
 void do_benchmark() {
-  std::vector<typename Backend::algo_type> algos
+  std::vector<typename Backend::allreduce_algo_type> algos
       = get_nb_allreduce_algorithms<Backend>();
   typename Backend::comm_type comm = get_comm<Backend>();
   std::vector<size_t> sizes = {0};

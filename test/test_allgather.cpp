@@ -52,7 +52,7 @@ void test_allgather_algo(const typename VectorType<Backend>::type& expected,
                          typename VectorType<Backend>::type input,
                          typename VectorType<Backend>::type input_inplace,
                          typename Backend::comm_type& comm,
-                         typename Backend::algo_type algo) {
+                         typename Backend::allgather_algo_type algo) {
   auto recv = get_vector<Backend>(input.size() * comm.size());
   // Test regular allgather.
   Al::Allgather<Backend>(input.data(), recv.data(), input.size(), comm, algo);
@@ -82,7 +82,7 @@ void test_nb_allgather_algo(const typename VectorType<Backend>::type& expected,
                             typename VectorType<Backend>::type input,
                             typename VectorType<Backend>::type input_inplace,
                             typename Backend::comm_type& comm,
-                            typename Backend::algo_type algo) {
+                            typename Backend::allgather_algo_type algo) {
   typename Backend::req_type req = get_request<Backend>();
   auto recv = get_vector<Backend>(input.size() * comm.size());
   // Test regular allgather.
@@ -130,7 +130,7 @@ void test_correctness() {
     for (auto&& algo : algos) {
       MPI_Barrier(MPI_COMM_WORLD);
       if (comm.rank() == 0) {
-        std::cout << " Algo: " << Al::allreduce_name(algo) << std::endl;
+        std::cout << " Algo: " << Al::algorithm_name(algo) << std::endl;
       }
       test_allgather_algo<Backend>(expected, expected_inplace,
                                    data, data_inplace, comm, algo);
@@ -138,7 +138,7 @@ void test_correctness() {
     for (auto&& algo : nb_algos) {
       MPI_Barrier(MPI_COMM_WORLD);
       if (comm.rank() == 0) {
-        std::cout << " Algo: NB " << Al::allreduce_name(algo) << std::endl;
+        std::cout << " Algo: NB " << Al::algorithm_name(algo) << std::endl;
       }
       test_nb_allgather_algo<Backend>(expected, expected_inplace,
                                       data, data_inplace, comm, algo);

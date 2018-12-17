@@ -1569,7 +1569,7 @@ void pe_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
  * This is used for requesting a particular algorithm. Use automatic to let the
  * library select for you.
  */
-enum class AllreduceAlgorithm {
+enum class MPIAllreduceAlgorithm {
   automatic,
   mpi_passthrough,
   mpi_recursive_doubling,
@@ -1580,21 +1580,21 @@ enum class AllreduceAlgorithm {
 };
 
 /** Return a textual name for an MPI allreduce algorithm. */
-inline std::string allreduce_name(AllreduceAlgorithm algo) {
+inline std::string algorithm_name(MPIAllreduceAlgorithm algo) {
   switch (algo) {
-  case AllreduceAlgorithm::automatic:
+  case MPIAllreduceAlgorithm::automatic:
     return "automatic";
-  case AllreduceAlgorithm::mpi_passthrough:
+  case MPIAllreduceAlgorithm::mpi_passthrough:
     return "MPI passthrough";
-  case AllreduceAlgorithm::mpi_recursive_doubling:
+  case MPIAllreduceAlgorithm::mpi_recursive_doubling:
     return "MPI recursive doubling";
-  case AllreduceAlgorithm::mpi_ring:
+  case MPIAllreduceAlgorithm::mpi_ring:
     return "MPI ring";
-  case AllreduceAlgorithm::mpi_rabenseifner:
+  case MPIAllreduceAlgorithm::mpi_rabenseifner:
     return "MPI Rabenseifner";
-  case AllreduceAlgorithm::mpi_pe_ring:
+  case MPIAllreduceAlgorithm::mpi_pe_ring:
     return "MPI PE/ring";
-  case AllreduceAlgorithm::mpi_biring:
+  case MPIAllreduceAlgorithm::mpi_biring:
     return "MPI biring";
   default:
     return "unknown";
@@ -1603,7 +1603,7 @@ inline std::string allreduce_name(AllreduceAlgorithm algo) {
 
 class MPIBackend {
  public:
-  using algo_type = AllreduceAlgorithm;
+  using allreduce_algo_type = MPIAllreduceAlgorithm;
   using comm_type = MPICommunicator;
   using req_type = internal::AlRequest;
   static constexpr std::nullptr_t null_req = nullptr;
@@ -1611,35 +1611,35 @@ class MPIBackend {
   template <typename T>
   static void Allreduce(const T* sendbuf, T* recvbuf, size_t count,
                         ReductionOperator op, comm_type& comm,
-                        algo_type algo,
+                        allreduce_algo_type algo,
                         const int tag = internal::mpi::default_tag) {
-    if (algo == AllreduceAlgorithm::automatic) {
+    if (algo == MPIAllreduceAlgorithm::automatic) {
       // TODO: Better algorithm selection/performance model.
       // TODO: Make tuneable.
       if (count <= 1<<9) {
-        algo = AllreduceAlgorithm::mpi_recursive_doubling;
+        algo = MPIAllreduceAlgorithm::mpi_recursive_doubling;
       } else {
-        algo = AllreduceAlgorithm::mpi_rabenseifner;
+        algo = MPIAllreduceAlgorithm::mpi_rabenseifner;
       }
     }
     switch (algo) {
-      case AllreduceAlgorithm::mpi_passthrough:
+      case MPIAllreduceAlgorithm::mpi_passthrough:
         internal::mpi::passthrough_allreduce(sendbuf, recvbuf, count, op, comm);
         break;
-      case AllreduceAlgorithm::mpi_recursive_doubling:
+      case MPIAllreduceAlgorithm::mpi_recursive_doubling:
         internal::mpi::recursive_doubling_allreduce(
           sendbuf, recvbuf, count, op, comm, tag);
         break;
-      case AllreduceAlgorithm::mpi_ring:
+      case MPIAllreduceAlgorithm::mpi_ring:
         internal::mpi::ring_allreduce(sendbuf, recvbuf, count, op, comm, false, 1, tag);
         break;
-      case AllreduceAlgorithm::mpi_rabenseifner:
+      case MPIAllreduceAlgorithm::mpi_rabenseifner:
         internal::mpi::rabenseifner_allreduce(sendbuf, recvbuf, count, op, comm, tag);
         break;
-      case AllreduceAlgorithm::mpi_pe_ring:
+      case MPIAllreduceAlgorithm::mpi_pe_ring:
         internal::mpi::pe_ring_allreduce(sendbuf, recvbuf, count, op, comm, tag);
         break;
-      case AllreduceAlgorithm::mpi_biring:
+      case MPIAllreduceAlgorithm::mpi_biring:
         internal::mpi::ring_allreduce(sendbuf, recvbuf, count, op, comm, true, 1, tag);
         break;
       default:
@@ -1650,7 +1650,7 @@ class MPIBackend {
   template <typename T>
   static void Allreduce(T* recvbuf, size_t count,
                         ReductionOperator op, comm_type& comm,
-                        algo_type algo) {
+                        allreduce_algo_type algo) {
     Allreduce(internal::IN_PLACE<T>(), recvbuf, count, op, comm, algo);
   }
 
@@ -1660,33 +1660,33 @@ class MPIBackend {
       ReductionOperator op,
       comm_type& comm,
       req_type& req,
-      algo_type algo) {
-    if (algo == AllreduceAlgorithm::automatic) {
+      allreduce_algo_type algo) {
+    if (algo == MPIAllreduceAlgorithm::automatic) {
       // TODO: Better algorithm selection/performance model.
       // TODO: Make tuneable.
       if (count <= 1<<9) {
-        algo = AllreduceAlgorithm::mpi_recursive_doubling;
+        algo = MPIAllreduceAlgorithm::mpi_recursive_doubling;
       } else {
-        algo = AllreduceAlgorithm::mpi_rabenseifner;
+        algo = MPIAllreduceAlgorithm::mpi_rabenseifner;
       }
     }
     switch (algo) {
-      case AllreduceAlgorithm::mpi_passthrough:
+      case MPIAllreduceAlgorithm::mpi_passthrough:
         internal::mpi::nb_passthrough_allreduce(sendbuf, recvbuf, count, op, comm,
                                                 req);
         break;
-      case AllreduceAlgorithm::mpi_recursive_doubling:
+      case MPIAllreduceAlgorithm::mpi_recursive_doubling:
         internal::mpi::nb_recursive_doubling_allreduce(
             sendbuf, recvbuf, count, op, comm, req);
         break;
-      case AllreduceAlgorithm::mpi_ring:
+      case MPIAllreduceAlgorithm::mpi_ring:
         internal::mpi::nb_ring_allreduce(sendbuf, recvbuf, count, op, comm, req);
         break;
-      case AllreduceAlgorithm::mpi_rabenseifner:
+      case MPIAllreduceAlgorithm::mpi_rabenseifner:
         internal::mpi::nb_rabenseifner_allreduce(sendbuf, recvbuf, count, op, comm,
                                                  req);
         break;
-        /*case AllreduceAlgorithm::mpi_pe_ring:
+        /*case MPIAllreduceAlgorithm::mpi_pe_ring:
           internal::mpi::nb_pe_ring_allreduce(sendbuf, recvbuf, count, op, comm, req);
           break;*/
       default:
@@ -1699,7 +1699,7 @@ class MPIBackend {
       T* recvbuf, size_t count,
       ReductionOperator op, comm_type& comm,
       req_type& req,
-      algo_type algo) {
+      allreduce_algo_type algo) {
     NonblockingAllreduce(internal::IN_PLACE<T>(), recvbuf, count, op, comm,
                          req, algo);
   }
