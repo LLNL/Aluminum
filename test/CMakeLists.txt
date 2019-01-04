@@ -1,8 +1,3 @@
-# The name changed in CMake 3.10
-if (NOT MPIEXEC_EXECUTABLE AND MPIEXEC)
-  set(MPIEXEC_EXECUTABLE ${MPIEXEC})
-endif ()
-
 set_full_path(TEST_HEADERS
   test_utils.hpp)
 if (AL_HAS_CUDA)
@@ -23,78 +18,40 @@ target_sources(aluminum_test_headers INTERFACE "${TEST_HEADERS}")
 target_include_directories(
   aluminum_test_headers INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}")
 
-add_executable(TestCorrectness.exe test_correctness.cpp ${TEST_HEADERS})
-target_link_libraries(TestCorrectness.exe PRIVATE Al)
-if (AL_HAS_CUDA)
-  target_link_libraries(TestCorrectness.exe PUBLIC cuda)
-endif ()
+set(TEST_SRCS
+  test_allreduce.cpp
+  test_reduce.cpp
+  test_reduce_scatter.cpp
+  test_allgather.cpp
+  test_alltoall.cpp
+  test_bcast.cpp
+  test_gather.cpp
+  test_scatter.cpp
+  test_pt2pt.cpp
+  test_multi_nballreduces.cpp)
 
-# This is mostly a sanity check
-set(TEST_ARGS MPI 8)
-add_test(NAME TestCorrectness
-  COMMAND $<TARGET_FILE:TestCorrectness.exe> ${TEST_ARGS})
-
-if (MPIEXEC_EXECUTABLE)
-  add_test(NAME TestCorrectness_np4
-    COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 4
-    ${MPIEXEC_PREFLAGS}
-    $<TARGET_FILE:TestCorrectness.exe>
-    ${MPIEXEC_POSTFLAGS} ${TEST_ARGS})
-endif ()
-
-add_executable(TestMultiNBAllReduces.exe
-  test_multi_nballreduces.cpp ${TEST_HEADERS})
-target_link_libraries(TestMultiNBAllReduces.exe PRIVATE Al)
-if (AL_HAS_CUDA)
-  target_link_libraries(TestMultiNBAllReduces.exe PUBLIC cuda)
-endif ()
-
-set(TEST_ARGS "8")
-add_test(NAME TestMultiNBAllReduces
-  COMMAND $<TARGET_FILE:TestMultiNBAllReduces.exe> ${TEST_ARGS})
-
-if (MPIEXEC_EXECUTABLE)
-  add_test(NAME TestMultiNBAllReduces_np4
-    COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 4
-    ${MPIEXEC_PREFLAGS}
-    $<TARGET_FILE:TestMultiNBAllReduces.exe>
-    ${MPIEXEC_POSTFLAGS} ${TEST_ARGS})
-endif ()
-
-add_executable(TestNCCLCollectives.exe
-  test_nccl_collectives.cpp ${TEST_HEADERS})
-target_link_libraries(TestNCCLCollectives.exe PRIVATE Al)
-if (AL_HAS_CUDA)
-  target_link_libraries(TestNCCLCollectives.exe PUBLIC cuda)
-endif ()
-
-set(TEST_ARGS "8")
-add_test(NAME TestNCCLCollectives
-  COMMAND $<TARGET_FILE:TestNCCLCollectives.exe> ${TEST_ARGS})
-
-if (MPIEXEC_EXECUTABLE)
-  add_test(NAME TestNCCLCollectives_np4
-    COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 4
-    ${MPIEXEC_PREFLAGS}
-    $<TARGET_FILE:TestNCCLCollectives.exe>
-    ${MPIEXEC_POSTFLAGS} ${TEST_ARGS})
-endif ()
+foreach(src ${TEST_SRCS})
+  string(REPLACE ".cpp" ".exe" _test_exe_name "${src}")
+  add_executable(${_test_exe_name} ${src})
+  target_link_libraries(${_test_exe_name} PRIVATE Al aluminum_test_headers)
+  if (AL_HAS_CUDA)
+    target_link_libraries(${_test_exe_name} PUBLIC cuda)
+  endif()
+endforeach()
 
 if (AL_HAS_CUDA)
-  add_executable(TestStreamMemOps.exe
+  add_executable(test_stream_mem_ops.exe
   test_stream_mem_ops.cpp ${TEST_HEADERS})
-  target_link_libraries(TestStreamMemOps.exe PRIVATE Al)
-  target_link_libraries(TestStreamMemOps.exe PUBLIC cuda)
+  target_link_libraries(test_stream_mem_ops.exe PRIVATE Al)
+  target_link_libraries(test_stream_mem_ops.exe PUBLIC cuda)
+endif ()
 
-  set(TEST_ARGS "8")
-  add_test(NAME TestStreamMemOps
-    COMMAND $<TARGET_FILE:TestStreamMemOps.exe> ${TEST_ARGS})
-
-  if (MPIEXEC_EXECUTABLE)
-    add_test(NAME TestStreamMemOps_np4
-      COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 4
-      ${MPIEXEC_PREFLAGS}
-      $<TARGET_FILE:TestStreamMemOps.exe>
-      ${MPIEXEC_POSTFLAGS} ${TEST_ARGS})
-  endif ()
+if (AL_HAS_MPI_CUDA_RMA)
+  add_executable(test_rma_ring.exe test_rma_ring.cpp ${TEST_HEADERS})
+  target_link_libraries(test_rma_ring.exe PRIVATE Al)
+  target_link_libraries(test_rma_ring.exe PUBLIC cuda)
+  add_executable(test_rma_halo_exchange.exe
+    test_rma_halo_exchange.cpp ${TEST_HEADERS})
+  target_link_libraries(test_rma_halo_exchange.exe PRIVATE Al)
+  target_link_libraries(test_rma_halo_exchange.exe PUBLIC cuda)
 endif ()

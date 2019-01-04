@@ -40,11 +40,6 @@ size_t max_size = 1<<20;
 const size_t num_concurrent = 1024;
 const size_t num_blocking = 8;
 
-void get_expected_result(std::vector<float>& expected) {
-  MPI_Allreduce(MPI_IN_PLACE, expected.data(), expected.size(), MPI_FLOAT,
-                MPI_SUM, MPI_COMM_WORLD);
-}
-
 template <typename Backend>
 void test_multiple_nballreduces() {
   auto algos = get_nb_allreduce_algorithms<Backend>();
@@ -67,11 +62,11 @@ void test_multiple_nballreduces() {
       for (size_t i = 0; i < num_concurrent; ++i) {
         input_data.push_back(std::move(gen_data<Backend>(size)));
         expected_results.push_back(std::move(typename VectorType<Backend>::type(input_data[i])));
-        get_expected_result(expected_results[i]);
+        get_expected_allreduce_result(expected_results[i]);
       }
       MPI_Barrier(MPI_COMM_WORLD);
       if (comm.rank() == 0) {
-        std::cout << " Algo: " << Al::allreduce_name(algo) << std::endl;
+        std::cout << " Algo: " << Al::algorithm_name(algo) << std::endl;
       }
       // Start each allreduce.
       for (size_t i = 0; i < num_concurrent; ++i) {

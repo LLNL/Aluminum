@@ -99,7 +99,8 @@ bool Initialized();
 template <typename Backend, typename T>
 void Allreduce(const T* sendbuf, T* recvbuf, size_t count,
                ReductionOperator op, typename Backend::comm_type& comm,
-               typename Backend::algo_type algo = Backend::algo_type::automatic) {
+               typename Backend::allreduce_algo_type algo =
+               Backend::allreduce_algo_type::automatic) {
   Backend::template Allreduce<T>(sendbuf, recvbuf, count, op, comm, algo);
 }
 
@@ -114,7 +115,8 @@ void Allreduce(const T* sendbuf, T* recvbuf, size_t count,
 template <typename Backend, typename T>
 void Allreduce(T* recvbuf, size_t count,
                ReductionOperator op, typename Backend::comm_type& comm,
-               typename Backend::algo_type algo = Backend::algo_type::automatic) {
+               typename Backend::allreduce_algo_type algo =
+               Backend::allreduce_algo_type::automatic) {
   Backend::template Allreduce<T>(recvbuf, count, op, comm, algo);
 }
 
@@ -132,7 +134,8 @@ void NonblockingAllreduce(
   ReductionOperator op,
   typename Backend::comm_type& comm,
   typename Backend::req_type& req,
-  typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  typename Backend::allreduce_algo_type algo =
+  Backend::allreduce_algo_type::automatic) {
   Backend::template NonblockingAllreduce<T>(sendbuf, recvbuf, count, op,
                                             comm, req, algo);
 }
@@ -143,7 +146,8 @@ void NonblockingAllreduce(
   ReductionOperator op,
   typename Backend::comm_type& comm,
   typename Backend::req_type& req,
-  typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  typename Backend::allreduce_algo_type algo =
+  Backend::allreduce_algo_type::automatic) {
   Backend::template NonblockingAllreduce<T>(recvbuf, count, op,
                                             comm, req, algo);
 }
@@ -161,7 +165,8 @@ void NonblockingAllreduce(
 template <typename Backend, typename T>
 void Reduce(const T* sendbuf, T* recvbuf, size_t count,
             ReductionOperator op, int root, typename Backend::comm_type& comm,
-            typename Backend::algo_type algo = Backend::algo_type::automatic) {
+            typename Backend::reduce_algo_type algo =
+            Backend::reduce_algo_type::automatic) {
   Backend::template Reduce<T>(sendbuf, recvbuf, count, op, root, comm, algo);
 }
 
@@ -177,8 +182,9 @@ void Reduce(const T* sendbuf, T* recvbuf, size_t count,
 template <typename Backend, typename T>
 void Reduce(T* recvbuf, size_t count,
             ReductionOperator op, int root, typename Backend::comm_type& comm,
-            typename Backend::algo_type algo = Backend::algo_type::automatic) {
-  Backend::template Reduce<T>( recvbuf, count, op, root, comm, algo);
+            typename Backend::reduce_algo_type algo =
+            Backend::reduce_algo_type::automatic) {
+  Backend::template Reduce<T>(recvbuf, count, op, root, comm, algo);
 }
 
 /**
@@ -195,7 +201,8 @@ void NonblockingReduce(
   int root,
   typename Backend::comm_type& comm,
   typename Backend::req_type& req,
-  typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  typename Backend::reduce_algo_type algo =
+  Backend::reduce_algo_type::automatic) {
   Backend::template NonblockingReduce<T>(sendbuf, recvbuf, count, op, root, comm, req, algo);
 }
 
@@ -207,7 +214,8 @@ void NonblockingReduce(
   int root,
   typename Backend::comm_type& comm,
   typename Backend::req_type& req,
-  typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  typename Backend::reduce_algo_type algo =
+  Backend::reduce_algo_type::automatic) {
   Backend::template NonblockingReduce<T>(recvbuf, count, op, root, comm, req, algo);
 }
 
@@ -228,7 +236,8 @@ template <typename Backend, typename T>
 void Reduce_scatter(
   const T* sendbuf, T* recvbuf, size_t count,
   ReductionOperator op, typename Backend::comm_type& comm,
-  typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  typename Backend::reduce_scatter_algo_type algo =
+  Backend::reduce_scatter_algo_type::automatic) {
   Backend::template Reduce_scatter<T>(sendbuf, recvbuf, count, op, comm, algo);
 }
 
@@ -248,7 +257,8 @@ template <typename Backend, typename T>
 void Reduce_scatter(
   T* recvbuf, size_t count,
   ReductionOperator op, typename Backend::comm_type& comm,
-  typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  typename Backend::reduce_scatter_algo_type algo =
+  Backend::reduce_scatter_algo_type::automatic) {
   Backend::template Reduce_scatter<T>(recvbuf, count, op, comm, algo);
 }
 
@@ -265,7 +275,8 @@ template <typename Backend, typename T>
 void Reduce_scatter(
   const T* sendbuf, T* recvbuf, size_t *counts,
   ReductionOperator op, typename Backend::comm_type& comm,
-  typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  typename Backend::reduce_scatter_algo_type algo =
+  Backend::reduce_scatter_algo_type::automatic) {
   Backend::template Reduce_scatter<T>(sendbuf, recvbuf, counts, op, comm, algo);
 }
 
@@ -281,7 +292,8 @@ template <typename Backend, typename T>
 void Reduce_scatter(
   T* recvbuf, size_t *counts,
   ReductionOperator op, typename Backend::comm_type& comm,
-  typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  typename Backend::reduce_scatter_algo_type algo =
+  Backend::reduce_scatter_algo_type::automatic) {
   Backend::template Reduce_scatter<T>(recvbuf, counts, op, comm, algo);
 }
 
@@ -302,7 +314,8 @@ void NonblockingReduce_scatter(
   ReductionOperator op,
   typename Backend::comm_type& comm,
   typename Backend::req_type& req,
-  typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  typename Backend::reduce_scatter_algo_type algo =
+  Backend::reduce_scatter_algo_type::automatic) {
   Backend::template NonblockingReduce_scatter<T>(
     sendbuf, recvbuf, count, op, comm, req, algo);
 }
@@ -317,7 +330,8 @@ void NonblockingReduce_scatter(
   ReductionOperator op,
   typename Backend::comm_type& comm,
   typename Backend::req_type& req,
-  typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  typename Backend::reduce_scatter_algo_type algo =
+  Backend::reduce_scatter_algo_type::automatic) {
   Backend::template NonblockingReduce_scatter<T>(recvbuf, count, op, comm, req, algo);
 }
 
@@ -334,7 +348,8 @@ void NonblockingReduce_scatter(
   ReductionOperator op,
   typename Backend::comm_type& comm,
   typename Backend::req_type& req,
-  typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  typename Backend::reduce_scatter_algo_type algo =
+  Backend::reduce_scatter_algo_type::automatic) {
   Backend::template NonblockingReduce_scatter<T>(
     sendbuf, recvbuf, counts, op, comm, req, algo);
 }
@@ -346,7 +361,8 @@ void NonblockingReduce_scatter(
   ReductionOperator op,
   typename Backend::comm_type& comm,
   typename Backend::req_type& req,
-  typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  typename Backend::reduce_scatter_algo_type algo =
+  Backend::reduce_scatter_algo_type::automatic) {
   Backend::template NonblockingReduce_scatter<T>(recvbuf, counts, op, comm, req, algo);
 }
 
@@ -361,7 +377,8 @@ void NonblockingReduce_scatter(
 template <typename Backend, typename T>
 void Allgather(const T* sendbuf, T* recvbuf, size_t count,
                typename Backend::comm_type& comm,
-               typename Backend::algo_type algo = Backend::algo_type::automatic) {
+               typename Backend::allgather_algo_type algo =
+               Backend::allgather_algo_type::automatic) {
   Backend::template Allgather<T>(sendbuf, recvbuf, count, comm, algo);
 }
 
@@ -375,7 +392,8 @@ void Allgather(const T* sendbuf, T* recvbuf, size_t count,
 template <typename Backend, typename T>
 void Allgather(T* recvbuf, size_t count,
                typename Backend::comm_type& comm,
-               typename Backend::algo_type algo = Backend::algo_type::automatic) {
+               typename Backend::allgather_algo_type algo =
+               Backend::allgather_algo_type::automatic) {
   Backend::template Allgather<T>(recvbuf, count, comm, algo);
 }
 
@@ -391,7 +409,8 @@ void NonblockingAllgather(
   const T* sendbuf, T* recvbuf, size_t count,
   typename Backend::comm_type& comm,
   typename Backend::req_type& req,
-  typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  typename Backend::allgather_algo_type algo =
+  Backend::allgather_algo_type::automatic) {
   Backend::template NonblockingAllgather<T>(sendbuf, recvbuf, count, comm, req, algo);
 }
 
@@ -401,7 +420,8 @@ void NonblockingAllgather(
   T* recvbuf, size_t count,
   typename Backend::comm_type& comm,
   typename Backend::req_type& req,
-  typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  typename Backend::allgather_algo_type algo =
+  Backend::allgather_algo_type::automatic) {
   Backend::template NonblockingAllgather<T>(recvbuf, count, comm, req, algo);
 }
 
@@ -420,7 +440,8 @@ void Bcast(T* buf,
            size_t count,
            int root,
            typename Backend::comm_type& comm,
-           typename Backend::algo_type algo = Backend::algo_type::automatic) {
+           typename Backend::bcast_algo_type algo =
+           Backend::bcast_algo_type::automatic) {
   Backend::template Bcast<T>(buf, count, root, comm, algo);
 }
 
@@ -438,7 +459,8 @@ void NonblockingBcast(
   int root,
   typename Backend::comm_type& comm,
   typename Backend::req_type& req,
-  typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  typename Backend::bcast_algo_type algo =
+  Backend::bcast_algo_type::automatic) {
   Backend::template NonblockingBcast<T>(buf,  count, root, comm, req, algo);
 }
 
@@ -454,7 +476,8 @@ template <typename Backend, typename T>
 void Alltoall(
   const T* sendbuf, T* recvbuf, size_t count,
   typename Backend::comm_type& comm,
-  typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  typename Backend::alltoall_algo_type algo =
+  Backend::alltoall_algo_type::automatic) {
   Backend::template Alltoall<T>(sendbuf, recvbuf, count, comm, algo);
 }
 
@@ -468,7 +491,8 @@ void Alltoall(
 template <typename Backend, typename T>
 void Alltoall(
   T* buffer, size_t count, typename Backend::comm_type& comm,
-  typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  typename Backend::alltoall_algo_type algo =
+  Backend::alltoall_algo_type::automatic) {
   Backend::template Alltoall<T>(buffer, count, comm, algo);
 }
 
@@ -484,7 +508,8 @@ void NonblockingAlltoall(
   const T* sendbuf, T* recvbuf, size_t count,
   typename Backend::comm_type& comm,
   typename Backend::req_type& req,
-  typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  typename Backend::alltoall_algo_type algo =
+  Backend::alltoall_algo_type::automatic) {
   Backend::template NonblockingAlltoall<T>(sendbuf, recvbuf, count,
                                            comm, req, algo);
 }
@@ -494,7 +519,8 @@ template <typename Backend, typename T>
 void NonblockingAlltoall(
   T* buffer, size_t count, typename Backend::comm_type& comm,
   typename Backend::req_type& req,
-  typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  typename Backend::alltoall_algo_type algo =
+  Backend::alltoall_algo_type::automatic) {
   Backend::template NonblockingAlltoall<T>(buffer, count, comm, req, algo);
 }
 
@@ -511,7 +537,8 @@ template <typename Backend, typename T>
 void Gather(
   const T* sendbuf, T* recvbuf, size_t count, int root,
   typename Backend::comm_type& comm,
-  typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  typename Backend::gather_algo_type algo =
+  Backend::gather_algo_type::automatic) {
   Backend::template Gather<T>(sendbuf, recvbuf, count, root, comm, algo);
 }
 
@@ -529,7 +556,8 @@ void Gather(
 template <typename Backend, typename T>
 void Gather(
   T* buffer, size_t count, int root, typename Backend::comm_type& comm,
-  typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  typename Backend::gather_algo_type algo =
+  Backend::gather_algo_type::automatic) {
   Backend::template Gather<T>(buffer, count, root, comm, algo);
 }
 
@@ -545,8 +573,9 @@ void NonblockingGather(
   const T* sendbuf, T* recvbuf, size_t count, int root,
   typename Backend::comm_type& comm,
   typename Backend::req_type& req,
-  typename Backend::algo_type algo = Backend::algo_type::automatic) {
-  Backend::template NonblockingGather<T>(sendbuf, recvbuf, count,
+  typename Backend::gather_algo_type algo =
+  Backend::gather_algo_type::automatic) {
+  Backend::template NonblockingGather<T>(sendbuf, recvbuf, count, root,
                                          comm, req, algo);
 }
 
@@ -555,7 +584,8 @@ template <typename Backend, typename T>
 void NonblockingGather(
   T* buffer, size_t count, int root, typename Backend::comm_type& comm,
   typename Backend::req_type& req,
-  typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  typename Backend::gather_algo_type algo =
+  Backend::gather_algo_type::automatic) {
   Backend::template NonblockingGather<T>(buffer, count, root, comm, req, algo);
 }
 
@@ -572,7 +602,8 @@ template <typename Backend, typename T>
 void Scatter(
   const T* sendbuf, T* recvbuf, size_t count, int root,
   typename Backend::comm_type& comm,
-  typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  typename Backend::scatter_algo_type algo =
+  Backend::scatter_algo_type::automatic) {
   Backend::template Scatter<T>(sendbuf, recvbuf, count, root, comm, algo);
 }
 
@@ -590,7 +621,8 @@ void Scatter(
 template <typename Backend, typename T>
 void Scatter(
   T* buffer, size_t count, int root, typename Backend::comm_type& comm,
-  typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  typename Backend::scatter_algo_type algo =
+  Backend::scatter_algo_type::automatic) {
   Backend::template Scatter<T>(buffer, count, root, comm, algo);
 }
 
@@ -606,8 +638,9 @@ void NonblockingScatter(
   const T* sendbuf, T* recvbuf, size_t count, int root,
   typename Backend::comm_type& comm,
   typename Backend::req_type& req,
-  typename Backend::algo_type algo = Backend::algo_type::automatic) {
-  Backend::template NonblockingScatter<T>(sendbuf, recvbuf, count,
+  typename Backend::scatter_algo_type algo =
+  Backend::scatter_algo_type::automatic) {
+  Backend::template NonblockingScatter<T>(sendbuf, recvbuf, count, root,
                                          comm, req, algo);
 }
 
@@ -616,7 +649,8 @@ template <typename Backend, typename T>
 void NonblockingScatter(
   T* buffer, size_t count, int root, typename Backend::comm_type& comm,
   typename Backend::req_type& req,
-  typename Backend::algo_type algo = Backend::algo_type::automatic) {
+  typename Backend::scatter_algo_type algo =
+  Backend::scatter_algo_type::automatic) {
   Backend::template NonblockingScatter<T>(buffer, count, root, comm, req, algo);
 }
 
@@ -698,6 +732,93 @@ bool Test(typename Backend::req_type& req);
 /** Wait until req has been completed. */
 template <typename Backend>
 void Wait(typename Backend::req_type& req);
+
+namespace ext {
+
+#ifdef AL_HAS_MPI_CUDA_RMA
+/**
+ * Attach a remote buffer to local memory space for RMA.
+ * @param local_buf Local buffer attached by remote rank.
+ * @param peer Rank in comm to attach buffers with.
+ * @param comm Communicator to attach buffers.
+ * @return Local address the remote buffer is attached at.
+ */
+template <typename Backend, typename T>
+T *AttachRemoteBuffer(T *local_buf, int peer,
+                      typename Backend::comm_type& comm) {
+  return Backend::template AttachRemoteBuffer<T>(local_buf, peer, comm);
+}
+
+/**
+ * Detach an attached buffer from local memory space.
+ * @param remote_buf Buffer previously attached.
+ * @param peer Rank in comm the buffer is attached with.
+ * @param comm Communicator the buffer is attached with.
+ */
+template <typename Backend, typename T>
+void DetachRemoteBuffer(T *remote_buf, int peer,
+                        typename Backend::comm_type& comm) {
+  Backend::template DetachRemoteBuffer<T>(remote_buf, peer, comm);
+}
+
+/**
+ * Send a notification message.
+ * @param peer Rank in comm to send a notification to.
+ * @param comm Communicator to send a notification within.
+ */
+template <typename Backend>
+void Notify(int peer, typename Backend::comm_type& comm) {
+  Backend::Notify(peer, comm);
+}
+
+/**
+ * Wait a notification message.
+ * @param peer Rank in comm to wait a notification from.
+ * @param comm Communicator to wait a notification within.
+ */
+template <typename Backend>
+void Wait(int peer, typename Backend::comm_type& comm) {
+  Backend::Wait(peer, comm);
+}
+
+/**
+ * Exchange a notification message.
+ * @param peer Rank in comm to exchange a notification with.
+ * @param comm Communicator to exchange a notification within.
+ */
+template <typename Backend>
+void Sync(int peer, typename Backend::comm_type& comm) {
+  Backend::Sync(peer, comm);
+}
+
+/**
+ * Exchange notification messages with multiple ranks.
+ * @param peers Ranks in comm to exchange a notification with.
+ * @param num_peers Number of ranks in peers.
+ * @param comm Communicator to exchange notifications within.
+ */
+template <typename Backend>
+void Sync(const int *peers, int num_peers,
+          typename Backend::comm_type& comm) {
+  Backend::Sync(peers, num_peers, comm);
+}
+
+/**
+ * Put a point-to-point message.
+ * @param srcbuf The data to put.
+ * @param count Length of srcbuf.
+ * @param dest Rank in comm to put to.
+ * @param destbuf Buffer to put to.
+ * @param comm Communicator to put within.
+ */
+template <typename Backend, typename T>
+void Put(const T* srcbuf, int dest, T *destbuf,
+         size_t count, typename Backend::comm_type& comm) {
+  Backend::template Put<T>(srcbuf, dest, destbuf, count, comm);
+}
+#endif // AL_HAS_MPI_CUDA_RMA
+
+} // namespace ext
 
 }  // namespace Al
 

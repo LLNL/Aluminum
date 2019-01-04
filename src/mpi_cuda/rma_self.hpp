@@ -25,46 +25,51 @@
 // permissions and limitations under the license.
 ////////////////////////////////////////////////////////////////////////////////
 
-#include "Al.hpp"
+#pragma once
+
+#include "mpi_cuda/communicator.hpp"
+#include "mpi_cuda/rma.hpp"
 
 namespace Al {
 namespace internal {
-namespace mpi {
+namespace mpi_cuda {
 
-namespace {
-// Whether we initialized MPI, or it was already initialized.
-bool initialized_mpi = false;
-// Maximum tag value in MPI.
-int max_tag = 0;
-}
-
-void init(int& argc, char**& argv) {
-  int flag;
-  MPI_Initialized(&flag);
-  if (!flag) {
-    int provided;
-    MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
-    if (provided != MPI_THREAD_MULTIPLE) {
-      throw_al_exception("MPI_THREAD_MULTIPLE not provided");
+class ConnectionSelf: public Connection {
+ public:
+  ConnectionSelf(MPICUDACommunicator &comm, int peer):
+      Connection(comm, peer) {}
+  ~ConnectionSelf() {}
+  void connect() {}
+  void disconnect() {}
+  void *attach_remote_buffer(void *local_addr) {
+    return local_addr;
+  }
+  void detach_remote_buffer(void *) {}
+  void detach_all_remote_buffers() {}
+  void notify(AlRequest &req) {
+    req->store(true, std::memory_order_release);
+  }
+  void wait(AlRequest &req) {
+    req->store(true, std::memory_order_release);
+  }
+  void sync(AlRequest &req) {
+    req->store(true, std::memory_order_release);
+  }
+  void put(const void *src, void *dst,
+           size_t size) {
+    if (size > 0) {
+      if (src == nullptr) {
+        throw_al_exception("Source buffer is null");
+      }
+      if (dst == nullptr) {
+        throw_al_exception("Destination buffer is null");
+      }
+      AL_CHECK_CUDA(cudaMemcpyAsync(
+          dst, src, size, cudaMemcpyDefault, m_comm.get_stream()));
     }
-    initialized_mpi = true;
   }
-  // Get the upper bound for tags; this is always set in MPI_COMM_WORLD.
-  int* p;
-  MPI_Comm_get_attr(MPI_COMM_WORLD, MPI_TAG_UB, &p, &flag);
-  max_tag = *p;
-}
+};
 
-void finalize() {
-  int flag;
-  MPI_Finalized(&flag);
-  if (!flag && initialized_mpi) {
-    MPI_Finalize();
-  }
-}
-
-int get_max_tag() { return max_tag; }
-
-}  // namespace mpi
-}  // namespace internal
-}  // namespace Al
+} // namespace mpi_cuda
+} // namespace internal
+} // namespace Al

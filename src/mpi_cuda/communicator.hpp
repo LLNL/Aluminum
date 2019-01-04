@@ -28,12 +28,16 @@
 #pragma once
 
 #include "cudacommunicator.hpp"
+#include <memory>
 
 namespace Al {
 namespace internal {
 namespace mpi_cuda {
 
 class RingMPICUDA;
+#ifdef AL_HAS_MPI_CUDA_RMA
+class RMA;
+#endif
 
 class MPICUDACommunicator: public CUDACommunicator {
  public:
@@ -41,15 +45,24 @@ class MPICUDACommunicator: public CUDACommunicator {
   MPICUDACommunicator(cudaStream_t stream_) :
     MPICUDACommunicator(MPI_COMM_WORLD, stream_) {}
   MPICUDACommunicator(MPI_Comm comm_, cudaStream_t stream_)
-    : CUDACommunicator(comm_, stream_), m_ring(nullptr) {
-  }
+    : CUDACommunicator(comm_, stream_), m_ring(nullptr)
+#ifdef AL_HAS_MPI_CUDA_RMA
+    , m_rma(nullptr)
+#endif
+  {}
 
   RingMPICUDA &get_ring();
+#ifdef AL_HAS_MPI_CUDA_RMA
+  RMA &get_rma();
+#endif
 
   ~MPICUDACommunicator();
 
  protected:
   RingMPICUDA *m_ring;
+#ifdef AL_HAS_MPI_CUDA_RMA
+  std::shared_ptr<RMA> m_rma;
+#endif
 };
 
 } // namespace mpi_cuda

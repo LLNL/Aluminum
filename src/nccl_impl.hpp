@@ -63,7 +63,7 @@ enum class NCCLCollectiveAlgorithm {
   automatic
 };
 
-inline std::string allreduce_name(NCCLCollectiveAlgorithm algo) {
+inline std::string algorithm_name(NCCLCollectiveAlgorithm algo) {
   switch (algo) {
   case NCCLCollectiveAlgorithm::automatic:
     return "automatic";
@@ -167,7 +167,11 @@ class NCCLBackend {
   friend void internal::nccl::init(int&, char**&);
   friend void internal::nccl::finalize();
  public:
-  using algo_type = NCCLCollectiveAlgorithm;
+  using allreduce_algo_type = NCCLCollectiveAlgorithm;
+  using bcast_algo_type = NCCLCollectiveAlgorithm;
+  using reduce_algo_type = NCCLCollectiveAlgorithm;
+  using allgather_algo_type = NCCLCollectiveAlgorithm;
+  using reduce_scatter_algo_type = NCCLCollectiveAlgorithm;
   using comm_type = NCCLCommunicator;
   using req_type = std::shared_ptr<internal::nccl::NCCLRequest>;
   static constexpr std::nullptr_t null_req = nullptr;
@@ -175,21 +179,21 @@ class NCCLBackend {
   template <typename T>
   static void Allreduce(const T* sendbuf, T* recvbuf, size_t count,
                         ReductionOperator op, comm_type& comm,
-                        algo_type) {
+                        allreduce_algo_type) {
     do_allreduce(sendbuf, recvbuf, count, op, comm, comm.get_stream());
   }
 
   template <typename T>
   static void Allreduce(T* recvbuf, size_t count,
                         ReductionOperator op, comm_type& comm,
-                        algo_type algo) {
+                        allreduce_algo_type algo) {
     Allreduce(internal::IN_PLACE<T>(), recvbuf, count, op, comm, algo);
   }
 
   template <typename T>
   static void NonblockingAllreduce(const T* sendbuf, T* recvbuf, size_t count,
                                    ReductionOperator op, comm_type& comm,
-                                   req_type& req, algo_type) {
+                                   req_type& req, allreduce_algo_type) {
     cudaStream_t internal_stream = internal::cuda::get_internal_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     do_allreduce(sendbuf, recvbuf, count, op, comm, internal_stream);
@@ -199,20 +203,20 @@ class NCCLBackend {
   template <typename T>
   static void NonblockingAllreduce(T* recvbuf, size_t count,
                                    ReductionOperator op, comm_type& comm,
-                                   req_type& req, algo_type algo) {
+                                   req_type& req, allreduce_algo_type algo) {
     NonblockingAllreduce(internal::IN_PLACE<T>(), recvbuf, count, op, comm,
                          req, algo);
   }
 
   template <typename T>
   static void Bcast(T* buf, size_t count, int root, comm_type& comm,
-                    algo_type) {
+                    bcast_algo_type) {
     do_broadcast(buf, count, root, comm, comm.get_stream());
   }
 
   template <typename T>
   static void NonblockingBcast(T* buf, size_t count, int root,
-                               comm_type& comm, req_type& req, algo_type) {
+                               comm_type& comm, req_type& req, bcast_algo_type) {
     cudaStream_t internal_stream = internal::cuda::get_internal_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     do_broadcast(buf, count, root, comm, internal_stream);
@@ -222,21 +226,21 @@ class NCCLBackend {
   template <typename T>
   static void Reduce(const T* sendbuf, T* recvbuf, size_t count,
                      ReductionOperator op, int root, comm_type& comm,
-                     algo_type) {
+                     reduce_algo_type) {
     do_reduce(sendbuf, recvbuf, count, op, root, comm, comm.get_stream());
   }
 
   template <typename T>
   static void Reduce(T* recvbuf, size_t count,
                      ReductionOperator op, int root, comm_type& comm,
-                     algo_type algo) {
+                     reduce_algo_type algo) {
     Reduce(internal::IN_PLACE<T>(), recvbuf, count, op, root, comm, algo);
   }
 
   template <typename T>
   static void NonblockingReduce(const T* sendbuf, T* recvbuf, size_t count,
                                 ReductionOperator op, int root, comm_type& comm,
-                                req_type& req, algo_type) {
+                                req_type& req, reduce_algo_type) {
     cudaStream_t internal_stream = internal::cuda::get_internal_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     do_reduce(sendbuf, recvbuf, count, op, root, comm, internal_stream);
@@ -246,27 +250,27 @@ class NCCLBackend {
   template <typename T>
   static void NonblockingReduce(T* recvbuf, size_t count, ReductionOperator op,
                                 int root, comm_type& comm, req_type& req,
-                                algo_type algo) {
+                                reduce_algo_type algo) {
     NonblockingReduce(internal::IN_PLACE<T>(), recvbuf, count, op, root, comm,
                        req, algo);
   }
 
   template <typename T>
   static void Allgather(const T* sendbuf, T* recvbuf, size_t send_count,
-                        comm_type& comm, algo_type) {
+                        comm_type& comm, allgather_algo_type) {
     do_allgather(sendbuf, recvbuf, send_count, comm, comm.get_stream());
   }
 
   template <typename T>
   static void Allgather(T* recvbuf, size_t send_count,
-                        comm_type& comm, algo_type algo) {
+                        comm_type& comm, allgather_algo_type algo) {
     Allgather(internal::IN_PLACE<T>(), recvbuf, send_count, comm, algo);
   }
 
   template <typename T>
   static void NonblockingAllgather(const T* sendbuf, T* recvbuf,
                                    size_t send_count, comm_type& comm,
-                                   req_type& req, algo_type) {
+                                   req_type& req, allgather_algo_type) {
     cudaStream_t internal_stream = internal::cuda::get_internal_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     do_allgather(sendbuf, recvbuf, send_count, comm, internal_stream);
@@ -276,7 +280,7 @@ class NCCLBackend {
   template <typename T>
   static void NonblockingAllgather(T* recvbuf, size_t send_count,
                                    comm_type& comm, req_type& req,
-                                   algo_type algo) {
+                                   allgather_algo_type algo) {
     NonblockingAllgather(internal::IN_PLACE<T>(), recvbuf, send_count, comm,
                          req, algo);
   }
@@ -284,7 +288,7 @@ class NCCLBackend {
   template <typename T>
   static void Reduce_scatter(const T* sendbuf, T* recvbuf, size_t count,
                              ReductionOperator op, comm_type& comm,
-                             algo_type) {
+                             reduce_scatter_algo_type) {
     do_reduce_scatter(sendbuf, recvbuf, count, op, comm,
                       comm.get_stream());
   }
@@ -292,7 +296,7 @@ class NCCLBackend {
   template <typename T>
   static void Reduce_scatter(T* recvbuf, size_t count,
                              ReductionOperator op, comm_type& comm,
-                             algo_type algo) {
+                             reduce_scatter_algo_type algo) {
     Reduce_scatter(internal::IN_PLACE<T>(), recvbuf, count, op, comm,
                    algo);
   }
@@ -301,7 +305,7 @@ class NCCLBackend {
   static void NonblockingReduce_scatter(const T* sendbuf, T* recvbuf,
                                         size_t count,
                                         ReductionOperator op, comm_type& comm,
-                                        req_type& req, algo_type) {
+                                        req_type& req, reduce_scatter_algo_type) {
     cudaStream_t internal_stream = internal::cuda::get_internal_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     do_reduce_scatter(sendbuf, recvbuf, count, op, comm, internal_stream);
@@ -311,7 +315,7 @@ class NCCLBackend {
   template <typename T>
   static void NonblockingReduce_scatter(T* recvbuf, size_t count,
                                         ReductionOperator op, comm_type& comm,
-                                        req_type& req, algo_type algo) {
+                                        req_type& req, reduce_scatter_algo_type algo) {
     NonblockingReduce_scatter(internal::IN_PLACE<T>(), recvbuf, count, op,
                               comm, req, algo);
   }
@@ -393,7 +397,7 @@ class NCCLBackend {
       return;
     }
     if (sendbuf == internal::IN_PLACE<T>()) {
-      sendbuf = recvbuf;
+      sendbuf = recvbuf + comm.rank()*send_count;
     }
     AL_CHECK_NCCL(ncclAllGather((const void*) sendbuf, (void*) recvbuf,
                                 send_count, internal::nccl::TypeMap<T>(),

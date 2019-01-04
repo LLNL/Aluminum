@@ -49,6 +49,65 @@ typename VectorType<Backend>::type get_vector(size_t count) {
   return typename VectorType<Backend>::type(count);
 }
 
+/** Parse input arguments. */
+void parse_args(int argc, char** argv,
+                std::string& backend, size_t& start_size, size_t& max_size) {
+  if (argc == 1) {
+    backend = "MPI";
+    return;
+  } else {
+    backend = argv[1];
+    if (argc == 3) {
+      start_size = std::stoul(argv[2]);
+      max_size = start_size;
+    } else if (argc == 4) {
+      start_size = std::stoul(argv[2]);
+      max_size = std::stoul(argv[3]);
+    } else if (argc > 5) {
+      std::cerr << "Unexpected argument." << std::endl;
+      std::abort();
+    }
+  }
+  if (backend != "MPI"
+#ifdef AL_HAS_NCCL
+      && backend != "NCCL"
+#endif
+#ifdef AL_HAS_MPI_CUDA
+      && backend != "MPI-CUDA"
+#endif
+    ) {
+    std::cerr << "Usage: " << argv[0] << " [MPI"
+#ifdef AL_HAS_NCCL
+              << " | NCCL"
+#endif
+#ifdef AL_HAS_MPI_CUDA
+              << " | MPI-CUDA"
+#endif
+              << "] [start size] [max size]"
+              << std::endl;
+    std::abort();
+  }
+}
+
+/**
+ * Return every size to test between start_size and max_size (inclusive).
+ * If odds is true, generate odd-numbered values too.
+ */
+std::vector<size_t> get_sizes(size_t start_size, size_t max_size,
+                              bool odds = false) {
+  std::vector<size_t> sizes;
+  if (start_size == 0) {
+    sizes.push_back(0);
+  }
+  for (size_t size = start_size; size <= max_size; size *= 2) {
+    sizes.push_back(size);
+    if (odds && size > 1) {
+      sizes.push_back(size + 1);
+    }
+  }
+  return sizes;
+}
+
 /** Generate random data of length count. */
 template <typename Backend=Al::MPIBackend>
 typename VectorType<Backend>::type gen_data(size_t count);
@@ -63,6 +122,7 @@ gen_data<Al::MPIBackend>(size_t count) {
       int rank;
       MPI_Comm_rank(MPI_COMM_WORLD, &rank);
       rng_gen.seed(rank);
+      rng_seeded = true;
     }
   }
   std::uniform_real_distribution<float> rng;
@@ -112,44 +172,142 @@ std::string human_readable_size(size_t size_) {
 }
 
 template <typename Backend>
-std::vector<typename Backend::algo_type> get_allreduce_algorithms() {
-  std::vector<typename Backend::algo_type> algos = {
-    Backend::algo_type::automatic};
+std::vector<typename Backend::allreduce_algo_type> get_allreduce_algorithms() {
+  std::vector<typename Backend::allreduce_algo_type> algos = {
+    Backend::allreduce_algo_type::automatic};
   return algos;
 }
- 
+
+template <typename Backend>
+std::vector<typename Backend::reduce_algo_type> get_reduce_algorithms() {
+  std::vector<typename Backend::reduce_algo_type> algos = {
+    Backend::reduce_algo_type::automatic};
+  return algos;
+}
+
+template <typename Backend>
+std::vector<typename Backend::reduce_scatter_algo_type> get_reduce_scatter_algorithms() {
+  std::vector<typename Backend::reduce_scatter_algo_type> algos = {
+    Backend::reduce_scatter_algo_type::automatic};
+  return algos;
+}
+
+template <typename Backend>
+std::vector<typename Backend::allgather_algo_type> get_allgather_algorithms() {
+  std::vector<typename Backend::allgather_algo_type> algos = {
+    Backend::allgather_algo_type::automatic};
+  return algos;
+}
+
+template <typename Backend>
+std::vector<typename Backend::bcast_algo_type> get_bcast_algorithms() {
+  std::vector<typename Backend::bcast_algo_type> algos = {
+    Backend::bcast_algo_type::automatic};
+  return algos;
+}
+
+template <typename Backend>
+std::vector<typename Backend::alltoall_algo_type> get_alltoall_algorithms() {
+  std::vector<typename Backend::alltoall_algo_type> algos = {
+    Backend::alltoall_algo_type::automatic};
+  return algos;
+}
+
+template <typename Backend>
+std::vector<typename Backend::gather_algo_type> get_gather_algorithms() {
+  std::vector<typename Backend::gather_algo_type> algos = {
+    Backend::gather_algo_type::automatic};
+  return algos;
+}
+
+template <typename Backend>
+std::vector<typename Backend::scatter_algo_type> get_scatter_algorithms() {
+  std::vector<typename Backend::scatter_algo_type> algos = {
+    Backend::scatter_algo_type::automatic};
+  return algos;
+}
+
 template <>
-std::vector<Al::MPIBackend::algo_type>
+std::vector<Al::MPIBackend::allreduce_algo_type>
 get_allreduce_algorithms<Al::MPIBackend>() {  
-   std::vector<Al::AllreduceAlgorithm> algos = {
-     Al::AllreduceAlgorithm::automatic,
-     Al::AllreduceAlgorithm::mpi_passthrough,
-     Al::AllreduceAlgorithm::mpi_recursive_doubling,
-     Al::AllreduceAlgorithm::mpi_ring,
-     Al::AllreduceAlgorithm::mpi_rabenseifner,
-     Al::AllreduceAlgorithm::mpi_pe_ring,
-     Al::AllreduceAlgorithm::mpi_biring
+   std::vector<Al::MPIAllreduceAlgorithm> algos = {
+     Al::MPIAllreduceAlgorithm::automatic,
+     Al::MPIAllreduceAlgorithm::mpi_passthrough,
+     Al::MPIAllreduceAlgorithm::mpi_recursive_doubling,
+     Al::MPIAllreduceAlgorithm::mpi_ring,
+     Al::MPIAllreduceAlgorithm::mpi_rabenseifner,
+     Al::MPIAllreduceAlgorithm::mpi_pe_ring,
+     Al::MPIAllreduceAlgorithm::mpi_biring
   };
   return algos;
 }
 
 template <typename Backend>
-std::vector<typename Backend::algo_type> get_nb_allreduce_algorithms() {
-  std::vector<typename Backend::algo_type> algos = {
-    Backend::algo_type::automatic};
+std::vector<typename Backend::allreduce_algo_type> get_nb_allreduce_algorithms() {
+  std::vector<typename Backend::allreduce_algo_type> algos = {
+    Backend::allreduce_algo_type::automatic};
+  return algos;
+}
+
+template <typename Backend>
+std::vector<typename Backend::reduce_algo_type> get_nb_reduce_algorithms() {
+  std::vector<typename Backend::reduce_algo_type> algos = {
+    Backend::reduce_algo_type::automatic};
+  return algos;
+}
+
+template <typename Backend>
+std::vector<typename Backend::reduce_scatter_algo_type> get_nb_reduce_scatter_algorithms() {
+  std::vector<typename Backend::reduce_scatter_algo_type> algos = {
+    Backend::reduce_scatter_algo_type::automatic};
+  return algos;
+}
+
+template <typename Backend>
+std::vector<typename Backend::allgather_algo_type> get_nb_allgather_algorithms() {
+  std::vector<typename Backend::allgather_algo_type> algos = {
+    Backend::allgather_algo_type::automatic};
+  return algos;
+}
+
+template <typename Backend>
+std::vector<typename Backend::bcast_algo_type> get_nb_bcast_algorithms() {
+  std::vector<typename Backend::bcast_algo_type> algos = {
+    Backend::bcast_algo_type::automatic};
+  return algos;
+}
+
+template <typename Backend>
+std::vector<typename Backend::alltoall_algo_type> get_nb_alltoall_algorithms() {
+  std::vector<typename Backend::alltoall_algo_type> algos = {
+    Backend::alltoall_algo_type::automatic};
+  return algos;
+}
+
+template <typename Backend>
+std::vector<typename Backend::gather_algo_type> get_nb_gather_algorithms() {
+  std::vector<typename Backend::gather_algo_type> algos = {
+    Backend::gather_algo_type::automatic};
+  return algos;
+}
+
+template <typename Backend>
+std::vector<typename Backend::scatter_algo_type> get_nb_scatter_algorithms() {
+  std::vector<typename Backend::scatter_algo_type> algos = {
+    Backend::scatter_algo_type::automatic};
   return algos;
 }
  
 template <>
-std::vector<Al::MPIBackend::algo_type>
+std::vector<Al::MPIBackend::allreduce_algo_type>
 get_nb_allreduce_algorithms<Al::MPIBackend>() {  
-  std::vector<Al::AllreduceAlgorithm> algos = {
-    Al::AllreduceAlgorithm::automatic,
-    Al::AllreduceAlgorithm::mpi_passthrough,
-    Al::AllreduceAlgorithm::mpi_recursive_doubling,
-    Al::AllreduceAlgorithm::mpi_ring,
-    Al::AllreduceAlgorithm::mpi_rabenseifner
-    //Al::AllreduceAlgorithm::mpi_pe_ring
+  std::vector<Al::MPIAllreduceAlgorithm> algos = {
+    Al::MPIAllreduceAlgorithm::automatic,
+    Al::MPIAllreduceAlgorithm::mpi_passthrough,
+    Al::MPIAllreduceAlgorithm::mpi_recursive_doubling,
+    Al::MPIAllreduceAlgorithm::mpi_ring,
+    Al::MPIAllreduceAlgorithm::mpi_rabenseifner
+    //Al::MPIAllreduceAlgorithm::mpi_pe_ring
   };
   return algos;
 }
@@ -157,27 +315,35 @@ get_nb_allreduce_algorithms<Al::MPIBackend>() {
 #define eps (1e-4)
 
 bool check_vector(const std::vector<float>& expected,
-                  const std::vector<float>& actual) {
-  bool match = true;
+                  const std::vector<float>& actual,
+                  size_t start = 0,
+                  size_t end = std::numeric_limits<size_t>::max()) {
   int rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  for (size_t i = 0; i < expected.size(); ++i) {
+  if (end == std::numeric_limits<size_t>::max()) {
+    end = expected.size();
+  }
+  for (size_t i = start; i < end; ++i) {
     float e = expected[i];
-
     if (std::abs(e - actual[i]) > eps) {
 #ifdef AL_DEBUG
       std::stringstream ss;
       ss << "[" << rank << "] @" << i << " Expected: " << e
                 << ", Actual: " << actual[i] << "\n";
+      // Helpful for debugging to print out small vectors completely.
+      if (expected.size() < 128) {
+        ss << "[" << rank << "] expected: ";
+        for (const auto& v : expected) ss << v << " ";
+        ss << "actual: ";
+        for (const auto& v : actual) ss << v << " ";
+        ss << "\n";
+      }
       std::cerr << ss.str();
-      match = false;
-      return false;
-#else
-      return false;
 #endif
+      return false;
     }
   }
-  return match;
+  return true;
 }
 
 void print_stats(std::vector<double>& times) {
@@ -222,4 +388,102 @@ template <>
 inline typename Al::MPIBackend::req_type
 get_request<Al::MPIBackend>() {
   return Al::MPIBackend::null_req;
+}
+
+template <typename Backend>
+typename Backend::comm_type get_comm_with_stream(MPI_Comm c);
+
+template <typename Backend>
+void free_comm_with_stream(typename Backend::comm_type& c);
+
+template <>
+inline typename Al::MPIBackend::comm_type get_comm_with_stream<Al::MPIBackend>(
+  MPI_Comm c) {
+  return Al::MPIBackend::comm_type(c);
+}
+
+template <>
+inline void free_comm_with_stream<Al::MPIBackend>(
+  typename Al::MPIBackend::comm_type&) {}
+
+void get_expected_allreduce_result(std::vector<float>& expected) {
+  MPI_Allreduce(MPI_IN_PLACE, expected.data(), expected.size(),
+                MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
+}
+
+void get_expected_reduce_scatter_result(std::vector<float>& expected) {
+  int nprocs;
+  MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
+  MPI_Reduce_scatter_block(MPI_IN_PLACE, expected.data(),
+                           expected.size() / nprocs,
+                           MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
+}
+
+void get_expected_allgather_result(std::vector<float>& input,
+                                   std::vector<float>& expected) {
+  MPI_Allgather(input.data(), input.size(), MPI_FLOAT,
+                expected.data(), input.size(), MPI_FLOAT,
+                MPI_COMM_WORLD);
+}
+
+void get_expected_allgather_inplace_result(std::vector<float>& expected) {
+  int nprocs;
+  MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
+  MPI_Allgather(MPI_IN_PLACE, expected.size() / nprocs, MPI_FLOAT,
+                expected.data(), expected.size() / nprocs, MPI_FLOAT,
+                MPI_COMM_WORLD);
+}
+
+void get_expected_alltoall_result(std::vector<float>& expected) {
+  int nprocs;
+  MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
+  MPI_Alltoall(MPI_IN_PLACE, expected.size() / nprocs, MPI_FLOAT,
+               expected.data(), expected.size() / nprocs, MPI_FLOAT,
+               MPI_COMM_WORLD);
+}
+
+void get_expected_reduce_result(std::vector<float>& expected) {
+  int rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  if (rank == 0) {
+    MPI_Reduce(MPI_IN_PLACE, expected.data(), expected.size(),
+               MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
+  } else {
+    MPI_Reduce(expected.data(), expected.data(), expected.size(),
+               MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
+  }
+}
+
+void get_expected_bcast_result(std::vector<float>& expected) {
+  MPI_Bcast(expected.data(), expected.size(), MPI_FLOAT, 0, MPI_COMM_WORLD);
+}
+
+void get_expected_gather_result(std::vector<float>& expected) {
+  int rank, nprocs;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
+  if (rank == 0) {
+    MPI_Gather(MPI_IN_PLACE, expected.size() / nprocs, MPI_FLOAT,
+               expected.data(), expected.size() / nprocs, MPI_FLOAT,
+               0, MPI_COMM_WORLD);
+  } else {
+    MPI_Gather(expected.data(), expected.size() / nprocs, MPI_FLOAT,
+               expected.data(), expected.size() / nprocs, MPI_FLOAT,
+               0, MPI_COMM_WORLD);
+  }
+}
+
+void get_expected_scatter_result(std::vector<float>& expected) {
+  int rank, nprocs;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
+  if (rank == 0) {
+    MPI_Scatter(expected.data(), expected.size() / nprocs, MPI_FLOAT,
+                MPI_IN_PLACE, expected.size() / nprocs, MPI_FLOAT,
+                0, MPI_COMM_WORLD);
+  } else {
+    MPI_Scatter(expected.data(), expected.size() / nprocs, MPI_FLOAT,
+                expected.data(), expected.size() / nprocs, MPI_FLOAT,
+                0, MPI_COMM_WORLD);
+  }
 }

@@ -38,6 +38,9 @@
 #include "mpi_cuda/scatter.hpp"
 
 #include "mpi_cuda/pt2pt.hpp"
+#ifdef AL_HAS_MPI_CUDA_RMA
+#include "mpi_cuda/rma.hpp"
+#endif
 
 namespace Al {
 
@@ -48,7 +51,11 @@ enum class MPICUDAAllreduceAlgorithm {
   host_transfer
 };
 
-inline std::string allreduce_name(MPICUDAAllreduceAlgorithm algo) {
+enum class MPICUDACollectiveAlgorithm {
+  automatic
+};
+
+inline std::string algorithm_name(MPICUDAAllreduceAlgorithm algo) {
   switch (algo) {
   case MPICUDAAllreduceAlgorithm::automatic:
     return "automatic";
@@ -58,6 +65,15 @@ inline std::string allreduce_name(MPICUDAAllreduceAlgorithm algo) {
     return "bi-ring";
   case MPICUDAAllreduceAlgorithm::host_transfer:
     return "host-transfer";
+  default:
+    return "unknown";
+  }
+}
+
+inline std::string algorithm_name(MPICUDACollectiveAlgorithm algo) {
+  switch (algo) {
+  case MPICUDACollectiveAlgorithm::automatic:
+    return "automatic";
   default:
     return "unknown";
   }
@@ -90,7 +106,14 @@ class MPICUDABackend {
   friend void internal::mpi_cuda::init(int&, char**&);
   friend void internal::mpi_cuda::finalize();
  public:
-  using algo_type = MPICUDAAllreduceAlgorithm;
+  using allreduce_algo_type = MPICUDAAllreduceAlgorithm;
+  using allgather_algo_type = MPICUDACollectiveAlgorithm;
+  using alltoall_algo_type = MPICUDACollectiveAlgorithm;
+  using bcast_algo_type = MPICUDACollectiveAlgorithm;
+  using gather_algo_type = MPICUDACollectiveAlgorithm;
+  using reduce_algo_type = MPICUDACollectiveAlgorithm;
+  using reduce_scatter_algo_type = MPICUDACollectiveAlgorithm;
+  using scatter_algo_type = MPICUDACollectiveAlgorithm;
   using comm_type = internal::mpi_cuda::MPICUDACommunicator;
   using req_type = std::shared_ptr<internal::mpi_cuda::MPICUDARequest>;
   static constexpr std::nullptr_t null_req = nullptr;
@@ -98,7 +121,7 @@ class MPICUDABackend {
   template <typename T>
   static void Allreduce(const T* sendbuf, T* recvbuf, size_t count,
                         ReductionOperator op, comm_type& comm,
-                        algo_type algo) {
+                        allreduce_algo_type algo) {
     if (count == 0) return;
     switch (algo) {
     case MPICUDAAllreduceAlgorithm::ring:
@@ -121,7 +144,7 @@ class MPICUDABackend {
   template <typename T>
   static void Allreduce(T* recvbuf, size_t count,
                         ReductionOperator op, comm_type& comm,
-                        algo_type algo) {
+                        allreduce_algo_type algo) {
     Allreduce(recvbuf, recvbuf, count, op, comm, algo);
   }
 
@@ -131,7 +154,7 @@ class MPICUDABackend {
       ReductionOperator op,
       comm_type& comm,
       req_type& req,
-      algo_type algo) {
+      allreduce_algo_type algo) {
     if (count == 0) return;
     cudaStream_t internal_stream = internal::cuda::get_internal_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
@@ -160,7 +183,7 @@ class MPICUDABackend {
       T* recvbuf, size_t count,
       ReductionOperator op, comm_type& comm,
       req_type& req,
-      algo_type algo) {
+      allreduce_algo_type algo) {
     NonblockingAllreduce(recvbuf, recvbuf, count, op, comm,
                          req, algo);
   }
@@ -182,13 +205,49 @@ class MPICUDABackend {
                 comm.get_stream());
   }
 
+#ifdef AL_HAS_MPI_CUDA_RMA
+  template <typename T>
+  static T *AttachRemoteBuffer(T *local_buf, int peer, comm_type& comm) {
+    return static_cast<T*>(
+        comm.get_rma().attach_remote_buffer(local_buf, peer));
+  }
+
+  template <typename T>
+  static void DetachRemoteBuffer(T *remote_buf, int peer, comm_type& comm) {
+    comm.get_rma().detach_remote_buffer(remote_buf, peer);
+  }
+
+  static void Notify(int peer, comm_type& comm) {
+    comm.get_rma().notify(peer);
+  }
+
+  static void Wait(int peer, comm_type& comm) {
+    comm.get_rma().wait(peer);
+  }
+
+  static void Sync(int peer, comm_type& comm) {
+    comm.get_rma().sync(peer);
+  }
+
+  static void Sync(const int *peers, int num_peers, comm_type& comm) {
+    comm.get_rma().sync(peers, num_peers);
+  }
+
+  template <typename T>
+  static void Put(
+      const T* srcbuf, int dest, T * destbuf, size_t count,
+      comm_type& comm) {
+    comm.get_rma().put(srcbuf, dest, destbuf, sizeof(T) * count);
+  }
+#endif // AL_HAS_MPI_CUDA_RMA
+
   template <typename T>
   static void Allgather(
     const T* sendbuf, T* recvbuf, size_t count,
-    comm_type& comm, algo_type algo) {
+    comm_type& comm, allgather_algo_type algo) {
     if (count == 0) return;
     switch (algo) {
-    case MPICUDAAllreduceAlgorithm::automatic:
+    case MPICUDACollectiveAlgorithm::automatic:
       do_allgather(sendbuf, recvbuf, count, comm, comm.get_stream());
       break;
     default:
@@ -198,19 +257,19 @@ class MPICUDABackend {
 
   template <typename T>
   static void Allgather(
-    T* buffer, size_t count, comm_type& comm, algo_type algo) {
+    T* buffer, size_t count, comm_type& comm, allgather_algo_type algo) {
     Allgather(buffer, buffer, count, comm, algo);
   }
 
   template <typename T>
   static void NonblockingAllgather(
     const T* sendbuf, T* recvbuf, size_t count,
-    comm_type& comm, req_type& req, algo_type algo) {
+    comm_type& comm, req_type& req, allgather_algo_type algo) {
     if (count == 0) return;
     cudaStream_t internal_stream = internal::cuda::get_internal_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     switch (algo) {
-    case MPICUDAAllreduceAlgorithm::automatic:
+    case MPICUDACollectiveAlgorithm::automatic:
       do_allgather(sendbuf, recvbuf, count, comm, internal_stream);
       break;
     default:
@@ -222,17 +281,17 @@ class MPICUDABackend {
   template <typename T>
   static void NonblockingAllgather(
     T* buffer, size_t count,
-    comm_type& comm, req_type& req, algo_type algo) {
+    comm_type& comm, req_type& req, allgather_algo_type algo) {
     NonblockingAllgather<T>(buffer, buffer, count, comm, req, algo);
   }
 
   template <typename T>
   static void Alltoall(
     const T* sendbuf, T* recvbuf, size_t count,
-    comm_type& comm, algo_type algo) {
+    comm_type& comm, alltoall_algo_type algo) {
     if (count == 0) return;
     switch (algo) {
-    case MPICUDAAllreduceAlgorithm::automatic:
+    case MPICUDACollectiveAlgorithm::automatic:
       do_alltoall(sendbuf, recvbuf, count, comm, comm.get_stream());
       break;
     default:
@@ -242,19 +301,19 @@ class MPICUDABackend {
 
   template <typename T>
   static void Alltoall(
-    T* buffer, size_t count, comm_type& comm, algo_type algo) {
+    T* buffer, size_t count, comm_type& comm, alltoall_algo_type algo) {
     Alltoall(buffer, buffer, count, comm, algo);
   }
 
   template <typename T>
   static void NonblockingAlltoall(
     const T* sendbuf, T* recvbuf, size_t count,
-    comm_type& comm, req_type& req, algo_type algo) {
+    comm_type& comm, req_type& req, alltoall_algo_type algo) {
     if (count == 0) return;
     cudaStream_t internal_stream = internal::cuda::get_internal_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     switch (algo) {
-    case MPICUDAAllreduceAlgorithm::automatic:
+    case MPICUDACollectiveAlgorithm::automatic:
       do_alltoall(sendbuf, recvbuf, count, comm, internal_stream);
       break;
     default:
@@ -266,16 +325,16 @@ class MPICUDABackend {
   template <typename T>
   static void NonblockingAlltoall(
     T* buffer, size_t count,
-    comm_type& comm, req_type& req, algo_type algo) {
+    comm_type& comm, req_type& req, alltoall_algo_type algo) {
     NonblockingAlltoall<T>(buffer, buffer, count, comm, req, algo);
   }
 
   template <typename T>
   static void Bcast(T* buf, size_t count, int root, comm_type& comm,
-                    algo_type algo) {
+                    bcast_algo_type algo) {
     if (count == 0) return;
     switch (algo) {
-    case MPICUDAAllreduceAlgorithm::automatic:
+    case MPICUDACollectiveAlgorithm::automatic:
       do_bcast(buf, count, root, comm, comm.get_stream());
       break;
     default:
@@ -286,12 +345,12 @@ class MPICUDABackend {
   template <typename T>
   static void NonblockingBcast(
     T* buf, size_t count, int root,
-    comm_type& comm, req_type& req, algo_type algo) {
+    comm_type& comm, req_type& req, bcast_algo_type algo) {
     if (count == 0) return;
     cudaStream_t internal_stream = internal::cuda::get_internal_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     switch (algo) {
-    case MPICUDAAllreduceAlgorithm::automatic:
+    case MPICUDACollectiveAlgorithm::automatic:
       do_bcast(buf, count, root, comm, internal_stream);
       break;
     default:
@@ -303,10 +362,10 @@ class MPICUDABackend {
   template <typename T>
   static void Gather(
     const T* sendbuf, T* recvbuf, size_t count, int root,
-    comm_type& comm, algo_type algo) {
+    comm_type& comm, gather_algo_type algo) {
     if (count == 0) return;
     switch (algo) {
-    case MPICUDAAllreduceAlgorithm::automatic:
+    case MPICUDACollectiveAlgorithm::automatic:
       do_gather(sendbuf, recvbuf, count, root, comm, comm.get_stream());
       break;
     default:
@@ -316,19 +375,19 @@ class MPICUDABackend {
 
   template <typename T>
   static void Gather(
-    T* buffer, size_t count, int root, comm_type& comm, algo_type algo) {
+    T* buffer, size_t count, int root, comm_type& comm, gather_algo_type algo) {
     Gather(buffer, buffer, count, root, comm, algo);
   }
 
   template <typename T>
   static void NonblockingGather(
     const T* sendbuf, T* recvbuf, size_t count, int root,
-    comm_type& comm, req_type& req, algo_type algo) {
+    comm_type& comm, req_type& req, gather_algo_type algo) {
     if (count == 0) return;
     cudaStream_t internal_stream = internal::cuda::get_internal_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     switch (algo) {
-    case MPICUDAAllreduceAlgorithm::automatic:
+    case MPICUDACollectiveAlgorithm::automatic:
       do_gather(sendbuf, recvbuf, count, root, comm, internal_stream);
       break;
     default:
@@ -340,17 +399,17 @@ class MPICUDABackend {
   template <typename T>
   static void NonblockingGather(
     T* buffer, size_t count, int root,
-    comm_type& comm, req_type& req, algo_type algo) {
+    comm_type& comm, req_type& req, gather_algo_type algo) {
     NonblockingGather<T>(buffer, buffer, count, root, comm, req, algo);
   }
 
   template <typename T>
   static void Reduce(
     const T* sendbuf, T* recvbuf, size_t count, ReductionOperator op, int root,
-    comm_type& comm, algo_type algo) {
+    comm_type& comm, reduce_algo_type algo) {
     if (count == 0) return;
     switch (algo) {
-    case MPICUDAAllreduceAlgorithm::automatic:
+    case MPICUDACollectiveAlgorithm::automatic:
       do_reduce(sendbuf, recvbuf, count, op, root, comm, comm.get_stream());
       break;
     default:
@@ -361,19 +420,19 @@ class MPICUDABackend {
   template <typename T>
   static void Reduce(
     T* buffer, size_t count, ReductionOperator op, int root, comm_type& comm,
-    algo_type algo) {
+    reduce_algo_type algo) {
     Reduce(buffer, buffer, count, op, root, comm, algo);
   }
 
   template <typename T>
   static void NonblockingReduce(
     const T* sendbuf, T* recvbuf, size_t count, ReductionOperator op, int root,
-    comm_type& comm, req_type& req, algo_type algo) {
+    comm_type& comm, req_type& req, reduce_algo_type algo) {
     if (count == 0) return;
     cudaStream_t internal_stream = internal::cuda::get_internal_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     switch (algo) {
-    case MPICUDAAllreduceAlgorithm::automatic:
+    case MPICUDACollectiveAlgorithm::automatic:
       do_reduce(sendbuf, recvbuf, count, op, root, comm, internal_stream);
       break;
     default:
@@ -385,17 +444,17 @@ class MPICUDABackend {
   template <typename T>
   static void NonblockingReduce(
     T* buffer, size_t count, ReductionOperator op, int root,
-    comm_type& comm, req_type& req, algo_type algo) {
+    comm_type& comm, req_type& req, reduce_algo_type algo) {
     NonblockingReduce<T>(buffer, buffer, count, op, root, comm, req, algo);
   }
 
   template <typename T>
   static void Reduce_scatter(
     const T* sendbuf, T* recvbuf, size_t count, ReductionOperator op,
-    comm_type& comm, algo_type algo) {
+    comm_type& comm, reduce_scatter_algo_type algo) {
     if (count == 0) return;
     switch (algo) {
-    case MPICUDAAllreduceAlgorithm::automatic:
+    case MPICUDACollectiveAlgorithm::automatic:
       do_reduce_scatter(sendbuf, recvbuf, count, op, comm, comm.get_stream());
       break;
     default:
@@ -406,19 +465,19 @@ class MPICUDABackend {
   template <typename T>
   static void Reduce_scatter(
     T* buffer, size_t count, ReductionOperator op,
-    comm_type& comm, algo_type algo) {
+    comm_type& comm, reduce_scatter_algo_type algo) {
     Reduce_scatter(buffer, buffer, count, op, comm, algo);
   }
 
   template <typename T>
   static void NonblockingReduce_scatter(
     const T* sendbuf, T* recvbuf, size_t count, ReductionOperator op,
-    comm_type& comm, req_type& req, algo_type algo) {
+    comm_type& comm, req_type& req, reduce_scatter_algo_type algo) {
     if (count == 0) return;
     cudaStream_t internal_stream = internal::cuda::get_internal_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     switch (algo) {
-    case MPICUDAAllreduceAlgorithm::automatic:
+    case MPICUDACollectiveAlgorithm::automatic:
       do_reduce_scatter(sendbuf, recvbuf, count, op, comm, internal_stream);
       break;
     default:
@@ -430,17 +489,17 @@ class MPICUDABackend {
   template <typename T>
   static void NonblockingReduce_scatter(
     T* buffer, size_t count, ReductionOperator op,
-    comm_type& comm, algo_type algo) {
-    NonblockingReduce_scatter(buffer, buffer, count, op, comm, algo);
+    comm_type& comm, req_type& req, reduce_scatter_algo_type algo) {
+    NonblockingReduce_scatter(buffer, buffer, count, op, comm, req, algo);
   }
 
   template <typename T>
   static void Scatter(
     const T* sendbuf, T* recvbuf, size_t count, int root,
-    comm_type& comm, algo_type algo) {
+    comm_type& comm, scatter_algo_type algo) {
     if (count == 0) return;
     switch (algo) {
-    case MPICUDAAllreduceAlgorithm::automatic:
+    case MPICUDACollectiveAlgorithm::automatic:
       do_scatter(sendbuf, recvbuf, count, root, comm, comm.get_stream());
       break;
     default:
@@ -450,19 +509,19 @@ class MPICUDABackend {
 
   template <typename T>
   static void Scatter(
-    T* buffer, size_t count, int root, comm_type& comm, algo_type algo) {
+    T* buffer, size_t count, int root, comm_type& comm, scatter_algo_type algo) {
     Scatter(buffer, buffer, count, root, comm, algo);
   }
 
   template <typename T>
   static void NonblockingScatter(
     const T* sendbuf, T* recvbuf, size_t count, int root,
-    comm_type& comm, req_type& req, algo_type algo) {
+    comm_type& comm, req_type& req, scatter_algo_type algo) {
     if (count == 0) return;
     cudaStream_t internal_stream = internal::cuda::get_internal_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     switch (algo) {
-    case MPICUDAAllreduceAlgorithm::automatic:
+    case MPICUDACollectiveAlgorithm::automatic:
       do_scatter(sendbuf, recvbuf, count, root, comm, internal_stream);
       break;
     default:
@@ -474,7 +533,7 @@ class MPICUDABackend {
   template <typename T>
   static void NonblockingScatter(
     T* buffer, size_t count, int root,
-    comm_type& comm, req_type& req, algo_type algo) {
+    comm_type& comm, req_type& req, scatter_algo_type algo) {
     NonblockingScatter<T>(buffer, buffer, count, root, comm, req, algo);
   }
 

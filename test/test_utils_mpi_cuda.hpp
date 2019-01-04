@@ -61,23 +61,23 @@ inline double finish_timer<Al::MPICUDABackend>(typename Al::MPICUDABackend::comm
 }
 
 template <>
-std::vector<typename Al::MPICUDABackend::algo_type>
+std::vector<typename Al::MPICUDABackend::allreduce_algo_type>
 get_allreduce_algorithms<Al::MPICUDABackend>() {
-  std::vector<typename Al::MPICUDABackend::algo_type> algos = {
-    Al::MPICUDABackend::algo_type::ring,    
-    Al::MPICUDABackend::algo_type::bi_ring,
-    Al::MPICUDABackend::algo_type::host_transfer
+  std::vector<typename Al::MPICUDABackend::allreduce_algo_type> algos = {
+    Al::MPICUDABackend::allreduce_algo_type::ring,    
+    Al::MPICUDABackend::allreduce_algo_type::bi_ring,
+    Al::MPICUDABackend::allreduce_algo_type::host_transfer
   };
   return algos;
 }
 
 template <>
-std::vector<typename Al::MPICUDABackend::algo_type>
+std::vector<typename Al::MPICUDABackend::allreduce_algo_type>
 get_nb_allreduce_algorithms<Al::MPICUDABackend>() {
-  std::vector<typename Al::MPICUDABackend::algo_type> algos = {
-    Al::MPICUDABackend::algo_type::ring,
-    Al::MPICUDABackend::algo_type::bi_ring,
-    Al::MPICUDABackend::algo_type::host_transfer,
+  std::vector<typename Al::MPICUDABackend::allreduce_algo_type> algos = {
+    Al::MPICUDABackend::allreduce_algo_type::ring,
+    Al::MPICUDABackend::allreduce_algo_type::bi_ring,
+    Al::MPICUDABackend::allreduce_algo_type::host_transfer
   };
   return algos;
 }
@@ -86,4 +86,18 @@ template <>
 inline typename Al::MPICUDABackend::req_type
 get_request<Al::MPICUDABackend>() {
   return Al::MPICUDABackend::null_req;
+}
+
+template <>
+inline typename Al::MPICUDABackend::comm_type get_comm_with_stream<Al::MPICUDABackend>(
+  MPI_Comm c) {
+  cudaStream_t stream;
+  AL_FORCE_CHECK_CUDA_NOSYNC(cudaStreamCreate(&stream));
+  return Al::MPICUDABackend::comm_type(c, stream);
+}
+
+template <>
+inline void free_comm_with_stream<Al::MPICUDABackend>(
+  typename Al::MPICUDABackend::comm_type& c) {
+  AL_FORCE_CHECK_CUDA_NOSYNC(cudaStreamDestroy(c.get_stream()));
 }
