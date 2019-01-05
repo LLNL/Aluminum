@@ -45,7 +45,8 @@ public:
     rank_(comm.rank()), root_(root), count_(count),
     host_mem_(get_pinned_memory<T>(rank_ == root_
                                    ? comm.size()*count_ : count_)),
-    comm_(comm.get_comm()) {
+    comm_(comm.get_comm()),
+    compute_stream(comm.get_stream()) {
 
     bool const i_am_root = rank_ == root_;
     bool const inplace_operation = sendbuf == recvbuf;
@@ -126,6 +127,7 @@ public:
   }
 
   bool needs_completion() const override { return false; }
+  void* get_compute_stream() const override { return compute_stream; }
 
 private:
   int rank_;
@@ -142,6 +144,8 @@ private:
 
   bool scatter_started_ = false;
   bool scatter_done_ = false;
+
+  cudaStream_t compute_stream;
 };
 
 }  // namespace mpi_cuda

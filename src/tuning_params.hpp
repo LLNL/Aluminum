@@ -51,6 +51,7 @@
  * This must be a positive number.
  */
 #define AL_PE_NUM_CONCURRENT_OPS 4
+#define AL_PE_NUM_STREAMS 64
 
 /** Whether to protect memory pools with locks. */
 #define AL_LOCK_MEMPOOL 1

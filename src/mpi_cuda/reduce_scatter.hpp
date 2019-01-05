@@ -46,7 +46,8 @@ public:
     count_(count),
     host_mem_(get_pinned_memory<T>(comm.size()*count_)),
     op_(mpi::ReductionOperator2MPI_Op(op)),
-    comm_(comm.get_comm()) {
+    comm_(comm.get_comm()),
+    compute_stream(comm.get_stream()) {
 
     // Transfer data from device to host and use an event to determine when it
     // completes.
@@ -97,6 +98,7 @@ public:
   }
 
   bool needs_completion() const override { return false; }
+  void* get_compute_stream() const override { return compute_stream; }
 
 private:
   size_t count_;
@@ -108,6 +110,7 @@ private:
   MPI_Request req_ = MPI_REQUEST_NULL;
   bool rs_started_ = false;
   bool rs_done_ = false;
+  cudaStream_t compute_stream;
 };
 
 }  // namespace mpi_cuda

@@ -52,10 +52,13 @@ AlRequest get_free_request() {
   return std::make_shared<std::atomic<bool>>(false);
 }
 
-ProgressEngine::ProgressEngine() : enqueued_reqs(1<<16) {
+ProgressEngine::ProgressEngine() {
   stop_flag = false;
   started_flag = false;
   world_comm = new MPICommunicator(MPI_COMM_WORLD);
+  // Initialze with the default stream.
+  num_input_streams = 1;
+  stream_to_queue[DEFAULT_STREAM] = &request_queues[0];
 }
 
 ProgressEngine::~ProgressEngine() {
@@ -84,7 +87,20 @@ void ProgressEngine::stop() {
 }
 
 void ProgressEngine::enqueue(AlState* state) {
-  enqueued_reqs.push(state);
+  // Find the correct input queue for the stream, creating it if needed.
+  auto iter = stream_to_queue.find(state->get_compute_stream());
+  if (iter != stream_to_queue.end()) {
+    iter->second->q.push(state);
+  } else {
+    size_t cur_stream = num_input_streams.load();
+    if (cur_stream == AL_PE_NUM_STREAMS) {
+      throw_al_exception("Using more streams than supported!");
+    }
+    request_queues[cur_stream].compute_stream = state->get_compute_stream();
+    stream_to_queue[state->get_compute_stream()] = &request_queues[cur_stream];
+    request_queues[cur_stream].q.push(state);
+    ++num_input_streams;
+  }
 }
 
 bool ProgressEngine::is_complete(AlRequest& req) {
@@ -189,30 +205,55 @@ void ProgressEngine::engine() {
   }
   startup_cv.notify_one();
   while (!stop_flag.load(std::memory_order_acquire)) {
-    // Check for newly-submitted requests, if we can take more.
-    if (!in_progress_reqs.full()) {
-      AlState* req = enqueued_reqs.pop();
-      if (req != nullptr) {
-        in_progress_reqs.push(req);
-        req->start();
+    // Check for newly-submitted requests.
+    size_t cur_input_streams = num_input_streams.load();
+    for (size_t i = 0; i < cur_input_streams; ++i) {
+      if (!request_queues[i].blocked) {
+        AlState* req = request_queues[i].q.peek();
+        if (req != nullptr) {
+          // Add to the correct run queue if one is available.
+          switch (req->get_run_type()) {
+          case RunType::bounded:
+            if (num_bounded < AL_PE_NUM_CONCURRENT_OPS) {
+              ++num_bounded;
+              run_queue.push_back(req);
+              req->start();
+              request_queues[i].q.pop_always();
+            }
+            break;
+          case RunType::unbounded:
+            run_queue.push_back(req);
+            req->start();
+            request_queues[i].q.pop_always();
+            break;
+          }
+          if (req->blocks()) {
+            request_queues[i].blocked = true;
+            blocking_reqs[req] = i;
+          }
+        }
       }
     }
     // Process one step of each in-progress request.
-    bool any_completed = false;
-    for (size_t i = 0; i < in_progress_reqs.cur_size; ++i) {
-      if (in_progress_reqs.l[i]->step()) {
-        if (in_progress_reqs.l[i]->needs_completion()) {
-          // Mark the request as completed.
-          in_progress_reqs.l[i]->get_req()->store(true, std::memory_order_release);
+    for (auto i = run_queue.begin(); i != run_queue.end();) {
+      AlState* req = *i;
+      if (req->step()) {
+        if (req->needs_completion()) {
+          req->get_req()->store(true, std::memory_order_release);
         }
-        delete in_progress_reqs.l[i];
-        // Mark slot for compaction.
-        in_progress_reqs.l[i] = nullptr;
-        any_completed = true;
+        if (req->get_run_type() == RunType::bounded) {
+          --num_bounded;
+        }
+        if (req->blocks()) {
+          // Unblock the associated input queue.
+          request_queues[blocking_reqs[req]].blocked = false;
+          blocking_reqs.erase(req);
+        }
+        delete req;
+        i = run_queue.erase(i);
+      } else {
+        ++i;
       }
-    }
-    if (any_completed) {
-      in_progress_reqs.compact();
     }
   }
 }
