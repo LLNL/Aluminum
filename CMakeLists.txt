@@ -36,6 +36,16 @@ if (ALUMINUM_ENABLE_NCCL AND NOT ALUMINUM_ENABLE_CUDA)
   set(ALUMINUM_ENABLE_CUDA ON)
 endif ()
 
+if (ALUMINUM_ENABLE_CUDA
+    AND NOT ALUMINUM_ENABLE_NCCL
+    AND NOT ALUMINUM_ENABLE_MPI_CUDA)
+  message(FATAL_ERROR
+    "CUDA has been enabled without a backend. "
+    "This should not happen. "
+    "Please turn on \"ALUMINUM_ENABLE_NCCL\" and/or "
+    "\"ALUMINUM_ENABLE_MPI_CUDA\" and reconfigure.")
+endif ()
+
 if (CMAKE_BUILD_TYPE MATCHES Debug)
   set(AL_DEBUG ON)
 endif ()
