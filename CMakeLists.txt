@@ -52,6 +52,12 @@ endif ()
 
 # Setup CXX requirements
 set(CMAKE_CXX_FLAGS "-Wall -Wextra -pedantic -g")
+# -faligned-new is needed to use new alignment-aware new when available.
+include(CheckCXXCompilerFlag)
+check_cxx_compiler_flag("-faligned-new" CXX_COMPILER_HAS_FALIGNED_NEW)
+if (CXX_COMPILER_HAS_FALIGNED_NEW)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -faligned-new")
+endif ()
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 if (NOT DEFINED BUILD_SHARED_LIBS)
