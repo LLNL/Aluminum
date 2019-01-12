@@ -70,10 +70,12 @@ find_package(MPI 3.0 REQUIRED COMPONENTS CXX)
 # MPI::MPI_CXX or OpenMP::OpenMP_CXX "linkage".
 get_target_property(
   __mpi_compile_options MPI::MPI_CXX INTERFACE_COMPILE_OPTIONS)
-set_property(TARGET MPI::MPI_CXX PROPERTY
-  INTERFACE_COMPILE_OPTIONS
-  $<$<COMPILE_LANGUAGE:CXX>:${__mpi_compile_options}>)
-unset(__mpi_compile_options)
+if (__mpi_compile_options)
+  set_property(TARGET MPI::MPI_CXX PROPERTY
+    INTERFACE_COMPILE_OPTIONS
+    $<$<COMPILE_LANGUAGE:CXX>:${__mpi_compile_options}>)
+  unset(__mpi_compile_options)
+endif ()
 
 # Assuming this target is excluded from all device-link steps, this
 # should not be necessary after the above FIXME is resolved.
