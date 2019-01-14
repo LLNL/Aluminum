@@ -74,6 +74,50 @@ void test_send_and_recv(const typename VectorType<Backend>::type& expected_recv,
   }
 }
 
+/** Test non-blocking send/recv. */
+template <typename Backend>
+void test_nb_send_and_recv(
+  const typename VectorType<Backend>::type& expected_recv,
+  typename VectorType<Backend>::type& to_send,
+  typename Backend::comm_type& comm) {
+  if (comm.size() % 2 != 0 && comm.rank() == comm.size() - 1) {
+    // No partner, this rank sits out.
+    MPI_Barrier(MPI_COMM_WORLD);  // Participate in barrier below.
+    return;
+  }
+  typename Backend::req_type req = get_request<Backend>();
+  auto recv = get_vector<Backend>(expected_recv.size());
+  if (comm.rank() % 2 == 0) {
+    Al::NonblockingSend<Backend>(to_send.data(), to_send.size(),
+                                 comm.rank() + 1, comm, req);
+  } else {
+    Al::NonblockingRecv<Backend>(recv.data(), recv.size(), comm.rank() - 1,
+                                 comm, req);
+  }
+  Al::Wait<Backend>(req);
+  if (comm.rank() % 2 != 0) {
+    if (!check_vector(expected_recv, recv)) {
+      std::cout << comm.rank() << ": recv does not match" << std::endl;
+      std::abort();
+    }
+  }
+  MPI_Barrier(MPI_COMM_WORLD);
+  if (comm.rank() % 2 == 0) {
+    Al::NonblockingRecv<Backend>(recv.data(), recv.size(), comm.rank() + 1,
+                                 comm, req);
+  } else {
+    Al::NonblockingSend<Backend>(to_send.data(), to_send.size(),
+                                 comm.rank() - 1, comm, req);
+  }
+  Al::Wait<Backend>(req);
+  if (comm.rank() % 2 == 0) {
+    if (!check_vector(expected_recv, recv)) {
+      std::cout << comm.rank() << ": recv does not match" << std::endl;
+      std::abort();
+    }
+  }
+}
+
 /** Test sendrecv. */
 template <typename Backend>
 void test_sendrecv(const typename VectorType<Backend>::type& expected_recv,
@@ -91,6 +135,33 @@ void test_sendrecv(const typename VectorType<Backend>::type& expected_recv,
     Al::SendRecv<Backend>(to_send.data(), to_send.size(), comm.rank() - 1,
                           recv.data(), recv.size(), comm.rank() - 1, comm);
   }
+  if (!check_vector(expected_recv, recv)) {
+    std::cout << comm.rank() << ": recv does not match" << std::endl;
+    std::abort();
+  }
+}
+
+/** Test non-blocking sendrecv. */
+template <typename Backend>
+void test_nb_sendrecv(const typename VectorType<Backend>::type& expected_recv,
+                      typename VectorType<Backend>::type& to_send,
+                      typename Backend::comm_type& comm) {
+  if (comm.size() % 2 != 0 && comm.rank() == comm.size() - 1) {
+    // No partner, this rank sits out.
+    return;
+  }
+  typename Backend::req_type req = get_request<Backend>();
+  auto recv = get_vector<Backend>(expected_recv.size());
+  if (comm.rank() % 2 == 0) {
+    Al::NonblockingSendRecv<Backend>(to_send.data(), to_send.size(),
+                                     comm.rank() + 1, recv.data(), recv.size(),
+                                     comm.rank() + 1, comm, req);
+  } else {
+    Al::NonblockingSendRecv<Backend>(to_send.data(), to_send.size(),
+                                     comm.rank() - 1, recv.data(), recv.size(),
+                                     comm.rank() - 1, comm, req);
+  }
+  Al::Wait<Backend>(req);
   if (!check_vector(expected_recv, recv)) {
     std::cout << comm.rank() << ": recv does not match" << std::endl;
     std::abort();
@@ -119,9 +190,19 @@ void test_correctness() {
     test_send_and_recv<Backend>(to_recv, to_send, comm);
     MPI_Barrier(MPI_COMM_WORLD);
     if (comm.rank() == 0) {
+      std::cout << " NB Send/recv" << std::endl;
+    }
+    test_nb_send_and_recv<Backend>(to_recv, to_send, comm);
+    MPI_Barrier(MPI_COMM_WORLD);
+    if (comm.rank() == 0) {
       std::cout << " Sendrecv" << std::endl;
     }
     test_sendrecv<Backend>(to_recv, to_send, comm);
+    MPI_Barrier(MPI_COMM_WORLD);
+    if (comm.rank() == 0) {
+      std::cout << " NB Sendrecv" << std::endl;
+    }
+    test_nb_sendrecv<Backend>(to_recv, to_send, comm);
   }
   free_comm_with_stream<Backend>(comm);
 }
