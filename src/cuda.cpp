@@ -109,6 +109,7 @@ bool stream_memory_operations_supported() {
 }
 
 FastEvent::FastEvent() {
+#if 0
   if (stream_memory_operations_supported()) {
     sync_event = get_pinned_memory<int32_t>(1);
     // Initialize to completed to match CUDA event semantics.
@@ -116,21 +117,27 @@ FastEvent::FastEvent() {
     AL_CHECK_CUDA_DRV(cuMemHostGetDevicePointer(
                         &sync_event_dev_ptr, sync_event, 0));
   }
-  else {
+  else
+#endif
+  {
     plain_event = get_cuda_event();
   }
 }
 
 FastEvent::~FastEvent() {
+#if 0
   if (stream_memory_operations_supported()) {
     release_pinned_memory(sync_event);
   }
-  else {
+  else
+#endif
+  {
     release_cuda_event(plain_event);
   }
 }
 
 void FastEvent::record(cudaStream_t stream) {
+#if 0
   if (stream_memory_operations_supported()) {
     // We cannot use std::atomic because we need the actual address of the memory.
     __atomic_store_n(sync_event, 0, __ATOMIC_SEQ_CST);
@@ -138,15 +145,20 @@ void FastEvent::record(cudaStream_t stream) {
                         stream, sync_event_dev_ptr, 1,
                         CU_STREAM_WRITE_VALUE_DEFAULT));
   }
-  else {
+  else
+#endif
+  {
     AL_CHECK_CUDA(cudaEventRecord(plain_event, stream));
   }
 }
 
 bool FastEvent::query() {
+#if 0
   if (stream_memory_operations_supported())
     return __atomic_load_n(sync_event, __ATOMIC_SEQ_CST);
-  else {
+  else
+#endif
+  {
     cudaError_t r = cudaEventQuery(plain_event);
     if (r == cudaSuccess)
       return true;
