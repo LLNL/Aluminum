@@ -194,8 +194,26 @@ class MPICUDABackend {
   }
 
   template <typename T>
+  static void NonblockingSend(const T* sendbuf, size_t count, int dest,
+                              comm_type& comm, req_type& req) {
+    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+    sync_internal_stream_with_comm(internal_stream, comm);
+    do_send(sendbuf, count, dest, comm, internal_stream);
+    setup_completion_event(internal_stream, comm, req);
+  }
+
+  template <typename T>
   static void Recv(T* recvbuf, size_t count, int src, comm_type& comm) {
     do_recv(recvbuf, count, src, comm, comm.get_stream());
+  }
+
+  template <typename T>
+  static void NonblockingRecv(T* recvbuf, size_t count, int src,
+                              comm_type& comm, req_type& req) {
+    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+    sync_internal_stream_with_comm(internal_stream, comm);
+    do_recv(recvbuf, count, src, comm, internal_stream);
+    setup_completion_event(internal_stream, comm, req);
   }
 
   template <typename T>
@@ -203,6 +221,17 @@ class MPICUDABackend {
                        T* recvbuf, size_t recv_count, int src, comm_type& comm) {
     do_sendrecv(sendbuf, send_count, dest, recvbuf, recv_count, src, comm,
                 comm.get_stream());
+  }
+
+  template <typename T>
+  static void NonblockingSendRecv(const T* sendbuf, size_t send_count, int dest,
+                                  T* recvbuf, size_t recv_count, int src,
+                                  comm_type& comm, req_type& req) {
+    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+    sync_internal_stream_with_comm(internal_stream, comm);
+    do_sendrecv(sendbuf, send_count, dest, recvbuf, recv_count, src, comm,
+                internal_stream);
+    setup_completion_event(internal_stream, comm, req);
   }
 
 #ifdef AL_HAS_MPI_CUDA_RMA
