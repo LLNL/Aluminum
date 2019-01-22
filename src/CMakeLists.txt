@@ -6,6 +6,7 @@ set_full_path(THIS_DIR_HEADERS
   mempool.hpp
   mpi_impl.hpp
   tuning_params.hpp
+  utils.hpp
   )
 set_full_path(THIS_DIR_CXX_SOURCES
   Al.cpp
