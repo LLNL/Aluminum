@@ -145,9 +145,8 @@ T* get_pinned_memory(size_t count) {
       }
     }
     // No memory free, allocate some.
-    // TODO: Error checking for memory allocation.
     T* mem;
-    cudaMallocHost(&mem, count*sizeof(T));
+    AL_CHECK_CUDA(cudaMallocHost(&mem, count*sizeof(T)));
     pool.memmap[count].emplace_back(mem, true);
     pool.allocated[mem] = count;
     return mem;
@@ -155,7 +154,7 @@ T* get_pinned_memory(size_t count) {
     // No entry for this size; so no free memory.
     pool.memmap.emplace(count, MempoolSizeList<T>());
     T* mem;
-    cudaMallocHost(&mem, count*sizeof(T));
+    AL_CHECK_CUDA(cudaMallocHost(&mem, count*sizeof(T)));
     pool.memmap[count].emplace_back(mem, true);
     pool.allocated[mem] = count;
     return mem;

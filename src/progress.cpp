@@ -212,24 +212,26 @@ void ProgressEngine::engine() {
         AlState* req = request_queues[i].q.peek();
         if (req != nullptr) {
           // Add to the correct run queue if one is available.
+          bool do_start = false;
           switch (req->get_run_type()) {
           case RunType::bounded:
             if (num_bounded < AL_PE_NUM_CONCURRENT_OPS) {
               ++num_bounded;
-              run_queue.push_back(req);
-              req->start();
-              request_queues[i].q.pop_always();
+              do_start = true;
             }
             break;
           case RunType::unbounded:
+            do_start = true;
+            break;
+          }
+          if (do_start) {
             run_queue.push_back(req);
             req->start();
             request_queues[i].q.pop_always();
-            break;
-          }
-          if (req->blocks()) {
-            request_queues[i].blocked = true;
-            blocking_reqs[req] = i;
+            if (req->blocks()) {
+              request_queues[i].blocked = true;
+              blocking_reqs[req] = i;
+            }
           }
         }
       }
