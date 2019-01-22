@@ -37,6 +37,7 @@
 #include "Al_config.hpp"
 #include "base.hpp"
 #include "tuning_params.hpp"
+#include "utils.hpp"
 
 namespace Al {
 

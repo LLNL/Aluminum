@@ -497,6 +497,10 @@ class MPIAlState : public AlState {
   int tag;
   /** Requests for send_recv. */
   MPI_Request send_recv_reqs[2] = {MPI_REQUEST_NULL, MPI_REQUEST_NULL};
+#ifdef AL_DEBUG_HANG_CHECK
+  bool hang_reported = false;
+  double send_recv_start = std::numeric_limits<double>::max();
+#endif
 
   /** Start a send/recv. */
   void start_send_recv(
@@ -504,11 +508,25 @@ class MPIAlState : public AlState {
     void* recv, int recv_count, int source) {
     MPI_Irecv(recv, recv_count, type, source, tag, comm, &(send_recv_reqs[0]));
     MPI_Isend(send, send_count, type, dest, tag, comm, &(send_recv_reqs[1]));
+#ifdef AL_DEBUG_HANG_CHECK
+    send_recv_start = get_time();
+#endif
   }
   /** Return true if the outstanding send/recv has completed. */
   bool test_send_recv() {
     int flag;
     MPI_Testall(2, send_recv_reqs, &flag, MPI_STATUSES_IGNORE);
+#ifdef AL_DEBUG_HANG_CHECK
+    if (!flag && !hang_reported) {
+      double t = get_time();
+      // Choice of 10 + rank is arbitrary, but seems reasonable.
+      // The + rank part helps ensure printing from ranks isn't interleaved.
+      if (t - sr_start > 10.0 + rank) {
+        std::cout << rank << ": Possible send/recv hang detected, tag=" << tag << std::endl;
+        hang_reported = true;
+      }
+    }
+#endif
     return flag;
   }
 };
