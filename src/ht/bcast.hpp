@@ -28,23 +28,20 @@
 #pragma once
 
 #include "cuda.hpp"
-#include "cuda_kernels.hpp"
-#include "mpi_cuda/communicator.hpp"
 #include "progress.hpp"
 
 namespace Al {
 namespace internal {
-namespace mpi_cuda {
+namespace host_transfer {
 
 template <typename T>
-class ReduceAlState : public AlState {
+class BcastAlState : public AlState {
 public:
-  ReduceAlState(const T* sendbuf, T* recvbuf, size_t count, ReductionOperator op,
-                int root, MPICUDACommunicator& comm, cudaStream_t stream) :
+  BcastAlState(T* buf, size_t count, int root,
+               HTCommunicator& comm, cudaStream_t stream) :
     AlState(nullptr),
     rank_(comm.rank()), root_(root), count_(count),
     host_mem_(get_pinned_memory<T>(count_)),
-    op_(mpi::ReductionOperator2MPI_Op(op)),
     comm_(comm.get_comm()),
     compute_stream(comm.get_stream()) {
 
@@ -52,49 +49,47 @@ public:
 
     // Transfer data from device to host and use an event to determine when it
     // completes.
-    AL_CHECK_CUDA(cudaMemcpyAsync(host_mem_, sendbuf, sizeof(T)*count_,
-                                  cudaMemcpyDeviceToHost, stream));
+    if (i_am_root) {
+      AL_CHECK_CUDA(cudaMemcpyAsync(
+                      host_mem_, buf, sizeof(T)*count_,
+                      cudaMemcpyDeviceToHost, stream));
+    }
     d2h_event_.record(stream);
     gpuwait_.wait(stream);
 
-    if (i_am_root) {
+    if (!i_am_root) {
       // Transfer completed buffer back to device.
-      AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, host_mem_, sizeof(T)*count,
+      AL_CHECK_CUDA(cudaMemcpyAsync(buf, host_mem_, sizeof(T)*count_,
                                     cudaMemcpyHostToDevice, stream));
       h2d_event_.record(stream);
     }
   }
 
-  ~ReduceAlState() override {
+  ~BcastAlState() override {
     release_pinned_memory(host_mem_);
   }
 
   bool step() override {
-    if (!reduce_started_) {
-      // Check if mem xfer complete
+    if (!bcast_started_) {
       if (d2h_event_.query()) {
-        if (root_ == rank_) {
-          MPI_Ireduce(MPI_IN_PLACE, host_mem_, count_, mpi::TypeMap<T>(),
-                      op_, root_, comm_, &req_);
-        } else {
-          MPI_Ireduce(host_mem_, host_mem_, count_, mpi::TypeMap<T>(),
-                      op_, root_, comm_, &req_);
+        MPI_Ibcast(host_mem_, count_, mpi::TypeMap<T>(),
+                     root_, comm_, &req_);
+        if (rank_ == root_) {
           gpuwait_.signal();
         }
-        reduce_started_ = true;
-      }
-      else {
+        bcast_started_ = true;
+      } else {
         return false;
       }
     }
 
-    if (!reduce_done_) {
-      // Wait for the reduce to complete
+    if (!bcast_done_) {
+      // Wait for the bcast to complete
       int flag;
       MPI_Test(&req_, &flag, MPI_STATUS_IGNORE);
       if (flag) {
-        reduce_done_ = true;
-        if (rank_ == root_) {
+        bcast_done_ = true;
+        if (rank_ != root_) {
           gpuwait_.signal();
         } else {
           return true;
@@ -109,7 +104,6 @@ public:
     if (h2d_event_.query()) {
       return true;
     }
-
     return false;
   }
 
@@ -126,16 +120,15 @@ private:
 
   cuda::FastEvent d2h_event_, h2d_event_;
 
-  MPI_Op op_;
   MPI_Comm comm_;
   MPI_Request req_ = MPI_REQUEST_NULL;
 
-  bool reduce_started_ = false;
-  bool reduce_done_ = false;
+  bool bcast_started_ = false;
+  bool bcast_done_ = false;
 
   cudaStream_t compute_stream;
 };
 
-}  // namespace mpi_cuda
+}  // namespace host_transfer
 }  // namespace internal
 }  // namespace Al

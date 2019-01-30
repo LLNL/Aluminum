@@ -23,6 +23,7 @@ option(ALUMINUM_ENABLE_CUDA "Enable CUDA support." OFF)
 option(ALUMINUM_ENABLE_MPI_CUDA "Enable MPI-CUDA support." OFF)
 option(ALUMINUM_ENABLE_NCCL "Enable NCCL support." OFF)
 option(ALUMINUM_ENABLE_MPI_CUDA_RMA "Enable RMA in MPI-CUDA." OFF)
+option(ALUMINUM_ENABLE_HOST_TRANSFER "Enable host-transfer support." OFF)
 if (ALUMINUM_ENABLE_MPI_CUDA_RMA AND NOT ALUMINUM_ENABLE_MPI_CUDA)
   message(STATUS "RMA in MPI-CUDA requested; enabling MPI-CUDA support, too.")
   set(ALUMINUM_ENABLE_CUDA ON)
@@ -35,15 +36,21 @@ if (ALUMINUM_ENABLE_NCCL AND NOT ALUMINUM_ENABLE_CUDA)
   message(STATUS "NCCL support requested; enabling CUDA support, too.")
   set(ALUMINUM_ENABLE_CUDA ON)
 endif ()
+if (ALUMINUM_ENABLE_HOST_TRANSFER AND NOT ALUMINUM_ENABLE_CUDA)
+  message(STATUS "Host-transfer support requested; enabling CUDA support, too.")
+  set(ALUMINUM_ENABLE_CUDA ON)
+endif ()
 
 if (ALUMINUM_ENABLE_CUDA
     AND NOT ALUMINUM_ENABLE_NCCL
-    AND NOT ALUMINUM_ENABLE_MPI_CUDA)
+    AND NOT ALUMINUM_ENABLE_MPI_CUDA
+    AND NOT ALUMINUM_ENABLE_HOST_TRANSFER)
   message(FATAL_ERROR
     "CUDA has been enabled without a backend. "
     "This should not happen. "
-    "Please turn on \"ALUMINUM_ENABLE_NCCL\" and/or "
-    "\"ALUMINUM_ENABLE_MPI_CUDA\" and reconfigure.")
+    "Please turn on \"ALUMINUM_ENABLE_NCCL\", "
+    "\"ALUMINUM_ENABLE_MPI_CUDA\" and/or "
+    "\"ALUMINUM_ENABLE_HOST_TRANSFER\" and reconfigure.")
 endif ()
 
 if (CMAKE_BUILD_TYPE MATCHES Debug)
@@ -135,6 +142,10 @@ if (ALUMINUM_ENABLE_CUDA)
       endif ()
     endif ()
 
+    if (ALUMINUM_ENABLE_HOST_TRANSFER)
+      set(AL_HAS_HOST_TRANSFER TRUE)
+    endif ()
+
     # Add the cuda imported target
     if (NOT TARGET cuda::cuda)
       add_library(cuda::cuda INTERFACE IMPORTED)
@@ -161,8 +172,10 @@ if (ALUMINUM_ENABLE_CUDA)
     message(WARNING "CUDA support requested but not found. Disabling.")
     set(ALUMINUM_ENABLE_CUDA OFF)
     set(ALUMINUM_ENABLE_MPI_CUDA OFF)
+    set(ALUMINUM_ENABLE_HOST_TRANSFER OFF)
     set(AL_HAS_CUDA FALSE)
     set(AL_HAS_MPI_CUDA FALSE)
+    set(AL_HAS_HOST_TRANSFER FALSE)
   endif ()
 endif ()
 # Build library and executables

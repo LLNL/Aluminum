@@ -28,19 +28,17 @@
 #pragma once
 
 #include "cuda.hpp"
-#include "cuda_kernels.hpp"
-#include "mpi_cuda/communicator.hpp"
 #include "progress.hpp"
 
 namespace Al {
 namespace internal {
-namespace mpi_cuda {
+namespace host_transfer {
 
 template <typename T>
 class ScatterAlState : public AlState {
 public:
   ScatterAlState(const T* sendbuf, T* recvbuf, size_t count, int root,
-                MPICUDACommunicator& comm, cudaStream_t stream) :
+                HTCommunicator& comm, cudaStream_t stream) :
     AlState(nullptr),
     rank_(comm.rank()), root_(root), count_(count),
     host_mem_(get_pinned_memory<T>(rank_ == root_
@@ -148,6 +146,6 @@ private:
   cudaStream_t compute_stream;
 };
 
-}  // namespace mpi_cuda
+}  // namespace host_transfer
 }  // namespace internal
 }  // namespace Al

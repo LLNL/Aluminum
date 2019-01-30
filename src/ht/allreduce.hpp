@@ -28,91 +28,95 @@
 #pragma once
 
 #include "cuda.hpp"
-#include "cuda_kernels.hpp"
-#include "mpi_cuda/communicator.hpp"
 #include "progress.hpp"
+#include "mpi_impl.hpp"
+#include <cassert>
 
 namespace Al {
 namespace internal {
-namespace mpi_cuda {
+namespace host_transfer {
 
+/** Progress engine state for the host-transfer allreduce. */
 template <typename T>
-class ReduceScatterAlState : public AlState {
-public:
-  ReduceScatterAlState(const T* sendbuf, T* recvbuf, size_t count,
-                       ReductionOperator op, MPICUDACommunicator& comm,
-                       cudaStream_t stream) :
-    AlState(nullptr),
-    count_(count),
-    host_mem_(get_pinned_memory<T>(comm.size()*count_)),
-    op_(mpi::ReductionOperator2MPI_Op(op)),
-    comm_(comm.get_comm()),
+class HostTransferState : public AlState {
+ public:
+  HostTransferState(const T* sendbuf, T* recvbuf, size_t count,
+                    ReductionOperator op, HTCommunicator& comm,
+                    cudaStream_t stream, AlRequest req_) :
+    AlState(req_),
+    host_mem(get_pinned_memory<T>(count)),
     compute_stream(comm.get_stream()) {
+    if (count <= 1<<9) {
+      host_ar = new mpi::MPIRecursiveDoublingAlState<T>(
+        IN_PLACE<T>(), host_mem, count, op, comm, get_free_request());
+    } else {
+      host_ar = new mpi::MPIRabenseifnerAlState<T>(
+        IN_PLACE<T>(), host_mem, count, op, comm, get_free_request());
+    }
 
     // Transfer data from device to host and use an event to determine when it
-    // completes.
-    AL_CHECK_CUDA(cudaMemcpyAsync(host_mem_, sendbuf, sizeof(T)*count*comm.size(),
-                                  cudaMemcpyDeviceToHost, stream));
-    d2h_event_.record(stream);
+    // completes. Handle in-place vs non-in-place.
+    if (sendbuf != recvbuf) {
+      AL_CHECK_CUDA(cudaMemcpyAsync(host_mem, sendbuf, sizeof(T)*count,
+                                    cudaMemcpyDeviceToHost, stream));
+    } else {
+      AL_CHECK_CUDA(cudaMemcpyAsync(host_mem, recvbuf, sizeof(T)*count,
+                                    cudaMemcpyDeviceToHost, stream));
+    }
+    d2h_event.record(stream);
 
     // Have the device wait on the host.
-    gpuwait_.wait(stream);
+    gpu_wait.wait(stream);
 
     // Transfer completed buffer back to device.
-    AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, host_mem_, sizeof(T)*count,
+    AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, host_mem, sizeof(T)*count,
                                   cudaMemcpyHostToDevice, stream));
-    h2d_event_.record(stream);
+    h2d_event.record(stream);
   }
 
-  ~ReduceScatterAlState() override {
-    release_pinned_memory(host_mem_);
+  ~HostTransferState() {
+    release_pinned_memory(host_mem);
   }
 
   bool step() override {
-    if (!rs_started_) {
+    if (!ar_started) {
       // Wait for memory to get to the host.
-      if (d2h_event_.query()) {
-        MPI_Ireduce_scatter_block(MPI_IN_PLACE, host_mem_, count_,
-                                  mpi::TypeMap<T>(), op_, comm_, &req_);
-        rs_started_ = true;
+      if (d2h_event.query()) {
+        host_ar->setup();
+        ar_started = true;
       } else {
         return false;
       }
     }
-    if (!rs_done_) {
-      // Wait for the RS to complete.
-      int flag;
-      MPI_Test(&req_, &flag, MPI_STATUS_IGNORE);
-      if (flag) {
-        rs_done_ = true;
-        gpuwait_.signal();
+    if (!ar_done) {
+      // Wait for the allreduce to complete.
+      if (host_ar->step()) {
+        ar_done = true;
+        delete host_ar;  // TODO: Maybe move this.
+        // Mark the sync as done to wake up the device.
+        gpu_wait.signal();
       } else {
         return false;
       }
     }
-    // Wait for host-to-device memcopy; cleanup
-    if (h2d_event_.query()) {
+    // Wait for the memcpy back to device to complete so we can clean up.
+    if (h2d_event.query()) {
       return true;
     }
     return false;
   }
-
   bool needs_completion() const override { return false; }
   void* get_compute_stream() const override { return compute_stream; }
-
-private:
-  size_t count_;
-  T* host_mem_;
-  cuda::GPUWait gpuwait_;
-  cuda::FastEvent d2h_event_, h2d_event_;
-  MPI_Op op_;
-  MPI_Comm comm_;
-  MPI_Request req_ = MPI_REQUEST_NULL;
-  bool rs_started_ = false;
-  bool rs_done_ = false;
+ private:
+  T* host_mem;
+  mpi::MPIAlState<T>* host_ar;
+  cuda::FastEvent d2h_event, h2d_event;
+  cuda::GPUWait gpu_wait;
+  bool ar_started = false;
+  bool ar_done = false;
   cudaStream_t compute_stream;
 };
 
-}  // namespace mpi_cuda
-}  // namespace internal
-}  // namespace Al
+} // namespace host_transfer
+} // namespace internal
+} // namespace Al

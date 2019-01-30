@@ -35,6 +35,9 @@
 #ifdef AL_HAS_MPI_CUDA
 #include "test_utils_mpi_cuda.hpp"
 #endif
+#ifdef AL_HAS_HOST_TRANSFER
+#include "test_utils_ht_cuda.hpp"
+#endif
 
 size_t max_size = 1<<20;
 const size_t num_concurrent = 1024;
@@ -122,6 +125,10 @@ int main(int argc, char** argv) {
   } else if (backend == "MPI-CUDA") {
     test_multiple_nballreduces<Al::MPICUDABackend>();
 #endif
+#ifdef AL_HAS_HOST_TRANSFER
+  } else if (backend == "HT") {
+    test_multiple_nballreduces<Al::HTBackend>();
+#endif
   } else {
     std::cerr << "usage: " << argv[0] << " [MPI";
 #ifdef AL_HAS_NCCL
@@ -129,6 +136,9 @@ int main(int argc, char** argv) {
 #endif
 #ifdef AL_HAS_MPI_CUDA
     std::cerr << " | MPI-CUDA";
+#endif
+#ifdef AL_HAS_HOST_TRANSFER
+    std::cerr << " | HT";
 #endif
     std::cerr << "]" << std::endl;
     return -1;

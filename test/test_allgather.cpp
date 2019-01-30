@@ -34,6 +34,9 @@
 #ifdef AL_HAS_MPI_CUDA
 #include "test_utils_mpi_cuda.hpp"
 #endif
+#ifdef AL_HAS_HOST_TRANSFER
+#include "test_utils_ht_cuda.hpp"
+#endif
 
 #include <stdlib.h>
 #include <math.h>
@@ -166,7 +169,12 @@ int main(int argc, char** argv) {
 #endif
 #ifdef AL_HAS_MPI_CUDA
   } else if (backend == "MPI-CUDA") {
-    test_correctness<Al::MPICUDABackend>();
+    std::cerr << "Allgather not supported on MPI-CUDA backend." << std::endl;
+    std::abort();
+#endif
+#ifdef AL_HAS_HOST_TRANSFER
+  } else if (backend == "HT") {
+    test_correctness<Al::HTBackend>();
 #endif
   }
 

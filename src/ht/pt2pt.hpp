@@ -28,11 +28,10 @@
 #pragma once
 
 #include "cuda.hpp"
-#include "mpi_cuda/communicator.hpp"
 
 namespace Al {
 namespace internal {
-namespace mpi_cuda {
+namespace host_transfer {
 
 constexpr int pt2pt_tag = 2;
 
@@ -41,7 +40,7 @@ template <typename T>
 class SendAlState : public AlState {
  public:
   SendAlState(const T* sendbuf, size_t count_, int dest_,
-              MPICUDACommunicator& comm_, cudaStream_t stream) :
+              HTCommunicator& comm_, cudaStream_t stream) :
     AlState(nullptr), count(count_), dest(dest_), comm(comm_.get_comm()),
     compute_stream(comm_.get_stream()) {
     mem = get_pinned_memory<T>(count);
@@ -90,7 +89,7 @@ template <typename T>
 class RecvAlState : public AlState {
  public:
   RecvAlState(T* recvbuf, size_t count_, int src_,
-              MPICUDACommunicator& comm_, cudaStream_t stream) :
+              HTCommunicator& comm_, cudaStream_t stream) :
     AlState(nullptr), count(count_), src(src_), comm(comm_.get_comm()),
     compute_stream(comm_.get_stream()) {
     mem = get_pinned_memory<T>(count);
@@ -138,7 +137,7 @@ class SendRecvAlState : public AlState {
  public:
   SendRecvAlState(const T* sendbuf, size_t send_count, int dest,
                   T* recvbuf, size_t recv_count, int src,
-                  MPICUDACommunicator& comm, cudaStream_t stream) :
+                  HTCommunicator& comm, cudaStream_t stream) :
     AlState(nullptr),
     send_state(sendbuf, send_count, dest, comm, stream),
     recv_state(recvbuf, recv_count, src, comm, stream) {}
@@ -168,6 +167,6 @@ class SendRecvAlState : public AlState {
 };
 
 
-}  // namespace mpi_cuda
+}  // namespace host_transfer
 }  // namespace internal
 }  // namespace Al

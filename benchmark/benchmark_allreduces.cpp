@@ -34,6 +34,9 @@
 #ifdef AL_HAS_MPI_CUDA
 #include "test_utils_mpi_cuda.hpp"
 #endif
+#ifdef AL_HAS_HOST_TRANSFER
+#include "test_utils_ht_cuda.hpp"
+#endif
 
 size_t start_size = 1;
 size_t max_size = 1<<28;
@@ -120,6 +123,10 @@ int main(int argc, char** argv) {
   } else if (backend == "MPI-CUDA") {
     do_benchmark<Al::MPICUDABackend>(sizes);
 #endif    
+#ifdef AL_HAS_HOST_TRANSFER
+  } else if (backend == "HT") {
+    do_benchmark<Al::HTBackend>(sizes);
+#endif
   } else {
     std::cerr << "usage: " << argv[0] << " [MPI";
 #ifdef AL_HAS_NCCL
@@ -127,6 +134,9 @@ int main(int argc, char** argv) {
 #endif
 #ifdef AL_HAS_MPI_CUDA
     std::cerr << " | MPI-CUDA";
+#endif
+#ifdef AL_HAS_HOST_TRANSFER
+    std::cerr << " | HT";
 #endif
     std::cerr << "]" << std::endl;
     return -1;

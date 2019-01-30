@@ -25,40 +25,25 @@
 // permissions and limitations under the license.
 ////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "cuda.hpp"
-#include "mpi_cuda/communicator.hpp"
-#include "mpi_cuda/allreduce_ring.hpp"
-#include "mpi_cuda/util.hpp"
-#include <cassert>
+#include "mpi_cuda_impl.hpp"
 
 namespace Al {
+
+// Initialize this.
+cudaEvent_t HTBackend::sync_event = (cudaEvent_t) 0;
+
 namespace internal {
-namespace mpi_cuda {
+namespace host_transfer {
 
-template <typename T> inline
-void ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
-                    ReductionOperator op, MPICUDACommunicator& comm,
-                    cudaStream_t stream) {
-  if (sendbuf != recvbuf) {
-    COLL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, sendbuf, sizeof(T) * count,
-                                    cudaMemcpyDefault, stream));
-  }
-  comm.get_ring().allreduce<T>(recvbuf, count, op, stream, false);
+void init(int&, char**&) {
+  AL_CHECK_CUDA(cudaEventCreateWithFlags(&HTBackend::sync_event,
+                                         cudaEventDisableTiming));
 }
 
-template <typename T> inline
-void bi_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
-                       ReductionOperator op, MPICUDACommunicator& comm,
-                       cudaStream_t stream) {
-  if (sendbuf != recvbuf) {
-    COLL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, sendbuf, sizeof(T) * count,
-                                    cudaMemcpyDefault, stream));
-  }
-  comm.get_ring().allreduce<T>(recvbuf, count, op, stream, true);
+void finalize() {
+  AL_CHECK_CUDA(cudaEventDestroy(HTBackend::sync_event));
 }
 
-} // namespace mpi_cuda
-} // namespace internal
-} // namespace Al
+}  // namespace host_transfer
+}  // namespace internal
+}  // namespace Al

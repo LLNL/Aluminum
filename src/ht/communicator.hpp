@@ -27,38 +27,24 @@
 
 #pragma once
 
-#include "cuda.hpp"
-#include "mpi_cuda/communicator.hpp"
-#include "mpi_cuda/allreduce_ring.hpp"
-#include "mpi_cuda/util.hpp"
-#include <cassert>
+#include "cudacommunicator.hpp"
 
 namespace Al {
 namespace internal {
-namespace mpi_cuda {
+namespace host_transfer {
 
-template <typename T> inline
-void ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
-                    ReductionOperator op, MPICUDACommunicator& comm,
-                    cudaStream_t stream) {
-  if (sendbuf != recvbuf) {
-    COLL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, sendbuf, sizeof(T) * count,
-                                    cudaMemcpyDefault, stream));
-  }
-  comm.get_ring().allreduce<T>(recvbuf, count, op, stream, false);
-}
+/** Communicator for host-transfer communication. */
+class HTCommunicator : public CUDACommunicator {
+ public:
+  HTCommunicator() : HTCommunicator(MPI_COMM_WORLD, 0) {}
+  HTCommunicator(cudaStream_t stream_) :
+    HTCommunicator(MPI_COMM_WORLD, stream_) {}
+  HTCommunicator(MPI_Comm comm_, cudaStream_t stream_) :
+    CUDACommunicator(comm_, stream_) {}
 
-template <typename T> inline
-void bi_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
-                       ReductionOperator op, MPICUDACommunicator& comm,
-                       cudaStream_t stream) {
-  if (sendbuf != recvbuf) {
-    COLL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, sendbuf, sizeof(T) * count,
-                                    cudaMemcpyDefault, stream));
-  }
-  comm.get_ring().allreduce<T>(recvbuf, count, op, stream, true);
-}
+  ~HTCommunicator() {}
+};
 
-} // namespace mpi_cuda
-} // namespace internal
-} // namespace Al
+}  // namespace host_transfer
+}  // namespace internal
+}  // namespace Al
