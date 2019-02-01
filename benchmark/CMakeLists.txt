@@ -30,3 +30,19 @@ if (AL_HAS_CUDA)
   target_link_libraries(benchmark_pingpong.exe PUBLIC cuda)
 endif ()
 target_include_directories(benchmark_pingpong.exe PRIVATE ${CMAKE_SOURCE_DIR}/test)
+
+add_executable(benchmark_events.exe benchmark_events.cpp
+  $<$<BOOL:${AL_HAS_CUDA}>:wait.cu>)
+target_link_libraries(benchmark_events.exe PRIVATE Al aluminum_test_headers)
+if (AL_HAS_CUDA)
+  target_link_libraries(benchmark_events.exe PUBLIC cuda)
+endif ()
+target_include_directories(benchmark_events.exe PRIVATE ${CMAKE_SOURCE_DIR}/test)
+
+add_executable(benchmark_waits.exe benchmark_waits.cpp
+  $<$<BOOL:${AL_HAS_CUDA}>:wait.cu>)
+target_link_libraries(benchmark_waits.exe PRIVATE Al aluminum_test_headers)
+if (AL_HAS_CUDA)
+  target_link_libraries(benchmark_waits.exe PUBLIC cuda)
+endif ()
+target_include_directories(benchmark_waits.exe PRIVATE ${CMAKE_SOURCE_DIR}/test)
