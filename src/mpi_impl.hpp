@@ -521,7 +521,7 @@ class MPIAlState : public AlState {
       double t = get_time();
       // Choice of 10 + rank is arbitrary, but seems reasonable.
       // The + rank part helps ensure printing from ranks isn't interleaved.
-      if (t - sr_start > 10.0 + rank) {
+      if (t - send_recv_start > 10.0 + rank) {
         std::cout << rank << ": Possible send/recv hang detected, tag=" << tag << std::endl;
         hang_reported = true;
       }
