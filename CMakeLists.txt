@@ -35,6 +35,7 @@ if (ALUMINUM_ENABLE_NCCL AND NOT ALUMINUM_ENABLE_CUDA)
   message(STATUS "NCCL support requested; enabling CUDA support, too.")
   set(ALUMINUM_ENABLE_CUDA ON)
 endif ()
+option(ALUMINUM_DEBUG_HANG_CHECK "Enable hang checking." OFF)
 
 if (ALUMINUM_ENABLE_CUDA
     AND NOT ALUMINUM_ENABLE_NCCL
@@ -48,6 +49,9 @@ endif ()
 
 if (CMAKE_BUILD_TYPE MATCHES Debug)
   set(AL_DEBUG ON)
+endif ()
+if (ALUMINUM_DEBUG_HANG_CHECK)
+  set(AL_DEBUG_HANG_CHECK ON)
 endif ()
 
 # Setup CXX requirements

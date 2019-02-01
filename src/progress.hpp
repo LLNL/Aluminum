@@ -77,6 +77,7 @@ enum class RunType {
  * pre-allocated before enqueueing.
  */
 class AlState {
+  friend class ProgressEngine;
  public:
   /** Create with an associated request. */
   AlState(AlRequest req_) : req(req_) {}
@@ -104,6 +105,10 @@ class AlState {
   virtual bool blocks() const { return false; }
  private:
   AlRequest req;
+#ifdef AL_DEBUG_HANG_CHECK
+  bool hang_reported = false;
+  double start_time = std::numeric_limits<double>::max();
+#endif
 };
 
 /**

@@ -227,6 +227,9 @@ void ProgressEngine::engine() {
           if (do_start) {
             run_queue.push_back(req);
             req->start();
+#ifdef AL_DEBUG_HANG_CHECK
+            req->start_time = get_time();
+#endif
             request_queues[i].q.pop_always();
             if (req->blocks()) {
               request_queues[i].blocked = true;
@@ -254,6 +257,21 @@ void ProgressEngine::engine() {
         delete req;
         i = run_queue.erase(i);
       } else {
+#ifdef AL_DEBUG_HANG_CHECK
+        if (!req->hang_reported) {
+          double t = get_time();
+          if (t - req->start_time > 10.0 + world_comm->rank()) {
+            std::cout << world_comm->rank()
+                      << ": Progress engine detected a possible hang"
+                      << " state=" << req
+                      << " compute_stream=" << req->get_compute_stream()
+                      << " run_type="
+                      << (req->get_run_type() == RunType::bounded ? "bounded" : "unbounded")
+                      << " blocks=" << req->blocks() << std::endl;
+            req->hang_reported = true;
+          }
+        }
+#endif
         ++i;
       }
     }
