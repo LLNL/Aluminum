@@ -5,12 +5,14 @@ set_full_path(THIS_DIR_HEADERS
   base.hpp
   mempool.hpp
   mpi_impl.hpp
+  profiling.hpp
   tuning_params.hpp
   utils.hpp
   )
 set_full_path(THIS_DIR_CXX_SOURCES
   Al.cpp
   mpi_impl.cpp
+  profiling.cpp
   progress.cpp
   )
 
@@ -48,7 +50,8 @@ target_include_directories(Al PUBLIC
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/aluminum>)
 target_link_libraries(Al PUBLIC
   MPI::MPI_CXX HWLOC::hwloc OpenMP::OpenMP_CXX
-  $<$<BOOL:${AL_HAS_CUDA}>:cuda::cuda>)
+  $<$<BOOL:${AL_HAS_CUDA}>:cuda::cuda>
+  $<$<BOOL:${AL_HAS_NVPROF}>:cuda::nvtx>)
 target_compile_features(Al PUBLIC cxx_std_11)
 
 install(TARGETS Al

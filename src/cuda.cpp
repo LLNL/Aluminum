@@ -52,6 +52,8 @@ void init(int&, char**&) {
   // Initialize internal streams.
   for (int i = 0; i < num_internal_streams; ++i) {
     AL_CHECK_CUDA(cudaStreamCreate(&internal_streams[i]));
+    profiling::name_stream(internal_streams[i],
+                           "al_internal_" + std::to_string(i));
   }
   // Check whether stream memory operations are supported.
   CUdevice dev;

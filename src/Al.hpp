@@ -38,6 +38,7 @@
 #include "base.hpp"
 #include "tuning_params.hpp"
 #include "utils.hpp"
+#include "profiling.hpp"
 
 namespace Al {
 

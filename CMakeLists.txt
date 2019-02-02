@@ -36,6 +36,7 @@ if (ALUMINUM_ENABLE_NCCL AND NOT ALUMINUM_ENABLE_CUDA)
   set(ALUMINUM_ENABLE_CUDA ON)
 endif ()
 option(ALUMINUM_DEBUG_HANG_CHECK "Enable hang checking." OFF)
+option(ALUMINUM_ENABLE_NVPROF "Enable profiling via nvprof/NVTX." OFF)
 
 if (ALUMINUM_ENABLE_CUDA
     AND NOT ALUMINUM_ENABLE_NCCL
@@ -52,6 +53,10 @@ if (CMAKE_BUILD_TYPE MATCHES Debug)
 endif ()
 if (ALUMINUM_DEBUG_HANG_CHECK)
   set(AL_DEBUG_HANG_CHECK ON)
+endif ()
+if (ALUMINUM_ENABLE_NVPROF)
+  find_package(NVTX REQUIRED)
+  set(AL_HAS_NVPROF ON)
 endif ()
 
 # Setup CXX requirements

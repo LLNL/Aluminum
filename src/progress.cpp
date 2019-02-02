@@ -73,6 +73,7 @@ void ProgressEngine::run() {
   cur_device = device;
 #endif
   thread = std::thread(&ProgressEngine::engine, this);
+  profiling::name_thread(thread.native_handle(), "al-progress");
   // Wait for the progress engine to start.
   std::unique_lock<std::mutex> lock(startup_mutex);
   startup_cv.wait(lock, [this] {return started_flag.load() == true;});
