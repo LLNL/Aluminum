@@ -128,6 +128,8 @@ public:
   bool needs_completion() const override { return false; }
   void* get_compute_stream() const override { return compute_stream; }
 
+  std::string get_name() const override { return "HTGather"; }
+
 private:
   int rank_;
   int root_;

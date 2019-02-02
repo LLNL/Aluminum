@@ -573,6 +573,7 @@ class MPIPassthroughAlState : public MPIAlState<T> {
     }
     return false;
   }
+  std::string get_name() const override { return "MPIPassthrough"; }
  private:
   MPI_Op mpi_op;
   MPI_Request mpi_req;
@@ -747,6 +748,7 @@ class MPIRecursiveDoublingAlState : public MPIAlState<T> {
     }
     return false;
   }
+  std::string get_name() const override { return "MPIRecursiveDoubling"; }
  private:
   /** Mask for computing partners in each step. */
   unsigned int mask = 1;
@@ -1024,6 +1026,7 @@ class MPIRingAlState : public MPIAlState<T> {
       return ag_step();
     }
   }
+  std::string get_name() const override { return "MPIRing"; }
  private:
   /** 0 == reduce-scatter, 1 == allgather. */
   int phase = 0;
@@ -1369,6 +1372,7 @@ class MPIRabenseifnerAlState : public MPIAlState<T> {
       }
     }
   }
+  std::string get_name() const override { return "MPIRabenseifner"; }
  private:
   /** 0 == reduce-scatter, 1 == allgather. */
   int phase = 0;

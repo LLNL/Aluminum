@@ -107,6 +107,8 @@ class AlState {
   virtual RunType get_run_type() const { return RunType::bounded; }
   /** True if this is meant to block operations until completion. */
   virtual bool blocks() const { return false; }
+  /** Return a name identifying the state (for debugging/info purposes). */
+  virtual std::string get_name() const { return "AlState"; }
  private:
   AlRequest req;
 #ifdef AL_DEBUG_HANG_CHECK

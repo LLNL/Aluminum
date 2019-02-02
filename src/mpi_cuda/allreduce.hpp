@@ -132,6 +132,8 @@ class HostTransferState : public AlState {
   }
   bool needs_completion() const override { return false; }
   void* get_compute_stream() const override { return compute_stream; }
+
+  std::string get_name() const override { return "HTAllreduce"; }
  private:
   T* host_mem;
   mpi::MPIAlState<T>* host_ar;

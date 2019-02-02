@@ -53,7 +53,7 @@ AlState::~AlState() {
 }
 
 void AlState::start() {
-  prof_range = profiling::prof_start("AlState");
+  prof_range = profiling::prof_start(get_name());
 }
 
 AlRequest get_free_request() {
@@ -272,7 +272,7 @@ void ProgressEngine::engine() {
           if (t - req->start_time > 10.0 + world_comm->rank()) {
             std::cout << world_comm->rank()
                       << ": Progress engine detected a possible hang"
-                      << " state=" << req
+                      << " state=" << req << " " << req->get_name()
                       << " compute_stream=" << req->get_compute_stream()
                       << " run_type="
                       << (req->get_run_type() == RunType::bounded ? "bounded" : "unbounded")
