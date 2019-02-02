@@ -103,6 +103,7 @@ class RecvAlState : public AlState {
     release_pinned_memory(mem);
   }
   void start() override {
+    AlState::start();
     MPI_Irecv(mem, count, mpi::TypeMap<T>(), src, pt2pt_tag, comm, &req);
   }
   bool step() override {
@@ -143,6 +144,7 @@ class SendRecvAlState : public AlState {
     send_state(sendbuf, send_count, dest, comm, stream),
     recv_state(recvbuf, recv_count, src, comm, stream) {}
   void start() override {
+    AlState::start();
     send_state.start();
     recv_state.start();
   }
