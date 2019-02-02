@@ -43,6 +43,7 @@ class NotifyState: public AlState {
               cudaEvent_t ev):
       AlState(req), m_peer(peer), m_comm(comm), m_ev(ev) {}
   void start() override {
+    AlState::start();
     AL_CHECK_CUDA(cudaEventRecord(m_ev, m_comm.get_stream()));
     MPI_Isend(&key, 1, MPI_INT, m_peer, 0,
               m_comm.get_comm(), &m_requests[0]);
@@ -70,6 +71,7 @@ class WaitState: public AlState {
       m_ev_peer(ev_peer),
       m_stream_wait_set(false) {}
   void start() override {
+    AlState::start();
     MPI_Irecv(&key, 1, MPI_INT, m_peer, 0,
               m_comm.get_comm(), &m_req);
   }
@@ -107,6 +109,7 @@ class SyncState: public AlState {
       m_ev_self(ev_self), m_ev_peer(ev_peer),
       m_stream_wait_set(false) {}
   void start() override {
+    AlState::start();
     AL_CHECK_CUDA(cudaEventRecord(m_ev_self, m_comm.get_stream()));
     MPI_Isend(&key, 1, MPI_INT, m_peer, 0,
               m_comm.get_comm(), &m_requests[0]);

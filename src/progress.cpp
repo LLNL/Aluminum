@@ -48,6 +48,14 @@ hwloc_obj_t hwloc_get_numanode_obj_by_os_index(hwloc_topology_t topology, unsign
 namespace Al {
 namespace internal {
 
+AlState::~AlState() {
+  profiling::prof_end(prof_range);
+}
+
+void AlState::start() {
+  prof_range = profiling::prof_start(get_name());
+}
+
 AlRequest get_free_request() {
   return std::make_shared<std::atomic<bool>>(false);
 }
@@ -73,6 +81,7 @@ void ProgressEngine::run() {
   cur_device = device;
 #endif
   thread = std::thread(&ProgressEngine::engine, this);
+  profiling::name_thread(thread.native_handle(), "al-progress");
   // Wait for the progress engine to start.
   std::unique_lock<std::mutex> lock(startup_mutex);
   startup_cv.wait(lock, [this] {return started_flag.load() == true;});
@@ -263,7 +272,7 @@ void ProgressEngine::engine() {
           if (t - req->start_time > 10.0 + world_comm->rank()) {
             std::cout << world_comm->rank()
                       << ": Progress engine detected a possible hang"
-                      << " state=" << req
+                      << " state=" << req << " " << req->get_name()
                       << " compute_stream=" << req->get_compute_stream()
                       << " run_type="
                       << (req->get_run_type() == RunType::bounded ? "bounded" : "unbounded")

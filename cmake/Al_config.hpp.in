@@ -10,3 +10,5 @@
 
 #cmakedefine AL_DEBUG
 #cmakedefine AL_DEBUG_HANG_CHECK
+
+#cmakedefine AL_HAS_NVPROF

@@ -46,6 +46,10 @@ namespace Al {
 class Communicator;
 
 namespace internal {
+// Forward declaration.
+namespace profiling {
+struct ProfileRange;
+}
 
 /**
  * Request handle for non-blocking operations.
@@ -81,12 +85,12 @@ class AlState {
  public:
   /** Create with an associated request. */
   AlState(AlRequest req_) : req(req_) {}
-  virtual ~AlState() {}
+  virtual ~AlState();
   /**
    * Perform initial setup of the algorithm.
    * This is called by the progress engine when the operation begins execution.
    */
-  virtual void start() {}
+  virtual void start();
   /**
    * Run one step of the algorithm.
    * Return true if the operation has completed, false if it has more steps
@@ -103,12 +107,15 @@ class AlState {
   virtual RunType get_run_type() const { return RunType::bounded; }
   /** True if this is meant to block operations until completion. */
   virtual bool blocks() const { return false; }
+  /** Return a name identifying the state (for debugging/info purposes). */
+  virtual std::string get_name() const { return "AlState"; }
  private:
   AlRequest req;
 #ifdef AL_DEBUG_HANG_CHECK
   bool hang_reported = false;
   double start_time = std::numeric_limits<double>::max();
 #endif
+  profiling::ProfileRange prof_range;
 };
 
 /**
