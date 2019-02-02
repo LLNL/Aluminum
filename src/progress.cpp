@@ -48,6 +48,14 @@ hwloc_obj_t hwloc_get_numanode_obj_by_os_index(hwloc_topology_t topology, unsign
 namespace Al {
 namespace internal {
 
+AlState::~AlState() {
+  profiling::prof_end(prof_range);
+}
+
+void AlState::start() {
+  prof_range = profiling::prof_start("AlState");
+}
+
 AlRequest get_free_request() {
   return std::make_shared<std::atomic<bool>>(false);
 }

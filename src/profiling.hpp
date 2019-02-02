@@ -30,7 +30,7 @@
 #include <thread>
 #include <string>
 
-#include "Al.hpp"
+#include "Al_config.hpp"
 
 #ifdef AL_HAS_NVPROF
 #include <nvToolsExt.h>
@@ -38,7 +38,8 @@
 #include <nvToolsExtCudaRt.h>
 #endif
 #ifdef AL_HAS_CUDA
-#include "cuda.hpp"
+#include <cuda.h>
+#include <cuda_runtime.h>
 #endif
 
 namespace Al {
