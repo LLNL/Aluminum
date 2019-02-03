@@ -155,10 +155,8 @@ class FastEvent {
   /** Return true if the event has completed. */
   bool query();
  private:
-#if 0
   int32_t* sync_event __attribute__((aligned(64)));
   CUdeviceptr sync_event_dev_ptr;
-#endif
   cudaEvent_t plain_event;
 };
 

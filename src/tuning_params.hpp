@@ -58,3 +58,6 @@
 
 /** Amount of sync object memory to preallocate in the pool. */
 #define AL_SYNC_MEM_PREALLOC 1024
+
+/** Whether to use stream memory operations (if supported). */
+#define AL_USE_STREAM_MEM_OPS 1

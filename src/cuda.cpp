@@ -55,6 +55,7 @@ void init(int&, char**&) {
     profiling::name_stream(internal_streams[i],
                            "al_internal_" + std::to_string(i));
   }
+#if AL_USE_STREAM_MEM_OPS
   // Check whether stream memory operations are supported.
   CUdevice dev;
   AL_CHECK_CUDA_DRV(cuCtxGetDevice(&dev));
@@ -62,6 +63,7 @@ void init(int&, char**&) {
   AL_CHECK_CUDA_DRV(cuDeviceGetAttribute(
                       &attr, CU_DEVICE_ATTRIBUTE_CAN_USE_STREAM_MEM_OPS, dev));
   stream_mem_ops_supported = attr;
+#endif
   // Preallocate memory for synchronization operations.
   std::vector<int32_t*> prealloc_mem;
   for (int i = 0; i < AL_SYNC_MEM_PREALLOC; ++i) {
@@ -111,56 +113,41 @@ bool stream_memory_operations_supported() {
 }
 
 FastEvent::FastEvent() {
-#if 0
   if (stream_memory_operations_supported()) {
     sync_event = get_pinned_memory<int32_t>(1);
     // Initialize to completed to match CUDA event semantics.
     __atomic_store_n(sync_event, 1, __ATOMIC_SEQ_CST);
     AL_CHECK_CUDA_DRV(cuMemHostGetDevicePointer(
                         &sync_event_dev_ptr, sync_event, 0));
-  }
-  else
-#endif
-  {
+  } else {
     plain_event = get_cuda_event();
   }
 }
 
 FastEvent::~FastEvent() {
-#if 0
   if (stream_memory_operations_supported()) {
     release_pinned_memory(sync_event);
-  }
-  else
-#endif
-  {
+  } else {
     release_cuda_event(plain_event);
   }
 }
 
 void FastEvent::record(cudaStream_t stream) {
-#if 0
   if (stream_memory_operations_supported()) {
     // We cannot use std::atomic because we need the actual address of the memory.
     __atomic_store_n(sync_event, 0, __ATOMIC_SEQ_CST);
     AL_CHECK_CUDA_DRV(cuStreamWriteValue32(
                         stream, sync_event_dev_ptr, 1,
                         CU_STREAM_WRITE_VALUE_DEFAULT));
-  }
-  else
-#endif
-  {
+  } else {
     AL_CHECK_CUDA(cudaEventRecord(plain_event, stream));
   }
 }
 
 bool FastEvent::query() {
-#if 0
-  if (stream_memory_operations_supported())
+  if (stream_memory_operations_supported()) {
     return __atomic_load_n(sync_event, __ATOMIC_SEQ_CST);
-  else
-#endif
-  {
+  } else {
     cudaError_t r = cudaEventQuery(plain_event);
     if (r == cudaSuccess)
       return true;
