@@ -34,6 +34,9 @@ namespace profiling {
 void name_thread(std::thread::native_handle_type handle, std::string name) {
 #ifdef AL_HAS_NVPROF
   nvtxNameOsThreadA(handle, name.c_str());
+#else
+  (void) handle;
+  (void) name;
 #endif
 }
 
@@ -41,13 +44,18 @@ void name_thread(std::thread::native_handle_type handle, std::string name) {
 void name_stream(cudaStream_t stream, std::string name) {
 #ifdef AL_HAS_NVPROF
   nvtxNameCudaStreamA(stream, name.c_str());
-#endif  
+#else
+  (void) stream;
+  (void) name;
+#endif
 }
 #endif
 
 void mark(std::string desc) {
 #ifdef AL_HAS_NVPROF
   nvtxMarkA(desc.c_str());
+#else
+  (void) desc;
 #endif
 }
 
@@ -55,6 +63,8 @@ ProfileRange prof_start(std::string name) {
   ProfileRange range;
 #ifdef AL_HAS_NVPROF
   range.nvtx_range = nvtxRangeStartA(name.c_str());
+#else
+  (void) name;
 #endif
   return range;
 }
@@ -62,6 +72,8 @@ ProfileRange prof_start(std::string name) {
 void prof_end(ProfileRange range) {
 #ifdef AL_HAS_NVPROF
   nvtxRangeEnd(range.nvtx_range);
+#else
+  (void) range;
 #endif
 }
 
