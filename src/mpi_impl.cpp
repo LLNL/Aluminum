@@ -48,6 +48,13 @@ void init(int& argc, char**& argv) {
       throw_al_exception("MPI_THREAD_MULTIPLE not provided");
     }
     initialized_mpi = true;
+  } else {
+    // Ensure that we have THREAD_MULTIPLE.
+    int provided;
+    MPI_Query_thread(&provided);
+    if (provided != MPI_THREAD_MULTIPLE) {
+      throw_al_exception("MPI already initialized without MPI_THREAD_MULTIPLE");
+    }
   }
   // Get the upper bound for tags; this is always set in MPI_COMM_WORLD.
   int* p;
