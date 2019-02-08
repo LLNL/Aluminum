@@ -37,6 +37,7 @@ if (ALUMINUM_ENABLE_NCCL AND NOT ALUMINUM_ENABLE_CUDA)
 endif ()
 option(ALUMINUM_DEBUG_HANG_CHECK "Enable hang checking." OFF)
 option(ALUMINUM_ENABLE_NVPROF "Enable profiling via nvprof/NVTX." OFF)
+option(ALUMINUM_ENABLE_STREAM_MEM_OPS "Enable stream memory operations." OFF)
 
 if (ALUMINUM_ENABLE_CUDA
     AND NOT ALUMINUM_ENABLE_NCCL
@@ -57,6 +58,9 @@ endif ()
 if (ALUMINUM_ENABLE_NVPROF)
   find_package(NVTX REQUIRED)
   set(AL_HAS_NVPROF ON)
+endif ()
+if (ALUMINUM_ENABLE_STREAM_MEM_OPS)
+  set(AL_USE_STREAM_MEM_OPS ON)
 endif ()
 
 # Setup CXX requirements
