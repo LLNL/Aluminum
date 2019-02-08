@@ -15,3 +15,5 @@
 
 /** Whether to use stream memory operations (if supported). */
 #cmakedefine01 AL_USE_STREAM_MEM_OPS
+
+#cmakedefine AL_HT_USE_PASSTHROUGH

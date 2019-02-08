@@ -38,6 +38,7 @@ endif ()
 option(ALUMINUM_DEBUG_HANG_CHECK "Enable hang checking." OFF)
 option(ALUMINUM_ENABLE_NVPROF "Enable profiling via nvprof/NVTX." OFF)
 option(ALUMINUM_ENABLE_STREAM_MEM_OPS "Enable stream memory operations." OFF)
+option(ALUMINUM_HT_USE_PASSTHROUGH "Host-transfer allreduces use MPI directly." ON)
 
 if (ALUMINUM_ENABLE_CUDA
     AND NOT ALUMINUM_ENABLE_NCCL
@@ -57,6 +58,9 @@ if (ALUMINUM_DEBUG_HANG_CHECK)
 endif ()
 if (ALUMINUM_ENABLE_STREAM_MEM_OPS)
   set(AL_USE_STREAM_MEM_OPS ON)
+endif ()
+if (ALUMINUM_HT_USE_PASSTHROUGH)
+  set(AL_HT_USE_PASSTHROUGH ON)
 endif ()
 
 # Setup CXX requirements

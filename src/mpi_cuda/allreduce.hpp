@@ -71,6 +71,10 @@ class HostTransferState : public AlState {
     AlState(req_),
     host_mem(get_pinned_memory<T>(count)),
     compute_stream(comm.get_stream()) {
+#ifdef AL_HT_USE_PASSTHROUGH
+    host_ar = new mpi::MPIPassthroughAlState<T>(
+      IN_PLACE<T>(), host_mem, count, op, comm, get_free_request());
+#else
     if (count <= 1<<9) {
       host_ar = new mpi::MPIRecursiveDoublingAlState<T>(
         IN_PLACE<T>(), host_mem, count, op, comm, get_free_request());
@@ -78,6 +82,7 @@ class HostTransferState : public AlState {
       host_ar = new mpi::MPIRabenseifnerAlState<T>(
         IN_PLACE<T>(), host_mem, count, op, comm, get_free_request());
     }
+#endif
 
     // Transfer data from device to host and use an event to determine when it
     // completes. Handle in-place vs non-in-place.
