@@ -16,7 +16,7 @@
 ### Prerequisites
 * A compiler that supports at least C++11
 * MPI (at least MPI 3.0)
-* CUDA (_optional if no GPU support is needed_)
+* CUDA (at least 9.0, _optional if no GPU support is needed_)
 * NCCL2 (_optional if no NCCL support is needed_)
 
 ### Building
