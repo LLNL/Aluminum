@@ -5,7 +5,16 @@ cmake_minimum_required(VERSION 3.9)
 # set the CMAKE_CXX_STANDARD flag, but the compile features are a more
 # elegant solution.
 
-project(ALUMINUM VERSION 0.1 LANGUAGES CXX)
+#
+# Version setup
+#
+
+set(ALUMINUM_VERSION_MAJOR 0)
+set(ALUMINUM_VERSION_MINOR 2)
+set(ALUMINUM_VERSION_PATCH 0)
+set(ALUMINUM_VERSION "${ALUMINUM_VERSION_MAJOR}.${ALUMINUM_VERSION_MINOR}.${ALUMINUM_VERSION_PATCH}")
+
+project(ALUMINUM VERSION ${ALUMINUM_VERSION} LANGUAGES CXX)
 # Not "CUDA" because no CUDA sources being compiled, so don't need
 # NVCC, just cuda runtime.
 
