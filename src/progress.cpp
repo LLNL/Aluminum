@@ -138,7 +138,7 @@ std::ostream& ProgressEngine::dump_state(std::ostream& ss) {
   // This is *not* thread safe, and stuff might blow up.
   // You should only be dumping state where you don't care about that anyway.
   const size_t run_queue_size = run_queue.size();
-  ss << "Run queue (" << run_queue_size << "):";
+  ss << "Run queue (" << run_queue_size << "):\n";
   for (size_t i = 0; i < run_queue_size; ++i) {
     ss << i << ": ";
     if (run_queue[i]) {
@@ -148,7 +148,7 @@ std::ostream& ProgressEngine::dump_state(std::ostream& ss) {
     }
   }
   const size_t req_queue_size = num_input_streams.load();
-  ss << "Request queues (" << req_queue_size << "):";
+  ss << "Request queues (" << req_queue_size << "):\n";
   for (size_t i = 0; i < req_queue_size; ++i) {
     ss << i << ": blocked=" << request_queues[i].blocked;
     const size_t front = request_queues[i].q.front.load();
