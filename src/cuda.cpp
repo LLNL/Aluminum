@@ -51,7 +51,16 @@ bool stream_mem_ops_supported = false;
 void init(int&, char**&) {
   // Initialize internal streams.
   for (int i = 0; i < num_internal_streams; ++i) {
-    AL_CHECK_CUDA(cudaStreamCreate(&internal_streams[i]));
+    // Set highest priority if instructed
+    if (std::getenv("AL_USE_PRIORITY_STREAM")) {
+      int least_priority, greatest_priority;
+      AL_CHECK_CUDA(cudaDeviceGetStreamPriorityRange(
+          &least_priority, &greatest_priority));
+      AL_CHECK_CUDA(cudaStreamCreateWithPriority(
+          &internal_streams[i], cudaStreamDefault, greatest_priority));
+    } else {
+      AL_CHECK_CUDA(cudaStreamCreate(&internal_streams[i]));
+    }
     profiling::name_stream(internal_streams[i],
                            "al_internal_" + std::to_string(i));
   }
