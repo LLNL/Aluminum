@@ -471,6 +471,13 @@ class MPIAlState : public AlState {
     }
     return false;
   }
+
+  std::string get_desc() const override {
+    return std::to_string(rank) + " "
+      + std::to_string(nprocs) + " "
+      + std::to_string(count) + " "
+      + std::to_string(tag);
+  }
  protected:
   /** Local rank. */
   int rank;
@@ -1725,6 +1732,8 @@ class MPIBackend {
     NonblockingAllreduce(internal::IN_PLACE<T>(), recvbuf, count, op, comm,
                          req, algo);
   }
+
+  static std::string Name() { return "MPIBackend"; }
 };
 
 template <>

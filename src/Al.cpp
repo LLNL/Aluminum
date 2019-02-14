@@ -25,12 +25,20 @@
 // permissions and limitations under the license.
 ////////////////////////////////////////////////////////////////////////////////
 
+#include <signal.h>
+#include <execinfo.h>
+#include <unistd.h>
+#include <limits.h>
+#include <string>
+#include <sstream>
+#include <fstream>
 #include "Al.hpp"
 #include "internal.hpp"
 #include "progress.hpp"
 #ifdef AL_HAS_CUDA
 #include "cuda.hpp"
 #endif
+#include "trace.hpp"
 
 namespace Al {
 
@@ -39,6 +47,65 @@ namespace {
 bool is_initialized = false;
 // Progress engine.
 internal::ProgressEngine* progress_engine = nullptr;
+
+// Custom signal handler for debugging.
+void handle_signal(int signal) {
+  // Technically, these are unsafe to call from a signal handler.
+  // But we burn everything at the end anyway, so this is best-effort.
+  std::stringstream ss;
+  ss << "Signal " << signal << " - ";
+  switch (signal) {
+  case SIGILL:
+    ss << "illegal instruction";
+    break;
+  case SIGABRT:
+    ss << "abort";
+    break;
+  case SIGFPE:
+    ss << "floating point exception";
+    break;
+  case SIGBUS:
+    ss << "bus error";
+    break;
+  case SIGSEGV:
+    ss << "segmentation fault";
+    break;
+  default:
+    ss << "unknown";
+  }
+  // Attempt a backtrace.
+  ss << "\nBacktrace:\n";
+  constexpr int max_frames = 128;
+  void* frames[max_frames];
+  int num_frames = backtrace(frames, max_frames);
+  char** symbols = backtrace_symbols(frames, num_frames);
+  for (int i = 0; i < num_frames; ++i) {
+    ss << "\t" << i << ": ";
+    if (symbols && symbols[i]) {
+      ss << symbols[i];
+    } else {
+      ss << "(no symbol info)";
+    }
+    ss << "\n";
+  }
+  free(symbols);
+  // Attempt to get progress engine state.
+  if (progress_engine) {
+    progress_engine->dump_state(ss);
+  }
+  // Write to a file.
+  char hostname[HOST_NAME_MAX];
+  gethostname(hostname, HOST_NAME_MAX);
+  pid_t pid = getpid();
+  std::ofstream file(std::string(hostname) + "." + std::to_string(pid)
+                     + ".dump.txt");
+  file << ss.str();
+  file.close();
+#ifdef AL_TRACE
+  internal::trace::write_trace_to_file();
+#endif
+}
+
 }
 
 void Initialize(int& argc, char**& argv) {
@@ -59,6 +126,17 @@ void Initialize(int& argc, char**& argv) {
 #ifdef AL_HAS_MPI_CUDA
   internal::mpi_cuda::init(argc, argv);
 #endif
+
+  // Add signal handlers.
+  const std::vector<int> handled_signals = {SIGILL, SIGABRT, SIGFPE,
+                                            SIGBUS, SIGSEGV};
+  static struct sigaction sa;
+  sa.sa_handler = &handle_signal;
+  sa.sa_flags = SA_RESTART;
+  sigfillset(&sa.sa_mask);
+  for (const auto& sig : handled_signals) {
+    sigaction(sig, &sa, nullptr);
+  }
 }
 
 void Finalize() {
@@ -81,6 +159,7 @@ void Finalize() {
   progress_engine = nullptr;
   is_initialized = false;
   internal::mpi::finalize();
+  internal::trace::write_trace_to_file();
 }
 
 bool Initialized() {

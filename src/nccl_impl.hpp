@@ -320,6 +320,8 @@ class NCCLBackend {
                               comm, req, algo);
   }
 
+  static std::string Name() { return "NCCLBackend"; }
+
  private:
   /** Event for synchronizing between streams. */
   static cudaEvent_t sync_event;

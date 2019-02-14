@@ -105,6 +105,7 @@ class HostTransferState : public AlState {
   }
 
   ~HostTransferState() {
+    delete host_ar;
     release_pinned_memory(host_mem);
   }
 
@@ -122,7 +123,6 @@ class HostTransferState : public AlState {
       // Wait for the allreduce to complete.
       if (host_ar->step()) {
         ar_done = true;
-        delete host_ar;  // TODO: Maybe move this.
         // Mark the sync as done to wake up the device.
         gpu_wait.signal();
       } else {
@@ -139,6 +139,9 @@ class HostTransferState : public AlState {
   void* get_compute_stream() const override { return compute_stream; }
 
   std::string get_name() const override { return "HTAllreduce"; }
+  std::string get_desc() const override {
+    return host_ar->get_desc();
+  }
  private:
   T* host_mem;
   mpi::MPIAlState<T>* host_ar;

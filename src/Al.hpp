@@ -39,6 +39,7 @@
 #include "tuning_params.hpp"
 #include "utils.hpp"
 #include "profiling.hpp"
+#include "trace.hpp"
 
 namespace Al {
 
@@ -103,6 +104,8 @@ void Allreduce(const T* sendbuf, T* recvbuf, size_t count,
                ReductionOperator op, typename Backend::comm_type& comm,
                typename Backend::allreduce_algo_type algo =
                Backend::allreduce_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>("allreduce", comm, sendbuf, recvbuf,
+                                         count);
   Backend::template Allreduce<T>(sendbuf, recvbuf, count, op, comm, algo);
 }
 
@@ -119,6 +122,7 @@ void Allreduce(T* recvbuf, size_t count,
                ReductionOperator op, typename Backend::comm_type& comm,
                typename Backend::allreduce_algo_type algo =
                Backend::allreduce_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>("allreduce", comm, recvbuf, count);
   Backend::template Allreduce<T>(recvbuf, count, op, comm, algo);
 }
 
@@ -138,6 +142,8 @@ void NonblockingAllreduce(
   typename Backend::req_type& req,
   typename Backend::allreduce_algo_type algo =
   Backend::allreduce_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>("nonblocking-allreduce", comm, sendbuf,
+                                         recvbuf, count);
   Backend::template NonblockingAllreduce<T>(sendbuf, recvbuf, count, op,
                                             comm, req, algo);
 }
@@ -150,6 +156,8 @@ void NonblockingAllreduce(
   typename Backend::req_type& req,
   typename Backend::allreduce_algo_type algo =
   Backend::allreduce_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>("nonblocking-allreduce", comm,
+                                         recvbuf, count);
   Backend::template NonblockingAllreduce<T>(recvbuf, count, op,
                                             comm, req, algo);
 }

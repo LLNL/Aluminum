@@ -39,6 +39,7 @@
 #include <condition_variable>
 #include <queue>
 #include <algorithm>
+#include <ostream>
 
 namespace Al {
 
@@ -109,6 +110,8 @@ class AlState {
   virtual bool blocks() const { return false; }
   /** Return a name identifying the state (for debugging/info purposes). */
   virtual std::string get_name() const { return "AlState"; }
+  /** Return a string description of the state (for debugging/info purposes). */
+  virtual std::string get_desc() const { return ""; }
  private:
   AlRequest req;
 #ifdef AL_DEBUG_HANG_CHECK
@@ -124,6 +127,7 @@ class AlState {
  * (see Le, et al. "Correct and Efficient Bounded FIFO Queues").
  */
 class SPSCQueue {
+  friend class ProgressEngine;
  public:
   /**
    * Initialize the queue.
@@ -294,6 +298,12 @@ class ProgressEngine {
    * This will block the calling thread.
    */
   void wait_for_completion(AlRequest& req);
+
+  /**
+   * Best effort to dump progress engine state for debugging.
+   * State is written to ss.
+   */
+  std::ostream& dump_state(std::ostream& ss);
  private:
   /** The actual thread of execution. */
   std::thread thread;
