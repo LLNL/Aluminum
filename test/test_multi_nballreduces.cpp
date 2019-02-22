@@ -86,6 +86,7 @@ void test_multiple_nballreduces() {
         Al::Allreduce<Al::MPIBackend>(blocking_data.data(), blocking_data.size(),
                                       Al::ReductionOperator::sum, comm);
       }*/
+      (void) num_blocking;
       // Complete and check them.
       for (size_t i = 0; i < num_concurrent; ++i) {
         Al::Wait<Backend>(reqs[i]);

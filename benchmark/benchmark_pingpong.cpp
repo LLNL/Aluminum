@@ -132,6 +132,8 @@ int main(int argc, char** argv) {
   do_benchmark();
   Al::Finalize();
 #else
+  (void) argc;
+  (void) argv;
   std::cout << "MPI-CUDA support required" << std::endl;
 #endif
   return 0;
