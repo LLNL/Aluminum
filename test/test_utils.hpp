@@ -346,17 +346,69 @@ bool check_vector(const std::vector<float>& expected,
   return true;
 }
 
+// Stores statistics related to a set of measurements.
+struct MeasurementStats {
+  // This is not const or by reference so we can use nth_element.
+  MeasurementStats(std::vector<double> times) {
+    const double sum = std::accumulate(times.begin(), times.end(), 0.0);
+    mean = sum / times.size();
+    if (times.size() > 1) {
+      double sqsum = 0.0;
+      for (const auto& t : times) sqsum += (t - mean) * (t - mean);
+      stdev = std::sqrt(1.0 / (times.size() - 1) * sqsum);
+    }
+    std::nth_element(times.begin(), times.begin() + times.size() / 2, times.end());
+    median = times[times.size() / 2];
+    auto minmax = std::minmax_element(times.begin(), times.end());
+    min = *(minmax.first);
+    max = *(minmax.second);
+  }
+  double mean = 0.0;
+  double median = 0.0;
+  double min = 0.0;
+  double max = 0.0;
+  double stdev = 0.0;
+};
+
 void print_stats(std::vector<double>& times) {
-  double sum = std::accumulate(times.begin(), times.end(), 0.0);
-  double mean = sum / times.size();
-  std::nth_element(times.begin(), times.begin() + times.size() / 2, times.end());
-  double median = times[times.size() / 2];
-  auto minmax = std::minmax_element(times.begin(), times.end());
-  double min = *(minmax.first);
-  double max = *(minmax.second);
-  std::cout << "mean=" << mean << " median=" << median << " min=" << min <<
-    " max=" << max << std::endl;
+  MeasurementStats stats(times);
+  std::cout << "mean=" << stats.mean << " median=" << stats.median <<
+    " min=" << stats.min << " max=" << stats.max << " stdev=" << stats.stdev <<
+    std::endl;
 }
+
+// Stores runs for profiling a collective.
+template <typename Backend>
+struct CollectiveProfile {
+  CollectiveProfile(std::string coll_name_) : coll_name(coll_name_) {}
+  void add_result(const typename Backend::comm_type& comm,
+                  size_t size, typename Backend::allreduce_algo_type algo,
+                  bool inplace, double t) {
+    results.emplace_back(std::make_tuple(
+                           comm.size(), comm.rank(), size, algo, inplace, t));
+  }
+  void print_result_table() {
+    // Print header.
+    std::cout << "Backend Collective CommSize CommRank CollSize Algo InPlace Time" << std::endl;
+    for (const auto& result : results) {
+      std::cout << Backend::Name() << " "
+                << coll_name << " "
+                << std::get<0>(result) << " "
+                << std::get<1>(result) << " "
+                << std::get<2>(result) << " "
+                << Al::algorithm_name(std::get<3>(result)) << " "
+                << std::get<4>(result) << " "
+                << std::get<5>(result) << "\n";
+    }
+    std::flush(std::cout);
+  }
+  std::string coll_name;
+  // Communicator size, rank, collective size, algorithm, inplace time.
+  // TODO: Generalize beyond allreduce algos.
+  std::vector<std::tuple<int, int, size_t,
+                         typename Backend::allreduce_algo_type, bool, double>>
+                   results;
+};
 
 template <typename Backend>
 void start_timer(typename Backend::comm_type& comm);

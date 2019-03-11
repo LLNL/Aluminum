@@ -37,13 +37,13 @@
 
 size_t start_size = 1;
 size_t max_size = 1<<28;
-const size_t num_trials = 10;
+const size_t num_trials = 20;
 
 template <typename Backend>
 void time_allreduce_algo(typename VectorType<Backend>::type input,
                          typename Backend::comm_type& comm,
-                         typename Backend::allreduce_algo_type algo) {
-  std::vector<double> times, in_place_times;
+                         typename Backend::allreduce_algo_type algo,
+                         CollectiveProfile<Backend>& prof) {
   auto recv = get_vector<Backend>(input.size());
   auto in_place_input(input);
   for (size_t trial = 0; trial < num_trials + 1; ++trial) {
@@ -51,24 +51,19 @@ void time_allreduce_algo(typename VectorType<Backend>::type input,
     start_timer<Backend>(comm);
     Al::Allreduce<Backend>(input.data(), recv.data(), input.size(),
                            Al::ReductionOperator::sum, comm, algo);
-    times.push_back(finish_timer<Backend>(comm));
+    if (trial > 0) {  // Skip warmup.
+      prof.add_result(comm, input.size(), algo, false,
+                      finish_timer<Backend>(comm));
+    }
     in_place_input = input;
     MPI_Barrier(MPI_COMM_WORLD);
     start_timer<Backend>(comm);
     Al::Allreduce<Backend>(in_place_input.data(), input.size(),
                            Al::ReductionOperator::sum, comm, algo);
-    in_place_times.push_back(finish_timer<Backend>(comm));
-  }
-  // Delete warmup trial.
-  times.erase(times.begin());
-  in_place_times.erase(in_place_times.begin());
-  if (comm.rank() == 0) {
-    std::cout << "size=" << input.size() << " algo=" << static_cast<int>(algo)
-              << " regular ";
-    print_stats(times);
-    std::cout << "size=" << input.size() << " algo=" << static_cast<int>(algo)
-              << " inplace ";
-    print_stats(in_place_times);
+    if (trial > 0) {  // Skip warmup.
+      prof.add_result(comm, input.size(), algo, true,
+                      finish_timer<Backend>(comm));
+    }
   }
 }
 
@@ -77,13 +72,18 @@ void do_benchmark(const std::vector<size_t> &sizes) {
   std::vector<typename Backend::allreduce_algo_type> algos
       = get_allreduce_algorithms<Backend>();
   typename Backend::comm_type comm;  // Use COMM_WORLD.
+  CollectiveProfile<Backend> prof("allreduce");
   for (const auto& size : sizes) {
     auto data = gen_data<Backend>(size);
     // Benchmark algorithms.
     for (auto&& algo : algos) {
       MPI_Barrier(MPI_COMM_WORLD);
-      time_allreduce_algo<Backend>(data, comm, algo);        
+      time_allreduce_algo<Backend>(data, comm, algo, prof);
     }
+  }
+  if (comm.rank() == 0) {
+    prof.print_result_table();
+    std::cout << std::flush;
   }
 }
 
