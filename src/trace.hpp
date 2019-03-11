@@ -48,8 +48,8 @@ void save_trace_entry(std::string entry, bool progress = false);
 
 /** Record an operation to the trace log. */
 template <typename Backend, typename T, typename... Args>
-void record_op(std::string op, typename Backend::comm_type& comm, Args... args) {
 #ifdef AL_TRACE
+void record_op(std::string op, typename Backend::comm_type& comm, Args... args) {
   std::stringstream ss;
   ss << get_time() << ": "
      << Backend::Name() << " "
@@ -61,11 +61,11 @@ void record_op(std::string op, typename Backend::comm_type& comm, Args... args) 
   using expander = int[];
   (void) expander{0, (void(ss << " " << std::forward<Args>(args)), 0)...};
   save_trace_entry(ss.str(), false);
-#else
-  (void) op;
-  (void) comm;
-#endif
 }
+#else  // AL_TRACE
+void record_op(std::string, typename Backend::comm_type&, Args...) {
+}
+#endif  // AL_TRACE
 
 /** Record a progress engine operation start to the trace log. */
 void record_pe_start(const AlState& state);
