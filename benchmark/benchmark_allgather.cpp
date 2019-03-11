@@ -46,7 +46,7 @@ void time_allgather_algo(typename VectorType<Backend>::type input,
                          CollectiveProfile<Backend, typename Backend::allgather_algo_type>& prof) {
   const size_t recv_size = input.size() * comm.size();
   auto recv = get_vector<Backend>(recv_size);
-  auto in_place_input(input);
+  auto in_place_input(recv);
   for (size_t trial = 0; trial < num_trials + 1; ++trial) {
     MPI_Barrier(MPI_COMM_WORLD);
     start_timer<Backend>(comm);
