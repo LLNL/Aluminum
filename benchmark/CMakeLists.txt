@@ -1,6 +1,8 @@
 set(BENCHMARK_SRCS
+  benchmark_allgather.cpp
   benchmark_allreduces.cpp
   benchmark_nballreduces.cpp
+  benchmark_reduce_scatter.cpp
   benchmark_reductions.cpp)
 
 foreach(src ${BENCHMARK_SRCS})

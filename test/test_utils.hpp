@@ -378,11 +378,11 @@ void print_stats(std::vector<double>& times) {
 }
 
 // Stores runs for profiling a collective.
-template <typename Backend>
+template <typename Backend, typename AlgoType>
 struct CollectiveProfile {
   CollectiveProfile(std::string coll_name_) : coll_name(coll_name_) {}
   void add_result(const typename Backend::comm_type& comm,
-                  size_t size, typename Backend::allreduce_algo_type algo,
+                  size_t size, AlgoType algo,
                   bool inplace, double t) {
     results.emplace_back(std::make_tuple(
                            comm.size(), comm.rank(), size, algo, inplace, t));
@@ -404,9 +404,12 @@ struct CollectiveProfile {
   }
   std::string coll_name;
   // Communicator size, rank, collective size, algorithm, inplace time.
-  // TODO: Generalize beyond allreduce algos.
-  std::vector<std::tuple<int, int, size_t,
-                         typename Backend::allreduce_algo_type, bool, double>>
+  std::vector<std::tuple<int,
+                         int,
+                         size_t,
+                         AlgoType,
+                         bool,
+                         double>>
                    results;
 };
 
