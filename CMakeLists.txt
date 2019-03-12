@@ -169,15 +169,11 @@ if (ALUMINUM_ENABLE_CUDA)
       PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${CUDA_INCLUDE_DIRS})
 
     if (ALUMINUM_ENABLE_NCCL)
-      find_package(NCCL 2.0.0)
-      if (NCCL_FOUND)
-        set(AL_HAS_NCCL TRUE)
-        set_property(TARGET cuda::cuda APPEND
-          PROPERTY INTERFACE_LINK_LIBRARIES cuda::nccl)
-      else ()
-        message(WARNING "NCCL support requested but not found. Disabling.")
-        set(ALUMINUM_ENABLE_NCCL OFF)
-      endif ()
+      find_package(NCCL 2.0.0 REQUIRED)
+
+      set(AL_HAS_NCCL TRUE)
+      set_property(TARGET cuda::cuda APPEND
+        PROPERTY INTERFACE_LINK_LIBRARIES cuda::nccl)
     endif ()
 
     if (ALUMINUM_ENABLE_NVPROF)
@@ -188,10 +184,21 @@ if (ALUMINUM_ENABLE_CUDA)
     message(WARNING "CUDA support requested but not found. Disabling.")
     set(ALUMINUM_ENABLE_CUDA OFF)
     set(ALUMINUM_ENABLE_MPI_CUDA OFF)
+    set(ALUMINUM_ENABLE_NCCL OFF)
+    set(ALUMINUM_ENABLE_NVPROF OFF)
     set(AL_HAS_CUDA FALSE)
     set(AL_HAS_MPI_CUDA FALSE)
+    set(AL_HAS_NCCL FALSE)
+    set(AL_HAS_NVPROF OFF)
+  endif ()
+
+  # Check that a backend is found
+  if (NOT AL_HAS_NCCL AND NOT AL_HAS_MPI_CUDA)
+    set(ALUMINUM_ENABLE_CUDA FALSE)
+    set(AL_HAS_CUDA FALSE)
   endif ()
 endif ()
+
 # Build library and executables
 
 # Write the configuration file
