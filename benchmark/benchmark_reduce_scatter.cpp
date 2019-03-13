@@ -40,17 +40,18 @@ size_t max_size = 1<<28;
 const size_t num_trials = 20;
 
 template <typename Backend>
-void time_allreduce_algo(typename VectorType<Backend>::type input,
-                         typename Backend::comm_type& comm,
-                         typename Backend::allreduce_algo_type algo,
-                         CollectiveProfile<Backend, typename Backend::allreduce_algo_type>& prof) {
-  auto recv = get_vector<Backend>(input.size());
+void time_reduce_scatter_algo(typename VectorType<Backend>::type input,
+                              typename Backend::comm_type& comm,
+                              typename Backend::reduce_scatter_algo_type algo,
+                              CollectiveProfile<Backend, typename Backend::reduce_scatter_algo_type>& prof) {
+  const size_t recv_size = input.size() / comm.size();
+  auto recv = get_vector<Backend>(recv_size);
   auto in_place_input(input);
   for (size_t trial = 0; trial < num_trials + 1; ++trial) {
     MPI_Barrier(MPI_COMM_WORLD);
     start_timer<Backend>(comm);
-    Al::Allreduce<Backend>(input.data(), recv.data(), input.size(),
-                           Al::ReductionOperator::sum, comm, algo);
+    Al::Reduce_scatter<Backend>(input.data(), recv.data(), recv_size,
+                                Al::ReductionOperator::sum, comm, algo);
     if (trial > 0) {  // Skip warmup.
       prof.add_result(comm, input.size(), algo, false,
                       finish_timer<Backend>(comm));
@@ -58,8 +59,8 @@ void time_allreduce_algo(typename VectorType<Backend>::type input,
     in_place_input = input;
     MPI_Barrier(MPI_COMM_WORLD);
     start_timer<Backend>(comm);
-    Al::Allreduce<Backend>(in_place_input.data(), input.size(),
-                           Al::ReductionOperator::sum, comm, algo);
+    Al::Reduce_scatter<Backend>(in_place_input.data(), recv_size,
+                                Al::ReductionOperator::sum, comm, algo);
     if (trial > 0) {  // Skip warmup.
       prof.add_result(comm, input.size(), algo, true,
                       finish_timer<Backend>(comm));
@@ -69,16 +70,17 @@ void time_allreduce_algo(typename VectorType<Backend>::type input,
 
 template <typename Backend>
 void do_benchmark(const std::vector<size_t> &sizes) {
-  std::vector<typename Backend::allreduce_algo_type> algos
-      = get_allreduce_algorithms<Backend>();
+  std::vector<typename Backend::reduce_scatter_algo_type> algos
+      = get_reduce_scatter_algorithms<Backend>();
   typename Backend::comm_type comm;  // Use COMM_WORLD.
-  CollectiveProfile<Backend, typename Backend::allreduce_algo_type> prof("allreduce");
+  CollectiveProfile<Backend, typename Backend::reduce_scatter_algo_type> prof("reduce-scatter");
   for (const auto& size : sizes) {
-    auto data = gen_data<Backend>(size);
+    const size_t global_size = size * comm.size();
+    auto data = gen_data<Backend>(global_size);
     // Benchmark algorithms.
     for (auto&& algo : algos) {
       MPI_Barrier(MPI_COMM_WORLD);
-      time_allreduce_algo<Backend>(data, comm, algo, prof);
+      time_reduce_scatter_algo<Backend>(data, comm, algo, prof);
     }
   }
   if (comm.rank() == 0) {
@@ -111,7 +113,8 @@ int main(int argc, char** argv) {
   std::vector<size_t> sizes = get_sizes(start_size, max_size);
   
   if (backend == "MPI") {
-    do_benchmark<Al::MPIBackend>(sizes);
+    std::cout << "Reduce-scatter not supported on MPI backend." << std::endl;
+    std::abort();
 #ifdef AL_HAS_NCCL
   } else if (backend == "NCCL") {
     do_benchmark<Al::NCCLBackend>(sizes);

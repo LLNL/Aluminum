@@ -17,3 +17,5 @@
 #cmakedefine01 AL_USE_STREAM_MEM_OPS
 
 #cmakedefine AL_HT_USE_PASSTHROUGH
+
+#cmakedefine AL_TRACE

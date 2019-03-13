@@ -566,6 +566,7 @@ class MPICUDABackend {
     NonblockingScatter<T>(buffer, buffer, count, root, comm, req, algo);
   }
 
+  static std::string Name() { return "MPICUDABackend"; }
 
  private:
   /** Event for synchronizing between streams. */

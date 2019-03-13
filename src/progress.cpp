@@ -29,6 +29,7 @@
 #include <cstdlib>
 #include "Al.hpp"
 #include "progress.hpp"
+#include "trace.hpp"
 
 // For ancient versions of hwloc.
 #if HWLOC_API_VERSION < 0x00010b00
@@ -130,6 +131,35 @@ void ProgressEngine::wait_for_completion(AlRequest& req) {
   // Spin until the request has completed.
   while (!req->load(std::memory_order_acquire)) {}
   req = NULL_REQUEST;
+}
+
+std::ostream& ProgressEngine::dump_state(std::ostream& ss) {
+  // Note: This pulls *directly from internal state*.
+  // This is *not* thread safe, and stuff might blow up.
+  // You should only be dumping state where you don't care about that anyway.
+  const size_t run_queue_size = run_queue.size();
+  ss << "Run queue (" << run_queue_size << "):\n";
+  for (size_t i = 0; i < run_queue_size; ++i) {
+    ss << i << ": ";
+    if (run_queue[i]) {
+      ss << run_queue[i]->get_name() << " " << run_queue[i]->get_desc() << "\n";
+    } else {
+      ss << "(unknown)\n";
+    }
+  }
+  const size_t req_queue_size = num_input_streams.load();
+  ss << "Request queues (" << req_queue_size << "):\n";
+  for (size_t i = 0; i < req_queue_size; ++i) {
+    ss << i << ": blocked=" << request_queues[i].blocked;
+    const size_t front = request_queues[i].q.front.load();
+    const size_t back = request_queues[i].q.back.load();
+    ss << " front=" << front << " back=" << back << "\n";
+    for (size_t j = front; j < back; ++j) {
+      ss << "\t" << j << ": " << request_queues[i].q.data[j]->get_name()
+         << " " << request_queues[i].q.data[j]->get_desc() << "\n";
+    }
+  }
+  return ss;
 }
 
 void ProgressEngine::bind() {
@@ -239,6 +269,9 @@ void ProgressEngine::engine() {
 #ifdef AL_DEBUG_HANG_CHECK
             req->start_time = get_time();
 #endif
+#ifdef AL_TRACE
+            trace::record_pe_start(*req);
+#endif
             request_queues[i].q.pop_always();
             if (req->blocks()) {
               request_queues[i].blocked = true;
@@ -263,6 +296,9 @@ void ProgressEngine::engine() {
           request_queues[blocking_reqs[req]].blocked = false;
           blocking_reqs.erase(req);
         }
+#ifdef AL_TRACE
+        trace::record_pe_done(*req);
+#endif
         delete req;
         i = run_queue.erase(i);
       } else {
