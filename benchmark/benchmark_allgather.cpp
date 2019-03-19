@@ -55,7 +55,6 @@ void time_allgather_algo(typename VectorType<Backend>::type input,
       prof.add_result(comm, input.size(), algo, false,
                       finish_timer<Backend>(comm));
     }
-    in_place_input = input;
     MPI_Barrier(MPI_COMM_WORLD);
     start_timer<Backend>(comm);
     Al::Allgather<Backend>(in_place_input.data(), input.size(), comm, algo);
