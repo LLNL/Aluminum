@@ -186,6 +186,8 @@ void Reduce(const T* sendbuf, T* recvbuf, size_t count,
             ReductionOperator op, int root, typename Backend::comm_type& comm,
             typename Backend::reduce_algo_type algo =
             Backend::reduce_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>("reduce", comm, sendbuf, recvbuf,
+                                         count, root);
   Backend::template Reduce<T>(sendbuf, recvbuf, count, op, root, comm, algo);
 }
 
@@ -203,6 +205,7 @@ void Reduce(T* recvbuf, size_t count,
             ReductionOperator op, int root, typename Backend::comm_type& comm,
             typename Backend::reduce_algo_type algo =
             Backend::reduce_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>("reduce", comm, recvbuf, count, root);
   Backend::template Reduce<T>(recvbuf, count, op, root, comm, algo);
 }
 
@@ -222,6 +225,8 @@ void NonblockingReduce(
   typename Backend::req_type& req,
   typename Backend::reduce_algo_type algo =
   Backend::reduce_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>("nonblocking-reduce", comm, sendbuf,
+                                         recvbuf, count, root);
   Backend::template NonblockingReduce<T>(sendbuf, recvbuf, count, op, root, comm, req, algo);
 }
 
@@ -235,6 +240,8 @@ void NonblockingReduce(
   typename Backend::req_type& req,
   typename Backend::reduce_algo_type algo =
   Backend::reduce_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>("nonblocking-reduce", comm, recvbuf,
+                                         count, root);
   Backend::template NonblockingReduce<T>(recvbuf, count, op, root, comm, req, algo);
 }
 
@@ -257,6 +264,8 @@ void Reduce_scatter(
   ReductionOperator op, typename Backend::comm_type& comm,
   typename Backend::reduce_scatter_algo_type algo =
   Backend::reduce_scatter_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>("reduce_scatter", comm, sendbuf,
+                                         recvbuf, count);
   Backend::template Reduce_scatter<T>(sendbuf, recvbuf, count, op, comm, algo);
 }
 
@@ -278,6 +287,7 @@ void Reduce_scatter(
   ReductionOperator op, typename Backend::comm_type& comm,
   typename Backend::reduce_scatter_algo_type algo =
   Backend::reduce_scatter_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>("reduce_scatter", comm, recvbuf, count);
   Backend::template Reduce_scatter<T>(recvbuf, count, op, comm, algo);
 }
 
@@ -335,6 +345,8 @@ void NonblockingReduce_scatter(
   typename Backend::req_type& req,
   typename Backend::reduce_scatter_algo_type algo =
   Backend::reduce_scatter_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>("nonblocking-reduce_scatter", comm,
+                                         sendbuf, recvbuf, count);
   Backend::template NonblockingReduce_scatter<T>(
     sendbuf, recvbuf, count, op, comm, req, algo);
 }
@@ -351,6 +363,8 @@ void NonblockingReduce_scatter(
   typename Backend::req_type& req,
   typename Backend::reduce_scatter_algo_type algo =
   Backend::reduce_scatter_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>("nonblocking-reduce_scatter", comm,
+                                         recvbuf, count);
   Backend::template NonblockingReduce_scatter<T>(recvbuf, count, op, comm, req, algo);
 }
 
@@ -398,6 +412,8 @@ void Allgather(const T* sendbuf, T* recvbuf, size_t count,
                typename Backend::comm_type& comm,
                typename Backend::allgather_algo_type algo =
                Backend::allgather_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>("allgather", comm, sendbuf, recvbuf,
+                                         count);
   Backend::template Allgather<T>(sendbuf, recvbuf, count, comm, algo);
 }
 
@@ -413,6 +429,7 @@ void Allgather(T* recvbuf, size_t count,
                typename Backend::comm_type& comm,
                typename Backend::allgather_algo_type algo =
                Backend::allgather_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>("allgather", comm, recvbuf, count);
   Backend::template Allgather<T>(recvbuf, count, comm, algo);
 }
 
@@ -430,6 +447,8 @@ void NonblockingAllgather(
   typename Backend::req_type& req,
   typename Backend::allgather_algo_type algo =
   Backend::allgather_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>("nonblocking-allgather", comm,
+                                         sendbuf, recvbuf, count);
   Backend::template NonblockingAllgather<T>(sendbuf, recvbuf, count, comm, req, algo);
 }
 
@@ -441,6 +460,8 @@ void NonblockingAllgather(
   typename Backend::req_type& req,
   typename Backend::allgather_algo_type algo =
   Backend::allgather_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>("nonblocking-allgather", comm,
+                                         recvbuf, count);
   Backend::template NonblockingAllgather<T>(recvbuf, count, comm, req, algo);
 }
 
@@ -461,6 +482,7 @@ void Bcast(T* buf,
            typename Backend::comm_type& comm,
            typename Backend::bcast_algo_type algo =
            Backend::bcast_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>("bcast", comm, buf, count, root);
   Backend::template Bcast<T>(buf, count, root, comm, algo);
 }
 
@@ -480,6 +502,8 @@ void NonblockingBcast(
   typename Backend::req_type& req,
   typename Backend::bcast_algo_type algo =
   Backend::bcast_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>("nonblocking-bcast", comm, buf,
+                                         count, root);
   Backend::template NonblockingBcast<T>(buf,  count, root, comm, req, algo);
 }
 
@@ -497,6 +521,8 @@ void Alltoall(
   typename Backend::comm_type& comm,
   typename Backend::alltoall_algo_type algo =
   Backend::alltoall_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>("alltoall", comm, sendbuf, recvbuf,
+                                         count);
   Backend::template Alltoall<T>(sendbuf, recvbuf, count, comm, algo);
 }
 
@@ -512,6 +538,7 @@ void Alltoall(
   T* buffer, size_t count, typename Backend::comm_type& comm,
   typename Backend::alltoall_algo_type algo =
   Backend::alltoall_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>("alltoall", comm, buffer, count);
   Backend::template Alltoall<T>(buffer, count, comm, algo);
 }
 
@@ -529,6 +556,8 @@ void NonblockingAlltoall(
   typename Backend::req_type& req,
   typename Backend::alltoall_algo_type algo =
   Backend::alltoall_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>("nonblocking-alltoall", comm, sendbuf,
+                                         recvbuf, count);
   Backend::template NonblockingAlltoall<T>(sendbuf, recvbuf, count,
                                            comm, req, algo);
 }
@@ -540,6 +569,8 @@ void NonblockingAlltoall(
   typename Backend::req_type& req,
   typename Backend::alltoall_algo_type algo =
   Backend::alltoall_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>("nonblocking-alltoall", comm, buffer,
+                                         count);
   Backend::template NonblockingAlltoall<T>(buffer, count, comm, req, algo);
 }
 
@@ -558,6 +589,8 @@ void Gather(
   typename Backend::comm_type& comm,
   typename Backend::gather_algo_type algo =
   Backend::gather_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>("gather", comm, sendbuf, recvbuf,
+                                         count, root);
   Backend::template Gather<T>(sendbuf, recvbuf, count, root, comm, algo);
 }
 
@@ -577,6 +610,7 @@ void Gather(
   T* buffer, size_t count, int root, typename Backend::comm_type& comm,
   typename Backend::gather_algo_type algo =
   Backend::gather_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>("gather", comm, buffer, count, root);
   Backend::template Gather<T>(buffer, count, root, comm, algo);
 }
 
@@ -594,6 +628,8 @@ void NonblockingGather(
   typename Backend::req_type& req,
   typename Backend::gather_algo_type algo =
   Backend::gather_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>("nonblocking-gather", comm, sendbuf,
+                                         recvbuf, count, root);
   Backend::template NonblockingGather<T>(sendbuf, recvbuf, count, root,
                                          comm, req, algo);
 }
@@ -605,6 +641,8 @@ void NonblockingGather(
   typename Backend::req_type& req,
   typename Backend::gather_algo_type algo =
   Backend::gather_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>("nonblocking-gather", comm, buffer,
+                                         count, root);
   Backend::template NonblockingGather<T>(buffer, count, root, comm, req, algo);
 }
 
@@ -623,6 +661,8 @@ void Scatter(
   typename Backend::comm_type& comm,
   typename Backend::scatter_algo_type algo =
   Backend::scatter_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>("scatter", comm, sendbuf, recvbuf,
+                                         count, root);
   Backend::template Scatter<T>(sendbuf, recvbuf, count, root, comm, algo);
 }
 
@@ -642,6 +682,7 @@ void Scatter(
   T* buffer, size_t count, int root, typename Backend::comm_type& comm,
   typename Backend::scatter_algo_type algo =
   Backend::scatter_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>("scatter", comm, buffer, count, root);
   Backend::template Scatter<T>(buffer, count, root, comm, algo);
 }
 
@@ -659,6 +700,8 @@ void NonblockingScatter(
   typename Backend::req_type& req,
   typename Backend::scatter_algo_type algo =
   Backend::scatter_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>("nonblocking-scatter", comm, sendbuf,
+                                         recvbuf, count, root);
   Backend::template NonblockingScatter<T>(sendbuf, recvbuf, count, root,
                                          comm, req, algo);
 }
@@ -670,6 +713,8 @@ void NonblockingScatter(
   typename Backend::req_type& req,
   typename Backend::scatter_algo_type algo =
   Backend::scatter_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>("nonblocking-scatter", comm, buffer,
+                                         count, root);
   Backend::template NonblockingScatter<T>(buffer, count, root, comm, req, algo);
 }
 
@@ -683,6 +728,7 @@ void NonblockingScatter(
 template <typename Backend, typename T>
 void Send(const T* sendbuf, size_t count, int dest,
           typename Backend::comm_type& comm) {
+  internal::trace::record_op<Backend, T>("send", comm, sendbuf, count, dest);
   Backend::template Send<T>(sendbuf, count, dest, comm);
 }
 
@@ -691,6 +737,8 @@ template <typename Backend, typename T>
 void NonblockingSend(const T* sendbuf, size_t count, int dest,
                      typename Backend::comm_type& comm,
                      typename Backend::req_type& req) {
+  internal::trace::record_op<Backend, T>("nonblocking-send", comm, sendbuf,
+                                         count, dest);
   Backend::template NonblockingSend<T>(sendbuf, count, dest, comm, req);
 }
 
@@ -704,6 +752,7 @@ void NonblockingSend(const T* sendbuf, size_t count, int dest,
 template <typename Backend, typename T>
 void Recv(T* recvbuf, size_t count, int src,
           typename Backend::comm_type& comm) {
+  internal::trace::record_op<Backend, T>("recv", comm, recvbuf, count, src);
   Backend::template Recv<T>(recvbuf, count, src, comm);
 }
 
@@ -712,6 +761,8 @@ template <typename Backend, typename T>
 void NonblockingRecv(T* recvbuf, size_t count, int src,
                      typename Backend::comm_type& comm,
                      typename Backend::req_type& req) {
+  internal::trace::record_op<Backend, T>("nonblocking-recv", comm, recvbuf,
+                                         count, src);
   Backend::template NonblockingRecv<T>(recvbuf, count, src, comm, req);
 }
 
@@ -729,6 +780,8 @@ template <typename Backend, typename T>
 void SendRecv(const T* sendbuf, size_t send_count, int dest,
               T* recvbuf, size_t recv_count, int src,
               typename Backend::comm_type& comm) {
+  internal::trace::record_op<Backend, T>("sendrecv", comm, sendbuf, send_count,
+                                         dest, recvbuf, recv_count, src);
   Backend::template SendRecv<T>(sendbuf, send_count, dest,
                                 recvbuf, recv_count, src, comm);
 }
@@ -738,6 +791,9 @@ void NonblockingSendRecv(const T* sendbuf, size_t send_count, int dest,
                          T* recvbuf, size_t recv_count, int src,
                          typename Backend::comm_type& comm,
                          typename Backend::req_type& req) {
+  internal::trace::record_op<Backend, T>("nonblocking-sendrecv", comm,
+                                         sendbuf, send_count, dest,
+                                         recvbuf, recv_count, src);
   Backend::template NonblockingSendRecv<T>(sendbuf, send_count, dest,
                                            recvbuf, recv_count, src,
                                            comm, req);

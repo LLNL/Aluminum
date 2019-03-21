@@ -75,6 +75,9 @@ class SendAlState : public AlState {
   void* get_compute_stream() const override { return compute_stream; }
   RunType get_run_type() const override { return RunType::unbounded; }
   std::string get_name() const override { return "HTSend"; }
+  std::string get_desc() const override {
+    return std::to_string(count) + " " + std::to_string(dest);
+  }
  private:
   T* mem;
   size_t count;
@@ -124,6 +127,9 @@ class RecvAlState : public AlState {
   void* get_compute_stream() const override { return compute_stream; }
   RunType get_run_type() const override { return RunType::unbounded; }
   std::string get_name() const override { return "HTRecv"; }
+  std::string get_desc() const override {
+    return std::to_string(count) + " " + std::to_string(src);
+  }
  private:
   T* mem;
   size_t count;
@@ -165,6 +171,9 @@ class SendRecvAlState : public AlState {
   }
   RunType get_run_type() const override { return RunType::unbounded; }
   std::string get_name() const override { return "HTSendRecv"; }
+  std::string get_desc() const override {
+    return send_state.get_desc() + " " + recv_state.get_desc();
+  }
  private:
   SendAlState<T> send_state;
   RecvAlState<T> recv_state;
