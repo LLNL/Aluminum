@@ -52,10 +52,19 @@ class SendAlState : public AlState {
   ~SendAlState() override {
     release_pinned_memory(mem);
   }
+#ifdef AL_HAS_PROF
+  void start() override {
+    AlState::start();
+    prof_range = profiling::prof_start("HTSend d2h");
+  }
+#endif
   bool step() override {
     if (!mem_transfer_done) {
       if (sync_event.query()) {
         mem_transfer_done = true;
+#ifdef AL_HAS_PROF
+        profiling::prof_end(prof_range);
+#endif
       }
 
       // Always return false here so the send is not started until the next
@@ -64,11 +73,19 @@ class SendAlState : public AlState {
       return false;
     }
     if (!send_started) {
+#ifdef AL_HAS_PROF
+      prof_range = profiling::prof_start("HTSend MPI");
+#endif
       MPI_Isend(mem, count, mpi::TypeMap<T>(), dest, pt2pt_tag, comm, &req);
       send_started = true;
     }
     int flag;
     MPI_Test(&req, &flag, MPI_STATUS_IGNORE);
+#ifdef AL_HAS_PROF
+    if (flag) {
+      profiling::prof_end(prof_range);
+    }
+#endif
     return flag;
   }
   bool needs_completion() const override { return false; }
@@ -88,6 +105,9 @@ class SendAlState : public AlState {
   bool mem_transfer_done = false;
   bool send_started = false;
   cudaStream_t compute_stream;
+#ifdef AL_HAS_PROF
+  profiling::ProfileRange prof_range;
+#endif
 };
 
 template <typename T>
@@ -108,6 +128,9 @@ class RecvAlState : public AlState {
   }
   void start() override {
     AlState::start();
+#ifdef AL_HAS_PROF
+    prof_range = profiling::prof_start("HTRecv MPI");
+#endif
     MPI_Irecv(mem, count, mpi::TypeMap<T>(), src, pt2pt_tag, comm, &req);
   }
   bool step() override {
@@ -118,10 +141,22 @@ class RecvAlState : public AlState {
         recv_done = true;
         // Signal the device that the memcpy can start.
         wait_sync.signal();
+#ifdef AL_HAS_PROF
+        profiling::prof_end(prof_range);
+        prof_range = profiling::prof_start("HTRecv h2d");
+#endif
       }
     }
     // Wait until the memcpy has completed so everything can be safely freed.
+#ifdef AL_HAS_PROF
+    bool r = sync_event.query();
+    if (r) {
+      profiling::prof_end(prof_range);
+    }
+    return r;
+#else
     return sync_event.query();
+#endif
   }
   bool needs_completion() const override { return false; }
   void* get_compute_stream() const override { return compute_stream; }
@@ -140,6 +175,9 @@ class RecvAlState : public AlState {
   cuda::GPUWait wait_sync;
   bool recv_done = false;
   cudaStream_t compute_stream;
+#ifdef AL_HAS_PROF
+  profiling::ProfileRange prof_range;
+#endif
 };
 
 template <typename T>

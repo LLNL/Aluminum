@@ -11,6 +11,7 @@
 #cmakedefine AL_DEBUG
 #cmakedefine AL_DEBUG_HANG_CHECK
 
+#cmakedefine AL_HAS_PROF
 #cmakedefine AL_HAS_NVPROF
 
 /** Whether to use stream memory operations (if supported). */

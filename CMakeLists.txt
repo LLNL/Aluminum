@@ -206,6 +206,10 @@ endif ()
 # Build library and executables
 
 # Write the configuration file
+# Update to include other profiling interfaces as needed:
+if (AL_HAS_NVPROF)
+  set(AL_HAS_PROF ON)
+endif ()
 configure_file(
   "${CMAKE_SOURCE_DIR}/cmake/Al_config.hpp.in"
   "${CMAKE_BINARY_DIR}/Al_config.hpp" @ONLY)
