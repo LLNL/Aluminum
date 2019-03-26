@@ -31,6 +31,7 @@
 #include <sstream>
 #include <cuda.h>
 #include <cuda_runtime.h>
+#include <cuda_fp16.h>
 
 // Note: These macros only work inside the Al namespace.
 

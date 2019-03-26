@@ -142,8 +142,7 @@ template <> inline ncclDataType_t TypeMap<int>() { return ncclInt; }
 template <> inline ncclDataType_t TypeMap<unsigned int>() { return ncclUint32; }
 template <> inline ncclDataType_t TypeMap<long long int>() { return ncclInt64; }
 template <> inline ncclDataType_t TypeMap<unsigned long long int>() { return ncclUint64; }
-// TODO half-precision.
-//template <> inline ncclDataType_t TypeMap<??>() { return ncclHalf; }
+template <> inline ncclDataType_t TypeMap<__half>() { return ncclHalf; }
 template <> inline ncclDataType_t TypeMap<float>() { return ncclFloat; }
 template <> inline ncclDataType_t TypeMap<double>() { return ncclDouble; }
 
