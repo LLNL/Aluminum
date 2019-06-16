@@ -47,6 +47,53 @@ namespace {
 bool is_initialized = false;
 // Progress engine.
 internal::ProgressEngine* progress_engine = nullptr;
+// Whether this thread is in an error handler.
+// Note this might not interoprate with anything not using real threads.
+thread_local bool in_error_handler = false;
+
+// Attempt to print a backtrace to os.
+std::ostream& attempt_backtrace(std::ostream& os) {
+  constexpr int max_frames = 128;
+  void* frames[max_frames];
+  int num_frames = backtrace(frames, max_frames);
+  char** symbols = backtrace_symbols(frames, num_frames);
+  os << "Backtrace\n";
+  for (int i = 0; i < num_frames; ++i) {
+    os << "\t" << i << ": ";
+    if (symbols && symbols[i]) {
+      os << symbols[i];
+    } else {
+      os << "(no symbol info)";
+    }
+    os << "\n";
+  }
+  free(symbols);
+  return os;
+}
+
+// Write an error to a file.
+void write_error_to_file(std::stringstream& ss) {
+  char hostname[HOST_NAME_MAX];
+  gethostname(hostname, HOST_NAME_MAX);
+  pid_t pid = getpid();
+  std::ofstream file(std::string(hostname) + "." + std::to_string(pid)
+                     + ".dump.txt");
+  file << ss.str();
+  file.close();
+}
+
+// Dump an error.
+void dump_error(std::stringstream& ss) {
+  attempt_backtrace(ss);
+  // Attempt to get progress engine state.
+  if (progress_engine) {
+    progress_engine->dump_state(ss);
+  }
+  write_error_to_file(ss);
+#ifdef AL_TRACE
+  internal::trace::write_trace_to_file();
+#endif
+}
 
 // Custom signal handler for debugging.
 void handle_signal(int signal) {
@@ -73,37 +120,35 @@ void handle_signal(int signal) {
   default:
     ss << "unknown";
   }
-  // Attempt a backtrace.
-  ss << "\nBacktrace:\n";
-  constexpr int max_frames = 128;
-  void* frames[max_frames];
-  int num_frames = backtrace(frames, max_frames);
-  char** symbols = backtrace_symbols(frames, num_frames);
-  for (int i = 0; i < num_frames; ++i) {
-    ss << "\t" << i << ": ";
-    if (symbols && symbols[i]) {
-      ss << symbols[i];
-    } else {
-      ss << "(no symbol info)";
-    }
-    ss << "\n";
+  ss << "\n";
+  dump_error(ss);
+}
+
+// Custom MPI error handler to print a backtrace.
+void handle_mpi_error(MPI_Comm* comm, int* error, ...) {
+  std::stringstream ss;
+  // Catch recursion in case something goes wrong.
+  if (in_error_handler) {
+    ss << "MPI error " << *error << " while handling an error\n"
+       << "Everything is probably on fire. Goodbye.";
+    std::cerr << ss.str() << std::endl;
+    std::abort();
   }
-  free(symbols);
-  // Attempt to get progress engine state.
-  if (progress_engine) {
-    progress_engine->dump_state(ss);
-  }
-  // Write to a file.
-  char hostname[HOST_NAME_MAX];
-  gethostname(hostname, HOST_NAME_MAX);
-  pid_t pid = getpid();
-  std::ofstream file(std::string(hostname) + "." + std::to_string(pid)
-                     + ".dump.txt");
-  file << ss.str();
-  file.close();
-#ifdef AL_TRACE
-  internal::trace::write_trace_to_file();
-#endif
+
+  in_error_handler = true;
+  // Get the error string.
+  char error_str[MPI_MAX_ERROR_STRING];
+  int error_len;
+  MPI_Error_string(*error, error_str, &error_len);
+  // Get info about the communicator the error occurred on.
+  int rank, size;
+  MPI_Comm_rank(*comm, &rank);
+  MPI_Comm_size(*comm, &size);
+  ss << "MPI error " << *error
+     << " on rank " << rank << " of " << size
+     << ": " << error_str << "\n";
+  dump_error(ss);
+  std::abort();
 }
 
 }
@@ -114,6 +159,12 @@ void Initialize(int& argc, char**& argv) {
     return;
   }
   internal::mpi::init(argc, argv);
+  // Add error handler here, since we always use MPI and can use the error
+  // helpers above.
+  // This will be inherited by all MPI communicators.
+  MPI_Errhandler errhandler;
+  MPI_Comm_create_errhandler(&handle_mpi_error, &errhandler);
+  MPI_Comm_set_errhandler(MPI_COMM_WORLD, errhandler);
   progress_engine = new internal::ProgressEngine();
   progress_engine->run();
   is_initialized = true;
