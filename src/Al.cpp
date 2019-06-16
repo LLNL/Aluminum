@@ -147,8 +147,10 @@ void handle_mpi_error(MPI_Comm* comm, int* error, ...) {
   ss << "MPI error " << *error
      << " on rank " << rank << " of " << size
      << ": " << error_str << "\n";
+  // Print a note about the error.
+  std::cerr << ss.str() << std::endl;
   dump_error(ss);
-  std::abort();
+  std::exit(1);
 }
 
 }
