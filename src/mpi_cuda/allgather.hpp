@@ -28,7 +28,6 @@
 #pragma once
 
 #include "cuda.hpp"
-#include "cuda_kernels.hpp"
 #include "mpi_cuda/communicator.hpp"
 #include "progress.hpp"
 

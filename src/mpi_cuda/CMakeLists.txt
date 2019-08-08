@@ -1,12 +1,9 @@
 set_full_path(THIS_DIR_HEADERS
   allgather.hpp
   allreduce.hpp
-  allreduce_ring.hpp
   alltoall.hpp
   bcast.hpp
   communicator.hpp
-  cuda_kernels.hpp
-  cuda_local_transfer.hpp
   gather.hpp
   reduce.hpp
   reduce_scatter.hpp
@@ -29,9 +26,8 @@ if (AL_HAS_MPI_CUDA_RMA)
     "${CMAKE_CURRENT_SOURCE_DIR}/rma.cpp")
 endif ()
 
-set_full_path(THIS_DIR_CUDA_SOURCES
-  cuda_kernels.cu
-  )
+#set_full_path(THIS_DIR_CUDA_SOURCES
+#  )
 
 # Custom install
 install(FILES ${THIS_DIR_HEADERS}

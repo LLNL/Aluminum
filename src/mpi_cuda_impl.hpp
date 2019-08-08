@@ -46,8 +46,6 @@ namespace Al {
 
 enum class MPICUDAAllreduceAlgorithm {
   automatic,
-  ring,
-  bi_ring,
   host_transfer
 };
 
@@ -59,10 +57,6 @@ inline std::string algorithm_name(MPICUDAAllreduceAlgorithm algo) {
   switch (algo) {
   case MPICUDAAllreduceAlgorithm::automatic:
     return "automatic";
-  case MPICUDAAllreduceAlgorithm::ring:
-    return "ring";
-  case MPICUDAAllreduceAlgorithm::bi_ring:
-    return "bi-ring";
   case MPICUDAAllreduceAlgorithm::host_transfer:
     return "host-transfer";
   default:
@@ -124,15 +118,7 @@ class MPICUDABackend {
                         allreduce_algo_type algo) {
     if (count == 0) return;
     switch (algo) {
-    case MPICUDAAllreduceAlgorithm::ring:
-      internal::mpi_cuda::ring_allreduce(sendbuf, recvbuf, count,
-                                         op, comm, comm.get_stream());
-      break;
     case MPICUDAAllreduceAlgorithm::automatic:
-    case MPICUDAAllreduceAlgorithm::bi_ring:
-      internal::mpi_cuda::bi_ring_allreduce(sendbuf, recvbuf, count,
-                                            op, comm, comm.get_stream());
-      break;
     case MPICUDAAllreduceAlgorithm::host_transfer:
       do_host_transfer_allreduce(sendbuf, recvbuf, count, op, comm,
                                  comm.get_stream());
@@ -159,15 +145,7 @@ class MPICUDABackend {
     cudaStream_t internal_stream = internal::cuda::get_internal_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     switch (algo) {
-    case MPICUDAAllreduceAlgorithm::ring:
-      internal::mpi_cuda::ring_allreduce(sendbuf, recvbuf, count,
-                                         op, comm, internal_stream);
-      break;
     case MPICUDAAllreduceAlgorithm::automatic:
-    case MPICUDAAllreduceAlgorithm::bi_ring:
-      internal::mpi_cuda::bi_ring_allreduce(sendbuf, recvbuf, count,
-                                            op, comm, internal_stream);
-      break;
     case MPICUDAAllreduceAlgorithm::host_transfer:
       do_host_transfer_allreduce(sendbuf, recvbuf, count, op, comm,
                                  internal_stream);
