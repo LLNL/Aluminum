@@ -27,7 +27,6 @@
 
 #include "Al.hpp"
 #include "mpi_cuda/communicator.hpp"
-#include "mpi_cuda/allreduce_ring.hpp"
 #ifdef AL_HAS_MPI_CUDA_RMA
 #include "mpi_cuda/rma.hpp"
 #endif
@@ -35,12 +34,6 @@
 namespace Al {
 namespace internal {
 namespace mpi_cuda {
-
-RingMPICUDA &MPICUDACommunicator::get_ring() {
-  if (!m_ring)
-    m_ring = new RingMPICUDA(*this);
-  return *m_ring;
-}
 
 #ifdef AL_HAS_MPI_CUDA_RMA
 RMA &MPICUDACommunicator::get_rma() {
@@ -50,10 +43,7 @@ RMA &MPICUDACommunicator::get_rma() {
 }
 #endif
 
-MPICUDACommunicator::~MPICUDACommunicator() {
-  if (m_ring)
-    delete m_ring;
-}
+MPICUDACommunicator::~MPICUDACommunicator() {}
 
 } // namespace mpi_cuda
 } // namespace internal
