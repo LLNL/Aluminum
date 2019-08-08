@@ -64,8 +64,6 @@ template <>
 std::vector<typename Al::MPICUDABackend::allreduce_algo_type>
 get_allreduce_algorithms<Al::MPICUDABackend>() {
   std::vector<typename Al::MPICUDABackend::allreduce_algo_type> algos = {
-    Al::MPICUDABackend::allreduce_algo_type::ring,    
-    Al::MPICUDABackend::allreduce_algo_type::bi_ring,
     Al::MPICUDABackend::allreduce_algo_type::host_transfer
   };
   return algos;
@@ -75,8 +73,6 @@ template <>
 std::vector<typename Al::MPICUDABackend::allreduce_algo_type>
 get_nb_allreduce_algorithms<Al::MPICUDABackend>() {
   std::vector<typename Al::MPICUDABackend::allreduce_algo_type> algos = {
-    Al::MPICUDABackend::allreduce_algo_type::ring,
-    Al::MPICUDABackend::allreduce_algo_type::bi_ring,
     Al::MPICUDABackend::allreduce_algo_type::host_transfer
   };
   return algos;
