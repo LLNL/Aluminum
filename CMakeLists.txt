@@ -31,6 +31,7 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 option(ALUMINUM_ENABLE_CUDA "Enable CUDA support." OFF)
 option(ALUMINUM_ENABLE_MPI_CUDA "Enable MPI-CUDA support." OFF)
 option(ALUMINUM_ENABLE_NCCL "Enable NCCL support." OFF)
+option(ALUMINUM_ENABLE_CUDA_AWARE_MPI "Enable CUDA-aware MPI support." OFF)
 option(ALUMINUM_ENABLE_MPI_CUDA_RMA "Enable RMA in MPI-CUDA." OFF)
 if (ALUMINUM_ENABLE_MPI_CUDA_RMA AND NOT ALUMINUM_ENABLE_MPI_CUDA)
   message(STATUS "RMA in MPI-CUDA requested; enabling MPI-CUDA support, too.")
@@ -44,6 +45,10 @@ if (ALUMINUM_ENABLE_NCCL AND NOT ALUMINUM_ENABLE_CUDA)
   message(STATUS "NCCL support requested; enabling CUDA support, too.")
   set(ALUMINUM_ENABLE_CUDA ON)
 endif ()
+if (ALUMINUM_ENABLE_CUDA_AWARE_MPI AND NOT ALUMINUM_ENABLE_CUDA)
+  message(STATUS "CUDA-aware MPI support requested; enabling CUDA support, too.")
+  set(ALUMINUM_ENABLE_CUDA ON)
+endif()
 option(ALUMINUM_DEBUG_HANG_CHECK "Enable hang checking." OFF)
 option(ALUMINUM_ENABLE_NVPROF "Enable profiling via nvprof/NVTX." OFF)
 option(ALUMINUM_ENABLE_STREAM_MEM_OPS "Enable stream memory operations." OFF)
@@ -52,12 +57,14 @@ option(ALUMINUM_ENABLE_TRACE "Enable runtime tracing." OFF)
 
 if (ALUMINUM_ENABLE_CUDA
     AND NOT ALUMINUM_ENABLE_NCCL
-    AND NOT ALUMINUM_ENABLE_MPI_CUDA)
+    AND NOT ALUMINUM_ENABLE_MPI_CUDA
+    AND NOT ALUMINUM_ENABLE_CUDA_AWARE_MPI)
   message(FATAL_ERROR
     "CUDA has been enabled without a backend. "
     "This should not happen. "
     "Please turn on \"ALUMINUM_ENABLE_NCCL\" and/or "
-    "\"ALUMINUM_ENABLE_MPI_CUDA\" and reconfigure.")
+    "\"ALUMINUM_ENABLE_MPI_CUDA\" and/or "
+    "\"ALUMINUM_ENABLE_CUDA_AWARE_MPI\" and reconfigure.")
 endif ()
 
 if (CMAKE_BUILD_TYPE MATCHES Debug)
@@ -154,11 +161,13 @@ if (ALUMINUM_ENABLE_CUDA)
     enable_language(CUDA)
     set(AL_HAS_CUDA TRUE)
     if (ALUMINUM_ENABLE_MPI_CUDA)
-      set(AL_HAS_CUDA TRUE)
       set(AL_HAS_MPI_CUDA TRUE)
       if (ALUMINUM_ENABLE_MPI_CUDA_RMA)
 	set(AL_HAS_MPI_CUDA_RMA TRUE)
       endif ()
+    endif ()
+    if (ALUMINUM_ENABLE_CUDA_AWARE_MPI)
+      set(AL_HAS_CUDA_AWARE_MPI TRUE)
     endif ()
 
     # Add the cuda imported target

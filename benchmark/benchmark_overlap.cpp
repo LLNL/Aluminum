@@ -38,6 +38,9 @@
 #ifdef AL_HAS_MPI_CUDA
 #include "test_utils_mpi_cuda.hpp"
 #endif
+#ifdef AL_HAS_CUDA_AWARE_MPI
+#include "test_utils_cuda_aware_mpi.hpp"
+#endif
 
 size_t start_size = 1;
 size_t max_size = 1<<22;
@@ -68,6 +71,14 @@ void do_work<Al::MPICUDABackend>(size_t size, typename Al::MPICUDABackend::comm_
 }
 #endif
 
+#ifdef AL_HAS_CUDA_AWARE_MPI
+template <>
+void do_work<Al::CUDAAwareMPIBackend>(size_t size, typename Al::CUDAAwareMPIBackend::comm_type& comm) {
+  const double sleep_time = 0.0001*std::log2(size);
+  gpu_wait(sleep_time, comm.get_stream());
+}
+#endif
+
 template <typename Backend>
 typename Backend::comm_type get_comm();
 
@@ -92,6 +103,13 @@ typename Al::NCCLBackend::comm_type get_comm<Al::NCCLBackend>() {
 template <>
 typename Al::MPICUDABackend::comm_type get_comm<Al::MPICUDABackend>() {
   return typename Al::MPICUDABackend::comm_type(MPI_COMM_WORLD, bm_stream);
+}
+#endif
+
+#ifdef AL_HAS_CUDA_AWARE_MPI
+template <>
+typename Al::CUDAAwareMPIBackend::comm_type get_comm<Al::CUDAAwareMPIBackend>() {
+  return typename Al::CUDAAwareMPIBackend::comm_type(MPI_COMM_WORLD, bm_stream);
 }
 #endif
 
@@ -187,11 +205,15 @@ int main(int argc, char *argv[]) {
 #ifdef AL_HAS_NCCL
   } else if (backend == "NCCL") {
     do_benchmark<Al::NCCLBackend>();
-#endif    
+#endif
 #ifdef AL_HAS_MPI_CUDA
   } else if (backend == "MPI-CUDA") {
     do_benchmark<Al::MPICUDABackend>();
-#endif    
+#endif
+#ifdef AL_HAS_CUDA_AWARE_MPI
+  } else if (backend == "CUDA-AWARE-MPI") {
+    do_benchmark<Al::CUDAAwareMPIBackend>();
+#endif
   } else {
     std::cerr << "usage: " << argv[0] << " [MPI";
 #ifdef AL_HAS_NCCL
@@ -199,6 +221,9 @@ int main(int argc, char *argv[]) {
 #endif
 #ifdef AL_HAS_MPI_CUDA
     std::cerr << " | MPI-CUDA";
+#endif
+#ifdef AL_HAS_CUDA_AWARE_MPI
+    std::cerr << " | CUDA-AWARE-MPI";
 #endif
     std::cerr << "]" << std::endl;
     return -1;

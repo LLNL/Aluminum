@@ -34,6 +34,9 @@
 #ifdef AL_HAS_MPI_CUDA
 #include "test_utils_mpi_cuda.hpp"
 #endif
+#ifdef AL_HAS_CUDA_AWARE_MPI
+#include "test_utils_cuda_aware_mpi.hpp"
+#endif
 
 #include <stdlib.h>
 #include <math.h>
@@ -163,6 +166,10 @@ int main(int argc, char** argv) {
 #ifdef AL_HAS_MPI_CUDA
   } else if (backend == "MPI-CUDA") {
     test_correctness<Al::MPICUDABackend>();
+#endif
+#ifdef AL_HAS_CUDA_AWARE_MPI
+  } else if (backend == "CUDA-AWARE-MPI") {
+    test_correctness<Al::CUDAAwareMPIBackend>();
 #endif
   }
 

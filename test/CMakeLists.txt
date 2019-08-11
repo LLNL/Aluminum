@@ -12,6 +12,10 @@ if (AL_HAS_NCCL)
   list(APPEND TEST_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/test_utils_nccl_cuda.hpp)
 endif ()
 
+if (AL_HAS_CUDA_AWARE_MPI)
+  list(APPEND TEST_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/test_utils_cuda_aware_mpi.hpp)
+endif ()
+
 # These headers are used in the benchmark/ directory
 add_library(aluminum_test_headers INTERFACE)
 target_sources(aluminum_test_headers INTERFACE "${TEST_HEADERS}")

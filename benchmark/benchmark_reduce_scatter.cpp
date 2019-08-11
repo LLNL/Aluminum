@@ -34,6 +34,9 @@
 #ifdef AL_HAS_MPI_CUDA
 #include "test_utils_mpi_cuda.hpp"
 #endif
+#ifdef AL_HAS_CUDA_AWARE_MPI
+#include "test_utils_cuda_aware_mpi.hpp"
+#endif
 
 size_t start_size = 1;
 size_t max_size = 1<<28;
@@ -118,11 +121,15 @@ int main(int argc, char** argv) {
 #ifdef AL_HAS_NCCL
   } else if (backend == "NCCL") {
     do_benchmark<Al::NCCLBackend>(sizes);
-#endif    
+#endif
 #ifdef AL_HAS_MPI_CUDA
   } else if (backend == "MPI-CUDA") {
     do_benchmark<Al::MPICUDABackend>(sizes);
-#endif    
+#endif
+#ifdef AL_HAS_CUDA_AWARE_MPI
+  } else if (backend == "CUDA-AWARE-MPI") {
+    do_benchmark<Al::CUDAAwareMPIBackend>(sizes);
+#endif
   } else {
     std::cerr << "usage: " << argv[0] << " [MPI";
 #ifdef AL_HAS_NCCL
@@ -130,6 +137,9 @@ int main(int argc, char** argv) {
 #endif
 #ifdef AL_HAS_MPI_CUDA
     std::cerr << " | MPI-CUDA";
+#endif
+#ifdef AL_HAS_CUDA_AWARE_MPI
+    std::cerr << " | CUDA-AWARE-MPI";
 #endif
     std::cerr << "]" << std::endl;
     return -1;

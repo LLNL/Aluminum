@@ -35,6 +35,9 @@
 #ifdef AL_HAS_MPI_CUDA
 #include "test_utils_mpi_cuda.hpp"
 #endif
+#ifdef AL_HAS_CUDA_AWARE_MPI
+#include "test_utils_cuda_aware_mpi.hpp"
+#endif
 
 size_t max_size = 1<<20;
 const size_t num_concurrent = 1024;
@@ -123,6 +126,10 @@ int main(int argc, char** argv) {
   } else if (backend == "MPI-CUDA") {
     test_multiple_nballreduces<Al::MPICUDABackend>();
 #endif
+#ifdef AL_HAS_CUDA_AWARE_MPI
+  } else if (backend == "CUDA-AWARE-MPI") {
+    test_multiple_nballreduces<Al::CUDAAwareMPIBackend>();
+#endif
   } else {
     std::cerr << "usage: " << argv[0] << " [MPI";
 #ifdef AL_HAS_NCCL
@@ -130,6 +137,9 @@ int main(int argc, char** argv) {
 #endif
 #ifdef AL_HAS_MPI_CUDA
     std::cerr << " | MPI-CUDA";
+#endif
+#ifdef AL_HAS_CUDA_AWARE_MPI
+    std::cerr << " | CUDA-AWARE-MPI";
 #endif
     std::cerr << "]" << std::endl;
     return -1;

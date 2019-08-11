@@ -40,6 +40,14 @@ if (AL_HAS_NCCL)
   list(APPEND THIS_DIR_CXX_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/nccl_impl.cpp")
 endif ()
 
+if (AL_HAS_CUDA_AWARE_MPI)
+  list(APPEND THIS_DIR_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/cuda_aware_mpi_impl.hpp")
+  list(APPEND THIS_DIR_CXX_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/cuda_aware_mpi_impl.cpp")
+
+  add_subdirectory(cuda_aware_mpi)
+endif ()
+
 set(ALUMINUM_HEADERS "${HEADERS}" "${THIS_DIR_HEADERS}")
 set(ALUMINUM_CXX_SOURCES "${CXX_SOURCES}" "${THIS_DIR_CXX_SOURCES}")
 set(ALUMINUM_CUDA_SOURCES "${CUDA_SOURCES}" "${THIS_DIR_CUDA_SOURCES}")
