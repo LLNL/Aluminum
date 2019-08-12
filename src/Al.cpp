@@ -126,6 +126,9 @@ void Initialize(int& argc, char**& argv) {
 #ifdef AL_HAS_MPI_CUDA
   internal::mpi_cuda::init(argc, argv);
 #endif
+#ifdef AL_HAS_CUDA_AWARE_MPI
+  internal::cuda_aware_mpi::init(argc, argv);
+#endif
 
   // Add signal handlers.
   const std::vector<int> handled_signals = {SIGILL, SIGABRT, SIGFPE,
