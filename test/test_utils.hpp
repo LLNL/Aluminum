@@ -381,19 +381,27 @@ void print_stats(std::vector<double>& times) {
 template <typename Backend, typename AlgoType>
 struct CollectiveProfile {
   CollectiveProfile(std::string coll_name_) : coll_name(coll_name_) {}
+  // Size is expected to be the size of a single segment.
   void add_result(const typename Backend::comm_type& comm,
                   size_t size, AlgoType algo,
-                  bool inplace, double t) {
-    results.emplace_back(std::make_tuple(
-                           comm.size(), comm.rank(), size, algo, inplace, t));
+                  bool inplace, double t,
+                  size_t num_segments = 1, bool mod_segments = true) {
+    results.emplace_back(
+      std::make_tuple(
+        comm.size(), comm.rank(), size, algo, inplace, t,
+        num_segments, mod_segments));
   }
   void print_result_table() {
     // Print header.
-    std::cout << "Backend Collective CommSize CommRank CollSize Algo InPlace Time" << std::endl;
+    std::cout << "Backend Collective CommSize Segments ModSeg CommRank "
+              << "CollSize Algo InPlace Time" << std::endl;
     for (const auto& result : results) {
+      size_t segments = std::get<6>(result);
       std::cout << Backend::Name() << " "
                 << coll_name << " "
-                << std::get<0>(result) << " "
+                << (std::get<0>(result)*segments) << " "
+                << segments << " "
+                << std::get<7>(result) << " "
                 << std::get<1>(result) << " "
                 << std::get<2>(result) << " "
                 << Al::algorithm_name(std::get<3>(result)) << " "
@@ -403,13 +411,16 @@ struct CollectiveProfile {
     std::flush(std::cout);
   }
   std::string coll_name;
-  // Communicator size, rank, collective size, algorithm, inplace time.
+  // Communicator size, rank, collective size, algorithm, inplace time,
+  // number of segments, whether segments are computed modulo rank
   std::vector<std::tuple<int,
                          int,
                          size_t,
                          AlgoType,
                          bool,
-                         double>>
+                         double,
+                         size_t,
+                         bool>>
                    results;
 };
 

@@ -3,7 +3,8 @@ set(BENCHMARK_SRCS
   benchmark_allreduces.cpp
   benchmark_nballreduces.cpp
   benchmark_reduce_scatter.cpp
-  benchmark_reductions.cpp)
+  benchmark_reductions.cpp
+  benchmark_segallreduces.cpp)
 
 foreach(src ${BENCHMARK_SRCS})
   string(REPLACE ".cpp" ".exe" _benchmark_exe_name "${src}")
