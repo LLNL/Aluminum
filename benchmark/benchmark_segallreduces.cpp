@@ -13,6 +13,8 @@ size_t start_size = 1;
 size_t max_size = 1<<28;
 const size_t num_trials = 20;
 
+#ifdef AL_HAS_CUDA
+
 template <typename Backend>
 void time_allreduce_algo(typename VectorType<Backend>::type input,
                          typename Backend::comm_type& comm,
@@ -74,6 +76,8 @@ void do_benchmark(const std::vector<size_t>& sizes,
   }
 }
 
+#endif  // AL_HAS_CUDA
+
 std::vector<size_t> load_sizes(const char* filename) {
   std::vector<size_t> sizes;
   std::ifstream f(filename);
@@ -104,6 +108,12 @@ int main(int argc, char** argv) {
   size_t num_segments = std::atoi(argv[2]);
   bool seg_mod = (bool) std::atoi(argv[3]);
   std::vector<size_t> sizes = load_sizes(argv[4]);
+
+#ifndef AL_HAS_CUDA
+  // Suppress unused variable warning.
+  (void) num_segments;
+  (void) seg_mod;
+#endif
   
   if (backend == "MPI") {
     // Not supported right now for simplicity.
