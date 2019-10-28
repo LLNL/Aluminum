@@ -524,7 +524,7 @@ class HTBackend {
       throw_al_exception("Host-transfer allreduce not supported without stream memory operations");
     }
 #endif // 0
-    internal::ht::HostTransferState<T>* state = new internal::ht::HostTransferState<T>(
+    internal::ht::AllreduceAlState<T>* state = new internal::ht::AllreduceAlState<T>(
       sendbuf, recvbuf, count, op, comm, internal_stream, internal::get_free_request());
     internal::get_progress_engine()->enqueue(state);
   }

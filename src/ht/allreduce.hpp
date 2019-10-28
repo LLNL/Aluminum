@@ -39,11 +39,11 @@ namespace ht {
 
 /** Progress engine state for the host-transfer allreduce. */
 template <typename T>
-class HostTransferState : public AlState {
+class AllreduceAlState : public AlState {
  public:
-  HostTransferState(const T* sendbuf, T* recvbuf, size_t count,
-                    ReductionOperator op, HTCommunicator& comm,
-                    cudaStream_t stream, AlRequest req_) :
+  AllreduceAlState(const T* sendbuf, T* recvbuf, size_t count,
+                   ReductionOperator op, HTCommunicator& comm,
+                   cudaStream_t stream, AlRequest req_) :
     AlState(req_),
     host_mem(get_pinned_memory<T>(count)),
     compute_stream(comm.get_stream()) {
@@ -80,7 +80,7 @@ class HostTransferState : public AlState {
     h2d_event.record(stream);
   }
 
-  ~HostTransferState() {
+  ~AllreduceAlState() {
     delete host_ar;
     release_pinned_memory(host_mem);
   }
