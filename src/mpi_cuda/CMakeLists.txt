@@ -1,14 +1,5 @@
 set_full_path(THIS_DIR_HEADERS
-  allgather.hpp
-  allreduce.hpp
-  alltoall.hpp
-  bcast.hpp
   communicator.hpp
-  gather.hpp
-  reduce.hpp
-  reduce_scatter.hpp
-  scatter.hpp
-  pt2pt.hpp
   util.hpp
   )
 

@@ -31,8 +31,8 @@
 #ifdef AL_HAS_NCCL
 #include "test_utils_nccl_cuda.hpp"
 #endif
-#ifdef AL_HAS_MPI_CUDA
-#include "test_utils_mpi_cuda.hpp"
+#ifdef AL_HAS_HOST_TRANSFER
+#include "test_utils_host_transfer_cuda.hpp"
 #endif
 
 size_t start_size = 1;
@@ -59,10 +59,10 @@ typename Al::NCCLBackend::comm_type get_comm<Al::NCCLBackend>() {
 }
 #endif
 
-#ifdef AL_HAS_MPI_CUDA
+#ifdef AL_HAS_HOST_TRANSFER
 template <>
-typename Al::MPICUDABackend::comm_type get_comm<Al::MPICUDABackend>() {
-  return typename Al::MPICUDABackend::comm_type(MPI_COMM_WORLD, bm_stream);
+typename Al::HTBackend::comm_type get_comm<Al::HTBackend>() {
+  return typename Al::HTBackend::comm_type(MPI_COMM_WORLD, bm_stream);
 }
 #endif
 
@@ -256,17 +256,17 @@ int main(int argc, char** argv) {
   } else if (backend == "NCCL") {
     do_benchmark<Al::NCCLBackend>();
 #endif    
-#ifdef AL_HAS_MPI_CUDA
-  } else if (backend == "MPI-CUDA") {
-    do_benchmark<Al::MPICUDABackend>();
+#ifdef AL_HAS_HOST_TRANSFER
+  } else if (backend == "HT") {
+    do_benchmark<Al::HTBackend>();
 #endif    
   } else {
     std::cerr << "usage: " << argv[0] << " [MPI";
 #ifdef AL_HAS_NCCL
     std::cerr << " | NCCL";
 #endif
-#ifdef AL_HAS_MPI_CUDA
-    std::cerr << " | MPI-CUDA";
+#ifdef AL_HAS_HOST_TRANSFER
+    std::cerr << " | HT";
 #endif
     std::cerr << "]" << std::endl;
     return -1;

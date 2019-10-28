@@ -126,6 +126,9 @@ void Initialize(int& argc, char**& argv) {
 #ifdef AL_HAS_MPI_CUDA
   internal::mpi_cuda::init(argc, argv);
 #endif
+#ifdef AL_HAS_HOST_TRANSFER
+  internal::ht::init(argc, argv);
+#endif
 
   // Add signal handlers.
   const std::vector<int> handled_signals = {SIGILL, SIGABRT, SIGFPE,
@@ -145,6 +148,9 @@ void Finalize() {
     return;
   }
   // Finalize in reverse order of initialization.
+#ifdef AL_HAS_HOST_TRANSFER
+  internal::ht::finalize();
+#endif
 #ifdef AL_HAS_MPI_CUDA
   internal::mpi_cuda::finalize();
 #endif

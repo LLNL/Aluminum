@@ -28,89 +28,72 @@
 #pragma once
 
 #include "cuda.hpp"
-#include "mpi_cuda/communicator.hpp"
+#include "ht/communicator.hpp"
 #include "progress.hpp"
 
 namespace Al {
 namespace internal {
-namespace mpi_cuda {
+namespace ht {
 
 template <typename T>
-class ScatterAlState : public AlState {
+class BcastAlState : public AlState {
 public:
-  ScatterAlState(const T* sendbuf, T* recvbuf, size_t count, int root,
-                MPICUDACommunicator& comm, cudaStream_t stream) :
+  BcastAlState(T* buf, size_t count, int root,
+               HTCommunicator& comm, cudaStream_t stream) :
     AlState(nullptr),
     rank_(comm.rank()), root_(root), count_(count),
-    host_mem_(get_pinned_memory<T>(rank_ == root_
-                                   ? comm.size()*count_ : count_)),
+    host_mem_(get_pinned_memory<T>(count_)),
     comm_(comm.get_comm()),
     compute_stream(comm.get_stream()) {
 
     bool const i_am_root = rank_ == root_;
-    bool const inplace_operation = sendbuf == recvbuf;
 
+    // Transfer data from device to host and use an event to determine when it
+    // completes.
     if (i_am_root) {
-      // Transfer the data to scatter from device to host.
       AL_CHECK_CUDA(cudaMemcpyAsync(
-                      host_mem_, sendbuf, sizeof(T)*count_*comm.size(),
+                      host_mem_, buf, sizeof(T)*count_,
                       cudaMemcpyDeviceToHost, stream));
-      d2h_event_.record(stream);
-      // Root only needs to copy its data to its final destination on the
-      // device when it's not in place.
-      if (!inplace_operation) {
-        AL_CHECK_CUDA(cudaMemcpyAsync(
-                        recvbuf, sendbuf + rank_*count_,
-                        count_*sizeof(T), cudaMemcpyDeviceToDevice, stream));
-      }
-      gpuwait_.wait(stream);  // Block until comm is initiated.
-    } else {
-      d2h_event_.record(stream);  // Ensure comm not started early.
-      // Block device until data can be transferred.
-      gpuwait_.wait(stream);
+    }
+    d2h_event_.record(stream);
+    gpuwait_.wait(stream);
+
+    if (!i_am_root) {
       // Transfer completed buffer back to device.
-      AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, host_mem_, sizeof(T)*count,
+      AL_CHECK_CUDA(cudaMemcpyAsync(buf, host_mem_, sizeof(T)*count_,
                                     cudaMemcpyHostToDevice, stream));
       h2d_event_.record(stream);
     }
   }
 
-  ~ScatterAlState() override {
+  ~BcastAlState() override {
     release_pinned_memory(host_mem_);
   }
 
   bool step() override {
-    if (!scatter_started_) {
-      // Check if mem xfer complete
+    if (!bcast_started_) {
       if (d2h_event_.query()) {
-        if (root_ == rank_) {
-          MPI_Iscatter(host_mem_, count_, mpi::TypeMap<T>(),
-                       MPI_IN_PLACE, count_, mpi::TypeMap<T>(),
-                       root_, comm_, &req_);
-          // Root can unblock the device here.
+        MPI_Ibcast(host_mem_, count_, mpi::TypeMap<T>(),
+                     root_, comm_, &req_);
+        if (rank_ == root_) {
           gpuwait_.signal();
-        } else {
-          MPI_Iscatter(host_mem_, count_, mpi::TypeMap<T>(),
-                       host_mem_, count_, mpi::TypeMap<T>(),
-                       root_, comm_, &req_);
         }
-        scatter_started_ = true;
-      }
-      else {
+        bcast_started_ = true;
+      } else {
         return false;
       }
     }
 
-    if (!scatter_done_) {
-      // Wait for the scatter to complete
+    if (!bcast_done_) {
+      // Wait for the bcast to complete
       int flag;
       MPI_Test(&req_, &flag, MPI_STATUS_IGNORE);
       if (flag) {
-        scatter_done_ = true;
-        if (rank_ == root_) {
-          return true;
-        } else {
+        bcast_done_ = true;
+        if (rank_ != root_) {
           gpuwait_.signal();
+        } else {
+          return true;
         }
       }
       else {
@@ -127,7 +110,8 @@ public:
 
   bool needs_completion() const override { return false; }
   void* get_compute_stream() const override { return compute_stream; }
-  std::string get_name() const override { return "HTScatter"; }
+
+  std::string get_name() const override { return "HTBcast"; }
 
 private:
   int rank_;
@@ -142,12 +126,12 @@ private:
   MPI_Comm comm_;
   MPI_Request req_ = MPI_REQUEST_NULL;
 
-  bool scatter_started_ = false;
-  bool scatter_done_ = false;
+  bool bcast_started_ = false;
+  bool bcast_done_ = false;
 
   cudaStream_t compute_stream;
 };
 
-}  // namespace mpi_cuda
+}  // namespace ht
 }  // namespace internal
 }  // namespace Al

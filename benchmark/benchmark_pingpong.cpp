@@ -28,9 +28,9 @@
 #include <iostream>
 #include "Al.hpp"
 #include "test_utils.hpp"
-#ifdef AL_HAS_MPI_CUDA
+#ifdef AL_HAS_HOST_TRANSFER
 #include "test_utils_cuda.hpp"
-#include "test_utils_mpi_cuda.hpp"
+#include "test_utils_host_transfer_cuda.hpp"
 #include "wait.hpp"
 #endif
 
@@ -40,12 +40,12 @@ size_t max_size = 1<<18;
 //size_t max_size = 256;
 size_t num_trials = 10000;
 
-#ifdef AL_HAS_MPI_CUDA
+#ifdef AL_HAS_HOST_TRANSFER
 
 void do_benchmark() {
   cudaStream_t stream;
   cudaStreamCreate(&stream);
-  typename Al::MPICUDABackend::comm_type comm(MPI_COMM_WORLD, stream);
+  typename Al::HTBackend::comm_type comm(MPI_COMM_WORLD, stream);
   for (size_t size = start_size; size <= max_size; size *= 2) {
     if (comm.rank() == 0) std::cout << "Benchmarking size " << human_readable_size(size) << std::endl;
     std::vector<double> times, sendrecv_times, host_times;
@@ -73,28 +73,28 @@ void do_benchmark() {
     MPI_Barrier(MPI_COMM_WORLD);
     for (size_t trial = 0; trial < num_trials; ++trial) {
       gpu_wait(0.0001, stream);
-      start_timer<Al::MPICUDABackend>(comm);
+      start_timer<Al::HTBackend>(comm);
       if (comm.rank() == 0) {
-        Al::Send<Al::MPICUDABackend>(sendbuf.data(), size, 1, comm);
-        Al::Recv<Al::MPICUDABackend>(recvbuf.data(), size, 1, comm);
+        Al::Send<Al::HTBackend>(sendbuf.data(), size, 1, comm);
+        Al::Recv<Al::HTBackend>(recvbuf.data(), size, 1, comm);
       } else if (comm.rank() == 1) {
-        Al::Recv<Al::MPICUDABackend>(recvbuf.data(), size, 0, comm);
-        Al::Send<Al::MPICUDABackend>(sendbuf.data(), size, 0, comm);
+        Al::Recv<Al::HTBackend>(recvbuf.data(), size, 0, comm);
+        Al::Send<Al::HTBackend>(sendbuf.data(), size, 0, comm);
       }
-      times.push_back(finish_timer<Al::MPICUDABackend>(comm) / 2);
+      times.push_back(finish_timer<Al::HTBackend>(comm) / 2);
     }
     MPI_Barrier(MPI_COMM_WORLD);
     for (size_t trial = 0; trial < num_trials; ++trial) {
       gpu_wait(0.0001, stream);
-      start_timer<Al::MPICUDABackend>(comm);
+      start_timer<Al::HTBackend>(comm);
       if (comm.rank() == 0) {
-        Al::SendRecv<Al::MPICUDABackend>(
+        Al::SendRecv<Al::HTBackend>(
           sendbuf.data(), size, 1, recvbuf.data(), size, 1, comm);
       } else if (comm.rank() == 1) {
-        Al::SendRecv<Al::MPICUDABackend>(
+        Al::SendRecv<Al::HTBackend>(
           sendbuf.data(), size, 0, recvbuf.data(), size, 0, comm);
       }
-      sendrecv_times.push_back(finish_timer<Al::MPICUDABackend>(comm) / 2);
+      sendrecv_times.push_back(finish_timer<Al::HTBackend>(comm) / 2);
     }
     times.erase(times.begin());
     host_times.erase(host_times.begin());
@@ -103,9 +103,9 @@ void do_benchmark() {
       std::cout << "Rank 0:" << std::endl;
       std::cout << "host ";
       print_stats(host_times);
-      std::cout << "mpicuda ";
+      std::cout << "ht ";
       print_stats(times);
-      std::cout << "mpicuda SR ";
+      std::cout << "ht SR ";
       print_stats(times);
     }
     MPI_Barrier(MPI_COMM_WORLD);
@@ -113,9 +113,9 @@ void do_benchmark() {
       std::cout << "Rank 1:" << std::endl;
       std::cout << "host ";
       print_stats(host_times);
-      std::cout << "mpicuda ";
+      std::cout << "ht ";
       print_stats(times);
-      std::cout << "mpicuda SR ";
+      std::cout << "ht SR ";
       print_stats(times);
     }
     MPI_Barrier(MPI_COMM_WORLD);
@@ -123,10 +123,10 @@ void do_benchmark() {
   cudaStreamDestroy(stream);
 }
 
-#endif  // AL_HAS_MPI_CUDA
+#endif  // AL_HAS_HOST_TRANSFER
 
 int main(int argc, char** argv) {
-#ifdef AL_HAS_MPI_CUDA
+#ifdef AL_HAS_HOST_TRANSFER
   set_device();
   Al::Initialize(argc, argv);
   do_benchmark();
@@ -134,7 +134,7 @@ int main(int argc, char** argv) {
 #else
   (void) argc;
   (void) argv;
-  std::cout << "MPI-CUDA support required" << std::endl;
+  std::cout << "Host-transfer support required" << std::endl;
 #endif
   return 0;
 }

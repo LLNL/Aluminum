@@ -5,8 +5,8 @@
 #ifdef AL_HAS_NCCL
 #include "test_utils_nccl_cuda.hpp"
 #endif
-#ifdef AL_HAS_MPI_CUDA
-#include "test_utils_mpi_cuda.hpp"
+#ifdef AL_HAS_HOST_TRANSFER
+#include "test_utils_host_transfer_cuda.hpp"
 #endif
 
 size_t start_size = 1;
@@ -114,12 +114,12 @@ int main(int argc, char** argv) {
   } else if (backend == "NCCL") {
     do_benchmark<Al::NCCLBackend>(sizes, num_segments, seg_mod);
 #endif    
-#ifdef AL_HAS_MPI_CUDA
-  } else if (backend == "MPI-CUDA") {
-    do_benchmark<Al::MPICUDABackend>(sizes, num_segments, seg_mod);
+#ifdef AL_HAS_HOST_TRANSFER
+  } else if (backend == "HT") {
+    do_benchmark<Al::HTBackend>(sizes, num_segments, seg_mod);
 #endif    
   } else {
-    std::cerr << "Usage: " << argv[0] << " [NCCL | MPI-CUDA] #segments modseg sizes" << std::endl;
+    std::cerr << "Usage: " << argv[0] << " [NCCL | HT] #segments modseg sizes" << std::endl;
     return -1;
   }
 

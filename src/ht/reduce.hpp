@@ -28,92 +28,80 @@
 #pragma once
 
 #include "cuda.hpp"
-#include "mpi_cuda/communicator.hpp"
+#include "ht/communicator.hpp"
 #include "progress.hpp"
 
 namespace Al {
 namespace internal {
-namespace mpi_cuda {
+namespace ht {
 
 template <typename T>
-class GatherAlState : public AlState {
+class ReduceAlState : public AlState {
 public:
-  GatherAlState(const T* sendbuf, T* recvbuf, size_t count, int root,
-                MPICUDACommunicator& comm, cudaStream_t stream) :
+  ReduceAlState(const T* sendbuf, T* recvbuf, size_t count, ReductionOperator op,
+                int root, HTCommunicator& comm, cudaStream_t stream) :
     AlState(nullptr),
     rank_(comm.rank()), root_(root), count_(count),
-    host_mem_(get_pinned_memory<T>(rank_ == root_ ? comm.size()*count_ : count_)),
+    host_mem_(get_pinned_memory<T>(count_)),
+    op_(mpi::ReductionOperator2MPI_Op(op)),
     comm_(comm.get_comm()),
     compute_stream(comm.get_stream()) {
 
     bool const i_am_root = rank_ == root_;
-    bool const inplace_operation = sendbuf == recvbuf;
 
     // Transfer data from device to host and use an event to determine when it
     // completes.
-    if (i_am_root)
-      AL_CHECK_CUDA(cudaMemcpyAsync(
-                      host_mem_+rank_*count_,
-                      inplace_operation ? sendbuf+rank_*count_ : sendbuf,
-                      sizeof(T)*count, cudaMemcpyDeviceToHost, stream));
-    else
-      AL_CHECK_CUDA(cudaMemcpyAsync(host_mem_, sendbuf, sizeof(T)*count_,
-                                    cudaMemcpyDeviceToHost, stream));
+    AL_CHECK_CUDA(cudaMemcpyAsync(host_mem_, sendbuf, sizeof(T)*count_,
+                                  cudaMemcpyDeviceToHost, stream));
     d2h_event_.record(stream);
     gpuwait_.wait(stream);
 
     if (i_am_root) {
       // Transfer completed buffer back to device.
-      AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, host_mem_, sizeof(T)*count*comm.size(),
+      AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, host_mem_, sizeof(T)*count,
                                     cudaMemcpyHostToDevice, stream));
       h2d_event_.record(stream);
     }
   }
 
-  ~GatherAlState() override {
+  ~ReduceAlState() override {
     release_pinned_memory(host_mem_);
   }
 
   bool step() override {
-    if (!gather_started_) {
+    if (!reduce_started_) {
       // Check if mem xfer complete
       if (d2h_event_.query()) {
         if (root_ == rank_) {
-          MPI_Igather(MPI_IN_PLACE, count_, mpi::TypeMap<T>(),
-                      host_mem_, count_, mpi::TypeMap<T>(),
-                      root_, comm_, &req_);
+          MPI_Ireduce(MPI_IN_PLACE, host_mem_, count_, mpi::TypeMap<T>(),
+                      op_, root_, comm_, &req_);
         } else {
-          MPI_Igather(host_mem_, count_, mpi::TypeMap<T>(),
-                      host_mem_, count_, mpi::TypeMap<T>(),
-                      root_, comm_, &req_);
+          MPI_Ireduce(host_mem_, host_mem_, count_, mpi::TypeMap<T>(),
+                      op_, root_, comm_, &req_);
           gpuwait_.signal();
         }
-        gather_started_ = true;
+        reduce_started_ = true;
       }
       else {
         return false;
       }
     }
 
-    if (!gather_done_) {
-      // Wait for the gather to complete
+    if (!reduce_done_) {
+      // Wait for the reduce to complete
       int flag;
       MPI_Test(&req_, &flag, MPI_STATUS_IGNORE);
       if (flag) {
-        gather_done_ = true;
-        if (rank_ == root_)
+        reduce_done_ = true;
+        if (rank_ == root_) {
           gpuwait_.signal();
-        else
+        } else {
           return true;
+        }
       }
       else {
         return false;
       }
-    }
-    else if (rank_ != root_) {
-      // Paranoia, in case step() is ever called again after returning
-      // 'true' for the first time.
-      return true;
     }
 
     // Wait for host-to-device memcopy; cleanup
@@ -126,8 +114,7 @@ public:
 
   bool needs_completion() const override { return false; }
   void* get_compute_stream() const override { return compute_stream; }
-
-  std::string get_name() const override { return "HTGather"; }
+  std::string get_name() const override { return "HTReduce"; }
 
 private:
   int rank_;
@@ -139,15 +126,16 @@ private:
 
   cuda::FastEvent d2h_event_, h2d_event_;
 
+  MPI_Op op_;
   MPI_Comm comm_;
   MPI_Request req_ = MPI_REQUEST_NULL;
 
-  bool gather_started_ = false;
-  bool gather_done_ = false;
+  bool reduce_started_ = false;
+  bool reduce_done_ = false;
 
   cudaStream_t compute_stream;
 };
 
-}  // namespace mpi_cuda
+}  // namespace ht
 }  // namespace internal
 }  // namespace Al

@@ -28,21 +28,23 @@
 #pragma once
 
 #include "cuda.hpp"
-#include "mpi_cuda/communicator.hpp"
+#include "ht/communicator.hpp"
 #include "progress.hpp"
 
 namespace Al {
 namespace internal {
-namespace mpi_cuda {
+namespace ht {
 
 template <typename T>
-class AlltoallAlState : public AlState {
+class ReduceScatterAlState : public AlState {
 public:
-  AlltoallAlState(const T* sendbuf, T* recvbuf, size_t count,
-                  MPICUDACommunicator& comm, cudaStream_t stream) :
+  ReduceScatterAlState(const T* sendbuf, T* recvbuf, size_t count,
+                       ReductionOperator op, HTCommunicator& comm,
+                       cudaStream_t stream) :
     AlState(nullptr),
-    host_mem_(get_pinned_memory<T>(comm.size()*count)),
     count_(count),
+    host_mem_(get_pinned_memory<T>(comm.size()*count_)),
+    op_(mpi::ReductionOperator2MPI_Op(op)),
     comm_(comm.get_comm()),
     compute_stream(comm.get_stream()) {
 
@@ -52,75 +54,65 @@ public:
                                   cudaMemcpyDeviceToHost, stream));
     d2h_event_.record(stream);
 
-    // Enqueue the kernel to wait on the host
+    // Have the device wait on the host.
     gpuwait_.wait(stream);
 
     // Transfer completed buffer back to device.
-    AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, host_mem_, sizeof(T)*count*comm.size(),
+    AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, host_mem_, sizeof(T)*count,
                                   cudaMemcpyHostToDevice, stream));
     h2d_event_.record(stream);
   }
 
-  ~AlltoallAlState() override {
+  ~ReduceScatterAlState() override {
     release_pinned_memory(host_mem_);
   }
 
   bool step() override {
-    if (!a2a_started_) {
-      // Check if mem xfer complete
+    if (!rs_started_) {
+      // Wait for memory to get to the host.
       if (d2h_event_.query()) {
-        MPI_Ialltoall(MPI_IN_PLACE, count_, mpi::TypeMap<T>(),
-                      host_mem_, count_, mpi::TypeMap<T>(), comm_, &req_);
-        a2a_started_ = true;
-      }
-      else {
+        MPI_Ireduce_scatter_block(MPI_IN_PLACE, host_mem_, count_,
+                                  mpi::TypeMap<T>(), op_, comm_, &req_);
+        rs_started_ = true;
+      } else {
         return false;
       }
     }
-
-    if (!a2a_done_) {
-      // Wait for the all2all to complete
+    if (!rs_done_) {
+      // Wait for the RS to complete.
       int flag;
       MPI_Test(&req_, &flag, MPI_STATUS_IGNORE);
       if (flag) {
-        a2a_done_ = true;
+        rs_done_ = true;
         gpuwait_.signal();
-      }
-      else {
+      } else {
         return false;
       }
     }
-
     // Wait for host-to-device memcopy; cleanup
     if (h2d_event_.query()) {
       return true;
     }
-
     return false;
   }
 
   bool needs_completion() const override { return false; }
   void* get_compute_stream() const override { return compute_stream; }
-
-  std::string get_name() const override { return "HTAlltoall"; }
+  std::string get_name() const override { return "HTReduceScatter"; }
 
 private:
-  T* host_mem_;
   size_t count_;
-
+  T* host_mem_;
   cuda::GPUWait gpuwait_;
-
   cuda::FastEvent d2h_event_, h2d_event_;
-
+  MPI_Op op_;
   MPI_Comm comm_;
   MPI_Request req_ = MPI_REQUEST_NULL;
-
-  bool a2a_started_ = false;
-  bool a2a_done_ = false;
-
+  bool rs_started_ = false;
+  bool rs_done_ = false;
   cudaStream_t compute_stream;
 };
 
-}  // namespace mpi_cuda
+}  // namespace ht
 }  // namespace internal
 }  // namespace Al

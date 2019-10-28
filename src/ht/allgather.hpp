@@ -28,91 +28,110 @@
 #pragma once
 
 #include "cuda.hpp"
-#include "mpi_cuda/communicator.hpp"
+#include "ht/communicator.hpp"
 #include "progress.hpp"
 
 namespace Al {
 namespace internal {
-namespace mpi_cuda {
+namespace ht {
 
 template <typename T>
-class ReduceScatterAlState : public AlState {
+class AllgatherAlState : public AlState {
 public:
-  ReduceScatterAlState(const T* sendbuf, T* recvbuf, size_t count,
-                       ReductionOperator op, MPICUDACommunicator& comm,
-                       cudaStream_t stream) :
+  AllgatherAlState(const T* sendbuf, T* recvbuf, size_t count,
+                   HTCommunicator& comm, cudaStream_t stream) :
     AlState(nullptr),
+    host_mem_(get_pinned_memory<T>(comm.size()*count)),
     count_(count),
-    host_mem_(get_pinned_memory<T>(comm.size()*count_)),
-    op_(mpi::ReductionOperator2MPI_Op(op)),
     comm_(comm.get_comm()),
     compute_stream(comm.get_stream()) {
 
+    int const rank = comm.rank();
+    bool const inplace_operation = sendbuf == recvbuf;
+
     // Transfer data from device to host and use an event to determine when it
     // completes.
-    AL_CHECK_CUDA(cudaMemcpyAsync(host_mem_, sendbuf, sizeof(T)*count*comm.size(),
-                                  cudaMemcpyDeviceToHost, stream));
+    if (inplace_operation) {
+      AL_CHECK_CUDA(cudaMemcpyAsync(host_mem_ + rank*count_,
+                                    sendbuf + rank*count_,
+                                    sizeof(T)*count_, cudaMemcpyDeviceToHost,
+                                    stream));
+    } else {
+      AL_CHECK_CUDA(cudaMemcpyAsync(host_mem_ + rank*count_,
+                                    sendbuf, sizeof(T)*count_,
+                                    cudaMemcpyDeviceToHost, stream));
+    }
     d2h_event_.record(stream);
 
-    // Have the device wait on the host.
+    // Enqueue the kernel to wait on the host
     gpuwait_.wait(stream);
 
     // Transfer completed buffer back to device.
-    AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, host_mem_, sizeof(T)*count,
+    AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, host_mem_, sizeof(T)*count*comm.size(),
                                   cudaMemcpyHostToDevice, stream));
     h2d_event_.record(stream);
   }
 
-  ~ReduceScatterAlState() override {
+  ~AllgatherAlState() override {
     release_pinned_memory(host_mem_);
   }
 
   bool step() override {
-    if (!rs_started_) {
-      // Wait for memory to get to the host.
+    if (!ag_started_) {
+      // Check if mem xfer complete
       if (d2h_event_.query()) {
-        MPI_Ireduce_scatter_block(MPI_IN_PLACE, host_mem_, count_,
-                                  mpi::TypeMap<T>(), op_, comm_, &req_);
-        rs_started_ = true;
-      } else {
+        MPI_Iallgather(MPI_IN_PLACE, count_, mpi::TypeMap<T>(),
+                       host_mem_, count_, mpi::TypeMap<T>(), comm_, &req_);
+        ag_started_ = true;
+      }
+      else {
         return false;
       }
     }
-    if (!rs_done_) {
-      // Wait for the RS to complete.
+
+    if (!ag_done_) {
+      // Wait for the all2all to complete
       int flag;
       MPI_Test(&req_, &flag, MPI_STATUS_IGNORE);
       if (flag) {
-        rs_done_ = true;
+        ag_done_ = true;
         gpuwait_.signal();
-      } else {
+      }
+      else {
         return false;
       }
     }
+
     // Wait for host-to-device memcopy; cleanup
     if (h2d_event_.query()) {
       return true;
     }
+
     return false;
   }
 
   bool needs_completion() const override { return false; }
   void* get_compute_stream() const override { return compute_stream; }
-  std::string get_name() const override { return "HTReduceScatter"; }
+
+  std::string get_name() const override { return "HTAllgather"; }
 
 private:
-  size_t count_;
   T* host_mem_;
+  size_t count_;
+
   cuda::GPUWait gpuwait_;
+
   cuda::FastEvent d2h_event_, h2d_event_;
-  MPI_Op op_;
+
   MPI_Comm comm_;
   MPI_Request req_ = MPI_REQUEST_NULL;
-  bool rs_started_ = false;
-  bool rs_done_ = false;
+
+  bool ag_started_ = false;
+  bool ag_done_ = false;
+
   cudaStream_t compute_stream;
 };
 
-}  // namespace mpi_cuda
+}  // namespace ht
 }  // namespace internal
 }  // namespace Al

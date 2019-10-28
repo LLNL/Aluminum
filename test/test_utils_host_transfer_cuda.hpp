@@ -32,26 +32,26 @@
 #include "test_utils_cuda.hpp"
 
 template <>
-struct VectorType<Al::MPICUDABackend> {
+struct VectorType<Al::HTBackend> {
   using type = CUDAVector<float>;
 };
 
 template <>
-typename VectorType<Al::MPICUDABackend>::type
-gen_data<Al::MPICUDABackend>(size_t count) {
+typename VectorType<Al::HTBackend>::type
+gen_data<Al::HTBackend>(size_t count) {
   auto &&host_data = gen_data<Al::MPIBackend>(count);
   CUDAVector<float> data(host_data);
   return data;
 }
 
 template <>
-inline void start_timer<Al::MPICUDABackend>(typename Al::MPICUDABackend::comm_type& comm) {
+inline void start_timer<Al::HTBackend>(typename Al::HTBackend::comm_type& comm) {
   cudaEvent_t start = get_timer_events().first;
   AL_FORCE_CHECK_CUDA_NOSYNC(cudaEventRecord(start, comm.get_stream()));
 }
 
 template <>
-inline double finish_timer<Al::MPICUDABackend>(typename Al::MPICUDABackend::comm_type& comm) {
+inline double finish_timer<Al::HTBackend>(typename Al::HTBackend::comm_type& comm) {
   std::pair<cudaEvent_t, cudaEvent_t> events = get_timer_events();
   AL_FORCE_CHECK_CUDA_NOSYNC(cudaEventRecord(events.second, comm.get_stream()));
   AL_FORCE_CHECK_CUDA_NOSYNC(cudaEventSynchronize(events.second));
@@ -61,21 +61,21 @@ inline double finish_timer<Al::MPICUDABackend>(typename Al::MPICUDABackend::comm
 }
 
 template <>
-inline typename Al::MPICUDABackend::req_type
-get_request<Al::MPICUDABackend>() {
-  return Al::MPICUDABackend::null_req;
+inline typename Al::HTBackend::req_type
+get_request<Al::HTBackend>() {
+  return Al::HTBackend::null_req;
 }
 
 template <>
-inline typename Al::MPICUDABackend::comm_type get_comm_with_stream<Al::MPICUDABackend>(
+inline typename Al::HTBackend::comm_type get_comm_with_stream<Al::HTBackend>(
   MPI_Comm c) {
   cudaStream_t stream;
   AL_FORCE_CHECK_CUDA_NOSYNC(cudaStreamCreate(&stream));
-  return Al::MPICUDABackend::comm_type(c, stream);
+  return Al::HTBackend::comm_type(c, stream);
 }
 
 template <>
-inline void free_comm_with_stream<Al::MPICUDABackend>(
-  typename Al::MPICUDABackend::comm_type& c) {
+inline void free_comm_with_stream<Al::HTBackend>(
+  typename Al::HTBackend::comm_type& c) {
   AL_FORCE_CHECK_CUDA_NOSYNC(cudaStreamDestroy(c.get_stream()));
 }
