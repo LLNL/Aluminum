@@ -86,31 +86,34 @@ class HostTransferState : public AlState {
     release_pinned_memory(host_mem);
   }
 
-  bool step() override {
-    if (!ar_started) {
-      // Wait for memory to get to the host.
+  PEAction step() override {
+    if (!mem_xfer_done) {
       if (d2h_event.query()) {
-        host_ar->setup();
-        ar_started = true;
+        mem_xfer_done = true;
+        return PEAction::advance;
       } else {
-        return false;
+        return PEAction::cont;
       }
+    }
+    if (!ar_started) {
+      host_ar->setup();
+      ar_started = true;
     }
     if (!ar_done) {
       // Wait for the allreduce to complete.
-      if (host_ar->step()) {
+      if (host_ar->step() == PEAction::complete) {
         ar_done = true;
         // Mark the sync as done to wake up the device.
         gpu_wait.signal();
       } else {
-        return false;
+        return PEAction::cont;
       }
     }
     // Wait for the memcpy back to device to complete so we can clean up.
     if (h2d_event.query()) {
-      return true;
+      return PEAction::complete;
     }
-    return false;
+    return PEAction::cont;
   }
   bool needs_completion() const override { return false; }
   void* get_compute_stream() const override { return compute_stream; }
@@ -124,6 +127,7 @@ class HostTransferState : public AlState {
   mpi::MPIAlState<T>* host_ar;
   cuda::FastEvent d2h_event, h2d_event;
   cuda::GPUWait gpu_wait;
+  bool mem_xfer_done = false;
   bool ar_started = false;
   bool ar_done = false;
   cudaStream_t compute_stream;

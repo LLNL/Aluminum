@@ -70,18 +70,22 @@ public:
     release_pinned_memory(host_mem_);
   }
 
-  bool step() override {
-    if (!bcast_started_) {
+  PEAction step() override {
+    if (!mem_xfer_done_) {
       if (d2h_event_.query()) {
-        MPI_Ibcast(host_mem_, count_, mpi::TypeMap<T>(),
-                     root_, comm_, &req_);
-        if (rank_ == root_) {
-          gpuwait_.signal();
-        }
-        bcast_started_ = true;
+        mem_xfer_done_ = true;
+        return PEAction::advance;
       } else {
-        return false;
+        return PEAction::cont;
       }
+    }
+    if (!bcast_started_) {
+      MPI_Ibcast(host_mem_, count_, mpi::TypeMap<T>(),
+                 root_, comm_, &req_);
+      if (rank_ == root_) {
+        gpuwait_.signal();
+      }
+      bcast_started_ = true;
     }
 
     if (!bcast_done_) {
@@ -93,19 +97,19 @@ public:
         if (rank_ != root_) {
           gpuwait_.signal();
         } else {
-          return true;
+          return PEAction::complete;
         }
       }
       else {
-        return false;
+        return PEAction::cont;
       }
     }
 
     // Wait for host-to-device memcopy; cleanup
     if (h2d_event_.query()) {
-      return true;
+      return PEAction::complete;
     }
-    return false;
+    return PEAction::cont;
   }
 
   bool needs_completion() const override { return false; }
@@ -126,6 +130,7 @@ private:
   MPI_Comm comm_;
   MPI_Request req_ = MPI_REQUEST_NULL;
 
+  bool mem_xfer_done_ = false;
   bool bcast_started_ = false;
   bool bcast_done_ = false;
 

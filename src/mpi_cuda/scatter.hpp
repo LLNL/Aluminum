@@ -79,26 +79,28 @@ public:
     release_pinned_memory(host_mem_);
   }
 
-  bool step() override {
-    if (!scatter_started_) {
-      // Check if mem xfer complete
+  PEAction step() override {
+    if (!mem_xfer_done_) {
       if (d2h_event_.query()) {
-        if (root_ == rank_) {
-          MPI_Iscatter(host_mem_, count_, mpi::TypeMap<T>(),
-                       MPI_IN_PLACE, count_, mpi::TypeMap<T>(),
-                       root_, comm_, &req_);
-          // Root can unblock the device here.
-          gpuwait_.signal();
-        } else {
-          MPI_Iscatter(host_mem_, count_, mpi::TypeMap<T>(),
-                       host_mem_, count_, mpi::TypeMap<T>(),
-                       root_, comm_, &req_);
-        }
-        scatter_started_ = true;
+        mem_xfer_done_ = true;
+        return PEAction::advance;
+      } else {
+        return PEAction::cont;
       }
-      else {
-        return false;
+    }
+    if (!scatter_started_) {
+      if (root_ == rank_) {
+        MPI_Iscatter(host_mem_, count_, mpi::TypeMap<T>(),
+                     MPI_IN_PLACE, count_, mpi::TypeMap<T>(),
+                     root_, comm_, &req_);
+        // Root can unblock the device here.
+        gpuwait_.signal();
+      } else {
+        MPI_Iscatter(host_mem_, count_, mpi::TypeMap<T>(),
+                     host_mem_, count_, mpi::TypeMap<T>(),
+                     root_, comm_, &req_);
       }
+      scatter_started_ = true;
     }
 
     if (!scatter_done_) {
@@ -108,21 +110,21 @@ public:
       if (flag) {
         scatter_done_ = true;
         if (rank_ == root_) {
-          return true;
+          return PEAction::complete;
         } else {
           gpuwait_.signal();
         }
       }
       else {
-        return false;
+        return PEAction::cont;
       }
     }
 
     // Wait for host-to-device memcopy; cleanup
     if (h2d_event_.query()) {
-      return true;
+      return PEAction::complete;
     }
-    return false;
+    return PEAction::cont;
   }
 
   bool needs_completion() const override { return false; }
@@ -142,6 +144,7 @@ private:
   MPI_Comm comm_;
   MPI_Request req_ = MPI_REQUEST_NULL;
 
+  bool mem_xfer_done_ = false;
   bool scatter_started_ = false;
   bool scatter_done_ = false;
 

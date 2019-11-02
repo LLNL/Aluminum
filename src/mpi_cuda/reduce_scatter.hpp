@@ -67,16 +67,19 @@ public:
     release_pinned_memory(host_mem_);
   }
 
-  bool step() override {
-    if (!rs_started_) {
-      // Wait for memory to get to the host.
+  PEAction step() override {
+    if (!mem_xfer_done_) {
       if (d2h_event_.query()) {
-        MPI_Ireduce_scatter_block(MPI_IN_PLACE, host_mem_, count_,
-                                  mpi::TypeMap<T>(), op_, comm_, &req_);
-        rs_started_ = true;
+        mem_xfer_done_ = true;
+        return PEAction::advance;
       } else {
-        return false;
+        return PEAction::cont;
       }
+    }
+    if (!rs_started_) {
+      MPI_Ireduce_scatter_block(MPI_IN_PLACE, host_mem_, count_,
+                                mpi::TypeMap<T>(), op_, comm_, &req_);
+      rs_started_ = true;
     }
     if (!rs_done_) {
       // Wait for the RS to complete.
@@ -86,14 +89,14 @@ public:
         rs_done_ = true;
         gpuwait_.signal();
       } else {
-        return false;
+        return PEAction::cont;
       }
     }
     // Wait for host-to-device memcopy; cleanup
     if (h2d_event_.query()) {
-      return true;
+      return PEAction::complete;
     }
-    return false;
+    return PEAction::cont;
   }
 
   bool needs_completion() const override { return false; }
@@ -108,6 +111,7 @@ private:
   MPI_Op op_;
   MPI_Comm comm_;
   MPI_Request req_ = MPI_REQUEST_NULL;
+  bool mem_xfer_done_ = false;
   bool rs_started_ = false;
   bool rs_done_ = false;
   cudaStream_t compute_stream;

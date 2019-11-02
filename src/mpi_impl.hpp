@@ -572,13 +572,13 @@ class MPIPassthroughAlState : public MPIAlState<T> {
     }
     return false;
   }
-  bool step() override {
+  PEAction step() override {
     int flag;
     MPI_Test(&mpi_req, &flag, MPI_STATUS_IGNORE);
     if (flag) {
-      return true;
+      return PEAction::complete;
     }
-    return false;
+    return PEAction::cont;
   }
   std::string get_name() const override { return "MPIPassthrough"; }
  private:
@@ -702,7 +702,7 @@ class MPIRecursiveDoublingAlState : public MPIAlState<T> {
     }
     return r;
   }
-  bool step() override {
+  PEAction step() override {
     // Check the send/recv from setup, if any.
     if (!setup_comm_done) {
       if (this->test_send_recv()) {
@@ -712,19 +712,19 @@ class MPIRecursiveDoublingAlState : public MPIAlState<T> {
           this->reduction_op(this->recv_to, this->recvbuf, this->count);
         }
       } else {
-        return false;
+        return PEAction::cont;
       }
     }
     // Complete final communication in the non-power-of-2 case.
     if (final_comm_started) {
-      return this->test_send_recv();
+      return this->test_send_recv() ? PEAction::complete : PEAction::cont;
     }
     if (adjusted_rank == -1) {
       // Just need to wait for data.
       MPI_Irecv(this->recvbuf, this->count, this->type, this->rank + 1,
                 this->tag, this->comm, &(this->send_recv_reqs[0]));
       final_comm_started = true;
-      return false;
+      return PEAction::cont;
     }
     bool test = this->test_send_recv();
     if (started && test) {
@@ -737,9 +737,9 @@ class MPIRecursiveDoublingAlState : public MPIAlState<T> {
           MPI_Isend(this->recvbuf, this->count, this->type, this->rank - 1,
                     this->tag, this->comm, &(this->send_recv_reqs[0]));
           final_comm_started = true;
-          return false;
+          return PEAction::cont;
         } else {
-          return true;
+          return PEAction::complete;
         }
       }
     }
@@ -753,7 +753,7 @@ class MPIRecursiveDoublingAlState : public MPIAlState<T> {
                             this->recv_to, this->count, partner);
       started = true;
     }
-    return false;
+    return PEAction::cont;
   }
   std::string get_name() const override { return "MPIRecursiveDoubling"; }
  private:
@@ -1020,7 +1020,7 @@ class MPIRingAlState : public MPIAlState<T> {
     }
     return r;
   }
-  bool step() override {
+  PEAction step() override {
     if (phase == 0) {
       if (rs_step()) {
         // Switch to allgather for next step.
@@ -1028,9 +1028,9 @@ class MPIRingAlState : public MPIAlState<T> {
         started = false;
         cur_step = 0;
       }
-      return false;
+      return PEAction::cont;
     } else {
-      return ag_step();
+      return ag_step() ? PEAction::complete : PEAction::cont;
     }
   }
   std::string get_name() const override { return "MPIRing"; }
@@ -1330,7 +1330,7 @@ class MPIRabenseifnerAlState : public MPIAlState<T> {
     }
     return r;
   }
-  bool step() override {
+  PEAction step() override {
     // Complete setup communication, if any.
     if (!setup_comm_done) {
       if (this->test_send_recv()) {
@@ -1340,19 +1340,19 @@ class MPIRabenseifnerAlState : public MPIAlState<T> {
           this->reduction_op(this->recv_to, this->recvbuf, this->count);
         }
       } else {
-        return false;
+        return PEAction::cont;
       }
     }
     // Complete final communication in the non-power-of-2 case.
     if (final_comm_started) {
-      return this->test_send_recv();
+      return this->test_send_recv() ? PEAction::complete : PEAction::cont;
     }
     if (adjusted_rank == -1) {
       // Just need to wait for data.
       MPI_Irecv(this->recvbuf, this->count, this->type, this->rank + 1,
                 this->tag, this->comm, &(this->send_recv_reqs[0]));
       final_comm_started = true;
-      return false;
+      return PEAction::cont;
     }
     if (phase == 0) {
       if (rs_step()) {
@@ -1362,7 +1362,7 @@ class MPIRabenseifnerAlState : public MPIAlState<T> {
         slice_mask >>= 1;
         partner_mask = 1;
       }
-      return false;
+      return PEAction::cont;
     } else {
       if (ag_step()) {
         // Done, but in the non-power-of-2 case we need to send to our partner.
@@ -1370,12 +1370,12 @@ class MPIRabenseifnerAlState : public MPIAlState<T> {
           MPI_Isend(this->recvbuf, this->count, this->type, this->rank - 1,
                     this->tag, this->comm, &(this->send_recv_reqs[0]));
           final_comm_started = true;
-          return false;
+          return PEAction::cont;
         } else {
-          return true;
+          return PEAction::complete;
         }
       } else {
-        return false;
+        return PEAction::cont;
       }
     }
   }
