@@ -302,7 +302,9 @@ void ProgressEngine::engine() {
         for (auto i = pipeline[stage].begin(); i != pipeline[stage].end();) {
           AlState* req = *i;
           // Simply skip over paused states.
-          if (!req->paused_for_advance) {
+          if (req->paused_for_advance) {
+            ++i;
+          } else {
             PEAction action = req->step();
             switch (action) {
             case PEAction::cont:
