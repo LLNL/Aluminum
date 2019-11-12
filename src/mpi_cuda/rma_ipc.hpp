@@ -50,10 +50,10 @@ class NotifyState: public AlState {
     MPI_Irecv(&key, 1, MPI_INT, m_peer, 0,
               m_comm.get_comm(), &m_requests[1]);
   }
-  bool step() override {
+  PEAction step() override {
     int flag;
     MPI_Testall(2, m_requests, &flag, MPI_STATUS_IGNORE);
-    return flag;
+    return flag ? PEAction::complete : PEAction::cont;
   }
  private:
   int key = 0;
@@ -75,7 +75,7 @@ class WaitState: public AlState {
     MPI_Irecv(&key, 1, MPI_INT, m_peer, 0,
               m_comm.get_comm(), &m_req);
   }
-  bool step() override {
+  PEAction step() override {
     int flag;
     MPI_Test(&m_req, &flag, MPI_STATUS_IGNORE);
     if (flag) {
@@ -85,12 +85,12 @@ class WaitState: public AlState {
         MPI_Isend(&key, 1, MPI_INT, m_peer, 0,
                   m_comm.get_comm(), &m_req);
         m_stream_wait_set = true;
-        return false;
+        return PEAction::cont;
       } else {
-        return true;
+        return PEAction::complete;
       }
     }
-    return false;
+    return PEAction::cont;
   }
  private:
   int key = 0;
@@ -116,7 +116,7 @@ class SyncState: public AlState {
     MPI_Irecv(&key, 1, MPI_INT, m_peer, 0,
               m_comm.get_comm(), &m_requests[1]);
   }
-  bool step() override {
+  PEAction step() override {
     int flag;
     MPI_Testall(2, m_requests, &flag, MPI_STATUS_IGNORE);
     if (flag) {
@@ -129,10 +129,10 @@ class SyncState: public AlState {
                   m_comm.get_comm(), &m_requests[1]);
         m_stream_wait_set = true;
       } else {
-        return true;
+        return PEAction::complete;
       }
     }
-    return false;
+    return PEAction::cont;
   }
  private:
   int key = 0;

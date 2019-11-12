@@ -40,6 +40,7 @@
 #include <queue>
 #include <algorithm>
 #include <ostream>
+#include <array>
 
 namespace Al {
 
@@ -71,15 +72,33 @@ enum class RunType {
   unbounded
 };
 
+/** Actions a state can ask the progress engine to do. */
+enum class PEAction {
+  /** Do nothing (i.e. keep running as it is now). */
+  cont,
+  /** Advance the state to the next pipeline stage. */
+  advance,
+  /** Operation is complete. */
+  complete
+};
+
 /**
  * Represents the state and algorithm for an asynchronous operation.
  * A non-blocking operation should create one of these and enqueue it for
  * execution by the progress thread. Specific implementations can override
  * as needed.
+ *
  * An algorithm should be broken up into steps which execute some small,
  * discrete operation. Steps from different operations may be interleaved.
  * Note that the memory pool is not thread-safe, so memory from it should be
  * pre-allocated before enqueueing.
+ *
+ * The steps are run through a simple pipeline. The algorithm can request it
+ * advance to the next stage by returning PEAction::advance. Operations enqueud
+ * on the same compute stream will only be advanced in the order they were
+ * enqueued. If a state asks to advance but it is not at the head of its
+ * pipeline stage, step will not be called again until it has successfully
+ * advanced.
  */
 class AlState {
   friend class ProgressEngine;
@@ -94,10 +113,9 @@ class AlState {
   virtual void start();
   /**
    * Run one step of the algorithm.
-   * Return true if the operation has completed, false if it has more steps
-   * remaining.
+   * Return the action the algorithm wishes the progress engine to take.
    */
-  virtual bool step() = 0;
+  virtual PEAction step() = 0;
   /** Return the associated request. */
   AlRequest& get_req() { return req; }
   /** True if this is meant to be waited on by the user. */
@@ -119,6 +137,8 @@ class AlState {
   double start_time = std::numeric_limits<double>::max();
 #endif
   profiling::ProfileRange prof_range;
+  /** Whether execution of this operation is paused on pipeline advancement. */
+  bool paused_for_advance = false;
 };
 
 /**
@@ -332,12 +352,12 @@ class ProgressEngine {
    */
   std::unordered_map<void*, InputQueue*> stream_to_queue;
   /**
-   * Arbitrary-length run queue.
+   * Per-stream pipelined run queues.
    * This should be accessed only by the progress engine.
    * Using a vector for compactness and to avoid repeated memory allocations.
-   * @todo May extend OrderedArray to handle this.
+   * @todo May extend OrderedArray / make a new class to handle this.
    */
-  std::vector<AlState*> run_queue;
+  std::unordered_map<void*, std::array<std::vector<AlState*>, AL_PE_NUM_PIPELINE_STAGES>> run_queues;
   /** Number of currently-active bounded-length operations. */
   size_t num_bounded = 0;
   /**

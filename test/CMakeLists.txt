@@ -28,6 +28,9 @@ set(TEST_SRCS
   test_gather.cpp
   test_scatter.cpp
   test_pt2pt.cpp
+  test_exchange.cpp
+  test_transfer_to_one.cpp
+  test_transfer_from_one.cpp
   test_multi_nballreduces.cpp)
 
 foreach(src ${TEST_SRCS})

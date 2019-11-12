@@ -137,14 +137,21 @@ std::ostream& ProgressEngine::dump_state(std::ostream& ss) {
   // Note: This pulls *directly from internal state*.
   // This is *not* thread safe, and stuff might blow up.
   // You should only be dumping state where you don't care about that anyway.
-  const size_t run_queue_size = run_queue.size();
-  ss << "Run queue (" << run_queue_size << "):\n";
-  for (size_t i = 0; i < run_queue_size; ++i) {
-    ss << i << ": ";
-    if (run_queue[i]) {
-      ss << run_queue[i]->get_name() << " " << run_queue[i]->get_desc() << "\n";
-    } else {
-      ss << "(unknown)\n";
+  for (auto&& stream_pipeline_pair : run_queues) {
+    ss << "Pipelined run queue for stream " << stream_pipeline_pair.first << ":\n";
+    auto&& pipeline = stream_pipeline_pair.second;
+    for (size_t stage = 0; stage < AL_PE_NUM_PIPELINE_STAGES; ++stage) {
+      const size_t stage_queue_size = pipeline[stage].size();
+      ss << "Stage " << stage << " run queue (" << stage_queue_size << "):\n";
+      for (size_t i = 0; i < stage_queue_size; ++i) {
+        ss << i << ": ";
+        if (pipeline[stage][i]) {
+          ss << pipeline[stage][i]->get_name() << " "
+             << pipeline[stage][i]->get_desc() << "\n";
+        } else {
+          ss << "(unknown)\n";
+        }
+      }
     }
   }
   const size_t req_queue_size = num_input_streams.load();
@@ -264,7 +271,13 @@ void ProgressEngine::engine() {
             break;
           }
           if (do_start) {
-            run_queue.push_back(req);
+            // Add to end of first pipeline stage.
+            // Create run queues if needed.
+            if (!run_queues.count(req->get_compute_stream())) {
+              run_queues.emplace(req->get_compute_stream(),
+                                 decltype(run_queues)::mapped_type{});
+            }
+            run_queues[req->get_compute_stream()][0].push_back(req);
             req->start();
 #ifdef AL_DEBUG_HANG_CHECK
             req->start_time = get_time();
@@ -282,42 +295,90 @@ void ProgressEngine::engine() {
       }
     }
     // Process one step of each in-progress request.
-    for (auto i = run_queue.begin(); i != run_queue.end();) {
-      AlState* req = *i;
-      if (req->step()) {
-        if (req->needs_completion()) {
-          req->get_req()->store(true, std::memory_order_release);
-        }
-        if (req->get_run_type() == RunType::bounded) {
-          --num_bounded;
-        }
-        if (req->blocks()) {
-          // Unblock the associated input queue.
-          request_queues[blocking_reqs[req]].blocked = false;
-          blocking_reqs.erase(req);
-        }
-#ifdef AL_TRACE
-        trace::record_pe_done(*req);
-#endif
-        delete req;
-        i = run_queue.erase(i);
-      } else {
+    for (auto&& stream_pipeline_pair : run_queues) {
+      auto&& pipeline = stream_pipeline_pair.second;
+      for (size_t stage = 0; stage < AL_PE_NUM_PIPELINE_STAGES; ++stage) {
+        // Process this stage of the pipeline.
+        for (auto i = pipeline[stage].begin(); i != pipeline[stage].end();) {
+          AlState* req = *i;
+          // Simply skip over paused states.
+          if (req->paused_for_advance) {
+            ++i;
+          } else {
+            PEAction action = req->step();
+            switch (action) {
+            case PEAction::cont:
+              // Nothing to do here.
 #ifdef AL_DEBUG_HANG_CHECK
-        if (!req->hang_reported) {
-          double t = get_time();
-          if (t - req->start_time > 10.0 + world_comm->rank()) {
-            std::cout << world_comm->rank()
-                      << ": Progress engine detected a possible hang"
-                      << " state=" << req << " " << req->get_name()
-                      << " compute_stream=" << req->get_compute_stream()
-                      << " run_type="
-                      << (req->get_run_type() == RunType::bounded ? "bounded" : "unbounded")
-                      << " blocks=" << req->blocks() << std::endl;
-            req->hang_reported = true;
+              // Check whether we have hung.
+              if (!req->hang_reported) {
+                double t = get_time();
+                if (t - req->start_time > 10.0 + world_comm->rank()) {
+                  std::cout << world_comm->rank()
+                            << ": Progress engine detected a possible hang"
+                            << " state=" << req << " " << req->get_name()
+                            << " compute_stream=" << req->get_compute_stream()
+                            << " run_type="
+                            << (req->get_run_type() == RunType::bounded ? "bounded" : "unbounded")
+                            << " blocks=" << req->blocks() << std::endl;
+                  req->hang_reported = true;
+                }
+              }
+#endif
+              ++i;
+              break;
+            case PEAction::advance:
+#ifdef AL_DEBUG
+              // Ensure we don't advance too far.
+              if (stage + 1 >= AL_PE_NUM_PIPELINE_STAGES) {
+                throw_al_exception("Trying to advance pipeline stage too far");
+              }
+#endif
+              // Only move if this is the head of the pipeline stage.
+              if (i == pipeline[stage].begin()) {
+                pipeline[stage+1].push_back(req);
+                i = pipeline[stage].erase(i);
+              } else {
+                req->paused_for_advance = true;
+                ++i;
+              }
+              break;
+            case PEAction::complete:
+              if (req->needs_completion()) {
+                req->get_req()->store(true, std::memory_order_release);
+              }
+              if (req->get_run_type() == RunType::bounded) {
+                --num_bounded;
+              }
+              if (req->blocks()) {
+                // Unblock the associated input queue.
+                request_queues[blocking_reqs[req]].blocked = false;
+                blocking_reqs.erase(req);
+              }
+#ifdef AL_TRACE
+              trace::record_pe_done(*req);
+#endif
+              delete req;
+              i = pipeline[stage].erase(i);
+              break;
+            default:
+              throw_al_exception("Unknown PEAction");
+              break;
+            }
           }
         }
-#endif
-        ++i;
+        // Check whether we can advance paused states.
+        for (auto i = pipeline[stage].begin(); i != pipeline[stage].end();) {
+          AlState* req = *i;
+          if (req->paused_for_advance) {
+            // Move to the next stage.
+            req->paused_for_advance = false;
+            pipeline[stage+1].push_back(req);
+            i = pipeline[stage].erase(i);
+          } else {
+            break;  // Nothing at the head to advance.
+          }
+        }
       }
     }
   }

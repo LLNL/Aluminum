@@ -58,19 +58,16 @@ class SendAlState : public AlState {
     prof_range = profiling::prof_start("HTSend d2h");
   }
 #endif
-  bool step() override {
+  PEAction step() override {
     if (!mem_transfer_done) {
       if (sync_event.query()) {
         mem_transfer_done = true;
 #ifdef AL_HAS_PROF
         profiling::prof_end(prof_range);
 #endif
+        return PEAction::advance;
       }
-
-      // Always return false here so the send is not started until the next
-      // pass through the in-progress requests.
-      // This ensures that sends always start in the order they were posted.
-      return false;
+      return PEAction::cont;
     }
     if (!send_started) {
 #ifdef AL_HAS_PROF
@@ -86,7 +83,7 @@ class SendAlState : public AlState {
       profiling::prof_end(prof_range);
     }
 #endif
-    return flag;
+    return flag ? PEAction::complete : PEAction::cont;
   }
   bool needs_completion() const override { return false; }
   void* get_compute_stream() const override { return compute_stream; }
@@ -133,7 +130,7 @@ class RecvAlState : public AlState {
 #endif
     MPI_Irecv(mem, count, mpi::TypeMap<T>(), src, pt2pt_tag, comm, &req);
   }
-  bool step() override {
+  PEAction step() override {
     if (!recv_done) {
       int flag;
       MPI_Test(&req, &flag, MPI_STATUS_IGNORE);
@@ -153,9 +150,9 @@ class RecvAlState : public AlState {
     if (r) {
       profiling::prof_end(prof_range);
     }
-    return r;
+    return r ? PEAction::complete : PEAction::cont;
 #else
-    return sync_event.query();
+    return sync_event.query() ? PEAction::complete : PEAction::cont;
 #endif
   }
   bool needs_completion() const override { return false; }
@@ -194,14 +191,18 @@ class SendRecvAlState : public AlState {
     send_state.start();
     recv_state.start();
   }
-  bool step() override {
+  PEAction step() override {
     if (!send_done) {
-      send_done = send_state.step();
+      PEAction send_action = send_state.step();
+      if (send_action == PEAction::advance) {
+        return send_action;
+      }
+      send_done = send_action == PEAction::complete;
     }
     if (!recv_done) {
-      recv_done = recv_state.step();
+      recv_done = recv_state.step() == PEAction::complete;
     }
-    return send_done && recv_done;
+    return send_done && recv_done ? PEAction::complete : PEAction::cont;
   }
   bool needs_completion() const override { return false; }
   void* get_compute_stream() const override {
@@ -215,6 +216,7 @@ class SendRecvAlState : public AlState {
  private:
   SendAlState<T> send_state;
   RecvAlState<T> recv_state;
+  bool send_advanced = false;
   bool send_done = false;
   bool recv_done = false;
 };
