@@ -1,6 +1,9 @@
 #include <iostream>
 #include "Al.hpp"
 #include "test_utils.hpp"
+#ifdef AL_HAS_NCCL
+#include "test_utils_nccl_cuda.hpp"
+#endif
 #ifdef AL_HAS_MPI_CUDA
 #include "test_utils_mpi_cuda.hpp"
 #endif
