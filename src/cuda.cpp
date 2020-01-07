@@ -158,12 +158,14 @@ bool FastEvent::query() {
     return __atomic_load_n(sync_event, __ATOMIC_SEQ_CST);
   } else {
     cudaError_t r = cudaEventQuery(plain_event);
-    if (r == cudaSuccess)
+    if (r == cudaSuccess) {
       return true;
-    else if (r != cudaErrorNotReady)
-      throw_al_exception("FastEvent::query: cudaEventQuery error");
-    else
+    } else if (r != cudaErrorNotReady) {
+      AL_CHECK_CUDA(r);
+      return false;  // Never reached.
+    } else {
       return false;
+    }
   }
 }
 
