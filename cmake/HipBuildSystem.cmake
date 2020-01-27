@@ -17,15 +17,18 @@ function (hipify_files_internal extension new_filenames)
   set(${new_filenames} "")
 
   foreach (filename ${ARGN})
+    set(input "${PROJECT_SOURCE_DIR}/${filename}")
+    set(output "${CMAKE_BINARY_DIR}/${filename}${extension}")
+
     message(DEBUG "Processing ${filename} into ${CMAKE_BINARY_DIR}/${filename}${extension}")
-    set(inner_new_filename "${CMAKE_BINARY_DIR}/${filename}${extension}")
 
     add_custom_command(
-      OUTPUT ${inner_new_filename}
-      COMMAND hipify-perl "${PROJECT_SOURCE_DIR}/${filename}" > ${inner_new_filename}
+      OUTPUT ${output}
+      COMMAND hipify-perl ${input} > ${output}
+      DEPENDS ${input}
       VERBATIM)
 
-    list(APPEND ${new_filenames} ${inner_new_filename})
+    list(APPEND ${new_filenames} ${output})
   endforeach()
 
   set(${new_filenames} ${${new_filenames}} PARENT_SCOPE)
