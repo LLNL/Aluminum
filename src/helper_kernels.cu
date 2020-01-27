@@ -44,10 +44,12 @@ void launch_wait_kernel(cudaStream_t stream, int32_t wait_value, volatile int32_
   spin_wait_kernel<<<1,1,0,stream>>>(wait_value, wait_mem);
 }
 
+#if AL_USE_STREAM_MEM_OPS
 void launch_wait_kernel(cudaStream_t stream, int32_t wait_value, CUdeviceptr wait_mem) {
   AL_CHECK_CUDA_DRV(cuStreamWaitValue32(
                       stream, wait_mem, wait_value, CU_STREAM_WAIT_VALUE_EQ));
 }
+#endif // AL_USE_STREAM_MEM_OPS
 
 } // namespace cuda
 } // namespace internal

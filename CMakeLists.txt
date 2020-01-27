@@ -29,6 +29,7 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 # Options
 
 option(ALUMINUM_ENABLE_CUDA "Enable CUDA support." OFF)
+option(ALUMINUM_ENABLE_ROCM "Enable almost-CUDA support." OFF)
 option(ALUMINUM_ENABLE_MPI_CUDA "Enable MPI-CUDA support." OFF)
 option(ALUMINUM_ENABLE_NCCL "Enable NCCL support." OFF)
 option(ALUMINUM_ENABLE_MPI_CUDA_RMA "Enable RMA in MPI-CUDA." OFF)
@@ -44,6 +45,7 @@ if (ALUMINUM_ENABLE_NCCL AND NOT ALUMINUM_ENABLE_CUDA)
   message(STATUS "NCCL support requested; enabling CUDA support, too.")
   set(ALUMINUM_ENABLE_CUDA ON)
 endif ()
+option(ALUMINUM_ENABLE_OPENMP "Enable OpenMP in the MPI implementation." OFF)
 option(ALUMINUM_DEBUG_HANG_CHECK "Enable hang checking." OFF)
 option(ALUMINUM_ENABLE_NVPROF "Enable profiling via nvprof/NVTX." OFF)
 option(ALUMINUM_ENABLE_STREAM_MEM_OPS "Enable stream memory operations." OFF)
@@ -144,9 +146,11 @@ endif ()
 
 find_package(HWLOC REQUIRED)
 
-# Fix an issue with OpenMP's egregious use of non-language-specific
-# compiler flags.
-if (OPENMP_FOUND)
+if (ALUMINUM_ENABLE_OPENMP)
+  find_package(OpenMP REQUIRED COMPONENTS CXX)
+
+  # Fix an issue with OpenMP's egregious use of non-language-specific
+  # compiler flags.
   get_target_property(
     __omp_compile_options OpenMP::OpenMP_CXX INTERFACE_COMPILE_OPTIONS)
   set_property(TARGET OpenMP::OpenMP_CXX PROPERTY
@@ -158,7 +162,10 @@ if (OPENMP_FOUND)
     set_property(TARGET OpenMP::OpenMP_CXX APPEND PROPERTY
       INTERFACE_LINK_LIBRARIES "${OpenMP_CXX_FLAGS}")
   endif ()
-endif (OPENMP_FOUND)
+
+  set(AL_HAS_OPENMP TRUE)
+endif ()
+
 if (ALUMINUM_ENABLE_CUDA)
   find_package(CUDA 9.0)
   if (CUDA_FOUND)
@@ -168,7 +175,7 @@ if (ALUMINUM_ENABLE_CUDA)
       set(AL_HAS_CUDA TRUE)
       set(AL_HAS_MPI_CUDA TRUE)
       if (ALUMINUM_ENABLE_MPI_CUDA_RMA)
-	set(AL_HAS_MPI_CUDA_RMA TRUE)
+        set(AL_HAS_MPI_CUDA_RMA TRUE)
       endif ()
     endif ()
 
@@ -214,6 +221,28 @@ if (ALUMINUM_ENABLE_CUDA)
   endif ()
 endif ()
 
+if (ALUMINUM_ENABLE_ROCM)
+  # Provides hipify_*_files
+  include(HipBuildSystem)
+
+  # Provides hip_add_executable
+  set(CMAKE_MODULE_PATH "/opt/rocm/hip/cmake" ${CMAKE_MODULE_PATH})
+
+  # hip-runtime library
+  find_package(HIP REQUIRED)
+
+  # Just in case any of the previous commands turned this on (TODO: Tom, did you see this happen?)
+  set(CMAKE_CXX_EXTENSIONS FALSE)
+
+  set(AL_HAS_ROCM TRUE)
+
+  # TODO: configure these based off actual options; reject invalid configurations
+  set(AL_HAS_CUDA TRUE)
+  set(AL_HAS_MPI_CUDA TRUE)
+
+  # TODO: compatibility checking of all the various options
+endif ()
+
 # Build library and executables
 
 # Write the configuration file
@@ -236,12 +265,25 @@ macro(set_full_path VAR)
   set(${VAR} "${__tmp_names}")
 endmacro()
 
+# Macro for setting up relative paths
+macro(set_relative_path VAR RELATIVE_TO)
+  unset(__tmp_names)
+  foreach(filename ${ARGN})
+    unset(__name)
+    get_filename_component(__name "${filename}" NAME)
+    list(APPEND __tmp_names "${RELATIVE_TO}/${__name}")
+  endforeach()
+  set(${VAR} "${__tmp_names}")
+endmacro()
+
 add_subdirectory(src)
-add_subdirectory(benchmark)
+
+# TODO before ROCm stuff merges: reenable these, test installation
+#add_subdirectory(benchmark)
 
 # Testing
-include(CTest)
-add_subdirectory(test)
+#include(CTest)
+#add_subdirectory(test)
 
 #
 # Install target
