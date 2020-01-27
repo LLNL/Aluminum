@@ -142,6 +142,10 @@ FastEvent::~FastEvent() {
 }
 
 void FastEvent::record(cudaStream_t stream) {
+/* This block is gated by STREAM_MEM_OP support because hip does not define
+ * CU_STREAM_WRITE_VALUE_DEFAULT
+ */
+#if AL_USE_STREAM_MEM_OPS
   if (stream_memory_operations_supported()) {
     // We cannot use std::atomic because we need the actual address of the memory.
     __atomic_store_n(sync_event, 0, __ATOMIC_SEQ_CST);
@@ -151,6 +155,9 @@ void FastEvent::record(cudaStream_t stream) {
   } else {
     AL_CHECK_CUDA(cudaEventRecord(plain_event, stream));
   }
+#else
+  AL_CHECK_CUDA(cudaEventRecord(plain_event, stream));
+#endif // AL_USE_STREAM_MEM_OPS
 }
 
 bool FastEvent::query() {
@@ -181,7 +188,9 @@ GPUWait::GPUWait()
                         &wait_sync_dev_ptr, wait_sync, 0));
   else
     AL_CHECK_CUDA(cudaHostGetDevicePointer(
-                    &wait_sync_dev_ptr_no_stream_mem_ops, wait_sync, 0));
+                    reinterpret_cast<void**>(&wait_sync_dev_ptr_no_stream_mem_ops),
+                    wait_sync,
+                    0));
 }
 
 GPUWait::~GPUWait() {
@@ -190,7 +199,7 @@ GPUWait::~GPUWait() {
 
 void GPUWait::wait(cudaStream_t stream) {
   if (stream_memory_operations_supported())
-    launch_wait_kernel(stream, 1, wait_sync_dev_ptr);
+    launch_wait_kernel(stream, 1, static_cast<int32_t*>(wait_sync_dev_ptr));
   else
     launch_wait_kernel(stream, 1, wait_sync_dev_ptr_no_stream_mem_ops);
 }

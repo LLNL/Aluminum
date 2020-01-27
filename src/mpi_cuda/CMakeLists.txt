@@ -1,4 +1,5 @@
-set_full_path(THIS_DIR_HEADERS
+file(RELATIVE_PATH THIS_DIR ${PROJECT_SOURCE_DIR} ${CMAKE_CURRENT_LIST_DIR})
+set_relative_path(THIS_DIR_HEADERS ${THIS_DIR}
   allgather.hpp
   allreduce.hpp
   alltoall.hpp
@@ -12,22 +13,25 @@ set_full_path(THIS_DIR_HEADERS
   util.hpp
   )
 
-set_full_path(THIS_DIR_CXX_SOURCES
+set_relative_path(THIS_DIR_CXX_SOURCES ${THIS_DIR}
   communicator.cpp
   )
 
-if (AL_HAS_MPI_CUDA_RMA)
-  list(APPEND THIS_DIR_HEADERS
-    "${CMAKE_CURRENT_SOURCE_DIR}/rma.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/rma_ipc.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/rma_null.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/rma_self.hpp")
-  list(APPEND THIS_DIR_CXX_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/rma.cpp")
-endif ()
+set_relative_path(THIS_DIR_CUDA_RMA_HEADERS ${THIS_DIR}
+  rma.hpp
+  rma_ipc.hpp
+  rma_null.hpp
+  rma_self.hpp
+  )
 
-#set_full_path(THIS_DIR_CUDA_SOURCES
-#  )
+set_relative_path(THIS_DIR_CUDA_RMA_CXX_SOURCES ${THIS_DIR}
+  rma.cpp
+  )
+
+if (AL_HAS_MPI_CUDA_RMA)
+  list(APPEND THIS_DIR_HEADERS "${THIS_DIR_CUDA_RMA_HEADERS}")
+  list(APPEND THIS_DIR_CXX_SOURCES "${THIS_DIR_CUDA_RMA_CXX_SOURCES}")
+endif ()
 
 # Custom install
 install(FILES ${THIS_DIR_HEADERS}
