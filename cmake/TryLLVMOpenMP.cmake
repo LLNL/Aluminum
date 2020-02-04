@@ -41,6 +41,12 @@ else ()
 
   # Let's try this again
   find_package(OpenMP COMPONENTS CXX)
+
+  # At least on OSX, there seems to be an error in which "-lomp" gets
+  # passed implicitly to the linker. CMake adds the full path to
+  # libomp.dylib to the link line, but the addition of the implicit
+  # "-lomp" throws it off. So we add the appropriate link directory to
+  # the target.
   if (OpenMP_CXX_FOUND)
     if (CMAKE_VERSION VERSION_GREATER 3.13.0)
       target_link_directories(
