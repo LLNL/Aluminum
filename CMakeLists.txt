@@ -130,7 +130,18 @@ endforeach()
 set_property(TARGET MPI::MPI_CXX
   PROPERTY INTERFACE_LINK_LIBRARIES ${_MPI_LINK_LIBRARIES})
 
-find_package(OpenMP REQUIRED COMPONENTS CXX)
+find_package(OpenMP QUIET COMPONENTS CXX)
+if (NOT OpenMP_FOUND AND CMAKE_CXX_COMPILER_ID MATCHES ".*[Cc]lang")
+  include(TryLLVMOpenMP)
+endif ()
+if (OpenMP_FOUND)
+  message(STATUS "Found OpenMP: ${OpenMP_CXX_FLAGS}")
+else ()
+  message(FATAL_ERROR "Aluminum thinks it needs OpenMP. "
+    "If using Clang or a derivative, try setting OpenMP_DIR to point "
+    "to the install prefix of an OpenMP library.")
+endif ()
+
 find_package(HWLOC REQUIRED)
 
 # Fix an issue with OpenMP's egregious use of non-language-specific
@@ -275,5 +286,8 @@ install(FILES
   "${CMAKE_BINARY_DIR}/Al_config.hpp" DESTINATION ${INCLUDE_INSTALL_DIRS})
 
 # Install the CMake modules we need
-install(FILES cmake/FindHWLOC.cmake cmake/FindNCCL.cmake
+install(FILES
+  cmake/FindHWLOC.cmake
+  cmake/FindNCCL.cmake
+  cmake/TryLLVMOpenMP.cmake
   DESTINATION ${CMAKE_INSTALL_DIR})
