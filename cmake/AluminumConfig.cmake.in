@@ -12,7 +12,19 @@ set(AL_HAS_NCCL @AL_HAS_NCCL@)
 set(MPI_CXX_COMPILER "@MPI_CXX_COMPILER@" CACHE FILEPATH
   "The MPI CXX compiler wrapper.")
 find_package(MPI 3.0 REQUIRED COMPONENTS CXX)
-find_package(OpenMP REQUIRED COMPONENTS CXX)
+
+find_package(OpenMP QUIET COMPONENTS CXX)
+if (NOT OpenMP_FOUND AND CMAKE_CXX_COMPILER_ID MATCHES ".*[Cc]lang")
+  include(TryLLVMOpenMP)
+endif ()
+if (OpenMP_FOUND)
+  message(STATUS "Found OpenMP: ${OpenMP_CXX_FLAGS}")
+else ()
+  message(FATAL_ERROR "Aluminum thinks it needs OpenMP. "
+    "If using Clang or a derivative, try setting OpenMP_DIR to point "
+    "to the install prefix of an OpenMP library.")
+endif ()
+
 find_package(HWLOC REQUIRED)
 
 # Fix an issue with OpenMP's egregious use of non-language-specific
