@@ -45,7 +45,7 @@
  */
 
 #ifdef AL_HAS_ROCM
-inline hipError_t cuGetErrorString(hipError_t error, const char** pStr)
+inline hipError_t cuGetErrorString(hipError_t /* error */, const char** pStr)
 {
   static char const* unsupported = "hipGetErrorString is unsupported :(";
   *pStr = unsupported;
