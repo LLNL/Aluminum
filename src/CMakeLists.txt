@@ -68,10 +68,13 @@ if (AL_HAS_ROCM)
   hipify_source_files(ALUMINUM_HIP_SOURCES ${ALUMINUM_CXX_SOURCES} ${ALUMINUM_CUDA_SOURCES})
   hipify_header_files(ALUMINUM_HIP_HEADERS ${ALUMINUM_HEADERS})
 
-  add_library(Al "${ALUMINUM_HIP_SOURCES}" "${ALUMINUM_HIP_HEADERS}")
+  hip_add_library(Al "${ALUMINUM_HIP_SOURCES}" "${ALUMINUM_HIP_HEADERS}")
   target_include_directories(Al PUBLIC
     $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/${THIS_DIR}>)
 
+  # TODO: this does duplicate work in hipify-perl to avoid some CMake pain
+  # (this also happens twice in mpi_cuda/CMakeLists.txt)
+  hipify_header_files(THIS_DIR_HEADERS_TO_INSTALL ${THIS_DIR_HEADERS})
 else ()
   add_library(Al
     "${ALUMINUM_CXX_SOURCES}" "${ALUMINUM_CUDA_SOURCES}" "${ALUMINUM_HEADERS}")
@@ -80,6 +83,8 @@ else ()
     $<$<BOOL:${AL_HAS_NVPROF}>:cuda::nvtx>)
   target_include_directories(Al PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
+
+  set(THIS_DIR_HEADERS_TO_INSTALL ${THIS_DIR_HEADERS})
 endif ()
 
 target_include_directories(Al PUBLIC
@@ -104,5 +109,5 @@ install(EXPORT AluminumTargets
   DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/aluminum
   )
 
-install(FILES ${THIS_DIR_HEADERS}
+install(FILES ${THIS_DIR_HEADERS_TO_INSTALL}
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/aluminum)
