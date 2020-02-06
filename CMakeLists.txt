@@ -240,7 +240,8 @@ if (ALUMINUM_ENABLE_ROCM)
   set(AL_HAS_CUDA TRUE)
   set(AL_HAS_MPI_CUDA TRUE)
 
-  # TODO: compatibility checking of all the various options
+  # TODO: compatibility checking of all the various options. At very least, turn
+  # stream mem ops off
 endif ()
 
 # Build library and executables

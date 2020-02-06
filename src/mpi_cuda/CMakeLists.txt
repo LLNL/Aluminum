@@ -33,8 +33,14 @@ if (AL_HAS_MPI_CUDA_RMA)
   list(APPEND THIS_DIR_CXX_SOURCES "${THIS_DIR_CUDA_RMA_CXX_SOURCES}")
 endif ()
 
+if (AL_HAS_ROCM)
+  hipify_header_files(THIS_DIR_HEADERS_TO_INSTALL ${THIS_DIR_HEADERS})
+else ()
+  set(THIS_DIR_HEADERS_TO_INSTALL ${THIS_DIR_HEADERS})
+endif ()
+
 # Custom install
-install(FILES ${THIS_DIR_HEADERS}
+install(FILES ${THIS_DIR_HEADERS_TO_INSTALL}
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/aluminum/mpi_cuda)
 
 # Propagate the files up the tree
