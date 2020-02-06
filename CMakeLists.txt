@@ -230,6 +230,14 @@ if (ALUMINUM_ENABLE_ROCM)
 
   # TODO: compatibility checking of all the various options. At very least, turn
   # stream mem ops off
+
+  # Set the base directory for source files. Because we're generating files into
+  # the build directory, looking for 'src/Al.cpp' is going to be different based
+  # on whether we're building with or without ROCm. So, set the source prefix
+  # here to where files will end up.
+  set(SOURCE_RELATIVE_PREFIX "")
+else ()
+  set(SOURCE_RELATIVE_PREFIX ${CMAKE_CURRENT_LIST_DIR})
 endif ()
 
 # Build library and executables
