@@ -231,13 +231,12 @@ if (ALUMINUM_ENABLE_ROCM)
   # TODO: compatibility checking of all the various options. At very least, turn
   # stream mem ops off
 
-  # Set the base directory for source files. Because we're generating files into
-  # the build directory, looking for 'src/Al.cpp' is going to be different based
-  # on whether we're building with or without ROCm. So, set the source prefix
-  # here to where files will end up.
-  set(SOURCE_RELATIVE_PREFIX "")
+  # For some reason, hipified files can be relatively specified, but regular
+  # files must be given a full path. This appears to be the easiest way for both
+  # ROCm and non-ROCm builds to both work and install.
+  set(SOURCE_PREFIX "")
 else ()
-  set(SOURCE_RELATIVE_PREFIX ${CMAKE_CURRENT_LIST_DIR})
+  set(SOURCE_PREFIX "${CMAKE_CURRENT_LIST_DIR}/")
 endif ()
 
 # Build library and executables
@@ -251,31 +250,24 @@ configure_file(
   "${CMAKE_SOURCE_DIR}/cmake/Al_config.hpp.in"
   "${CMAKE_BINARY_DIR}/Al_config.hpp" @ONLY)
 
-# Macro for setting up full paths
-macro(set_full_path VAR)
+# Macro for setting up paths
+macro(set_source_path VAR)
   unset(__tmp_names)
-  foreach(filename ${ARGN})
-    unset(__name)
-    get_filename_component(__name "${filename}" ABSOLUTE)
-    list(APPEND __tmp_names "${__name}")
-  endforeach()
-  set(${VAR} "${__tmp_names}")
-endmacro()
 
-# Macro for setting up relative paths
-macro(set_relative_path VAR RELATIVE_TO)
-  unset(__tmp_names)
+  file(RELATIVE_PATH __relative_to ${PROJECT_SOURCE_DIR} ${CMAKE_CURRENT_LIST_DIR})
+
   foreach(filename ${ARGN})
     unset(__name)
     get_filename_component(__name "${filename}" NAME)
-    list(APPEND __tmp_names "${RELATIVE_TO}/${__name}")
+    list(APPEND __tmp_names "${SOURCE_PREFIX}${__relative_to}/${__name}")
+    message(DEBUG "Set source path of ${__name} to ${SOURCE_PREFIX}${__relative_to}/${__name}")
   endforeach()
   set(${VAR} "${__tmp_names}")
 endmacro()
 
 add_subdirectory(src)
 
-# TODO before ROCm stuff merges: reenable these, test installation
+# TODO before ROCm stuff merges: reenable these
 #add_subdirectory(benchmark)
 
 # Testing

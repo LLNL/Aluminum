@@ -1,6 +1,4 @@
-file(RELATIVE_PATH THIS_DIR ${PROJECT_SOURCE_DIR} ${CMAKE_CURRENT_LIST_DIR})
-set(THIS_DIR "${SOURCE_RELATIVE_PREFIX}/${THIS_DIR}")
-set_relative_path(THIS_DIR_HEADERS ${THIS_DIR}
+set_source_path(THIS_DIR_HEADERS
   allgather.hpp
   allreduce.hpp
   alltoall.hpp
@@ -14,18 +12,18 @@ set_relative_path(THIS_DIR_HEADERS ${THIS_DIR}
   util.hpp
   )
 
-set_relative_path(THIS_DIR_CXX_SOURCES ${THIS_DIR}
+set_source_path(THIS_DIR_CXX_SOURCES
   communicator.cpp
   )
 
-set_relative_path(THIS_DIR_CUDA_RMA_HEADERS ${THIS_DIR}
+set_source_path(THIS_DIR_CUDA_RMA_HEADERS
   rma.hpp
   rma_ipc.hpp
   rma_null.hpp
   rma_self.hpp
   )
 
-set_relative_path(THIS_DIR_CUDA_RMA_CXX_SOURCES ${THIS_DIR}
+set_source_path(THIS_DIR_CUDA_RMA_CXX_SOURCES
   rma.cpp
   )
 
