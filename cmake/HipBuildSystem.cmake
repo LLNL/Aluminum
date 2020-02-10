@@ -13,6 +13,14 @@
 # This function runs hipify-perl on every filename given in ARGN as a build step
 # and writes the output to the same place as the initial file, but in the build
 # directory.
+
+find_program(HIPIFY_PERL hipify-perl)
+if (NOT HIPIFY_PERL)
+    message(FATAL_ERROR "hipify-perl was not found. Please make sure it's in $PATH")
+else ()
+    message(STATUS "hipify-perl found at ${HIPIFY_PERL}")
+endif ()
+
 function (hipify_files_internal extension new_filenames)
   set(${new_filenames} "")
 
@@ -24,7 +32,7 @@ function (hipify_files_internal extension new_filenames)
 
     add_custom_command(
       OUTPUT ${output}
-      COMMAND hipify-perl ${input} > ${output}
+      COMMAND ${HIPIFY_PERL} ${input} > ${output}
       DEPENDS ${input}
       VERBATIM)
 
