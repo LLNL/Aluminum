@@ -1,6 +1,4 @@
-file(RELATIVE_PATH THIS_DIR ${PROJECT_SOURCE_DIR} ${CMAKE_CURRENT_LIST_DIR})
-set(THIS_DIR "${SOURCE_RELATIVE_PREFIX}/${THIS_DIR}")
-set_relative_path(THIS_DIR_HEADERS ${THIS_DIR}
+set_source_path(THIS_DIR_HEADERS
   Al.hpp
   internal.hpp
   progress.hpp
@@ -12,34 +10,34 @@ set_relative_path(THIS_DIR_HEADERS ${THIS_DIR}
   tuning_params.hpp
   utils.hpp
   )
-set_relative_path(THIS_DIR_CXX_SOURCES ${THIS_DIR}
+set_source_path(THIS_DIR_CXX_SOURCES
   Al.cpp
   mpi_impl.cpp
   profiling.cpp
   progress.cpp
   trace.cpp
   )
-set_relative_path(THIS_DIR_CUDA_HEADERS ${THIS_DIR}
+set_source_path(THIS_DIR_CUDA_HEADERS
   cuda.hpp
   helper_kernels.hpp
   cudacommunicator.hpp
   )
-set_relative_path(THIS_DIR_CUDA_CXX_SOURCES ${THIS_DIR}
+set_source_path(THIS_DIR_CUDA_CXX_SOURCES
   cuda.cpp
   )
-set_relative_path(THIS_DIR_CUDA_SOURCES ${THIS_DIR}
+set_source_path(THIS_DIR_CUDA_SOURCES
   helper_kernels.cu
   )
-set_relative_path(THIS_DIR_MPI_CUDA_HEADERS ${THIS_DIR}
+set_source_path(THIS_DIR_MPI_CUDA_HEADERS
   mpi_cuda_impl.hpp
   )
-set_relative_path(THIS_DIR_MPI_CUDA_CXX_SOURCES ${THIS_DIR}
+set_source_path(THIS_DIR_MPI_CUDA_CXX_SOURCES
   mpi_cuda_impl.cpp
   )
-set_relative_path(THIS_DIR_NCCL_HEADERS ${THIS_DIR}
+set_source_path(THIS_DIR_NCCL_HEADERS
   nccl_impl.hpp
   )
-set_relative_path(THIS_DIR_NCCL_CXX_SOURCES ${THIS_DIR}
+set_source_path(THIS_DIR_NCCL_CXX_SOURCES
   nccl_impl.cpp
   )
 
@@ -71,10 +69,8 @@ if (AL_HAS_ROCM)
 
   hip_add_library(Al "${ALUMINUM_HIP_SOURCES}" "${ALUMINUM_HIP_HEADERS}")
   target_include_directories(Al PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/${THIS_DIR}>)
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>)
 
-  # TODO: this does duplicate work in hipify-perl to avoid some CMake pain
-  # (this also happens twice in mpi_cuda/CMakeLists.txt)
   hipify_header_files(THIS_DIR_HEADERS_TO_INSTALL ${THIS_DIR_HEADERS})
 else ()
   add_library(Al
