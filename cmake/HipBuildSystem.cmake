@@ -28,7 +28,7 @@ function (hipify_files_internal extension new_filenames)
     set(input "${PROJECT_SOURCE_DIR}/${filename}")
     set(output "${CMAKE_BINARY_DIR}/${filename}${extension}")
 
-    message(DEBUG "Processing ${filename} into ${CMAKE_BINARY_DIR}/${filename}${extension}")
+    #message(DEBUG "Processing ${filename} into ${CMAKE_BINARY_DIR}/${filename}${extension}")
 
     add_custom_command(
       OUTPUT ${output}

@@ -89,7 +89,8 @@ target_include_directories(Al PUBLIC
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/aluminum>)
 target_link_libraries(Al PUBLIC
   MPI::MPI_CXX HWLOC::hwloc
-  $<$<BOOL:${AL_HAS_OPENMP}>:OpenMP::OpenMP_CXX>)
+  $<$<BOOL:${AL_HAS_OPENMP}>:OpenMP::OpenMP_CXX>
+  $<TARGET_NAME_IF_EXISTS:roc::rccl>)
 
 target_compile_features(Al PUBLIC cxx_std_11)
 
