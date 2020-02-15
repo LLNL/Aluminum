@@ -64,19 +64,20 @@ foreach(src ${AL_TEST_SOURCES})
   endif()
 endforeach()
 
-# if (AL_HAS_CUDA)
-#   add_executable(test_stream_mem_ops.exe
-#   test_stream_mem_ops.cpp ${TEST_HEADERS})
-#   target_link_libraries(test_stream_mem_ops.exe PRIVATE Al)
-#   target_link_libraries(test_stream_mem_ops.exe PUBLIC cuda)
-# endif ()
+# FIXME: Should any of these tests be enabled with ROCm?
+if (AL_HAS_CUDA AND NOT AL_HAS_ROCM)
+  add_executable(test_stream_mem_ops.exe
+  test_stream_mem_ops.cpp ${TEST_HEADERS})
+  target_link_libraries(test_stream_mem_ops.exe PRIVATE Al)
+  target_link_libraries(test_stream_mem_ops.exe PUBLIC cuda)
+endif ()
 
-# if (AL_HAS_MPI_CUDA_RMA)
-#   add_executable(test_rma_ring.exe test_rma_ring.cpp ${TEST_HEADERS})
-#   target_link_libraries(test_rma_ring.exe PRIVATE Al)
-#   target_link_libraries(test_rma_ring.exe PUBLIC cuda)
-#   add_executable(test_rma_halo_exchange.exe
-#     test_rma_halo_exchange.cpp ${TEST_HEADERS})
-#   target_link_libraries(test_rma_halo_exchange.exe PRIVATE Al)
-#   target_link_libraries(test_rma_halo_exchange.exe PUBLIC cuda)
-# endif ()
+if (AL_HAS_MPI_CUDA_RMA AND NOT AL_HAS_ROCM)
+  add_executable(test_rma_ring.exe test_rma_ring.cpp ${TEST_HEADERS})
+  target_link_libraries(test_rma_ring.exe PRIVATE Al)
+  target_link_libraries(test_rma_ring.exe PUBLIC cuda)
+  add_executable(test_rma_halo_exchange.exe
+    test_rma_halo_exchange.cpp ${TEST_HEADERS})
+  target_link_libraries(test_rma_halo_exchange.exe PRIVATE Al)
+  target_link_libraries(test_rma_halo_exchange.exe PUBLIC cuda)
+endif ()
