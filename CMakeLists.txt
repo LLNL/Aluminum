@@ -349,10 +349,11 @@ endmacro()
 add_subdirectory(src)
 
 # Testing
-#include(CTest)
+include(CTest)
 add_subdirectory(test)
 
-# TODO before ROCm stuff merges: reenable these
+# The benchmarks depend on some test utility headers, so it must come
+# after the test/ directory.
 add_subdirectory(benchmark)
 
 #
