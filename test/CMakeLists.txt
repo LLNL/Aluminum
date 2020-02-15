@@ -33,29 +33,36 @@ else ()
     aluminum_test_headers INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}")
 endif ()
 
-# set(TEST_SRCS
-#   test_allreduce.cpp
-#   test_reduce.cpp
-#   test_reduce_scatter.cpp
-#   test_allgather.cpp
-#   test_alltoall.cpp
-#   test_bcast.cpp
-#   test_gather.cpp
-#   test_scatter.cpp
-#   test_pt2pt.cpp
-#   test_exchange.cpp
-#   test_transfer_to_one.cpp
-#   test_transfer_from_one.cpp
-#   test_multi_nballreduces.cpp)
+set_source_path(TEST_SRCS
+  test_allreduce.cpp
+  test_reduce.cpp
+  test_reduce_scatter.cpp
+  test_allgather.cpp
+  test_alltoall.cpp
+  test_bcast.cpp
+  test_gather.cpp
+  test_scatter.cpp
+  test_pt2pt.cpp
+  test_exchange.cpp
+  test_transfer_to_one.cpp
+  test_transfer_from_one.cpp
+  test_multi_nballreduces.cpp)
 
-# foreach(src ${TEST_SRCS})
-#   string(REPLACE ".cpp" ".exe" _test_exe_name "${src}")
-#   add_executable(${_test_exe_name} ${src})
-#   target_link_libraries(${_test_exe_name} PRIVATE Al aluminum_test_headers)
-#   if (AL_HAS_CUDA)
-#     target_link_libraries(${_test_exe_name} PUBLIC cuda)
-#   endif()
-# endforeach()
+if (AL_HAS_ROCM)
+  hipify_source_files(AL_TEST_SOURCES ${TEST_SRCS})
+else ()
+  set(AL_TEST_SOURCES ${TEST_SRCS})
+endif ()
+
+foreach(src ${AL_TEST_SOURCES})
+  string(REPLACE ".cpp" ".exe" _tmp_test_exe_name "${src}")
+  get_filename_component(_test_exe_name "${_tmp_test_exe_name}" NAME)
+  add_executable(${_test_exe_name} ${src})
+  target_link_libraries(${_test_exe_name} PRIVATE Al aluminum_test_headers)
+  if (AL_HAS_CUDA AND NOT AL_HAS_ROCM)
+    target_link_libraries(${_test_exe_name} PUBLIC cuda)
+  endif()
+endforeach()
 
 # if (AL_HAS_CUDA)
 #   add_executable(test_stream_mem_ops.exe
