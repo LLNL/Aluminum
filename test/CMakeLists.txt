@@ -1,60 +1,75 @@
-set_full_path(TEST_HEADERS
-  test_utils.hpp)
+set_source_path(TEST_BASE_HDRS test_utils.hpp)
 if (AL_HAS_CUDA)
-  list(APPEND TEST_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/test_utils_cuda.hpp)
+  set_source_path(TEST_CUDA_HDRS test_utils_cuda.hpp)
 endif ()
-
 if (AL_HAS_MPI_CUDA)
-  list(APPEND TEST_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/test_utils_mpi_cuda.hpp)
+  set_source_path(TEST_MPI_CUDA_HDRS test_utils_mpi_cuda.hpp)
+endif ()
+if (AL_HAS_NCCL)
+  set_source_path(TEST_NCCL_HDRS test_utils_nccl_cuda.hpp)
 endif ()
 
-if (AL_HAS_NCCL)
-  list(APPEND TEST_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/test_utils_nccl_cuda.hpp)
-endif ()
+set(TEST_HDRS
+  ${TEST_BASE_HDRS}
+  ${TEST_CUDA_HDRS}
+  ${TEST_MPI_CUDA_HDRS}
+  ${TEST_NCCL_HDRS})
 
 # These headers are used in the benchmark/ directory
 add_library(aluminum_test_headers INTERFACE)
-target_sources(aluminum_test_headers INTERFACE "${TEST_HEADERS}")
-target_include_directories(
-  aluminum_test_headers INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}")
 
-set(TEST_SRCS
-  test_allreduce.cpp
-  test_reduce.cpp
-  test_reduce_scatter.cpp
-  test_allgather.cpp
-  test_alltoall.cpp
-  test_bcast.cpp
-  test_gather.cpp
-  test_scatter.cpp
-  test_pt2pt.cpp
-  test_exchange.cpp
-  test_transfer_to_one.cpp
-  test_transfer_from_one.cpp
-  test_multi_nballreduces.cpp)
-
-foreach(src ${TEST_SRCS})
-  string(REPLACE ".cpp" ".exe" _test_exe_name "${src}")
-  add_executable(${_test_exe_name} ${src})
-  target_link_libraries(${_test_exe_name} PRIVATE Al aluminum_test_headers)
-  if (AL_HAS_CUDA)
-    target_link_libraries(${_test_exe_name} PUBLIC cuda)
-  endif()
-endforeach()
-
-if (AL_HAS_CUDA)
-  add_executable(test_stream_mem_ops.exe
-  test_stream_mem_ops.cpp ${TEST_HEADERS})
-  target_link_libraries(test_stream_mem_ops.exe PRIVATE Al)
-  target_link_libraries(test_stream_mem_ops.exe PUBLIC cuda)
+if (AL_HAS_ROCM)
+  hipify_header_files(TEST_HEADERS ${TEST_HDRS})
+  add_custom_target(gen_test_headers
+    DEPENDS ${TEST_HEADERS}
+    COMMENT "Generating hipified test headers.")
+  add_dependencies(aluminum_test_headers gen_test_headers)
+  target_include_directories(
+    aluminum_test_headers INTERFACE "${CMAKE_CURRENT_BINARY_DIR}")
+else ()
+  set(TEST_HEADERS ${TEST_HDRS})
+  target_sources(aluminum_test_headers INTERFACE "${TEST_HEADERS}")
+  target_include_directories(
+    aluminum_test_headers INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}")
 endif ()
 
-if (AL_HAS_MPI_CUDA_RMA)
-  add_executable(test_rma_ring.exe test_rma_ring.cpp ${TEST_HEADERS})
-  target_link_libraries(test_rma_ring.exe PRIVATE Al)
-  target_link_libraries(test_rma_ring.exe PUBLIC cuda)
-  add_executable(test_rma_halo_exchange.exe
-    test_rma_halo_exchange.cpp ${TEST_HEADERS})
-  target_link_libraries(test_rma_halo_exchange.exe PRIVATE Al)
-  target_link_libraries(test_rma_halo_exchange.exe PUBLIC cuda)
-endif ()
+# set(TEST_SRCS
+#   test_allreduce.cpp
+#   test_reduce.cpp
+#   test_reduce_scatter.cpp
+#   test_allgather.cpp
+#   test_alltoall.cpp
+#   test_bcast.cpp
+#   test_gather.cpp
+#   test_scatter.cpp
+#   test_pt2pt.cpp
+#   test_exchange.cpp
+#   test_transfer_to_one.cpp
+#   test_transfer_from_one.cpp
+#   test_multi_nballreduces.cpp)
+
+# foreach(src ${TEST_SRCS})
+#   string(REPLACE ".cpp" ".exe" _test_exe_name "${src}")
+#   add_executable(${_test_exe_name} ${src})
+#   target_link_libraries(${_test_exe_name} PRIVATE Al aluminum_test_headers)
+#   if (AL_HAS_CUDA)
+#     target_link_libraries(${_test_exe_name} PUBLIC cuda)
+#   endif()
+# endforeach()
+
+# if (AL_HAS_CUDA)
+#   add_executable(test_stream_mem_ops.exe
+#   test_stream_mem_ops.cpp ${TEST_HEADERS})
+#   target_link_libraries(test_stream_mem_ops.exe PRIVATE Al)
+#   target_link_libraries(test_stream_mem_ops.exe PUBLIC cuda)
+# endif ()
+
+# if (AL_HAS_MPI_CUDA_RMA)
+#   add_executable(test_rma_ring.exe test_rma_ring.cpp ${TEST_HEADERS})
+#   target_link_libraries(test_rma_ring.exe PRIVATE Al)
+#   target_link_libraries(test_rma_ring.exe PUBLIC cuda)
+#   add_executable(test_rma_halo_exchange.exe
+#     test_rma_halo_exchange.cpp ${TEST_HEADERS})
+#   target_link_libraries(test_rma_halo_exchange.exe PRIVATE Al)
+#   target_link_libraries(test_rma_halo_exchange.exe PUBLIC cuda)
+# endif ()

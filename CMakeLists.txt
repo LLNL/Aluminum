@@ -348,12 +348,12 @@ endmacro()
 
 add_subdirectory(src)
 
-# TODO before ROCm stuff merges: reenable these
-#add_subdirectory(benchmark)
-
 # Testing
 #include(CTest)
-#add_subdirectory(test)
+add_subdirectory(test)
+
+# TODO before ROCm stuff merges: reenable these
+add_subdirectory(benchmark)
 
 #
 # Install target
