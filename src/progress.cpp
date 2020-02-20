@@ -261,7 +261,13 @@ void ProgressEngine::engine() {
           bool do_start = false;
           switch (req->get_run_type()) {
           case RunType::bounded:
-            if (num_bounded < AL_PE_NUM_CONCURRENT_OPS) {
+            // Move to the run queue if any of the following hold:
+            //   1. num_bounded < AL_PE_NUM_CONCURRENT_OPS.
+            //   2. The run_queue for this stream doesn't exist.
+            //   3. The run_queue for this stream's first stage is empty.
+            if (num_bounded < AL_PE_NUM_CONCURRENT_OPS
+                || !run_queues.count(req->get_compute_stream())
+                || !run_queues[req->get_compute_stream()][0].size()) {
               ++num_bounded;
               do_start = true;
             }
