@@ -183,18 +183,6 @@ endforeach()
 set_property(TARGET MPI::MPI_CXX
   PROPERTY INTERFACE_LINK_LIBRARIES ${_MPI_LINK_LIBRARIES})
 
-find_package(OpenMP QUIET COMPONENTS CXX)
-if (NOT OpenMP_FOUND AND CMAKE_CXX_COMPILER_ID MATCHES ".*[Cc]lang")
-  include(TryLLVMOpenMP)
-endif ()
-if (OpenMP_FOUND)
-  message(STATUS "Found OpenMP: ${OpenMP_CXX_FLAGS}")
-else ()
-  message(FATAL_ERROR "Aluminum thinks it needs OpenMP. "
-    "If using Clang or a derivative, try setting OpenMP_DIR to point "
-    "to the install prefix of an OpenMP library.")
-endif ()
-
 find_package(HWLOC REQUIRED)
 
 if (ALUMINUM_ENABLE_OPENMP)
