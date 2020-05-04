@@ -37,7 +37,7 @@ namespace cuda {
 void launch_wait_kernel(cudaStream_t stream, int32_t wait_value,
                         volatile int32_t* wait_mem);
 
-#if AL_USE_STREAM_MEM_OPS
+#if defined AL_HAS_CUDA && !defined AL_HAS_ROCM
 void launch_wait_kernel(cudaStream_t stream, int32_t wait_value,
                         CUdeviceptr wait_mem);
 #endif // AL_USE_STREAM_MEM_OPS

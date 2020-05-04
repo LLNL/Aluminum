@@ -201,8 +201,12 @@ GPUWait::~GPUWait() {
 
 void GPUWait::wait(cudaStream_t stream) {
   if (stream_memory_operations_supported())
+#ifdef AL_HAS_ROCM
     launch_wait_kernel(stream, 1, static_cast<int32_t*>(wait_sync_dev_ptr));
-  else
+#elif defined AL_HAS_CUDA
+    launch_wait_kernel(stream, 1, wait_sync_dev_ptr);
+#endif
+    else
     launch_wait_kernel(stream, 1, wait_sync_dev_ptr_no_stream_mem_ops);
 }
 
