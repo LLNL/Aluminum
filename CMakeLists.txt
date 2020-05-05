@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.9)
+cmake_minimum_required(VERSION 3.14)
 # 3.9 is required for CUDA as a first-class language.
 #
 # 3.8 is required for cxx_std_11 compile feature. Otherwise we could
@@ -15,8 +15,7 @@ set(ALUMINUM_VERSION_PATCH 3)
 set(ALUMINUM_VERSION "${ALUMINUM_VERSION_MAJOR}.${ALUMINUM_VERSION_MINOR}.${ALUMINUM_VERSION_PATCH}")
 
 project(ALUMINUM VERSION ${ALUMINUM_VERSION} LANGUAGES CXX)
-# Not "CUDA" because no CUDA sources being compiled, so don't need
-# NVCC, just cuda runtime.
+# Not "CUDA" just yet since that's only one possible device paradigm.
 
 if (${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_BINARY_DIR})
   message(FATAL_ERROR "In-source builds are prohibited. "
@@ -29,38 +28,92 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 # Options
 
 option(ALUMINUM_ENABLE_CUDA "Enable CUDA support." OFF)
-option(ALUMINUM_ENABLE_MPI_CUDA "Enable MPI-CUDA support." OFF)
-option(ALUMINUM_ENABLE_NCCL "Enable NCCL support." OFF)
-option(ALUMINUM_ENABLE_MPI_CUDA_RMA "Enable RMA in MPI-CUDA." OFF)
-if (ALUMINUM_ENABLE_MPI_CUDA_RMA AND NOT ALUMINUM_ENABLE_MPI_CUDA)
-  message(STATUS "RMA in MPI-CUDA requested; enabling MPI-CUDA support, too.")
-  set(ALUMINUM_ENABLE_CUDA ON)
-endif ()
-if (ALUMINUM_ENABLE_MPI_CUDA AND NOT ALUMINUM_ENABLE_CUDA)
-  message(STATUS "MPI-CUDA support requested; enabling CUDA support, too.")
-  set(ALUMINUM_ENABLE_CUDA ON)
-endif ()
-if (ALUMINUM_ENABLE_NCCL AND NOT ALUMINUM_ENABLE_CUDA)
-  message(STATUS "NCCL support requested; enabling CUDA support, too.")
-  set(ALUMINUM_ENABLE_CUDA ON)
-endif ()
-option(ALUMINUM_DEBUG_HANG_CHECK "Enable hang checking." OFF)
-option(ALUMINUM_ENABLE_NVPROF "Enable profiling via nvprof/NVTX." OFF)
-option(ALUMINUM_ENABLE_STREAM_MEM_OPS "Enable stream memory operations." OFF)
-option(ALUMINUM_HT_USE_PASSTHROUGH "Host-transfer allreduces use MPI directly." OFF)
-option(ALUMINUM_ENABLE_TRACE "Enable runtime tracing." OFF)
+option(ALUMINUM_ENABLE_ROCM "Enable HIP/ROCm support." OFF)
 
-if (ALUMINUM_ENABLE_CUDA
+# CUDA and ROCm are considered to be mutually exclusive.
+if (ALUMINUM_ENABLE_CUDA AND ALUMINUM_ENABLE_ROCM)
+  message(FATAL_ERROR
+    "CUDA and HIP/ROCm support are mutually exclusive. "
+    "Please only enable one.")
+endif ()
+
+# The first of many atrocities to come: the build will be largely
+# agnostic to which of CUDA or ROCm is enabled. Use a generic flag to
+# hide this.
+if (ALUMINUM_ENABLE_CUDA OR ALUMINUM_ENABLE_ROCM)
+  set(ALUMINUM_HAS_GPU ON)
+endif ()
+
+# If ROCm is enabled, this means "ALUMINUM_ENABLE_MPI_ROCM"...
+option(ALUMINUM_ENABLE_MPI_CUDA "Enable MPI-CUDA support." OFF)
+option(ALUMINUM_ENABLE_MPI_CUDA_RMA "Enable RMA in MPI-CUDA." OFF)
+
+if (ALUMINUM_ENABLE_MPI_CUDA_RMA AND NOT ALUMINUM_ENABLE_MPI_CUDA)
+  message(STATUS
+    "RMA in MPI-CUDA requested; enabling MPI-CUDA support, too.")
+  set(ALUMINUM_ENABLE_MPI_CUDA ON)
+endif ()
+
+if (ALUMINUM_ENABLE_MPI_CUDA AND NOT ALUMINUM_HAS_GPU)
+  message(STATUS
+    "MPI-CUDA support requested but no GPU runtime enabled. "
+    "Assuming CUDA support.")
+  set(ALUMINUM_ENABLE_CUDA ON)
+endif ()
+
+# If ROCm is enabled, this means "ALUMINUM_ENABLE_RCCL"...
+option(ALUMINUM_ENABLE_NCCL "Enable NCCL support." OFF)
+
+if (ALUMINUM_ENABLE_NCCL AND NOT ALUMINUM_HAS_GPU)
+  message(STATUS
+    "NCCL support requested but no GPU runtime enabled. "
+    "Assuming CUDA support.")
+  set(ALUMINUM_ENABLE_CUDA ON)
+endif ()
+
+if (ALUMINUM_ENABLE_CUDA OR ALUMINUM_ENABLE_ROCM)
+  set(ALUMINUM_HAS_GPU ON)
+endif ()
+
+# The ROCm compilers have OpenMP problems. Make it toggle-able:
+if (ALUMINUM_ENABLE_ROCM)
+  set(DEFAULT_ALUMINUM_ENABLE_OPENMP OFF)
+else ()
+  set(DEFAULT_ALUMINUM_ENABLE_OPENMP ON)
+endif ()
+
+option(ALUMINUM_ENABLE_OPENMP
+  "Enable OpenMP in the MPI implementation."
+  ${DEFAULT_ALUMINUM_ENABLE_OPENMP})
+
+option(ALUMINUM_DEBUG_HANG_CHECK
+  "Enable hang checking."
+  OFF)
+option(ALUMINUM_ENABLE_NVPROF
+  "Enable profiling via nvprof/NVTX."
+  OFF)
+option(ALUMINUM_ENABLE_STREAM_MEM_OPS
+  "Enable stream memory operations."
+  OFF)
+option(ALUMINUM_HT_USE_PASSTHROUGH
+  "Host-transfer allreduces use MPI directly."
+  OFF)
+option(ALUMINUM_ENABLE_TRACE
+  "Enable runtime tracing."
+  OFF)
+
+if (ALUMINUM_HAS_GPU
     AND NOT ALUMINUM_ENABLE_NCCL
     AND NOT ALUMINUM_ENABLE_MPI_CUDA)
   message(FATAL_ERROR
-    "CUDA has been enabled without a backend. "
+    "CUDA or ROCm has been enabled without a backend. "
     "This should not happen. "
     "Please turn on \"ALUMINUM_ENABLE_NCCL\" and/or "
     "\"ALUMINUM_ENABLE_MPI_CUDA\" and reconfigure.")
 endif ()
 
-if (CMAKE_BUILD_TYPE MATCHES Debug)
+string(TOUPPER "${CMAKE_BUILD_TYPE}" AL_BUILD_TYPE_UPPER)
+if (AL_BUILD_TYPE_UPPER MATCHES "DEBUG")
   set(AL_DEBUG ON)
 endif ()
 if (ALUMINUM_DEBUG_HANG_CHECK)
@@ -130,23 +183,13 @@ endforeach()
 set_property(TARGET MPI::MPI_CXX
   PROPERTY INTERFACE_LINK_LIBRARIES ${_MPI_LINK_LIBRARIES})
 
-find_package(OpenMP QUIET COMPONENTS CXX)
-if (NOT OpenMP_FOUND AND CMAKE_CXX_COMPILER_ID MATCHES ".*[Cc]lang")
-  include(TryLLVMOpenMP)
-endif ()
-if (OpenMP_FOUND)
-  message(STATUS "Found OpenMP: ${OpenMP_CXX_FLAGS}")
-else ()
-  message(FATAL_ERROR "Aluminum thinks it needs OpenMP. "
-    "If using Clang or a derivative, try setting OpenMP_DIR to point "
-    "to the install prefix of an OpenMP library.")
-endif ()
-
 find_package(HWLOC REQUIRED)
 
-# Fix an issue with OpenMP's egregious use of non-language-specific
-# compiler flags.
-if (OPENMP_FOUND)
+if (ALUMINUM_ENABLE_OPENMP)
+  find_package(OpenMP REQUIRED COMPONENTS CXX)
+
+  # Fix an issue with OpenMP's egregious use of non-language-specific
+  # compiler flags.
   get_target_property(
     __omp_compile_options OpenMP::OpenMP_CXX INTERFACE_COMPILE_OPTIONS)
   set_property(TARGET OpenMP::OpenMP_CXX PROPERTY
@@ -158,7 +201,10 @@ if (OPENMP_FOUND)
     set_property(TARGET OpenMP::OpenMP_CXX APPEND PROPERTY
       INTERFACE_LINK_LIBRARIES "${OpenMP_CXX_FLAGS}")
   endif ()
-endif (OPENMP_FOUND)
+
+  set(AL_HAS_OPENMP TRUE)
+endif ()
+
 if (ALUMINUM_ENABLE_CUDA)
   find_package(CUDA 9.0)
   if (CUDA_FOUND)
@@ -168,7 +214,7 @@ if (ALUMINUM_ENABLE_CUDA)
       set(AL_HAS_CUDA TRUE)
       set(AL_HAS_MPI_CUDA TRUE)
       if (ALUMINUM_ENABLE_MPI_CUDA_RMA)
-	set(AL_HAS_MPI_CUDA_RMA TRUE)
+        set(AL_HAS_MPI_CUDA_RMA TRUE)
       endif ()
     endif ()
 
@@ -214,6 +260,49 @@ if (ALUMINUM_ENABLE_CUDA)
   endif ()
 endif ()
 
+if (ALUMINUM_ENABLE_ROCM)
+  # Provides hipify_*_files
+  include(HipBuildSystem)
+
+  # Provides hip_add_executable
+  set(CMAKE_MODULE_PATH "/opt/rocm/hip/cmake" ${CMAKE_MODULE_PATH})
+
+  # hip-runtime library
+  find_package(HIP REQUIRED)
+  set(AL_HAS_ROCM TRUE)
+
+  # This is needed for some compatibility
+  # things in the source code.
+  set(AL_HAS_CUDA TRUE)
+
+  if (ALUMINUM_ENABLE_MPI_CUDA)
+    set(AL_HAS_MPI_CUDA TRUE)
+    if (ALUMINUM_ENABLE_MPI_CUDA_RMA)
+      set(AL_HAS_MPI_CUDA_RMA TRUE)
+    endif ()
+  endif ()
+
+  if (ALUMINUM_ENABLE_NCCL)
+    find_package(rccl CONFIG QUIET
+      HINTS ${RCCL_DIR} $ENV{RCCL_DIR}
+      PATH_SUFFIXES lib64/cmake/rccl lib/cmake/rccl
+      NO_DEFAULT_PATH)
+    find_package(rccl CONFIG REQUIRED)
+    message(STATUS "Found RCCL: ${rccl_DIR}")
+    set(AL_HAS_NCCL TRUE)
+  endif ()
+
+  # Just in case any of the previous commands turned this on.
+  set(CMAKE_CXX_EXTENSIONS FALSE)
+
+  # For some reason, hipified files can be relatively specified, but regular
+  # files must be given a full path. This appears to be the easiest way for both
+  # ROCm and non-ROCm builds to both work and install.
+  set(SOURCE_PREFIX "")
+else ()
+  set(SOURCE_PREFIX "${CMAKE_CURRENT_LIST_DIR}/")
+endif ()
+
 # Build library and executables
 
 # Write the configuration file
@@ -225,23 +314,31 @@ configure_file(
   "${CMAKE_SOURCE_DIR}/cmake/Al_config.hpp.in"
   "${CMAKE_BINARY_DIR}/Al_config.hpp" @ONLY)
 
-# Macro for setting up full paths
-macro(set_full_path VAR)
+# Macro for setting up paths
+macro(set_source_path VAR)
   unset(__tmp_names)
+
+  file(RELATIVE_PATH __relative_to
+    "${PROJECT_SOURCE_DIR}" "${CMAKE_CURRENT_LIST_DIR}")
+
   foreach(filename ${ARGN})
     unset(__name)
-    get_filename_component(__name "${filename}" ABSOLUTE)
-    list(APPEND __tmp_names "${__name}")
+    get_filename_component(__name "${filename}" NAME)
+    list(APPEND __tmp_names "${SOURCE_PREFIX}${__relative_to}/${__name}")
+    #message(DEBUG "Set source path of ${__name} to ${SOURCE_PREFIX}${__relative_to}/${__name}")
   endforeach()
   set(${VAR} "${__tmp_names}")
 endmacro()
 
 add_subdirectory(src)
-add_subdirectory(benchmark)
 
 # Testing
 include(CTest)
 add_subdirectory(test)
+
+# The benchmarks depend on some test utility headers, so it must come
+# after the test/ directory.
+add_subdirectory(benchmark)
 
 #
 # Install target

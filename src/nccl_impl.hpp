@@ -27,7 +27,14 @@
 
 #pragma once
 
+#include "Al_config.hpp"
+
+#if defined(AL_HAS_ROCM)
+#include <rccl.h>
+#elif defined(AL_HAS_CUDA)
 #include <nccl.h>
+#endif // defined(AL_HAS_ROCM)
+
 #include "Al.hpp"
 #include "internal.hpp"
 #include "cuda.hpp"

@@ -64,7 +64,7 @@ void init(int&, char**&) {
     profiling::name_stream(internal_streams[i],
                            "al_internal_" + std::to_string(i));
   }
-#if AL_USE_STREAM_MEM_OPS
+#ifndef AL_HAS_ROCM
   // Check whether stream memory operations are supported.
   CUdevice dev;
   AL_CHECK_CUDA_DRV(cuCtxGetDevice(&dev));
@@ -72,6 +72,8 @@ void init(int&, char**&) {
   AL_CHECK_CUDA_DRV(cuDeviceGetAttribute(
                       &attr, CU_DEVICE_ATTRIBUTE_CAN_USE_STREAM_MEM_OPS, dev));
   stream_mem_ops_supported = attr;
+#else
+  stream_mem_ops_supported = false;
 #endif
   // Preallocate memory for synchronization operations.
   std::vector<int32_t*> prealloc_mem;
@@ -82,6 +84,7 @@ void init(int&, char**&) {
     release_pinned_memory(prealloc_mem[i]);
   }
 }
+
 void finalize() {
   for (auto&& event : cuda_events) {
     AL_CHECK_CUDA(cudaEventDestroy(event));
@@ -143,11 +146,16 @@ FastEvent::~FastEvent() {
 
 void FastEvent::record(cudaStream_t stream) {
   if (stream_memory_operations_supported()) {
-    // We cannot use std::atomic because we need the actual address of the memory.
+    // We cannot use std::atomic because we need the actual address of
+    // the memory.
+#ifndef AL_HAS_ROCM
     __atomic_store_n(sync_event, 0, __ATOMIC_SEQ_CST);
     AL_CHECK_CUDA_DRV(cuStreamWriteValue32(
                         stream, sync_event_dev_ptr, 1,
                         CU_STREAM_WRITE_VALUE_DEFAULT));
+#else
+    throw_al_exception("A serious error has occurred; should not reach this.");
+#endif
   } else {
     AL_CHECK_CUDA(cudaEventRecord(plain_event, stream));
   }
@@ -182,8 +190,11 @@ GPUWait::GPUWait()
     AL_CHECK_CUDA_DRV(cuMemHostGetDevicePointer(
                         &wait_sync_dev_ptr, wait_sync, 0));
   else
-    AL_CHECK_CUDA(cudaHostGetDevicePointer(
-                    &wait_sync_dev_ptr_no_stream_mem_ops, wait_sync, 0));
+    AL_CHECK_CUDA(
+      cudaHostGetDevicePointer(
+        reinterpret_cast<void**>(&wait_sync_dev_ptr_no_stream_mem_ops),
+        wait_sync,
+        0));
 }
 
 GPUWait::~GPUWait() {
@@ -192,8 +203,12 @@ GPUWait::~GPUWait() {
 
 void GPUWait::wait(cudaStream_t stream) {
   if (stream_memory_operations_supported())
+#ifdef AL_HAS_ROCM
+    launch_wait_kernel(stream, 1, static_cast<int32_t*>(wait_sync_dev_ptr));
+#else
     launch_wait_kernel(stream, 1, wait_sync_dev_ptr);
-  else
+#endif
+    else
     launch_wait_kernel(stream, 1, wait_sync_dev_ptr_no_stream_mem_ops);
 }
 

@@ -33,6 +33,7 @@
 #pragma once
 
 /** Whether to use OpenMP for reduction operators. */
+// TODO: This should be gated by AL_HAS_OPENMP
 #define AL_MPI_USE_OPENMP 0
 /** Use multiple threads for sum reductions this size or larger. */
 #define AL_MPI_MULTITHREAD_SUM_THRESH 262144

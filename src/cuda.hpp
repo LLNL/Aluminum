@@ -27,11 +27,31 @@
 
 #pragma once
 
+#include "Al_config.hpp"
+
 #include <utility>
 #include <sstream>
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <cuda_fp16.h>
+
+/**
+ * Things we use that hip doesn't support:
+ * - cuStreamWaitValue32
+ * - cuStreamWriteValue32
+ * - cuGetErrorString
+ * Of these, the first two are supported by the non-STREAM_MEM_OP code, so we
+ * just need to reimplement cuGetErrorString
+ */
+
+#ifdef AL_HAS_ROCM
+inline hipError_t cuGetErrorString(hipError_t /* error */, const char** pStr)
+{
+  static char const* unsupported = "hipGetErrorString is unsupported :(";
+  *pStr = unsupported;
+  return CUDA_SUCCESS;
+}
+#endif // AL_HAS_ROCM
 
 // Note: These macros only work inside the Al namespace.
 

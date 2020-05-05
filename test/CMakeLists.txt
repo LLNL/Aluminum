@@ -1,24 +1,39 @@
-set_full_path(TEST_HEADERS
-  test_utils.hpp)
+set_source_path(TEST_BASE_HDRS test_utils.hpp)
 if (AL_HAS_CUDA)
-  list(APPEND TEST_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/test_utils_cuda.hpp)
+  set_source_path(TEST_CUDA_HDRS test_utils_cuda.hpp)
 endif ()
-
 if (AL_HAS_MPI_CUDA)
-  list(APPEND TEST_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/test_utils_mpi_cuda.hpp)
+  set_source_path(TEST_MPI_CUDA_HDRS test_utils_mpi_cuda.hpp)
+endif ()
+if (AL_HAS_NCCL)
+  set_source_path(TEST_NCCL_HDRS test_utils_nccl_cuda.hpp)
 endif ()
 
-if (AL_HAS_NCCL)
-  list(APPEND TEST_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/test_utils_nccl_cuda.hpp)
-endif ()
+set(TEST_HDRS
+  ${TEST_BASE_HDRS}
+  ${TEST_CUDA_HDRS}
+  ${TEST_MPI_CUDA_HDRS}
+  ${TEST_NCCL_HDRS})
 
 # These headers are used in the benchmark/ directory
 add_library(aluminum_test_headers INTERFACE)
-target_sources(aluminum_test_headers INTERFACE "${TEST_HEADERS}")
-target_include_directories(
-  aluminum_test_headers INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}")
 
-set(TEST_SRCS
+if (AL_HAS_ROCM)
+  hipify_header_files(TEST_HEADERS ${TEST_HDRS})
+  add_custom_target(gen_test_headers
+    DEPENDS ${TEST_HEADERS}
+    COMMENT "Generating hipified test headers.")
+  add_dependencies(aluminum_test_headers gen_test_headers)
+  target_include_directories(
+    aluminum_test_headers INTERFACE "${CMAKE_CURRENT_BINARY_DIR}")
+else ()
+  set(TEST_HEADERS ${TEST_HDRS})
+  target_sources(aluminum_test_headers INTERFACE "${TEST_HEADERS}")
+  target_include_directories(
+    aluminum_test_headers INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}")
+endif ()
+
+set_source_path(TEST_SRCS
   test_allreduce.cpp
   test_reduce.cpp
   test_reduce_scatter.cpp
@@ -33,23 +48,31 @@ set(TEST_SRCS
   test_transfer_from_one.cpp
   test_multi_nballreduces.cpp)
 
-foreach(src ${TEST_SRCS})
-  string(REPLACE ".cpp" ".exe" _test_exe_name "${src}")
+if (AL_HAS_ROCM)
+  hipify_source_files(AL_TEST_SOURCES ${TEST_SRCS})
+else ()
+  set(AL_TEST_SOURCES ${TEST_SRCS})
+endif ()
+
+foreach(src ${AL_TEST_SOURCES})
+  string(REPLACE ".cpp" ".exe" _tmp_test_exe_name "${src}")
+  get_filename_component(_test_exe_name "${_tmp_test_exe_name}" NAME)
   add_executable(${_test_exe_name} ${src})
   target_link_libraries(${_test_exe_name} PRIVATE Al aluminum_test_headers)
-  if (AL_HAS_CUDA)
+  if (AL_HAS_CUDA AND NOT AL_HAS_ROCM)
     target_link_libraries(${_test_exe_name} PUBLIC cuda)
   endif()
 endforeach()
 
-if (AL_HAS_CUDA)
+# FIXME: Should any of these tests be enabled with ROCm?
+if (AL_HAS_CUDA AND NOT AL_HAS_ROCM)
   add_executable(test_stream_mem_ops.exe
   test_stream_mem_ops.cpp ${TEST_HEADERS})
   target_link_libraries(test_stream_mem_ops.exe PRIVATE Al)
   target_link_libraries(test_stream_mem_ops.exe PUBLIC cuda)
 endif ()
 
-if (AL_HAS_MPI_CUDA_RMA)
+if (AL_HAS_MPI_CUDA_RMA AND NOT AL_HAS_ROCM)
   add_executable(test_rma_ring.exe test_rma_ring.cpp ${TEST_HEADERS})
   target_link_libraries(test_rma_ring.exe PRIVATE Al)
   target_link_libraries(test_rma_ring.exe PUBLIC cuda)
