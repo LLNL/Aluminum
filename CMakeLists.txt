@@ -295,10 +295,6 @@ if (ALUMINUM_ENABLE_ROCM)
   # Just in case any of the previous commands turned this on.
   set(CMAKE_CXX_EXTENSIONS FALSE)
 
-  # FIXME: Verify ROCm support for this before allowing the
-  # possibility of it being enabled.
-  set(AL_USE_STREAM_MEM_OPS OFF)
-
   # For some reason, hipified files can be relatively specified, but regular
   # files must be given a full path. This appears to be the easiest way for both
   # ROCm and non-ROCm builds to both work and install.
