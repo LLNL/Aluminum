@@ -28,12 +28,12 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 # Options
 
 option(ALUMINUM_ENABLE_CUDA "Enable CUDA support." OFF)
-option(ALUMINUM_ENABLE_ROCM "Enable almost-CUDA support." OFF)
+option(ALUMINUM_ENABLE_ROCM "Enable HIP/ROCm support." OFF)
 
 # CUDA and ROCm are considered to be mutually exclusive.
 if (ALUMINUM_ENABLE_CUDA AND ALUMINUM_ENABLE_ROCM)
   message(FATAL_ERROR
-    "CUDA and ROCm support are mutually exclusive. "
+    "CUDA and HIP/ROCm support are mutually exclusive. "
     "Please only enable one.")
 endif ()
 
