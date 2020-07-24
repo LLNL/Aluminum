@@ -330,6 +330,7 @@ macro(set_source_path VAR)
   set(${VAR} "${__tmp_names}")
 endmacro()
 
+add_subdirectory(include/aluminum)
 add_subdirectory(src)
 
 # Testing
