@@ -27,8 +27,8 @@ mkdir build && cd build
 cmake <options> /path/to/aluminum/source
 ```
 
-The required packages are `MPI`, `OpenMP`, and `HWLOC`. `MPI` and
-`OpenMP` use the standard CMake packages and can be manipulated in the
+The required packages are `MPI` and `HWLOC`. `MPI`
+uses the standard CMake package and can be manipulated in the
 standard way. `HWLOC`, if installed in a nonstandard location, may
 require `HWLOC_DIR` to be set to the appropriate installation prefix.
 
