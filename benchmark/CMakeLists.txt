@@ -6,7 +6,6 @@ set_source_path(BENCHMARK_SRCS
   benchmark_allreduces.cpp
   benchmark_nballreduces.cpp
   benchmark_reduce_scatter.cpp
-  benchmark_reductions.cpp
   benchmark_segallreduces.cpp)
 
 if (AL_HAS_ROCM)
