@@ -25,21 +25,26 @@
 // permissions and limitations under the license.
 ////////////////////////////////////////////////////////////////////////////////
 
-#include "mpi_cuda_impl.hpp"
+#pragma once
+
+#include "cudacommunicator.hpp"
+#include <memory>
 
 namespace Al {
-
 namespace internal {
-namespace mpi_cuda {
+namespace ht {
 
-void init(int&, char**&) {
-  
-}
+class HostTransferCommunicator: public CUDACommunicator {
+ public:
+  HostTransferCommunicator() : HostTransferCommunicator(MPI_COMM_WORLD, 0) {}
+  HostTransferCommunicator(cudaStream_t stream_) :
+    HostTransferCommunicator(MPI_COMM_WORLD, stream_) {}
+  HostTransferCommunicator(MPI_Comm comm_, cudaStream_t stream_)
+    : CUDACommunicator(comm_, stream_) {}
 
-void finalize() {
-  
-}
+  ~HostTransferCommunicator() {}
+};
 
-}  // namespace mpi_cuda
-}  // namespace internal
-}  // namespace Al
+} // namespace ht
+} // namespace internal
+} // namespace Al

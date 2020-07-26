@@ -25,21 +25,25 @@
 // permissions and limitations under the license.
 ////////////////////////////////////////////////////////////////////////////////
 
-#include "mpi_cuda_impl.hpp"
+#include "ht_impl.hpp"
 
 namespace Al {
 
+// Initialize this.
+cudaEvent_t HostTransferBackend::sync_event = (cudaEvent_t) 0;
+
 namespace internal {
-namespace mpi_cuda {
+namespace ht {
 
 void init(int&, char**&) {
-  
+  AL_CHECK_CUDA(cudaEventCreateWithFlags(&HostTransferBackend::sync_event,
+                                         cudaEventDisableTiming));
 }
 
 void finalize() {
-  
+  AL_CHECK_CUDA(cudaEventDestroy(HostTransferBackend::sync_event));
 }
 
-}  // namespace mpi_cuda
+}  // namespace ht
 }  // namespace internal
 }  // namespace Al

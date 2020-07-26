@@ -18,6 +18,9 @@ set_source_path(THIS_DIR_CUDA_HEADERS
 set_source_path(THIS_DIR_MPI_CUDA_HEADERS
   mpi_cuda_impl.hpp
   )
+set_source_path(THIS_DIR_HOST_TRANSFER_HEADERS
+  ht_impl.hpp
+  )
 set_source_path(THIS_DIR_NCCL_HEADERS
   nccl_impl.hpp
   )
@@ -30,6 +33,11 @@ if (AL_HAS_MPI_CUDA)
   list(APPEND THIS_DIR_HEADERS "${THIS_DIR_MPI_CUDA_HEADERS}")
 
   add_subdirectory(mpi_cuda)
+endif ()
+
+if (AL_HAS_HOST_TRANSFER)
+  list(APPEND THIS_DIR_HEADERS "${THIS_DIR_HOST_TRANSFER_HEADERS}")
+  add_subdirectory(ht)
 endif ()
 
 if (AL_HAS_NCCL)
