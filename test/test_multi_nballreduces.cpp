@@ -32,8 +32,8 @@
 #ifdef AL_HAS_NCCL
 #include "test_utils_nccl_cuda.hpp"
 #endif
-#ifdef AL_HAS_MPI_CUDA
-#include "test_utils_mpi_cuda.hpp"
+#ifdef AL_HAS_HOST_TRANSFER
+#include "test_utils_ht.hpp"
 #endif
 
 size_t max_size = 1<<20;
@@ -121,7 +121,12 @@ int main(int argc, char** argv) {
 #endif
 #ifdef AL_HAS_MPI_CUDA
   } else if (backend == "MPI-CUDA") {
-    test_multiple_nballreduces<Al::MPICUDABackend>();
+    std::cerr << "Allreduce not supported on MPI-CUDA backend." << std::endl;
+    std::abort();
+#endif
+#ifdef AL_HAS_HOST_TRANSFER
+  } else if (backend == "HT") {
+    test_multiple_nballreduces<Al::HostTransferBackend>();
 #endif
   } else {
     std::cerr << "usage: " << argv[0] << " [MPI";
@@ -130,6 +135,9 @@ int main(int argc, char** argv) {
 #endif
 #ifdef AL_HAS_MPI_CUDA
     std::cerr << " | MPI-CUDA";
+#endif
+#ifdef AL_HAS_HOST_TRANSFER
+    std::cerr << " | HT";
 #endif
     std::cerr << "]" << std::endl;
     return -1;

@@ -28,18 +28,18 @@
 #pragma once
 
 #include "cuda.hpp"
-#include "mpi_cuda/communicator.hpp"
+#include "ht/communicator.hpp"
 #include "progress.hpp"
 
 namespace Al {
 namespace internal {
-namespace mpi_cuda {
+namespace ht {
 
 template <typename T>
 class BcastAlState : public AlState {
 public:
   BcastAlState(T* buf, size_t count, int root,
-               MPICUDACommunicator& comm, cudaStream_t stream) :
+               HostTransferCommunicator& comm, cudaStream_t stream) :
     AlState(nullptr),
     rank_(comm.rank()), root_(root), count_(count),
     host_mem_(get_pinned_memory<T>(count_)),
@@ -137,6 +137,6 @@ private:
   cudaStream_t compute_stream;
 };
 
-}  // namespace mpi_cuda
+}  // namespace ht
 }  // namespace internal
 }  // namespace Al

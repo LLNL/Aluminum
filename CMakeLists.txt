@@ -47,6 +47,7 @@ endif ()
 # If ROCm is enabled, this means "ALUMINUM_ENABLE_MPI_ROCM"...
 option(ALUMINUM_ENABLE_MPI_CUDA "Enable MPI-CUDA support." OFF)
 option(ALUMINUM_ENABLE_MPI_CUDA_RMA "Enable RMA in MPI-CUDA." OFF)
+option(ALUMINUM_ENABLE_HOST_TRANSFER "Enable host-transfer support." OFF)
 
 if (ALUMINUM_ENABLE_MPI_CUDA_RMA AND NOT ALUMINUM_ENABLE_MPI_CUDA)
   message(STATUS
@@ -57,6 +58,13 @@ endif ()
 if (ALUMINUM_ENABLE_MPI_CUDA AND NOT ALUMINUM_HAS_GPU)
   message(STATUS
     "MPI-CUDA support requested but no GPU runtime enabled. "
+    "Assuming CUDA support.")
+  set(ALUMINUM_ENABLE_CUDA ON)
+endif ()
+
+if (ALUMINUM_ENABLE_HOST_TRANSFER AND NOT ALUMINUM_HAS_GPU)
+  message(STATUS
+    "Host-transfer support requested but no GPU runtime enabled. "
     "Assuming CUDA support.")
   set(ALUMINUM_ENABLE_CUDA ON)
 endif ()
@@ -93,12 +101,14 @@ option(ALUMINUM_ENABLE_TRACE
 
 if (ALUMINUM_HAS_GPU
     AND NOT ALUMINUM_ENABLE_NCCL
-    AND NOT ALUMINUM_ENABLE_MPI_CUDA)
+    AND NOT ALUMINUM_ENABLE_MPI_CUDA
+    AND NOT ALUMINUM_ENABLE_HOST_TRANSFER)
   message(FATAL_ERROR
     "CUDA or ROCm has been enabled without a backend. "
     "This should not happen. "
     "Please turn on \"ALUMINUM_ENABLE_NCCL\" and/or "
-    "\"ALUMINUM_ENABLE_MPI_CUDA\" and reconfigure.")
+    "\"ALUMINUM_ENABLE_MPI_CUDA\" and/or "
+    "\"ALUMINUM_ENABLE_HOST_TRANSFER\" and reconfigure.")
 endif ()
 
 string(TOUPPER "${CMAKE_BUILD_TYPE}" AL_BUILD_TYPE_UPPER)
@@ -187,6 +197,11 @@ if (ALUMINUM_ENABLE_CUDA)
       endif ()
     endif ()
 
+    if (ALUMINUM_ENABLE_HOST_TRANSFER)
+      set(AL_HAS_CUDA TRUE)
+      set(AL_HAS_HOST_TRANSFER TRUE)
+    endif ()
+
     # Add the cuda imported target
     if (NOT TARGET cuda::cuda)
       add_library(cuda::cuda INTERFACE IMPORTED)
@@ -214,16 +229,18 @@ if (ALUMINUM_ENABLE_CUDA)
     message(WARNING "CUDA support requested but not found. Disabling.")
     set(ALUMINUM_ENABLE_CUDA OFF)
     set(ALUMINUM_ENABLE_MPI_CUDA OFF)
+    set(ALUMINUM_ENABLE_HOST_TRANSFER OFF)
     set(ALUMINUM_ENABLE_NCCL OFF)
     set(ALUMINUM_ENABLE_NVPROF OFF)
     set(AL_HAS_CUDA FALSE)
     set(AL_HAS_MPI_CUDA FALSE)
+    set(AL_HAS_HOST_TRANSFER FALSE)
     set(AL_HAS_NCCL FALSE)
     set(AL_HAS_NVPROF OFF)
   endif ()
 
   # Check that a backend is found
-  if (NOT AL_HAS_NCCL AND NOT AL_HAS_MPI_CUDA)
+  if (NOT AL_HAS_NCCL AND NOT AL_HAS_MPI_CUDA AND NOT AL_HAS_HOST_TRANSFER)
     set(ALUMINUM_ENABLE_CUDA FALSE)
     set(AL_HAS_CUDA FALSE)
   endif ()
@@ -249,6 +266,10 @@ if (ALUMINUM_ENABLE_ROCM)
     if (ALUMINUM_ENABLE_MPI_CUDA_RMA)
       set(AL_HAS_MPI_CUDA_RMA TRUE)
     endif ()
+  endif ()
+
+  if (ALUMINUM_ENABLE_HOST_TRANSFER)
+    set(AL_HAS_HOST_TRANSFER TRUE)
   endif ()
 
   if (ALUMINUM_ENABLE_NCCL)

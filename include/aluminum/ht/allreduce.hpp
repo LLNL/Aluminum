@@ -29,21 +29,20 @@
 
 #include "cuda.hpp"
 #include "progress.hpp"
-#include "mpi_cuda/communicator.hpp"
-#include "mpi_cuda/util.hpp"
+#include "ht/communicator.hpp"
 #include "mpi_impl.hpp"
 #include <cassert>
 
 namespace Al {
 namespace internal {
-namespace mpi_cuda {
+namespace ht {
 
 /** Progress engine state for the host-transfer allreduce. */
 template <typename T>
 class HostTransferState : public AlState {
  public:
   HostTransferState(const T* sendbuf, T* recvbuf, size_t count,
-                    ReductionOperator op, MPICUDACommunicator& comm,
+                    ReductionOperator op, HostTransferCommunicator& comm,
                     cudaStream_t stream, AlRequest req_) :
     AlState(req_),
     host_mem(get_pinned_memory<T>(count)),
@@ -133,6 +132,6 @@ class HostTransferState : public AlState {
   cudaStream_t compute_stream;
 };
 
-} // namespace mpi_cuda
+} // namespace ht
 } // namespace internal
 } // namespace Al
