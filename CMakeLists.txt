@@ -265,7 +265,7 @@ if (ALUMINUM_ENABLE_ROCM)
   include(HipBuildSystem)
 
   # Provides hip_add_executable
-  set(CMAKE_MODULE_PATH "/opt/rocm/hip/cmake" ${CMAKE_MODULE_PATH})
+  set(CMAKE_MODULE_PATH "/opt/rocm-3.6.0/hip/cmake" ${CMAKE_MODULE_PATH})
 
   # hip-runtime library
   find_package(HIP REQUIRED)
