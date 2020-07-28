@@ -5,6 +5,9 @@ endif ()
 if (AL_HAS_MPI_CUDA)
   set_source_path(TEST_MPI_CUDA_HDRS test_utils_mpi_cuda.hpp)
 endif ()
+if (AL_HAS_HOST_TRANSFER)
+  set_source_path(TEST_HOST_TRANSFER_HDRS test_utils_ht.hpp)
+endif ()
 if (AL_HAS_NCCL)
   set_source_path(TEST_NCCL_HDRS test_utils_nccl_cuda.hpp)
 endif ()
@@ -13,6 +16,7 @@ set(TEST_HDRS
   ${TEST_BASE_HDRS}
   ${TEST_CUDA_HDRS}
   ${TEST_MPI_CUDA_HDRS}
+  ${TEST_HOST_TRANSFER_HDRS}
   ${TEST_NCCL_HDRS})
 
 # These headers are used in the benchmark/ directory

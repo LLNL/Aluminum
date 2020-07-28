@@ -14,6 +14,9 @@ set_source_path(THIS_DIR_CUDA_SOURCES
 set_source_path(THIS_DIR_MPI_CUDA_CXX_SOURCES
   mpi_cuda_impl.cpp
   )
+set_source_path(THIS_DIR_HOST_TRANSFER_CXX_SOURCES
+  ht_impl.cpp
+  )
 set_source_path(THIS_DIR_NCCL_CXX_SOURCES
   nccl_impl.cpp
   )
@@ -27,6 +30,10 @@ if (AL_HAS_MPI_CUDA)
   list(APPEND THIS_DIR_CXX_SOURCES "${THIS_DIR_MPI_CUDA_CXX_SOURCES}")
 
   add_subdirectory(mpi_cuda)
+endif ()
+
+if (AL_HAS_HOST_TRANSFER)
+  list(APPEND THIS_DIR_CXX_SOURCES "${THIS_DIR_HOST_TRANSFER_CXX_SOURCES}")
 endif ()
 
 if (AL_HAS_NCCL)

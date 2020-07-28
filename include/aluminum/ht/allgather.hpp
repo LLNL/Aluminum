@@ -28,54 +28,51 @@
 #pragma once
 
 #include "cuda.hpp"
-#include "mpi_cuda/communicator.hpp"
+#include "ht/communicator.hpp"
 #include "progress.hpp"
 
 namespace Al {
 namespace internal {
-namespace mpi_cuda {
+namespace ht {
 
 template <typename T>
-class ScatterAlState : public AlState {
+class AllgatherAlState : public AlState {
 public:
-  ScatterAlState(const T* sendbuf, T* recvbuf, size_t count, int root,
-                MPICUDACommunicator& comm, cudaStream_t stream) :
+  AllgatherAlState(const T* sendbuf, T* recvbuf, size_t count,
+                   HostTransferCommunicator& comm, cudaStream_t stream) :
     AlState(nullptr),
-    rank_(comm.rank()), root_(root), count_(count),
-    host_mem_(get_pinned_memory<T>(rank_ == root_
-                                   ? comm.size()*count_ : count_)),
+    host_mem_(get_pinned_memory<T>(comm.size()*count)),
+    count_(count),
     comm_(comm.get_comm()),
     compute_stream(comm.get_stream()) {
 
-    bool const i_am_root = rank_ == root_;
+    int const rank = comm.rank();
     bool const inplace_operation = sendbuf == recvbuf;
 
-    if (i_am_root) {
-      // Transfer the data to scatter from device to host.
-      AL_CHECK_CUDA(cudaMemcpyAsync(
-                      host_mem_, sendbuf, sizeof(T)*count_*comm.size(),
-                      cudaMemcpyDeviceToHost, stream));
-      d2h_event_.record(stream);
-      // Root only needs to copy its data to its final destination on the
-      // device when it's not in place.
-      if (!inplace_operation) {
-        AL_CHECK_CUDA(cudaMemcpyAsync(
-                        recvbuf, sendbuf + rank_*count_,
-                        count_*sizeof(T), cudaMemcpyDeviceToDevice, stream));
-      }
-      gpuwait_.wait(stream);  // Block until comm is initiated.
+    // Transfer data from device to host and use an event to determine when it
+    // completes.
+    if (inplace_operation) {
+      AL_CHECK_CUDA(cudaMemcpyAsync(host_mem_ + rank*count_,
+                                    sendbuf + rank*count_,
+                                    sizeof(T)*count_, cudaMemcpyDeviceToHost,
+                                    stream));
     } else {
-      d2h_event_.record(stream);  // Ensure comm not started early.
-      // Block device until data can be transferred.
-      gpuwait_.wait(stream);
-      // Transfer completed buffer back to device.
-      AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, host_mem_, sizeof(T)*count,
-                                    cudaMemcpyHostToDevice, stream));
-      h2d_event_.record(stream);
+      AL_CHECK_CUDA(cudaMemcpyAsync(host_mem_ + rank*count_,
+                                    sendbuf, sizeof(T)*count_,
+                                    cudaMemcpyDeviceToHost, stream));
     }
+    d2h_event_.record(stream);
+
+    // Enqueue the kernel to wait on the host
+    gpuwait_.wait(stream);
+
+    // Transfer completed buffer back to device.
+    AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, host_mem_, sizeof(T)*count*comm.size(),
+                                  cudaMemcpyHostToDevice, stream));
+    h2d_event_.record(stream);
   }
 
-  ~ScatterAlState() override {
+  ~AllgatherAlState() override {
     release_pinned_memory(host_mem_);
   }
 
@@ -88,32 +85,19 @@ public:
         return PEAction::cont;
       }
     }
-    if (!scatter_started_) {
-      if (root_ == rank_) {
-        MPI_Iscatter(host_mem_, count_, mpi::TypeMap<T>(),
-                     MPI_IN_PLACE, count_, mpi::TypeMap<T>(),
-                     root_, comm_, &req_);
-        // Root can unblock the device here.
-        gpuwait_.signal();
-      } else {
-        MPI_Iscatter(host_mem_, count_, mpi::TypeMap<T>(),
-                     host_mem_, count_, mpi::TypeMap<T>(),
-                     root_, comm_, &req_);
-      }
-      scatter_started_ = true;
+    if (!ag_started_) {
+      MPI_Iallgather(MPI_IN_PLACE, count_, mpi::TypeMap<T>(),
+                     host_mem_, count_, mpi::TypeMap<T>(), comm_, &req_);
+      ag_started_ = true;
     }
 
-    if (!scatter_done_) {
-      // Wait for the scatter to complete
+    if (!ag_done_) {
+      // Wait for the all2all to complete
       int flag;
       MPI_Test(&req_, &flag, MPI_STATUS_IGNORE);
       if (flag) {
-        scatter_done_ = true;
-        if (rank_ == root_) {
-          return PEAction::complete;
-        } else {
-          gpuwait_.signal();
-        }
+        ag_done_ = true;
+        gpuwait_.signal();
       }
       else {
         return PEAction::cont;
@@ -124,18 +108,18 @@ public:
     if (h2d_event_.query()) {
       return PEAction::complete;
     }
+
     return PEAction::cont;
   }
 
   bool needs_completion() const override { return false; }
   void* get_compute_stream() const override { return compute_stream; }
-  std::string get_name() const override { return "HTScatter"; }
+
+  std::string get_name() const override { return "HTAllgather"; }
 
 private:
-  int rank_;
-  int root_;
-  size_t count_;
   T* host_mem_;
+  size_t count_;
 
   cuda::GPUWait gpuwait_;
 
@@ -145,12 +129,12 @@ private:
   MPI_Request req_ = MPI_REQUEST_NULL;
 
   bool mem_xfer_done_ = false;
-  bool scatter_started_ = false;
-  bool scatter_done_ = false;
+  bool ag_started_ = false;
+  bool ag_done_ = false;
 
   cudaStream_t compute_stream;
 };
 
-}  // namespace mpi_cuda
+}  // namespace ht
 }  // namespace internal
 }  // namespace Al

@@ -5,8 +5,8 @@
 #ifdef AL_HAS_NCCL
 #include "test_utils_nccl_cuda.hpp"
 #endif
-#ifdef AL_HAS_MPI_CUDA
-#include "test_utils_mpi_cuda.hpp"
+#ifdef AL_HAS_HOST_TRANSFER
+#include "test_utils_ht.hpp"
 #endif
 
 size_t start_size = 1;
@@ -126,10 +126,15 @@ int main(int argc, char** argv) {
 #endif    
 #ifdef AL_HAS_MPI_CUDA
   } else if (backend == "MPI-CUDA") {
-    do_benchmark<Al::MPICUDABackend>(sizes, num_segments, seg_mod);
-#endif    
+    std::cerr << "Allreduce not supported on MPI-CUDA backend" << std::endl;
+    return -1;
+#endif
+#ifdef AL_HAS_HOST_TRANSFER
+  } else if (backend == "HT") {
+    do_benchmark<Al::HostTransferBackend>(sizes, num_segments, seg_mod);
+#endif
   } else {
-    std::cerr << "Usage: " << argv[0] << " [NCCL | MPI-CUDA] #segments modseg sizes" << std::endl;
+    std::cerr << "Usage: " << argv[0] << " [NCCL | HT] #segments modseg sizes" << std::endl;
     return -1;
   }
 

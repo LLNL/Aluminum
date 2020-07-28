@@ -75,6 +75,9 @@ void parse_args(int argc, char** argv,
 #ifdef AL_HAS_MPI_CUDA
       && backend != "MPI-CUDA"
 #endif
+#ifdef AL_HAS_HOST_TRANSFER
+      && backend != "HT"
+#endif
     ) {
     std::cerr << "Usage: " << argv[0] << " [MPI"
 #ifdef AL_HAS_NCCL
@@ -82,6 +85,9 @@ void parse_args(int argc, char** argv,
 #endif
 #ifdef AL_HAS_MPI_CUDA
               << " | MPI-CUDA"
+#endif
+#ifdef AL_HAS_HOST_TRANSFER
+              << " | HT"
 #endif
               << "] [start size] [max size]"
               << std::endl;

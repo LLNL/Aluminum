@@ -28,43 +28,40 @@
 #pragma once
 
 #include "cuda.hpp"
-#include "mpi_cuda/communicator.hpp"
+#include "ht/communicator.hpp"
 #include "progress.hpp"
 
 namespace Al {
 namespace internal {
-namespace mpi_cuda {
+namespace ht {
 
 template <typename T>
-class ReduceAlState : public AlState {
+class AlltoallAlState : public AlState {
 public:
-  ReduceAlState(const T* sendbuf, T* recvbuf, size_t count, ReductionOperator op,
-                int root, MPICUDACommunicator& comm, cudaStream_t stream) :
+  AlltoallAlState(const T* sendbuf, T* recvbuf, size_t count,
+                  HostTransferCommunicator& comm, cudaStream_t stream) :
     AlState(nullptr),
-    rank_(comm.rank()), root_(root), count_(count),
-    host_mem_(get_pinned_memory<T>(count_)),
-    op_(mpi::ReductionOperator2MPI_Op(op)),
+    host_mem_(get_pinned_memory<T>(comm.size()*count)),
+    count_(count),
     comm_(comm.get_comm()),
     compute_stream(comm.get_stream()) {
 
-    bool const i_am_root = rank_ == root_;
-
     // Transfer data from device to host and use an event to determine when it
     // completes.
-    AL_CHECK_CUDA(cudaMemcpyAsync(host_mem_, sendbuf, sizeof(T)*count_,
+    AL_CHECK_CUDA(cudaMemcpyAsync(host_mem_, sendbuf, sizeof(T)*count*comm.size(),
                                   cudaMemcpyDeviceToHost, stream));
     d2h_event_.record(stream);
+
+    // Enqueue the kernel to wait on the host
     gpuwait_.wait(stream);
 
-    if (i_am_root) {
-      // Transfer completed buffer back to device.
-      AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, host_mem_, sizeof(T)*count,
-                                    cudaMemcpyHostToDevice, stream));
-      h2d_event_.record(stream);
-    }
+    // Transfer completed buffer back to device.
+    AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, host_mem_, sizeof(T)*count*comm.size(),
+                                  cudaMemcpyHostToDevice, stream));
+    h2d_event_.record(stream);
   }
 
-  ~ReduceAlState() override {
+  ~AlltoallAlState() override {
     release_pinned_memory(host_mem_);
   }
 
@@ -77,29 +74,19 @@ public:
         return PEAction::cont;
       }
     }
-    if (!reduce_started_) {
-      if (root_ == rank_) {
-        MPI_Ireduce(MPI_IN_PLACE, host_mem_, count_, mpi::TypeMap<T>(),
-                    op_, root_, comm_, &req_);
-      } else {
-        MPI_Ireduce(host_mem_, host_mem_, count_, mpi::TypeMap<T>(),
-                    op_, root_, comm_, &req_);
-        gpuwait_.signal();
-      }
-      reduce_started_ = true;
+    if (!a2a_started_) {
+      MPI_Ialltoall(MPI_IN_PLACE, count_, mpi::TypeMap<T>(),
+                    host_mem_, count_, mpi::TypeMap<T>(), comm_, &req_);
+      a2a_started_ = true;
     }
 
-    if (!reduce_done_) {
-      // Wait for the reduce to complete
+    if (!a2a_done_) {
+      // Wait for the all2all to complete
       int flag;
       MPI_Test(&req_, &flag, MPI_STATUS_IGNORE);
       if (flag) {
-        reduce_done_ = true;
-        if (rank_ == root_) {
-          gpuwait_.signal();
-        } else {
-          return PEAction::complete;
-        }
+        a2a_done_ = true;
+        gpuwait_.signal();
       }
       else {
         return PEAction::cont;
@@ -116,29 +103,27 @@ public:
 
   bool needs_completion() const override { return false; }
   void* get_compute_stream() const override { return compute_stream; }
-  std::string get_name() const override { return "HTReduce"; }
+
+  std::string get_name() const override { return "HTAlltoall"; }
 
 private:
-  int rank_;
-  int root_;
-  size_t count_;
   T* host_mem_;
+  size_t count_;
 
   cuda::GPUWait gpuwait_;
 
   cuda::FastEvent d2h_event_, h2d_event_;
 
-  MPI_Op op_;
   MPI_Comm comm_;
   MPI_Request req_ = MPI_REQUEST_NULL;
 
   bool mem_xfer_done_ = false;
-  bool reduce_started_ = false;
-  bool reduce_done_ = false;
+  bool a2a_started_ = false;
+  bool a2a_done_ = false;
 
   cudaStream_t compute_stream;
 };
 
-}  // namespace mpi_cuda
+}  // namespace ht
 }  // namespace internal
 }  // namespace Al
