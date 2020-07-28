@@ -14,9 +14,5 @@ set_source_path(THIS_DIR_HEADERS
 
 set(THIS_DIR_HEADERS_TO_INSTALL ${THIS_DIR_HEADERS})
 
-# Custom install
-install(FILES ${THIS_DIR_HEADERS_TO_INSTALL}
-  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/aluminum/mpi)
-
 # Propagate the files up the tree
 set(HEADERS ${HEADERS} ${THIS_DIR_HEADERS} PARENT_SCOPE)
