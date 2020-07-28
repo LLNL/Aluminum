@@ -45,10 +45,10 @@ set(ALUMINUM_CUDA_SOURCES "${CUDA_SOURCES}" "${THIS_DIR_CUDA_SOURCES}")
 
 if (AL_HAS_ROCM)
   hipify_source_files(ALUMINUM_HIP_SOURCES ${ALUMINUM_CXX_SOURCES} ${ALUMINUM_CUDA_SOURCES})
-
+  hipify_header_files(ALUMINUM_HIP_HEADERS ${ALUMINUM_HEADERS})
   hip_add_library(Al "${ALUMINUM_HIP_SOURCES}" "${ALUMINUM_HIP_HEADERS}")
   target_include_directories(Al PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>)
+    $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include/aluminum>)
 else ()
   add_library(Al
     "${ALUMINUM_CXX_SOURCES}" "${ALUMINUM_CUDA_SOURCES}" "${ALUMINUM_HEADERS}")
@@ -67,6 +67,20 @@ target_link_libraries(Al PUBLIC
   $<TARGET_NAME_IF_EXISTS:roc::rccl>)
 
 target_compile_features(Al PUBLIC cxx_std_11)
+
+# Header installation. For HIP, install the generated files. For
+# NOGPU/CUDA, install the real files.
+if (AL_HAS_ROCM)
+  install(
+    DIRECTORY ${CMAKE_BINARY_DIR}/include/aluminum
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    FILES_MATCHING PATTERN "*.hpp")
+else ()
+  install(
+    DIRECTORY ${CMAKE_SOURCE_DIR}/include/aluminum
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    FILES_MATCHING PATTERN "*.hpp")
+endif ()
 
 install(TARGETS Al
   EXPORT AluminumTargets

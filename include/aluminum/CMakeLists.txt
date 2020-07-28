@@ -46,12 +46,8 @@ endif ()
 
 set(ALUMINUM_HEADERS "${HEADERS}" "${THIS_DIR_HEADERS}" PARENT_SCOPE)
 
-if (AL_HAS_ROCM)
-  hipify_header_files(ALUMINUM_HIP_HEADERS ${ALUMINUM_HEADERS})
-  hipify_header_files(THIS_DIR_HEADERS_TO_INSTALL ${THIS_DIR_HEADERS})
-else ()
-  set(THIS_DIR_HEADERS_TO_INSTALL ${THIS_DIR_HEADERS})
-endif ()
-
-install(FILES ${THIS_DIR_HEADERS_TO_INSTALL}
-  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/aluminum)
+# Note (trb 07/27/2020): The way generated files work in CMake is a
+# bit tricky -- they only work properly if they're used in the same
+# scope that they are created. So I'm moving all the install logic to
+# "/src/CMakeLists.txt", including the header installation. This
+# doesn't really matter for CUDA, but it's a problem for HIP/ROCm.
