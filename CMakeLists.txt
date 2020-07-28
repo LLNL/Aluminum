@@ -139,9 +139,9 @@ find_package(MPI 3.0 REQUIRED COMPONENTS CXX)
 # Fix the imported target
 
 # FIXME (trb): We should split the library into language-specific
-# targets. That is, the .cu files should never need MPI linkage or
-# OpenMP, so they should be built into a separate target without
-# MPI::MPI_CXX or OpenMP::OpenMP_CXX "linkage".
+# targets. That is, the .cu files should never need MPI linkage, so
+# they should be built into a separate target without MPI::MPI_CXX
+# "linkage".
 get_target_property(
   __mpi_compile_options MPI::MPI_CXX INTERFACE_COMPILE_OPTIONS)
 if (__mpi_compile_options)
