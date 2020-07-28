@@ -135,7 +135,7 @@ int main(int argc, char** argv) {
     std::cerr << "Point-to-point not supported on MPI-CUDA backend." << std::endl;
     std::abort();
 #endif
-#ifdef AL_HAS_MPI_CUDA
+#ifdef AL_HAS_HOST_TRANSFER
   } else if (backend == "HT") {
     test_correctness<Al::HostTransferBackend>();
 #endif
