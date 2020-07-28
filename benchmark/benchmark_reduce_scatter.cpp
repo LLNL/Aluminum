@@ -113,8 +113,7 @@ int main(int argc, char** argv) {
   std::vector<size_t> sizes = get_sizes(start_size, max_size);
   
   if (backend == "MPI") {
-    std::cout << "Reduce-scatter not supported on MPI backend." << std::endl;
-    std::abort();
+    do_benchmark<Al::MPIBackend>(sizes);
 #ifdef AL_HAS_NCCL
   } else if (backend == "NCCL") {
     do_benchmark<Al::NCCLBackend>(sizes);

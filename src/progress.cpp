@@ -64,7 +64,7 @@ AlRequest get_free_request() {
 ProgressEngine::ProgressEngine() {
   stop_flag = false;
   started_flag = false;
-  world_comm = new MPICommunicator(MPI_COMM_WORLD);
+  world_comm = new mpi::MPICommunicator(MPI_COMM_WORLD);
   // Initialze with the default stream.
   num_input_streams = 1;
   stream_to_queue[DEFAULT_STREAM] = &request_queues[0];

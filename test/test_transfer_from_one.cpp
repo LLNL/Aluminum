@@ -119,8 +119,7 @@ int main(int argc, char** argv) {
   parse_args(argc, argv, backend, start_size, max_size);
 
   if (backend == "MPI") {
-    std::cerr << "Point-to-point not supported on MPI backend." << std::endl;
-    std::abort();
+    test_correctness<Al::MPIBackend>();
 #ifdef AL_HAS_NCCL
   } else if (backend == "NCCL") {
     std::cerr << "Point-to-point not supported on NCCL backend." << std::endl;
