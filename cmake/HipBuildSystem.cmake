@@ -24,12 +24,12 @@ endif ()
 function (hipify_files_internal extension new_filenames)
   set(${new_filenames} "")
 
-  foreach (filename ${ARGN})
+  foreach (filename_in ${ARGN})
+    string(REPLACE "${PROJECT_SOURCE_DIR}/" "" filename "${filename_in}")
     set(input "${PROJECT_SOURCE_DIR}/${filename}")
     set(output "${CMAKE_BINARY_DIR}/${filename}${extension}")
 
     #message(DEBUG "Processing ${filename} into ${CMAKE_BINARY_DIR}/${filename}${extension}")
-
     add_custom_command(
       OUTPUT ${output}
       COMMAND ${HIPIFY_PERL} ${input} > ${output}

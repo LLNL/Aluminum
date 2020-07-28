@@ -10,7 +10,7 @@ cmake_minimum_required(VERSION 3.14)
 #
 
 set(ALUMINUM_VERSION_MAJOR 0)
-set(ALUMINUM_VERSION_MINOR 4)
+set(ALUMINUM_VERSION_MINOR 5)
 set(ALUMINUM_VERSION_PATCH 0)
 set(ALUMINUM_VERSION "${ALUMINUM_VERSION_MAJOR}.${ALUMINUM_VERSION_MINOR}.${ALUMINUM_VERSION_PATCH}")
 
@@ -265,7 +265,7 @@ if (ALUMINUM_ENABLE_ROCM)
   include(HipBuildSystem)
 
   # Provides hip_add_executable
-  set(CMAKE_MODULE_PATH "/opt/rocm/hip/cmake" ${CMAKE_MODULE_PATH})
+  set(CMAKE_MODULE_PATH "/opt/rocm-3.6.0/hip/cmake" ${CMAKE_MODULE_PATH})
 
   # hip-runtime library
   find_package(HIP REQUIRED)
@@ -330,6 +330,7 @@ macro(set_source_path VAR)
   set(${VAR} "${__tmp_names}")
 endmacro()
 
+add_subdirectory(include/aluminum)
 add_subdirectory(src)
 
 # Testing
