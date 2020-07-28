@@ -25,6 +25,8 @@ set_source_path(THIS_DIR_NCCL_HEADERS
   nccl_impl.hpp
   )
 
+add_subdirectory(mpi)
+
 if (AL_HAS_CUDA)
   list(APPEND THIS_DIR_HEADERS "${THIS_DIR_CUDA_HEADERS}")
 endif ()
@@ -51,4 +53,3 @@ set(ALUMINUM_HEADERS "${HEADERS}" "${THIS_DIR_HEADERS}" PARENT_SCOPE)
 # scope that they are created. So I'm moving all the install logic to
 # "/src/CMakeLists.txt", including the header installation. This
 # doesn't really matter for CUDA, but it's a problem for HIP/ROCm.
-

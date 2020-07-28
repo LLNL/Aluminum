@@ -31,12 +31,12 @@ namespace Al {
 /**
  * Communicator including a CUDA stream to associate with operations.
  */
-class CUDACommunicator : public MPICommunicator {
+class CUDACommunicator : public internal::mpi::MPICommunicator {
  public:
   CUDACommunicator(cudaStream_t stream_) :
     CUDACommunicator(MPI_COMM_WORLD, stream_) {}
   CUDACommunicator(MPI_Comm comm_, cudaStream_t stream_) :
-    MPICommunicator(comm_), stream(stream_) {}
+    internal::mpi::MPICommunicator(comm_), stream(stream_) {}
   Communicator* copy() const override {
     return new CUDACommunicator(get_comm(), stream);
   }
