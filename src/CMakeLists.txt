@@ -66,12 +66,12 @@ target_compile_features(Al PUBLIC cxx_std_11)
 if (AL_HAS_ROCM)
   install(
     DIRECTORY ${CMAKE_BINARY_DIR}/include/aluminum
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/aluminum
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     FILES_MATCHING PATTERN "*.hpp")
 else ()
   install(
     DIRECTORY ${CMAKE_SOURCE_DIR}/include/aluminum
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/aluminum
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     FILES_MATCHING PATTERN "*.hpp")
 endif ()
 
