@@ -32,21 +32,6 @@
  */
 #pragma once
 
-/** Whether to use OpenMP for reduction operators. */
-// TODO: This should be gated by AL_HAS_OPENMP
-#define AL_MPI_USE_OPENMP 0
-/** Use multiple threads for sum reductions this size or larger. */
-#define AL_MPI_MULTITHREAD_SUM_THRESH 262144
-/** Use multiple threads for prod reductions this size or larger. */
-#define AL_MPI_MULTITHREAD_PROD_THRESH 262144
-/** Use multiple threads for min/max reductions this size or larger. */
-// Note: May need to re-benchmark this to deal with branch prediction.
-#define AL_MPI_MULTITHREAD_MINMAX_THRESH 262144
-/** Use multiple threads for logical reductions this size or larger. */
-#define AL_MPI_MULTITHREAD_LOGICAL_THRESH 262144
-/** Use multiple threads for bitwise reductions this size or larger. */
-#define AL_MPI_MULTITHREAD_BITWISE_THRESH 262144
-
 /**
  * Number of concurrent operations the progress engine will perform.
  * This must be a positive number.

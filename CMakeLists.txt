@@ -75,17 +75,6 @@ if (ALUMINUM_ENABLE_CUDA OR ALUMINUM_ENABLE_ROCM)
   set(ALUMINUM_HAS_GPU ON)
 endif ()
 
-# The ROCm compilers have OpenMP problems. Make it toggle-able:
-if (ALUMINUM_ENABLE_ROCM)
-  set(DEFAULT_ALUMINUM_ENABLE_OPENMP OFF)
-else ()
-  set(DEFAULT_ALUMINUM_ENABLE_OPENMP ON)
-endif ()
-
-option(ALUMINUM_ENABLE_OPENMP
-  "Enable OpenMP in the MPI implementation."
-  ${DEFAULT_ALUMINUM_ENABLE_OPENMP})
-
 option(ALUMINUM_DEBUG_HANG_CHECK
   "Enable hang checking."
   OFF)
@@ -150,9 +139,9 @@ find_package(MPI 3.0 REQUIRED COMPONENTS CXX)
 # Fix the imported target
 
 # FIXME (trb): We should split the library into language-specific
-# targets. That is, the .cu files should never need MPI linkage or
-# OpenMP, so they should be built into a separate target without
-# MPI::MPI_CXX or OpenMP::OpenMP_CXX "linkage".
+# targets. That is, the .cu files should never need MPI linkage, so
+# they should be built into a separate target without MPI::MPI_CXX
+# "linkage".
 get_target_property(
   __mpi_compile_options MPI::MPI_CXX INTERFACE_COMPILE_OPTIONS)
 if (__mpi_compile_options)
@@ -184,26 +173,6 @@ set_property(TARGET MPI::MPI_CXX
   PROPERTY INTERFACE_LINK_LIBRARIES ${_MPI_LINK_LIBRARIES})
 
 find_package(HWLOC REQUIRED)
-
-if (ALUMINUM_ENABLE_OPENMP)
-  find_package(OpenMP REQUIRED COMPONENTS CXX)
-
-  # Fix an issue with OpenMP's egregious use of non-language-specific
-  # compiler flags.
-  get_target_property(
-    __omp_compile_options OpenMP::OpenMP_CXX INTERFACE_COMPILE_OPTIONS)
-  set_property(TARGET OpenMP::OpenMP_CXX PROPERTY
-    INTERFACE_COMPILE_OPTIONS
-    $<$<COMPILE_LANGUAGE:CXX>:${__omp_compile_options}>)
-  unset(__omp_compile_options)
-
-  if (${CMAKE_CXX_COMPILER} MATCHES ".*xl[cC]")
-    set_property(TARGET OpenMP::OpenMP_CXX APPEND PROPERTY
-      INTERFACE_LINK_LIBRARIES "${OpenMP_CXX_FLAGS}")
-  endif ()
-
-  set(AL_HAS_OPENMP TRUE)
-endif ()
 
 if (ALUMINUM_ENABLE_CUDA)
   find_package(CUDA 9.0)
@@ -387,5 +356,4 @@ install(FILES
 install(FILES
   cmake/FindHWLOC.cmake
   cmake/FindNCCL.cmake
-  cmake/TryLLVMOpenMP.cmake
   DESTINATION ${CMAKE_INSTALL_DIR})

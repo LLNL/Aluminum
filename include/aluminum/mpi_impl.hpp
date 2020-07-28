@@ -148,202 +148,72 @@ inline void assert_count_fits_mpi(size_t count) {
 /** Basic sum reduction. */
 template <typename T>
 void sum_reduction(const T* src, T* dest, size_t count) {
-#if AL_MPI_USE_OPENMP
-  if (count >= AL_MPI_MULTITHREAD_SUM_THRESH) {
-    #pragma omp parallel for
-    for (size_t i = 0; i < count; ++i) {
-      dest[i] += src[i];
-    }
-  } else {
-    for (size_t i = 0; i < count; ++i) {
-      dest[i] += src[i];
-    }
-  }
-#else
   for (size_t i = 0; i < count; ++i) {
     dest[i] += src[i];
   }
-#endif
 }
 /** Basic prod reduction. */
 template <typename T>
 void prod_reduction(const T* src, T* dest, size_t count) {
-#if AL_MPI_USE_OPENMP
-  if (count >= AL_MPI_MULTITHREAD_PROD_THRESH) {
-    #pragma omp parallel for
-    for (size_t i = 0; i < count; ++i) {
-      dest[i] *= src[i];
-    }
-  } else {
-    for (size_t i = 0; i < count; ++i) {
-      dest[i] *= src[i];
-    }
-  }
-#else
   for (size_t i = 0; i < count; ++i) {
     dest[i] *= src[i];
   }
-#endif
 }
 /** Basic min reduction. */
 template <typename T>
 void min_reduction(const T* src, T* dest, size_t count) {
-#if AL_MPI_USE_OPENMP
-  if (count >= AL_MPI_MULTITHREAD_MINMAX_THRESH) {
-    #pragma omp parallel for
-    for (size_t i = 0; i < count; ++i) {
-      dest[i] = std::min(dest[i], src[i]);
-    }
-  } else {
-    for (size_t i = 0; i < count; ++i) {
-      dest[i] = std::min(dest[i], src[i]);
-    }
-  }
-#else
   for (size_t i = 0; i < count; ++i) {
     dest[i] = std::min(dest[i], src[i]);
   }
-#endif
 }
 /** Basic max reduction. */
 template <typename T>
 void max_reduction(const T* src, T* dest, size_t count) {
-#if AL_MPI_USE_OPENMP
-  if (count >= AL_MPI_MULTITHREAD_MINMAX_THRESH) {
-    #pragma omp parallel for
-    for (size_t i = 0; i < count; ++i) {
-      dest[i] = std::max(dest[i], src[i]);
-    }
-  } else {
-    for (size_t i = 0; i < count; ++i) {
-      dest[i] = std::max(dest[i], src[i]);
-    }
-  }
-#else
   for (size_t i = 0; i < count; ++i) {
     dest[i] = std::max(dest[i], src[i]);
   }
-#endif
 }
 /** Basic logical OR reduction. */
 template <typename T>
 void lor_reduction(const T* src, T* dest, size_t count) {
-#if AL_MPI_USE_OPENMP
-  if (count >= AL_MPI_MULTITHREAD_LOGICAL_THRESH) {
-    #pragma omp parallel for
-    for (size_t i = 0; i < count; ++i) {
-      dest[i] = src[i] || dest[i];
-    }
-  } else {
-    for (size_t i = 0; i < count; ++i) {
-      dest[i] = src[i] || dest[i];
-    }
-  }
-#else
   for (size_t i = 0; i < count; ++i) {
     dest[i] = src[i] || dest[i];
   }
-#endif
 }
 /** Basic logical AND reduction. */
 template <typename T>
 void land_reduction(const T* src, T* dest, size_t count) {
-#if AL_MPI_USE_OPENMP
-  if (count >= AL_MPI_MULTITHREAD_LOGICAL_THRESH) {
-    #pragma omp parallel for
-    for (size_t i = 0; i < count; ++i) {
-      dest[i] = src[i] && dest[i];
-    }
-  } else {
-    for (size_t i = 0; i < count; ++i) {
-      dest[i] = src[i] && dest[i];
-    }
-  }
-#else
   for (size_t i = 0; i < count; ++i) {
     dest[i] = src[i] && dest[i];
   }
-#endif
 }
 /** Basic logical XOR reduction. */
 template <typename T>
 void lxor_reduction(const T* src, T* dest, size_t count) {
-#if AL_MPI_USE_OPENMP
-  if (count >= AL_MPI_MULTITHREAD_LOGICAL_THRESH) {
-    #pragma omp parallel for
-    for (size_t i = 0; i < count; ++i) {
-      dest[i] = !src[i] != !dest[i];
-    }
-  } else {
-    for (size_t i = 0; i < count; ++i) {
-      dest[i] = !src[i] != !dest[i];
-    }
-  }
-#else
   for (size_t i = 0; i < count; ++i) {
     dest[i] = !src[i] != !dest[i];
   }
-#endif
 }
 /** Basic bitwise OR reduction. */
 template <typename T>
 void bor_reduction(const T* src, T* dest, size_t count) {
-#if AL_MPI_USE_OPENMP
-  if (count >= AL_MPI_MULTITHREAD_BITWISE_THRESH) {
-    #pragma omp parallel for
-    for (size_t i = 0; i < count; ++i) {
-      dest[i] = src[i] | dest[i];
-    }
-  } else {
-    for (size_t i = 0; i < count; ++i) {
-      dest[i] = src[i] | dest[i];
-    }
-  }
-#else
   for (size_t i = 0; i < count; ++i) {
     dest[i] = src[i] | dest[i];
   }
-#endif
 }
 /** Basic bitwise AND reduction. */
 template <typename T>
 void band_reduction(const T* src, T* dest, size_t count) {
-#if AL_MPI_USE_OPENMP
-  if (count >= AL_MPI_MULTITHREAD_BITWISE_THRESH) {
-    #pragma omp parallel for
-    for (size_t i = 0; i < count; ++i) {
-      dest[i] = src[i] & dest[i];
-    }
-  } else {
-    for (size_t i = 0; i < count; ++i) {
-      dest[i] = src[i] & dest[i];
-    }
-  }
-#else
   for (size_t i = 0; i < count; ++i) {
     dest[i] = src[i] & dest[i];
   }
-#endif
 }
 /** Basic bitwise XOR reduction. */
 template <typename T>
 void bxor_reduction(const T* src, T* dest, size_t count) {
-#if AL_MPI_USE_OPENMP
-  if (count >= AL_MPI_MULTITHREAD_BITWISE_THRESH) {
-    #pragma omp parallel for
-    for (size_t i = 0; i < count; ++i) {
-      dest[i] = src[i] ^ dest[i];
-    }
-  } else {
-    for (size_t i = 0; i < count; ++i) {
-      dest[i] = src[i] ^ dest[i];
-    }
-  }
-#else
   for (size_t i = 0; i < count; ++i) {
     dest[i] = src[i] ^ dest[i];
   }
-#endif
 }
 // Binary operations are not supported on floating point types.
 template <>
