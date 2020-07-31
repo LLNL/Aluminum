@@ -73,7 +73,6 @@ enum class MPIAllreduceAlgorithm {
   mpi_recursive_doubling,
   mpi_ring,
   mpi_rabenseifner,
-  mpi_pe_ring,
   mpi_biring
 };
 /** Supported algorithms for other collectives. */
@@ -94,8 +93,6 @@ inline std::string algorithm_name(MPIAllreduceAlgorithm algo) {
     return "MPI ring";
   case MPIAllreduceAlgorithm::mpi_rabenseifner:
     return "MPI Rabenseifner";
-  case MPIAllreduceAlgorithm::mpi_pe_ring:
-    return "MPI PE/ring";
   case MPIAllreduceAlgorithm::mpi_biring:
     return "MPI biring";
   default:
@@ -156,9 +153,6 @@ class MPIBackend {
       case MPIAllreduceAlgorithm::mpi_rabenseifner:
         internal::mpi::rabenseifner_allreduce(sendbuf, recvbuf, count, op, comm, tag);
         break;
-      case MPIAllreduceAlgorithm::mpi_pe_ring:
-        internal::mpi::pe_ring_allreduce(sendbuf, recvbuf, count, op, comm, tag);
-        break;
       case MPIAllreduceAlgorithm::mpi_biring:
         internal::mpi::ring_allreduce(sendbuf, recvbuf, count, op, comm, true, 1, tag);
         break;
@@ -207,9 +201,6 @@ class MPIBackend {
         internal::mpi::nb_rabenseifner_allreduce(sendbuf, recvbuf, count, op, comm,
                                                  req);
         break;
-        /*case MPIAllreduceAlgorithm::mpi_pe_ring:
-          internal::mpi::nb_pe_ring_allreduce(sendbuf, recvbuf, count, op, comm, req);
-          break;*/
       default:
         throw_al_exception("Invalid algorithm for NonblockingAllreduce");
     }
