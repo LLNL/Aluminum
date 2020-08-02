@@ -214,7 +214,7 @@ if (ALUMINUM_ENABLE_CUDA)
       PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${CUDA_INCLUDE_DIRS})
 
     if (ALUMINUM_ENABLE_NCCL)
-      find_package(NCCL 2.0.0 REQUIRED)
+      find_package(NCCL 2.7.0 REQUIRED)
 
       set(AL_HAS_NCCL TRUE)
       set_property(TARGET cuda::cuda APPEND
