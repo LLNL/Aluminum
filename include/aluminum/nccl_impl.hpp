@@ -175,9 +175,12 @@ class NCCLBackend {
  public:
   using allreduce_algo_type = NCCLCollectiveAlgorithm;
   using bcast_algo_type = NCCLCollectiveAlgorithm;
+  using gather_algo_type = NCCLCollectiveAlgorithm;
   using reduce_algo_type = NCCLCollectiveAlgorithm;
   using allgather_algo_type = NCCLCollectiveAlgorithm;
+  using alltoall_algo_type = NCCLCollectiveAlgorithm;
   using reduce_scatter_algo_type = NCCLCollectiveAlgorithm;
+  using scatter_algo_type = NCCLCollectiveAlgorithm;
   using comm_type = NCCLCommunicator;
   using req_type = std::shared_ptr<internal::nccl::NCCLRequest>;
   static constexpr std::nullptr_t null_req = nullptr;
@@ -215,6 +218,52 @@ class NCCLBackend {
   }
 
   template <typename T>
+  static void Send(const T* sendbuf, size_t count, int dest, comm_type& comm) {
+    do_send(sendbuf, count, dest, comm, comm.get_stream());
+  }
+
+  template <typename T>
+  static void NonblockingSend(const T* sendbuf, size_t count, int dest,
+                              comm_type& comm, req_type& req) {
+    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+    sync_internal_stream_with_comm(internal_stream, comm);
+    do_send(sendbuf, count, dest, comm, internal_stream);
+    setup_completion_event(internal_stream, comm, req);
+  }
+
+  template <typename T>
+  static void Recv(T* recvbuf, size_t count, int src, comm_type& comm) {
+    do_recv(recvbuf, count, src, comm, comm.get_stream());
+  }
+
+  template <typename T>
+  static void NonblockingRecv(T* recvbuf, size_t count, int src,
+                              comm_type& comm, req_type& req) {
+      cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+      sync_internal_stream_with_comm(internal_stream, comm);
+      do_recv(recvbuf, count, src, comm, internal_stream);
+      setup_completion_event(internal_stream, comm, req);
+  }
+
+  template <typename T>
+  static void SendRecv(const T* sendbuf, size_t send_count, int dest,
+                       T* recvbuf, size_t recv_count, int src, comm_type& comm) {
+    do_sendrecv(sendbuf, send_count, dest, recvbuf, recv_count, src,
+                comm, comm.get_stream());
+  }
+
+  template <typename T>
+  static void NonblockingSendRecv(const T* sendbuf, size_t send_count, int dest,
+                                  T* recvbuf, size_t recv_count, int src,
+                                  comm_type& comm, req_type& req) {
+    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+    sync_internal_stream_with_comm(internal_stream, comm);
+    do_sendrecv(sendbuf, send_count, dest, recvbuf, recv_count, src,
+                comm, internal_stream);
+    setup_completion_event(internal_stream, comm, req);
+  }
+
+  template <typename T>
   static void Bcast(T* buf, size_t count, int root, comm_type& comm,
                     bcast_algo_type) {
     do_broadcast(buf, count, root, comm, comm.get_stream());
@@ -227,6 +276,35 @@ class NCCLBackend {
     sync_internal_stream_with_comm(internal_stream, comm);
     do_broadcast(buf, count, root, comm, internal_stream);
     setup_completion_event(internal_stream, comm, req);
+  }
+
+  template <typename T>
+  static void Gather(const T* sendbuf, T* recvbuf, size_t count, int root,
+                     comm_type& comm, gather_algo_type) {
+    do_gather(sendbuf, recvbuf, count, root, comm, comm.get_stream());
+  }
+
+  template <typename T>
+  static void Gather(T* buffer, size_t count, int root, comm_type& comm,
+                     gather_algo_type algo) {
+    Gather(buffer, buffer, count, root, comm, algo);
+  }
+
+  template <typename T>
+  static void NonblockingGather(const T* sendbuf, T* recvbuf, size_t count,
+                                int root, comm_type& comm, req_type& req,
+                                gather_algo_type) {
+    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+    sync_internal_stream_with_comm(internal_stream, comm);
+    do_gather(sendbuf, recvbuf, count, root, comm, internal_stream);
+    setup_completion_event(internal_stream, comm, req);
+  }
+
+  template <typename T>
+  static void NonblockingGather(T* buffer, size_t count, int root,
+                                comm_type& comm, req_type& req,
+                                gather_algo_type algo) {
+    NonblockingGather(buffer, buffer, count, root, comm, req, algo);
   }
 
   template <typename T>
@@ -292,6 +370,34 @@ class NCCLBackend {
   }
 
   template <typename T>
+  static void Alltoall(const T* sendbuf, T* recvbuf, size_t count,
+                       comm_type& comm, alltoall_algo_type) {
+    do_alltoall(sendbuf, recvbuf, count, comm, comm.get_stream());
+  }
+
+  template <typename T>
+  static void Alltoall(T* buffer, size_t count, comm_type& comm,
+                       alltoall_algo_type algo) {
+    Alltoall(buffer, buffer, count, comm, algo);
+  }
+
+  template <typename T>
+  static void NonblockingAlltoall(const T* sendbuf, T* recvbuf, size_t count,
+                                  comm_type& comm, req_type& req,
+                                  alltoall_algo_type) {
+    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+    sync_internal_stream_with_comm(internal_stream, comm);
+    do_alltoall(sendbuf, recvbuf, count, comm, internal_stream);
+    setup_completion_event(internal_stream, comm, req);
+  }
+
+  template <typename T>
+  static void NonblockingAlltoall(T* buffer, size_t count, comm_type& comm,
+                                  req_type& req, alltoall_algo_type algo) {
+    NonblockingAlltoall(buffer, buffer, count, comm, req, algo);
+  }
+
+  template <typename T>
   static void Reduce_scatter(const T* sendbuf, T* recvbuf, size_t count,
                              ReductionOperator op, comm_type& comm,
                              reduce_scatter_algo_type) {
@@ -326,11 +432,41 @@ class NCCLBackend {
                               comm, req, algo);
   }
 
+  template <typename T>
+  static void Scatter(const T* sendbuf, T* recvbuf, size_t count, int root,
+                      comm_type& comm, scatter_algo_type) {
+    do_scatter(sendbuf, recvbuf, count, root, comm, comm.get_stream());
+  }
+
+  template <typename T>
+  static void Scatter(T* buffer, size_t count, int root,
+                      comm_type& comm, scatter_algo_type algo) {
+    Scatter(buffer, buffer, count, root, comm, algo);
+  }
+
+  template <typename T>
+  static void NonblockingScatter(const T* sendbuf, T* recvbuf, size_t count,
+                                 int root, comm_type& comm, req_type& req,
+                                 scatter_algo_type) {
+    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+    sync_internal_stream_with_comm(internal_stream, comm);
+    do_scatter(sendbuf, recvbuf, count, root, comm, internal_stream);
+    setup_completion_event(internal_stream, comm, req);
+  }
+
+  template <typename T>
+  static void NonblockingScatter(T* buffer, size_t count, int root,
+                                 comm_type& comm, req_type& req,
+                                 scatter_algo_type algo) {
+    NonblockingScatter(buffer, buffer, count, root, comm, req, algo);
+  }
+
   static std::string Name() { return "NCCLBackend"; }
 
  private:
   /** Event for synchronizing between streams. */
   static cudaEvent_t sync_event;
+
   /**
    * Set up stream synchronization.
    * This will cause the provided internal stream to synchronize with the stream
@@ -343,6 +479,7 @@ class NCCLBackend {
     AL_CHECK_CUDA(cudaEventRecord(sync_event, comm.get_stream()));
     AL_CHECK_CUDA(cudaStreamWaitEvent(internal_stream, sync_event, 0));
   }
+
   /**
    * Set up the request for completion checking.
    * This uses an event recorded on the provided internal stream.
@@ -353,6 +490,7 @@ class NCCLBackend {
     AL_CHECK_CUDA(cudaEventRecord(event, internal_stream));
     req = std::make_shared<internal::nccl::NCCLRequest>(event, comm.get_stream());
   }
+
   // These are thin wrappers around the actual NCCL calls.
   /** Do a NCCL allreduce. */
   template <typename T>
@@ -370,6 +508,54 @@ class NCCLBackend {
                                 internal::nccl::ReductionOperator2ncclRedOp(op),
                                 comm.m_nccl_comm, stream));
   }
+
+  /** Do a NCCL send. */
+  template <typename T>
+  static void do_send(const T* sendbuf, size_t count, int dest, comm_type& comm,
+                      cudaStream_t stream) {
+    if (count == 0) {
+      return;
+    }
+    AL_CHECK_NCCL(ncclSend((const void*) sendbuf, count,
+                           internal::nccl::TypeMap<T>(), dest,
+                           comm.m_nccl_comm, stream));
+  }
+
+  /** Do a NCCL recv. */
+  template <typename T>
+  static void do_recv(T* recvbuf, size_t count, int src, comm_type& comm,
+                      cudaStream_t stream) {
+    if (count == 0) {
+      return;
+    }
+    AL_CHECK_NCCL(ncclRecv((void*) recvbuf, count,
+                           internal::nccl::TypeMap<T>(), src,
+                           comm.m_nccl_comm, stream));
+  }
+
+  /** Do a NCCL sendrecv. */
+  template <typename T>
+  static void do_sendrecv(const T* sendbuf, size_t send_count, int dest,
+                          T* recvbuf, size_t recv_count, int src,
+                          comm_type& comm, cudaStream_t stream) {
+    if (send_count == 0 && recv_count == 0) {
+      return;
+    }
+    AL_CHECK_NCCL(ncclGroupStart());
+    // Work around some sort of potential bug.
+    if (send_count != 0) {
+      AL_CHECK_NCCL(ncclSend((const void*) sendbuf, send_count,
+                             internal::nccl::TypeMap<T>(), dest,
+                             comm.m_nccl_comm, stream));
+    }
+    if (recv_count != 0) {
+      AL_CHECK_NCCL(ncclRecv((void*) recvbuf, recv_count,
+                             internal::nccl::TypeMap<T>(), src,
+                             comm.m_nccl_comm, stream));
+    }
+    AL_CHECK_NCCL(ncclGroupEnd());
+  }
+
   /** Do a NCCL broadcast. */
   template <typename T>
   static void do_broadcast(T* buf, size_t count, int root, comm_type& comm,
@@ -381,6 +567,31 @@ class NCCLBackend {
                                 internal::nccl::TypeMap<T>(), root,
                                 comm.m_nccl_comm, stream));
   }
+
+  /** Do a NCCL gather. */
+  template <typename T>
+  static void do_gather(const T* sendbuf, T* recvbuf, size_t count, int root,
+                        comm_type& comm, cudaStream_t stream) {
+    if (count == 0) {
+      return;
+    }
+    if (sendbuf == internal::IN_PLACE<T>()) {
+      sendbuf = recvbuf + comm.rank()*count;
+    }
+    AL_CHECK_NCCL(ncclGroupStart());
+    if (comm.rank() == root) {
+      for (int rank = 0; rank < comm.size(); ++rank) {
+        AL_CHECK_NCCL(ncclRecv((void*) &recvbuf[rank*count], count,
+                               internal::nccl::TypeMap<T>(), rank,
+                               comm.m_nccl_comm, stream));
+      }
+    }
+    AL_CHECK_NCCL(ncclSend((const void*) sendbuf, count,
+                           internal::nccl::TypeMap<T>(), root,
+                           comm.m_nccl_comm, stream));
+    AL_CHECK_NCCL(ncclGroupEnd());
+  }
+
   /** Do a NCCL reduce. */
   template <typename T>
   static void do_reduce(const T* sendbuf, T* recvbuf, size_t count,
@@ -397,6 +608,7 @@ class NCCLBackend {
                              internal::nccl::ReductionOperator2ncclRedOp(op),
                              root, comm.m_nccl_comm, stream));
   }
+
   /** Do a NCCL allgather. */
   template <typename T>
   static void do_allgather(const T* sendbuf, T* recvbuf, size_t send_count,
@@ -411,6 +623,41 @@ class NCCLBackend {
                                 send_count, internal::nccl::TypeMap<T>(),
                                 comm.m_nccl_comm, stream));
   }
+
+  /** Do a NCCL alltoall. */
+  template <typename T>
+  static void do_alltoall(const T* sendbuf, T* recvbuf, size_t count,
+                          comm_type& comm, cudaStream_t stream) {
+    if (count == 0) {
+      return;
+    }
+    if (sendbuf == internal::IN_PLACE<T>()) {
+      sendbuf = recvbuf;
+    }
+    // Need to use a temporary buffer because we read and write to this.
+    // TODO: Optimize this.
+    T* tmp_sendbuf = const_cast<T*>(sendbuf);
+    if (sendbuf == recvbuf) {
+      AL_CHECK_CUDA(cudaMalloc(&tmp_sendbuf, count*sizeof(T)*comm.size()));
+      AL_CHECK_CUDA(cudaMemcpyAsync(tmp_sendbuf, sendbuf,
+                                    count*sizeof(T)*comm.size(),
+                                    cudaMemcpyDeviceToDevice, stream));
+    }
+    AL_CHECK_NCCL(ncclGroupStart());
+    for (int rank = 0; rank < comm.size(); ++rank) {
+      AL_CHECK_NCCL(ncclSend((const void*) &tmp_sendbuf[rank*count], count,
+                             internal::nccl::TypeMap<T>(), rank,
+                             comm.m_nccl_comm, stream));
+      AL_CHECK_NCCL(ncclRecv((void*) &recvbuf[rank*count], count,
+                             internal::nccl::TypeMap<T>(), rank,
+                             comm.m_nccl_comm, stream));
+    }
+    AL_CHECK_NCCL(ncclGroupEnd());
+    if (tmp_sendbuf != sendbuf) {
+      AL_CHECK_CUDA(cudaFree(tmp_sendbuf));
+    }
+  }
+
   /** Do a NCCL reduce-scatter. */
   template <typename T>
   static void do_reduce_scatter(const T* sendbuf, T* recvbuf,
@@ -427,6 +674,32 @@ class NCCLBackend {
                                     internal::nccl::ReductionOperator2ncclRedOp(op),
                                     comm.m_nccl_comm, stream));
   }
+
+  /** Do a NCCL scatter. */
+  template <typename T>
+  static void do_scatter(const T* sendbuf, T* recvbuf, size_t count, int root,
+                         comm_type& comm, cudaStream_t stream) {
+    if (count == 0) {
+      return;
+    }
+    if (sendbuf == internal::IN_PLACE<T>() && comm.rank() == root) {
+      sendbuf = recvbuf;
+      recvbuf = recvbuf + comm.rank()*count;
+    }
+    AL_CHECK_NCCL(ncclGroupStart());
+    if (root == comm.rank()) {
+      for (int rank = 0; rank < comm.size(); ++rank) {
+        AL_CHECK_NCCL(ncclSend((const void*) &sendbuf[rank*count], count,
+                               internal::nccl::TypeMap<T>(), rank,
+                               comm.m_nccl_comm, stream));
+      }
+    }
+    AL_CHECK_NCCL(ncclRecv((void*) recvbuf, count,
+                           internal::nccl::TypeMap<T>(), root,
+                           comm.m_nccl_comm, stream));
+    AL_CHECK_NCCL(ncclGroupEnd());
+  }
+
 };
 
 template <>
