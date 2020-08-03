@@ -11,13 +11,17 @@ endif ()
 if (AL_HAS_NCCL)
   set_source_path(TEST_NCCL_HDRS test_utils_nccl_cuda.hpp)
 endif ()
+if (AL_HAS_CUDA_AWARE_MPI)
+  set_source_path(TEST_CUDA_AWARE_MPI_HDRS test_utils_cuda_aware_mpi.hpp)
+endif ()
 
 set(TEST_HDRS
   ${TEST_BASE_HDRS}
   ${TEST_CUDA_HDRS}
   ${TEST_MPI_CUDA_HDRS}
   ${TEST_HOST_TRANSFER_HDRS}
-  ${TEST_NCCL_HDRS})
+  ${TEST_NCCL_HDRS}
+  ${TEST_CUDA_AWARE_MPI_HDRS})
 
 # These headers are used in the benchmark/ directory
 add_library(aluminum_test_headers INTERFACE)

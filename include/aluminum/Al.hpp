@@ -842,3 +842,6 @@ void Put(const T* srcbuf, int dest, T *destbuf,
 #ifdef AL_HAS_HOST_TRANSFER
 #include "ht_impl.hpp"
 #endif
+#ifdef AL_HAS_CUDA_AWARE_MPI
+#include "cuda_aware_mpi_impl.hpp"
+#endif

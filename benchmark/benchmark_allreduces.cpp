@@ -34,6 +34,9 @@
 #ifdef AL_HAS_HOST_TRANSFER
 #include "test_utils_ht.hpp"
 #endif
+#ifdef AL_HAS_CUDA_AWARE_MPI
+#include "test_utils_cuda_aware_mpi.hpp"
+#endif
 
 size_t start_size = 1;
 size_t max_size = 1<<28;
@@ -125,6 +128,10 @@ int main(int argc, char** argv) {
   } else if (backend == "HT") {
     do_benchmark<Al::HostTransferBackend>(sizes);
 #endif
+#ifdef AL_HAS_CUDA_AWARE_MPI
+  } else if (backend == "CUDA-AWARE-MPI") {
+    do_benchmark<Al::CUDAAwareMPIBackend>(sizes);
+#endif
   } else {
     std::cerr << "usage: " << argv[0] << " [MPI";
 #ifdef AL_HAS_NCCL
@@ -135,6 +142,9 @@ int main(int argc, char** argv) {
 #endif
 #ifdef AL_HAS_HOST_TRANSFER
     std::cerr << " | HT";
+#endif
+#ifdef AL_HAS_CUDA_AWARE_MPI
+    std::cerr << " | CUDA-AWARE-MPI";
 #endif
     std::cerr << "]" << std::endl;
     return -1;

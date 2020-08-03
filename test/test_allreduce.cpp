@@ -34,6 +34,9 @@
 #ifdef AL_HAS_HOST_TRANSFER
 #include "test_utils_ht.hpp"
 #endif
+#ifdef AL_HAS_CUDA_AWARE_MPI
+#include "test_utils_cuda_aware_mpi.hpp"
+#endif
 
 #include <stdlib.h>
 #include <math.h>
@@ -161,6 +164,10 @@ int main(int argc, char** argv) {
 #ifdef AL_HAS_HOST_TRANSFER
   } else if (backend == "HT") {
     test_correctness<Al::HostTransferBackend>();
+#endif
+#ifdef AL_HAS_CUDA_AWARE_MPI
+  } else if (backend == "CUDA-AWARE-MPI") {
+    test_correctness<Al::CUDAAwareMPIBackend>();
 #endif
   }
 

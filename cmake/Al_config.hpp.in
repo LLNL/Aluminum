@@ -5,6 +5,7 @@
 #cmakedefine AL_HAS_HOST_TRANSFER
 #cmakedefine AL_HAS_NCCL
 #cmakedefine AL_HAS_ROCM
+#cmakedefine AL_HAS_CUDA_AWARE_MPI
 
 #ifdef AL_HAS_MPI_CUDA
 #cmakedefine AL_HAS_MPI_CUDA_RMA
