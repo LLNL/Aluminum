@@ -105,8 +105,7 @@ int main(int argc, char** argv) {
     test_correctness<Al::MPIBackend>();
 #ifdef AL_HAS_NCCL
   } else if (backend == "NCCL") {
-    std::cerr << "Point-to-point not supported on NCCL backend." << std::endl;
-    std::abort();
+    test_correctness<Al::NCCLBackend>();
 #endif
 #ifdef AL_HAS_MPI_CUDA
   } else if (backend == "MPI-CUDA") {
