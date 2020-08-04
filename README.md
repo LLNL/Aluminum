@@ -1,93 +1,132 @@
 # Aluminum
 
-**Aluminum** provides a generic interface to high-performance communication libraries, with a focus on allreduce algorithms. Blocking and non-blocking algorithms and GPU-aware algorithms are supported. Aluminum also contains custom implementations of select algorithms to optimize for certain situations.
+**Aluminum** provides a generic interface to high-performance communication libraries for both CPU and GPU platforms and GPU-friendly semantics.
+
+If you use Aluminum, please cite our paper:
+```
+@inproceedings{dryden2018aluminum,
+  title={Aluminum: An Asynchronous, {GPU}-Aware Communication Library Optimized for Large-Scale Training of Deep Neural Networks on {HPC} Systems},
+  author={Dryden, Nikoli and Maruyama, Naoya and Moon, Tim and Benson, Tom and Yoo, Andy and Snir, Marc and Van Essen, Brian},
+  booktitle={Proceedings of the Workshop on Machine Learning in HPC Environments (MLHPC)},
+  year={2018}
+}
+```
 
 ## Features
 
-* Blocking and non-blocking algorithms
+* Support for blocking and non-blocking collective and point-to-point operations
 * GPU-aware algorithms
-* Implementations/interfaces:
+* GPU-centric communication semantics
+* Supported backends:
   * `MPI`: MPI and custom algorithms implemented on top of MPI
-  * `NCCL`: Interface to Nvidia's [NCCL 2](https://developer.nvidia.com/nccl) library
-  * `MPI-CUDA`: Custom GPU-aware algorithms
+  * `NCCL`: Interface to Nvidia's [NCCL 2](https://developer.nvidia.com/nccl) library (including point-to-point operations and collectives built on them)
+  * `HostTransfer`: Provides GPU support even when your MPI is not CUDA-aware
+  * `MPI-CUDA`: Experimental intra-node RMA support
+* Experimental support for AMD systems using HIP/ROCm and [RCCL](https://github.com/ROCmSoftwarePlatform/rccl)
+
+### GPU-centric Communication
+
+Aluminum aims to provide GPU-centric communication semantics with the `HostTransfer` backend: A communication operation should function "just like a CUDA kernel".
+Aluminum supports associating a CUDA stream with a communicator.
+All communication on the communicator will be with respect to the computation on that stream:
+* The communication will proceed asynchronously and not block the initiating host thread.
+* The communication will not begin until all outstanding operations on the stream at the time the communication operation was called have completed.
+* No computation on the stream enqueued after the communication operation was will begin until the communication completes.
+
+These semantics are comparable to those provided by NCCL.
+
+### Non-blocking GPU Communication
+
+Aluminum provides support for non-blocking GPU communication operations in its `NCCL` and `HostTransfer` backends.
+Much like non-blocking MPI operations can be initiated by a thread, progress in the background, and be waited on for completion later, a CUDA stream can do the same thing.
+Aluminum will manage the necessary synchronization and progress, and the communication will be performed on an internal CUDA stream.
 
 ## Getting started
 
-### Prerequisites
-* A compiler that supports at least C++11
+### Dependencies
+For all builds:
+* A compiler with at least C++11 support
 * MPI (at least MPI 3.0)
-* CUDA (at least 9.0, _optional if no GPU support is needed_)
-* NCCL2 (_optional if no NCCL support is needed_)
+* HWLOC (any recent version should work)
+* CMake 3.14 or later
+
+For GPU backends (`NCCL` and `HostTransfer`):
+* CUDA (at least 9.0, for Nvidia GPUs) or HIP/ROCm (at least 3.6, for AMD GPUs)
+
+For the `NCCL`/`RCCL` backend:
+* NCCL (for Nvidia GPUs) or RCCL (for AMD GPUs), at least version 2.7.0
 
 ### Building
 
-CMake 3.9 or newer is required. An out-of-source build is required:
+Aluminum uses CMake. An out-of-source build is required.
+A basic build can be done with:
 ```
 mkdir build && cd build
-cmake <options> /path/to/aluminum/source
+cmake /path/to/aluminum/source
 ```
 
-The required packages are `MPI` and `HWLOC`. `MPI`
-uses the standard CMake package and can be manipulated in the
-standard way. `HWLOC`, if installed in a nonstandard location, may
-require `HWLOC_DIR` to be set to the appropriate installation prefix.
+The supported communication backends are selected when you run `cmake`.
+The `MPI` backend is always available. For other backends:
+* `NCCL`: `-D ALUMINUM_ENABLE_NCCL=YES`
+* `HostTransfer`: `-D ALUMINUM_ENABLE_HOST_TRANSFER=YES`
+* `MPI-CUDA`: `-D ALUMINUM_ENABLE_MPI_CUDA=YES -D ALUMINUM_ENABLE_MPI_CUDA_RMA=YES`
 
-The `CUDA`-based backends assume `CUDA` is a first-class language in
-CMake. An alternative `CUDA` compiler can be selected using
-```
--DCMAKE_CUDA_COMPILER=/path/to/my/nvcc
-```
-If the `NCCL` backend is used, the `NCCL_DIR` variable may be
-used to point CMake to a nonstandard installation prefix.
+To manually specify CUDA or ROCm support, use `-D ALUMINUM_ENABLE_CUDA=YES` or `-D ALUMINUM_ENABLE_ROCM=YES`.
+If you specify a GPU communication backend, CUDA support will be assumed unless ROCm support is explicitly requested.
 
-For the `NCCL` backend:
+#### Other useful CMake flags
+
+For specifying the MPI location, see the [CMake FindMPI documentation](https://cmake.org/cmake/help/latest/module/FindMPI.html).
+
+To manually specify the a CUDA compiler, pass `-D CMAKE_CUDA_COMPILER=/path/to/nvcc`.
+
+If HWLOC is installed in a nonstandard location, pass `-D HWLOC_DIR=/path/to/hwloc/prefix`.
+
+If NCCL (or RCCL) is installed in a nonstandard location, pass `-D NCCL_DIR=/path/to/nccl/prefix`.
+
+To specify an install directory, use the standard CMake flag: `-D CMAKE_INSTALL_PREFIX=/path/to/install/destination`.
+
+##### Debug Builds
+
+A standard debug build can be enabled by using `-D CMAKE_BUILD_TYPE=Debug`.
+For additional debugging help, mostly intended for developers:
+* Internal hang checking for the progress engine: `-D ALUMINUM_DEBUG_HANG_CHECK=YES`.
+* Operation tracing: `-D ALUMINUM_ENABLE_TRACE=YES`.
+
+### Example Build
+
+For a "standard" Nvidia GPU system, you might use the following:
 ```
--DALUMINUM_ENABLE_NCCL=ON
+cmake \
+-D ALUMINUM_ENABLE_NCCL=YES \
+-D NCCL_DIR=/path/to/nccl \
+-D ALUMINUM_ENABLE_HOST_TRANSFER=YES \
+-D CMAKE_INSTALL_PREFIX=/path/to/install \
+path/to/aluminum/source
 ```
 
-For the `MPI-CUDA` backend:
-```
--DALUMINUM_ENABLE_MPI_CUDA=ON
-```
+## API Overview
 
-The `NCCL` and `MPI-CUDA` backends can be combined.
-
-Here is a complete example:
-```
-CMAKE_PREFIX_PATH=/path/to/your/MPI:$CMAKE_PREFIX_PATH cmake -D ALUMINUM_ENABLE_NCCL=YES -D ALUMINUM_ENABLE_MPI_CUDA=YES -D NCCL_DIR=/path/to/NCCL ..
-```
+Coming soon ...
 
 ## Tests and benchmarks
 
-The `test_correctness` binary will check the correctness of Aluminum's allreduce implementations. The usage is
+The `test` directory contains tests for every operation Aluminum supports.
+For example, to test the `Alltoall` operation on the NCCL backend:
 ```
-test_correctness [Al backend: MPI, NCCL, MPI-CUDA]
-```
-
-For example, to test the `MPI` backend:
-```
-mpirun -n 128 ./test_correctness
+mpirun -n 128 ./test_alltoall.exe NCCL
 ```
 
-To test the `NCCL` backend, instead:
-```
-mpirun -n 128 ./test_correctness NCCL
-```
-
-The `benchmark_allreduce` benchmark can be run similarly, and will report runtimes for different allreduce algorithms.
-
-## API overview
-
-Coming soon...
+The `benchmark` directory contains benchmarks for several operations, and can be run similarly.
 
 ## Authors
 * [Nikoli Dryden](https://github.com/ndryden)
 * [Naoya Maruyama](https://github.com/naoyam)
+* [Tom Benson](https://github.com/benson31)
 * Andy Yoo
-* Tom Benson
 
 See also [contributors](https://github.com/ndryden/Aluminum/graphs/contributors).
 
 ## License
 
-Aluminum is licensed under the Apache License 2.0. See [LICENSE](LICENSE) for details.
+Aluminum is licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for details.
