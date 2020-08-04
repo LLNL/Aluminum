@@ -107,7 +107,22 @@ path/to/aluminum/source
 
 ## API Overview
 
-Coming soon ...
+The `MPI`, `NCCL`/`RCCL`, and `HostTransfer` backends support the following operations, including non-blocking and in-place (where meaingful) versions:
+* Collectives:
+  * Allgather
+  * Allreduce
+  * Alltoall
+  * Broadcast
+  * Gather
+  * Reduce
+  * ReduceScatter (the block, not vector, version)
+  * Scatter
+* Point-to-point:
+  * Send
+  * Recv
+  * SendRecv
+
+Full API documentation is coming soon...
 
 ## Tests and benchmarks
 
