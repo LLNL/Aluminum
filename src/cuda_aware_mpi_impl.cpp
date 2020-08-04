@@ -38,6 +38,12 @@ namespace cuda_aware_mpi {
 void init(int&, char**&) {
   AL_CHECK_CUDA(cudaEventCreateWithFlags(&CUDAAwareMPIBackend::sync_event,
                                          cudaEventDisableTiming));
+  // Need to touch the GPU with MPI here to ensure MPI initializes its CUDA
+  // infrastructure before we have kernels blocking the GPU.
+  float* buf;
+  AL_CHECK_CUDA(cudaMalloc(&buf, sizeof(float)));
+  MPI_Allreduce(MPI_IN_PLACE, buf, 1, MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
+  AL_CHECK_CUDA(cudaFree(buf));
 }
 
 void finalize() {
