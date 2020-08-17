@@ -35,8 +35,6 @@
 #include "test_utils_ht.hpp"
 #endif
 
-size_t start_size = 1;
-size_t max_size = 1<<28;
 const size_t num_trials = 20;
 
 template <typename Backend>
@@ -93,23 +91,13 @@ int main(int argc, char** argv) {
   set_device();
 #endif
   Al::Initialize(argc, argv);
-  // Add algorithms to test here.
 
   std::string backend = "MPI";
-  if (argc >= 2) {
-    backend = argv[1];
-  }
-
-  if (argc == 3) {
-    start_size = std::atoi(argv[2]);
-    max_size = start_size;
-  }
-  if (argc == 4) {
-    start_size = std::atoi(argv[2]);
-    max_size = std::atoi(argv[3]);
-  }
+  size_t start_size = 1;
+  size_t max_size = 1<<28;
+  parse_args(argc, argv, backend, start_size, max_size);
   std::vector<size_t> sizes = get_sizes(start_size, max_size);
-  
+
   if (backend == "MPI") {
     do_benchmark<Al::MPIBackend>(sizes);
 #ifdef AL_HAS_NCCL
@@ -125,22 +113,8 @@ int main(int argc, char** argv) {
   } else if (backend == "HT") {
     do_benchmark<Al::HostTransferBackend>(sizes);
 #endif
-  } else {
-    std::cerr << "usage: " << argv[0] << " [MPI";
-#ifdef AL_HAS_NCCL
-    std::cerr << " | NCCL";
-#endif
-#ifdef AL_HAS_MPI_CUDA
-    std::cerr << " | MPI-CUDA";
-#endif
-#ifdef AL_HAS_HOST_TRANSFER
-    std::cerr << " | HT";
-#endif
-    std::cerr << "]" << std::endl;
-    return -1;
   }
 
   Al::Finalize();
   return 0;
-  
 }
