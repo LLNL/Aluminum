@@ -415,7 +415,7 @@ struct CollectiveProfile {
     std::flush(std::cout);
   }
   std::string coll_name;
-  // Communicator size, rank, collective size, algorithm, inplace time,
+  // Communicator size, rank, collective size, algorithm, inplace, time,
   // number of segments, whether segments are computed modulo rank
   std::vector<std::tuple<int,
                          int,
@@ -426,6 +426,38 @@ struct CollectiveProfile {
                          size_t,
                          bool>>
                    results;
+};
+
+// Stores runs for profiling point-to-point operations.
+template <typename Backend>
+struct PtToPtProfile {
+  PtToPtProfile(std::string op_name_) : op_name(op_name_) {}
+
+  void add_result(const typename Backend::comm_type& comm,
+                  size_t size, double t) {
+    results.emplace_back(
+      std::make_tuple(
+        comm.rank(), size, t));
+  }
+
+  void print_result_table() {
+    // Print header.
+    std::stringstream ss;
+    ss << "Backend Op CommRank Size Time\n";
+    for (const auto& result : results) {
+      ss << Backend::Name() << " "
+         << op_name << " "
+         << std::get<0>(result) << " "
+         << std::get<1>(result) << " "
+         << std::get<2>(result) << "\n";
+    }
+    std::cout << ss.str();
+    std::flush(std::cout);
+  }
+
+  std::string op_name;
+  // Rank, message size, time.
+  std::vector<std::tuple<int, size_t, double>> results;
 };
 
 template <typename Backend>
