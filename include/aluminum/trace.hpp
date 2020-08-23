@@ -39,6 +39,22 @@ namespace internal {
 class AlState;
 namespace trace {
 
+#ifdef AL_TRACE
+// Need to be able to print vectors.
+template <typename T>
+std::ostream& operator<<(std::ostream& os, const std::vector<T>& v) {
+  os << "[";
+  if (!v.empty()) {
+    for (size_t i = 0; i < v.size() - 1; ++i) {
+      os << v[i] << ", ";
+    }
+    os << v[v.size() - 1];
+  }
+  os << "]";
+  return os;
+}
+#endif
+
 /**
  * Save entry to the trace log.
  * progress is whether this comes from the progress engine, which is recorded

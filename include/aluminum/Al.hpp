@@ -156,6 +156,7 @@ void NonblockingAllreduce(
   Backend::template NonblockingAllreduce<T>(sendbuf, recvbuf, count, op,
                                             comm, req, algo);
 }
+
 /** In-place version of NonblockingAllreduce; same semantics apply. */
 template <typename Backend, typename T>
 void NonblockingAllreduce(
@@ -399,6 +400,83 @@ void NonblockingAllgather(
   Backend::template NonblockingAllgather<T>(recvbuf, count, comm, req, algo);
 }
 
+/**
+ * Perform a vector allgather.
+ * @param sendbuf Input data.
+ * @param recvbuf Output data; should already be allocated.
+ * @param counts Length of sendbuf on each processor.
+ * @param displs Offsets in recvbuf to receive each message.
+ * @param comm The communicator to allgatherv over.
+ * @param algo Request a particular allgatherv algorithm.
+ */
+template <typename Backend, typename T>
+void Allgatherv(const T* sendbuf, T* recvbuf,
+                std::vector<size_t> counts,
+                std::vector<size_t> displs,
+                typename Backend::comm_type& comm,
+                typename Backend::allgatherv_algo_type algo =
+                Backend::allgatherv_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>("allgatherv", comm, sendbuf, recvbuf,
+                                         counts, displs);
+  Backend::template Allgatherv<T>(sendbuf, recvbuf, counts, displs, comm, algo);
+}
+
+/**
+ * Perform an in-place vector allgather.
+ * @param buffer Input and output data; input will be overwritten.
+ * @param counts Length of data to send on each processor.
+ * @param displs Offsets in recvbuf for each message.
+ * @param comm The communicator to allgatherv over.
+ * @param algo Request a particular allgatherv algorithm.
+ */
+template <typename Backend, typename T>
+void Allgatherv(T* buffer,
+                std::vector<size_t> counts,
+                std::vector<size_t> displs,
+                typename Backend::comm_type& comm,
+                typename Backend::allgatherv_algo_type algo =
+                Backend::allgatherv_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>("allgatherv", comm, buffer,
+                                         counts, displs);
+  Backend::template Allgatherv<T>(buffer, counts, displs, comm, algo);
+}
+
+/**
+ * Non-blocking vector allgather.
+ *
+ * This returns immediately (i.e., does only local operations) and starts the
+ * vector allgather asynchronously.
+ *
+ * It is not safe to modify sendbuf or recvbuf until the request indicates that
+ * the operation has completed.
+ */
+template <typename Backend, typename T>
+void NonblockingAllgatherv(const T* sendbuf, T* recvbuf,
+                           std::vector<size_t> counts,
+                           std::vector<size_t> displs,
+                           typename Backend::comm_type& comm,
+                           typename Backend::req_type& req,
+                           typename Backend::allgatherv_algo_type algo =
+                           Backend::allgatherv_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>("nonblocking-allgatherv", comm,
+                                         sendbuf, recvbuf, counts, displs);
+  Backend::template NonblockingAllgatherv<T>(sendbuf, recvbuf, counts, displs, comm, req, algo);
+}
+
+/** In-place version of NonblockingAllgatherv; same semantics apply. */
+template <typename Backend, typename T>
+void NonblockingAllgatherv(T* buffer,
+                           std::vector<size_t> counts,
+                           std::vector<size_t> displs,
+                           typename Backend::comm_type& comm,
+                           typename Backend::req_type& req,
+                           typename Backend::allgatherv_algo_type algo =
+                           Backend::allgatherv_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>("nonblocking-allgatherv", comm,
+                                         buffer, counts, displs);
+  Backend::template NonblockingAllgatherv<T>(buffer, counts, displs, comm, req, algo);
+}
+
 // There are no in-place broadcast versions; it is always in-place.
 
 /**
@@ -509,6 +587,93 @@ void NonblockingAlltoall(
 }
 
 /**
+ * Vector all-to-all scatter/gather operation.
+ * @param sendbuf Source data buffer.
+ * @param send_counts Length of data to send to each processor.
+ * @param send_displs Offset in sendbuf for each message.
+ * @param recvbuf Destination data buffer.
+ * @param recv_counts Length of data to receive from each processor.
+ * @param recv_displs Offset in recvbuf for each message.
+ * @param comm Communicator for this all-to-all operation.
+ * @param algo Request a particular vector all-to-all algorithm.
+ */
+template <typename Backend, typename T>
+void Alltoallv(
+  const T* sendbuf,
+  std::vector<size_t> send_counts, std::vector<size_t> send_displs,
+  T* recvbuf,
+  std::vector<size_t> recv_counts, std::vector<size_t> recv_displs,
+  typename Backend::comm_type& comm,
+  typename Backend::alltoallv_algo_type algo =
+  Backend::alltoallv_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>(
+    "alltoallv", comm,
+    sendbuf, send_counts, send_displs,
+    recvbuf, recv_counts, recv_displs);
+  Backend::template Alltoallv<T>(sendbuf, send_counts, send_displs,
+                                 recvbuf, recv_counts, recv_displs,
+                                 comm, algo);
+}
+
+/**
+ * In-place vector all-to-all scatter/gather operation.
+ * @param buffer Send and receive data buffer.
+ * @param counts Length of data to send and receive from each processor.
+ * @param displs Offset in buffer for each message sent and received.
+ * @param comm Communicator for this all-to-all operation.
+ * @param algo Request a particular vector all-to-all algorithm.
+ */
+template <typename Backend, typename T>
+void Alltoallv(
+  T* buffer,
+  std::vector<size_t> counts, std::vector<size_t> displs,
+  typename Backend::comm_type& comm,
+  typename Backend::alltoallv_algo_type algo =
+  Backend::alltoallv_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>(
+    "alltoallv", comm, buffer, counts, displs);
+  Backend::template Alltoallv<T>(buffer, counts, displs, comm, algo);
+}
+
+/**
+ * Non-blocking vector all-to-all.
+ */
+template <typename Backend, typename T>
+void NonblockingAlltoallv(
+  const T* sendbuf,
+  std::vector<size_t> send_counts, std::vector<size_t> send_displs,
+  T* recvbuf,
+  std::vector<size_t> recv_counts, std::vector<size_t> recv_displs,
+  typename Backend::comm_type& comm,
+  typename Backend::req_type& req,
+  typename Backend::alltoallv_algo_type algo =
+  Backend::alltoallv_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>(
+    "nonblocking-alltoallv", comm,
+    sendbuf, send_counts, send_displs,
+    recvbuf, recv_counts, recv_displs);
+  Backend::template NonblockingAlltoallv<T>(
+    sendbuf, send_counts, send_displs,
+    recvbuf, recv_counts, recv_displs,
+    comm, req, algo);
+}
+
+/** In-place version of NonblockingAlltoall; same semantics apply. */
+template <typename Backend, typename T>
+void NonblockingAlltoallv(
+  T* buffer,
+  std::vector<size_t> counts, std::vector<size_t> displs,
+  typename Backend::comm_type& comm,
+  typename Backend::req_type& req,
+  typename Backend::alltoallv_algo_type algo =
+  Backend::alltoallv_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>(
+    "nonblocking-alltoallv", comm, buffer, counts, displs);
+  Backend::template NonblockingAlltoallv<T>(buffer, counts, displs, comm,
+                                            req, algo);
+}
+
+/**
  * Gather-to-one operation.
  * @param sendbuf The source data buffer.
  * @param recvbuf The destination data buffer.
@@ -581,6 +746,83 @@ void NonblockingGather(
 }
 
 /**
+ * Vector gather-to-one operation.
+ * @param sendbuf The source data buffer.
+ * @param recvbuf The destination data buffer.
+ * @param counts Amount of data each processor contributes.
+ * @param displs Offset in recvbuf for each received message.
+ * @param root The root process to which data is gathered.
+ * @param comm The communicator for this gather operation.
+ * @param algo Request a particular vector gather algorithm.
+ */
+template <typename Backend, typename T>
+void Gatherv(
+  const T* sendbuf, T* recvbuf,
+  std::vector<size_t> counts, std::vector<size_t> displs, int root,
+  typename Backend::comm_type& comm,
+  typename Backend::gatherv_algo_type algo =
+  Backend::gatherv_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>("gatherv", comm, sendbuf, recvbuf,
+                                         counts, displs, root);
+  Backend::template Gatherv<T>(sendbuf, recvbuf, counts, displs, root, comm, algo);
+}
+
+/**
+ * In-place vector gather-to-one operation.
+ * @param buffer Source and destination buffer.
+ * @param counts Amount of data each processor contributes.
+ * @param displs Offset in buffer for each received message.
+ * @param root The root process to which data is gathered.
+ * @param comm The communicator for this gather operation.
+ * @param algo Request a particular vector gather algorithm.
+ */
+template <typename Backend, typename T>
+void Gatherv(
+  T* buffer,
+  std::vector<size_t> counts, std::vector<size_t> displs, int root,
+  typename Backend::comm_type& comm,
+  typename Backend::gatherv_algo_type algo =
+  Backend::gatherv_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>("gatherv", comm, buffer,
+                                         counts, displs, root);
+  Backend::template Gatherv<T>(buffer, counts, displs, root, comm, algo);
+}
+
+/**
+ * Non-blocking vector gather-to-one operation.
+ */
+template <typename Backend, typename T>
+void NonblockingGatherv(
+  const T* sendbuf, T* recvbuf,
+  std::vector<size_t> counts, std::vector<size_t> displs, int root,
+  typename Backend::comm_type& comm,
+  typename Backend::req_type& req,
+  typename Backend::gatherv_algo_type algo =
+  Backend::gatherv_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>("nonblocking-gatherv",
+                                         comm, sendbuf, recvbuf,
+                                         counts, displs, root);
+  Backend::template NonblockingGatherv<T>(
+    sendbuf, recvbuf, counts, displs, root, comm, req, algo);
+}
+
+/** In-place non-blocking vector gather-to-one operation. */
+template <typename Backend, typename T>
+void NonblockingGatherv(
+  T* buffer,
+  std::vector<size_t> counts, std::vector<size_t> displs, int root,
+  typename Backend::comm_type& comm,
+  typename Backend::req_type& req,
+  typename Backend::gatherv_algo_type algo =
+  Backend::gatherv_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>("nonblocking-gatherv",
+                                         comm, buffer,
+                                         counts, displs, root);
+  Backend::template NonblockingGatherv<T>(
+    buffer, counts, displs, root, comm, req, algo);
+}
+
+/**
  * Scatter-to-all operation.
  * @param sendbuf The source data buffer.
  * @param recvbuf The destination data buffer.
@@ -650,6 +892,85 @@ void NonblockingScatter(
   internal::trace::record_op<Backend, T>("nonblocking-scatter", comm, buffer,
                                          count, root);
   Backend::template NonblockingScatter<T>(buffer, count, root, comm, req, algo);
+}
+
+/**
+ * Vector scatter-to-all operation.
+ * @param sendbuf Source data buffer.
+ * @param recvbuf Destination data buffer.
+ * @param counts Length of each message in sendbuf.
+ * @param displs Offsets of each message in sendbuf.
+ * @param root The root process from which data is scattered.
+ * @param comm The communicator for this scatter operation.
+ * @param algo Request a particular vector scatter algorithm.
+ */
+template <typename Backend, typename T>
+void Scatterv(
+  const T* sendbuf, T* recvbuf,
+  std::vector<size_t> counts, std::vector<size_t> displs, int root,
+  typename Backend::comm_type& comm,
+  typename Backend::scatterv_algo_type algo =
+  Backend::scatterv_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>("scatterv", comm,
+                                         sendbuf, recvbuf,
+                                         counts, displs, root);
+  Backend::template Scatterv<T>(sendbuf, recvbuf, counts, displs, root,
+                                comm, algo);
+}
+
+/**
+ * In-place vector scatter-to-all operation.
+ * @param buffer Source and destination data buffer.
+ * @param counts Length of each message in buffer.
+ * @param displs Offsets of each message in buffer.
+ * @param root The root process from which data is scattered.
+ * @param comm The communicator for this scatter operation.
+ * @param algo Request a particular vector scatter algorithm.
+ */
+template <typename Backend, typename T>
+void Scatterv(
+  T* buffer,
+  std::vector<size_t> counts, std::vector<size_t> displs, int root,
+  typename Backend::comm_type& comm,
+  typename Backend::scatterv_algo_type algo =
+  Backend::scatterv_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>("scatterv", comm,
+                                         buffer, counts, displs, root);
+  Backend::template Scatterv<T>(buffer, counts, displs, root,
+                                comm, algo);
+}
+
+/**
+ * Non-blocking vector scatter-to-all operation.
+ */
+template <typename Backend, typename T>
+void NonblockingScatterv(
+  const T* sendbuf, T* recvbuf,
+  std::vector<size_t> counts, std::vector<size_t> displs, int root,
+  typename Backend::comm_type& comm,
+  typename Backend::req_type& req,
+  typename Backend::scatterv_algo_type algo =
+  Backend::scatterv_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>("nonblocking-scatterv", comm,
+                                         sendbuf, recvbuf,
+                                         counts, displs, root);
+  Backend::template NonblockingScatterv<T>(
+    sendbuf, recvbuf, counts, displs, root, comm, req, algo);
+}
+
+/** In-place version of NonblockingScatterv. */
+template <typename Backend, typename T>
+void NonblockingScatterv(
+  T* buffer,
+  std::vector<size_t> counts, std::vector<size_t> displs, int root,
+  typename Backend::comm_type& comm,
+  typename Backend::req_type& req,
+  typename Backend::scatterv_algo_type algo =
+  Backend::scatterv_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>("nonblocking-scatterv", comm,
+                                         buffer, counts, displs, root);
+  Backend::template NonblockingScatterv<T>(
+    buffer, counts, displs, root, comm, algo);
 }
 
 /**
