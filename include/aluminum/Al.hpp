@@ -970,7 +970,7 @@ void NonblockingScatterv(
   internal::trace::record_op<Backend, T>("nonblocking-scatterv", comm,
                                          buffer, counts, displs, root);
   Backend::template NonblockingScatterv<T>(
-    buffer, counts, displs, root, comm, algo);
+    buffer, counts, displs, root, comm, req, algo);
 }
 
 /**
