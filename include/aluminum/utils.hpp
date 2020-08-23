@@ -28,6 +28,7 @@
 #pragma once
 
 #include <chrono>
+#include <vector>
 
 namespace Al {
 
@@ -36,6 +37,19 @@ inline double get_time() {
   using namespace std::chrono;                                                  
   return duration_cast<duration<double>>(                                       
     steady_clock::now().time_since_epoch()).count();                            
+}
+
+/**
+ * Compute an exclusive prefix sum.
+ *
+ * This is mostly meant to help with vector collectives.
+ */
+inline std::vector<size_t> excl_prefix_sum(const std::vector<size_t>& v) {
+  std::vector<size_t> r = std::vector<size_t>(v.size(), size_t{0});
+  for (size_t i = 1; i < v.size(); ++i) {
+    r[i] = v[i-1] + r[i-1];
+  }
+  return r;
 }
 
 }  // namespace Al

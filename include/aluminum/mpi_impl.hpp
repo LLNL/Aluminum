@@ -38,13 +38,17 @@
 #include "mpi/communicator.hpp"
 #include "mpi/utils.hpp"
 #include "mpi/allgather.hpp"
+#include "mpi/allgatherv.hpp"
 #include "mpi/allreduce.hpp"
 #include "mpi/alltoall.hpp"
+#include "mpi/alltoallv.hpp"
 #include "mpi/bcast.hpp"
 #include "mpi/gather.hpp"
+#include "mpi/gatherv.hpp"
 #include "mpi/reduce.hpp"
 #include "mpi/reduce_scatter.hpp"
 #include "mpi/scatter.hpp"
+#include "mpi/scatterv.hpp"
 #include "mpi/pt2pt.hpp"
 
 namespace Al {
@@ -114,12 +118,16 @@ class MPIBackend {
  public:
   using allreduce_algo_type = MPIAllreduceAlgorithm;
   using allgather_algo_type = MPICollectiveAlgorithm;
+  using allgatherv_algo_type = MPICollectiveAlgorithm;
   using alltoall_algo_type = MPICollectiveAlgorithm;
+  using alltoallv_algo_type = MPICollectiveAlgorithm;
   using bcast_algo_type = MPICollectiveAlgorithm;
   using gather_algo_type = MPICollectiveAlgorithm;
+  using gatherv_algo_type = MPICollectiveAlgorithm;
   using reduce_algo_type = MPICollectiveAlgorithm;
   using reduce_scatter_algo_type = MPICollectiveAlgorithm;
   using scatter_algo_type = MPICollectiveAlgorithm;
+  using scatterv_algo_type = MPICollectiveAlgorithm;
   using comm_type = internal::mpi::MPICommunicator;
   using req_type = internal::AlRequest;
   static constexpr std::nullptr_t null_req = nullptr;
@@ -308,6 +316,59 @@ class MPIBackend {
   }
 
   template <typename T>
+  static void Allgatherv(
+    const T* sendbuf, T* recvbuf,
+    std::vector<size_t> counts, std::vector<size_t> displs,
+    comm_type& comm, allgatherv_algo_type algo) {
+    for (size_t i = 0; i < counts.size(); ++i) {
+      internal::mpi::assert_count_fits_mpi(counts[i]);
+    }
+    switch (algo) {
+    case MPICollectiveAlgorithm::automatic:
+      internal::mpi::passthrough_allgatherv(
+        sendbuf, recvbuf, counts, displs, comm);
+      break;
+    default:
+      throw_al_exception("Invalid algorithm");
+    }
+  }
+
+  template <typename T>
+  static void Allgatherv(
+    T* buffer,
+    std::vector<size_t> counts, std::vector<size_t> displs,
+    comm_type& comm, allgatherv_algo_type algo) {
+    Allgatherv(internal::IN_PLACE<T>(), buffer, counts, displs, comm, algo);
+  }
+
+  template <typename T>
+  static void NonblockingAllgatherv(
+    const T* sendbuf, T* recvbuf,
+    std::vector<size_t> counts, std::vector<size_t> displs,
+    comm_type& comm, req_type& req, allgatherv_algo_type algo) {
+    for (size_t i = 0; i < counts.size(); ++i) {
+      internal::mpi::assert_count_fits_mpi(counts[i]);
+    }
+    switch (algo) {
+    case MPICollectiveAlgorithm::automatic:
+      internal::mpi::passthrough_nb_allgatherv(
+        sendbuf, recvbuf, counts, displs, comm, req);
+      break;
+    default:
+      throw_al_exception("Invalid algorithm");
+    }
+  }
+
+  template <typename T>
+  static void NonblockingAllgatherv(
+    T* buffer,
+    std::vector<size_t> counts, std::vector<size_t> displs,
+    comm_type& comm, req_type& req, allgatherv_algo_type algo) {
+    NonblockingAllgatherv(internal::IN_PLACE<T>(), buffer, counts, displs, comm,
+                          req, algo);
+  }
+
+  template <typename T>
   static void Alltoall(
     const T* sendbuf, T* recvbuf, size_t count,
     comm_type& comm, alltoall_algo_type algo) {
@@ -350,6 +411,68 @@ class MPIBackend {
     comm_type& comm, req_type& req, alltoall_algo_type algo) {
     NonblockingAlltoall(internal::IN_PLACE<T>(), buffer, count, comm, req,
                         algo);
+  }
+
+  template <typename T>
+  static void Alltoallv(
+    const T* sendbuf,
+    std::vector<size_t> send_counts, std::vector<size_t> send_displs,
+    T* recvbuf,
+    std::vector<size_t> recv_counts, std::vector<size_t> recv_displs,
+    comm_type& comm, alltoallv_algo_type algo) {
+    for (size_t i = 0; i < send_counts.size(); ++i) {
+      internal::mpi::assert_count_fits_mpi(send_counts[i]);
+      internal::mpi::assert_count_fits_mpi(recv_counts[i]);
+    }
+    switch (algo) {
+    case MPICollectiveAlgorithm::automatic:
+      internal::mpi::passthrough_alltoallv(
+        sendbuf, send_counts, send_displs,
+        recvbuf, recv_counts, recv_displs,
+        comm);
+      break;
+    default:
+      throw_al_exception("Invalid algorithm");
+    }
+  }
+
+  template <typename T>
+  static void Alltoallv(
+    T* buffer, std::vector<size_t> counts, std::vector<size_t> displs,
+    comm_type& comm, alltoallv_algo_type algo) {
+    Alltoallv(internal::IN_PLACE<T>(), counts, displs, buffer, counts, displs,
+              comm, algo);
+  }
+
+  template <typename T>
+  static void NonblockingAlltoallv(
+    const T* sendbuf,
+    std::vector<size_t> send_counts, std::vector<size_t> send_displs,
+    T* recvbuf,
+    std::vector<size_t> recv_counts, std::vector<size_t> recv_displs,
+    comm_type& comm, req_type& req, alltoallv_algo_type algo) {
+    for (size_t i = 0; i < send_counts.size(); ++i) {
+      internal::mpi::assert_count_fits_mpi(send_counts[i]);
+      internal::mpi::assert_count_fits_mpi(recv_counts[i]);
+    }
+    switch (algo) {
+    case MPICollectiveAlgorithm::automatic:
+      internal::mpi::passthrough_nb_alltoallv(
+        sendbuf, send_counts, send_displs,
+        recvbuf, recv_counts, recv_displs,
+        comm, req);
+      break;
+    default:
+      throw_al_exception("Invalid algorithm");
+    }
+  }
+
+  template <typename T>
+  static void NonblockingAlltoallv(
+    T* buffer, std::vector<size_t> counts, std::vector<size_t> displs,
+    comm_type& comm, req_type& req, alltoallv_algo_type algo) {
+    NonblockingAlltoallv(internal::IN_PLACE<T>(), counts, displs,
+                         buffer, counts, displs, comm, req, algo);
   }
 
   template <typename T>
@@ -425,6 +548,59 @@ class MPIBackend {
     comm_type& comm, req_type& req, gather_algo_type algo) {
     NonblockingGather(internal::IN_PLACE<T>(), buffer, count, root,
                       comm, req, algo);
+  }
+
+  template <typename T>
+  static void Gatherv(
+    const T* sendbuf, T* recvbuf,
+    std::vector<size_t> counts, std::vector<size_t> displs, int root,
+    comm_type& comm, gatherv_algo_type algo) {
+    for (size_t i = 0; i < counts.size(); ++i) {
+      internal::mpi::assert_count_fits_mpi(counts[i]);
+    }
+    switch (algo) {
+    case MPICollectiveAlgorithm::automatic:
+      internal::mpi::passthrough_gatherv(
+        sendbuf, recvbuf, counts, displs, root, comm);
+      break;
+    default:
+      throw_al_exception("Invalid algorithm");
+    }
+  }
+
+  template <typename T>
+  static void Gatherv(
+    T* buffer,
+    std::vector<size_t> counts, std::vector<size_t> displs, int root,
+    comm_type& comm, gatherv_algo_type algo) {
+    Gatherv(internal::IN_PLACE<T>(), buffer, counts, displs, root, comm, algo);
+  }
+
+  template <typename T>
+  static void NonblockingGatherv(
+    const T* sendbuf, T* recvbuf,
+    std::vector<size_t> counts, std::vector<size_t> displs, int root,
+    comm_type& comm, req_type& req, gatherv_algo_type algo) {
+    for (size_t i = 0; i < counts.size(); ++i) {
+      internal::mpi::assert_count_fits_mpi(counts[i]);
+    }
+    switch (algo) {
+    case MPICollectiveAlgorithm::automatic:
+      internal::mpi::passthrough_nb_gatherv(
+        sendbuf, recvbuf, counts, displs, root, comm, req);
+      break;
+    default:
+      throw_al_exception("Invalid algorithm");
+    }
+  }
+
+  template <typename T>
+  static void NonblockingGatherv(
+    T* buffer,
+    std::vector<size_t> counts, std::vector<size_t> displs, int root,
+    comm_type& comm, req_type& req, gatherv_algo_type algo) {
+    NonblockingGatherv(
+      internal::IN_PLACE<T>(), buffer, counts, displs, root, comm, req, algo);
   }
 
   template <typename T>
@@ -562,6 +738,59 @@ class MPIBackend {
     comm_type& comm, req_type& req, scatter_algo_type algo) {
     NonblockingScatter(internal::IN_PLACE<T>(), buffer, count, root, comm, req,
                        algo);
+  }
+
+  template <typename T>
+  static void Scatterv(
+    const T* sendbuf, T* recvbuf,
+    std::vector<size_t> counts, std::vector<size_t> displs, int root,
+    comm_type& comm, scatterv_algo_type algo) {
+    for (size_t i = 0; i < counts.size(); ++i) {
+      internal::mpi::assert_count_fits_mpi(counts[i]);
+    }
+    switch (algo) {
+    case MPICollectiveAlgorithm::automatic:
+      internal::mpi::passthrough_scatterv(
+        sendbuf, recvbuf, counts, displs, root, comm);
+      break;
+    default:
+      throw_al_exception("Invalid algorithm");
+    }
+  }
+
+  template <typename T>
+  static void Scatterv(
+    T* buffer,
+    std::vector<size_t> counts, std::vector<size_t> displs, int root,
+    comm_type& comm, scatterv_algo_type algo) {
+    Scatterv(internal::IN_PLACE<T>(), buffer, counts, displs, root, comm, algo);
+  }
+
+  template <typename T>
+  static void NonblockingScatterv(
+    const T* sendbuf, T* recvbuf,
+    std::vector<size_t> counts, std::vector<size_t> displs, int root,
+    comm_type& comm, req_type& req, scatterv_algo_type algo) {
+    for (size_t i = 0; i < counts.size(); ++i) {
+      internal::mpi::assert_count_fits_mpi(counts[i]);
+    }
+    switch (algo) {
+    case MPICollectiveAlgorithm::automatic:
+      internal::mpi::passthrough_nb_scatterv(
+        sendbuf, recvbuf, counts, displs, root, comm, req);
+      break;
+    default:
+      throw_al_exception("Invalid algorithm");
+    }
+  }
+
+  template <typename T>
+  static void NonblockingScatterv(
+    T* buffer,
+    std::vector<size_t> counts, std::vector<size_t> displs, int root,
+    comm_type& comm, req_type& req, scatterv_algo_type algo) {
+    NonblockingScatterv(
+      internal::IN_PLACE<T>(), buffer, counts, displs, root, comm, req, algo);
   }
 
   static std::string Name() { return "MPIBackend"; }

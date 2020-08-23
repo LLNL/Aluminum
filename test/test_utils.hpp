@@ -206,6 +206,13 @@ std::vector<typename Backend::allgather_algo_type> get_allgather_algorithms() {
 }
 
 template <typename Backend>
+std::vector<typename Backend::allgatherv_algo_type> get_allgatherv_algorithms() {
+  std::vector<typename Backend::allgatherv_algo_type> algos = {
+    Backend::allgatherv_algo_type::automatic};
+  return algos;
+}
+
+template <typename Backend>
 std::vector<typename Backend::bcast_algo_type> get_bcast_algorithms() {
   std::vector<typename Backend::bcast_algo_type> algos = {
     Backend::bcast_algo_type::automatic};
@@ -220,6 +227,13 @@ std::vector<typename Backend::alltoall_algo_type> get_alltoall_algorithms() {
 }
 
 template <typename Backend>
+std::vector<typename Backend::alltoallv_algo_type> get_alltoallv_algorithms() {
+  std::vector<typename Backend::alltoallv_algo_type> algos = {
+    Backend::alltoallv_algo_type::automatic};
+  return algos;
+}
+
+template <typename Backend>
 std::vector<typename Backend::gather_algo_type> get_gather_algorithms() {
   std::vector<typename Backend::gather_algo_type> algos = {
     Backend::gather_algo_type::automatic};
@@ -230,6 +244,20 @@ template <typename Backend>
 std::vector<typename Backend::scatter_algo_type> get_scatter_algorithms() {
   std::vector<typename Backend::scatter_algo_type> algos = {
     Backend::scatter_algo_type::automatic};
+  return algos;
+}
+
+template <typename Backend>
+std::vector<typename Backend::gatherv_algo_type> get_gatherv_algorithms() {
+  std::vector<typename Backend::gatherv_algo_type> algos = {
+    Backend::gatherv_algo_type::automatic};
+  return algos;
+}
+
+template <typename Backend>
+std::vector<typename Backend::scatterv_algo_type> get_scatterv_algorithms() {
+  std::vector<typename Backend::scatterv_algo_type> algos = {
+    Backend::scatterv_algo_type::automatic};
   return algos;
 }
 
@@ -276,6 +304,13 @@ std::vector<typename Backend::allgather_algo_type> get_nb_allgather_algorithms()
 }
 
 template <typename Backend>
+std::vector<typename Backend::allgatherv_algo_type> get_nb_allgatherv_algorithms() {
+  std::vector<typename Backend::allgatherv_algo_type> algos = {
+    Backend::allgatherv_algo_type::automatic};
+  return algos;
+}
+
+template <typename Backend>
 std::vector<typename Backend::bcast_algo_type> get_nb_bcast_algorithms() {
   std::vector<typename Backend::bcast_algo_type> algos = {
     Backend::bcast_algo_type::automatic};
@@ -290,6 +325,13 @@ std::vector<typename Backend::alltoall_algo_type> get_nb_alltoall_algorithms() {
 }
 
 template <typename Backend>
+std::vector<typename Backend::alltoallv_algo_type> get_nb_alltoallv_algorithms() {
+  std::vector<typename Backend::alltoallv_algo_type> algos = {
+    Backend::alltoallv_algo_type::automatic};
+  return algos;
+}
+
+template <typename Backend>
 std::vector<typename Backend::gather_algo_type> get_nb_gather_algorithms() {
   std::vector<typename Backend::gather_algo_type> algos = {
     Backend::gather_algo_type::automatic};
@@ -300,6 +342,20 @@ template <typename Backend>
 std::vector<typename Backend::scatter_algo_type> get_nb_scatter_algorithms() {
   std::vector<typename Backend::scatter_algo_type> algos = {
     Backend::scatter_algo_type::automatic};
+  return algos;
+}
+
+template <typename Backend>
+std::vector<typename Backend::gatherv_algo_type> get_nb_gatherv_algorithms() {
+  std::vector<typename Backend::gatherv_algo_type> algos = {
+    Backend::gatherv_algo_type::automatic};
+  return algos;
+}
+
+template <typename Backend>
+std::vector<typename Backend::scatterv_algo_type> get_nb_scatterv_algorithms() {
+  std::vector<typename Backend::scatterv_algo_type> algos = {
+    Backend::scatterv_algo_type::automatic};
   return algos;
 }
  
