@@ -28,6 +28,7 @@
 #pragma once
 
 #include "progress.hpp"
+#include "mpi/base_state.hpp"
 #include "mpi/communicator.hpp"
 #include "mpi/utils.hpp"
 
@@ -42,38 +43,28 @@ void passthrough_bcast(T* buf, size_t count, int root,
 }
 
 template <typename T>
-class BcastAlState : public AlState {
+class BcastAlState : public MPIState {
 public:
   BcastAlState(T* buf_, size_t count_, int root_,
                MPICommunicator& comm_, AlRequest req_) :
-    AlState(req_),
+    MPIState(req_),
     buf(buf_), count(count_), root(root_),
     comm(comm_.get_comm()) {}
 
   ~BcastAlState() override {}
 
-  void start() override {
-    AlState::start();
-    MPI_Ibcast(buf, count, TypeMap<T>(), root, comm, &mpi_req);
-  }
-
-  PEAction step() override {
-    int flag;
-    MPI_Test(&mpi_req, &flag, MPI_STATUS_IGNORE);
-    if (flag) {
-      return PEAction::complete;
-    }
-    return PEAction::cont;
-  }
-
   std::string get_name() const override { return "MPIBcast"; }
+
+protected:
+  void start_mpi_op() override {
+    MPI_Ibcast(buf, count, TypeMap<T>(), root, comm, get_mpi_req());
+  }
 
 private:
   T* buf;
   size_t count;
   int root;
   MPI_Comm comm;
-  MPI_Request mpi_req;
 };
 
 template <typename T>

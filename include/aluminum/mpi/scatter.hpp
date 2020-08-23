@@ -28,6 +28,7 @@
 #pragma once
 
 #include "progress.hpp"
+#include "mpi/base_state.hpp"
 #include "mpi/communicator.hpp"
 #include "mpi/utils.hpp"
 
@@ -49,37 +50,28 @@ void passthrough_scatter(const T* sendbuf, T* recvbuf, size_t count, int root,
 }
 
 template <typename T>
-class ScatterAlState : public AlState {
+class ScatterAlState : public MPIState {
 public:
   ScatterAlState(const T* sendbuf_, T* recvbuf_, size_t count_, int root_,
                  MPICommunicator& comm_, AlRequest req_) :
-    AlState(req_),
+    MPIState(req_),
     sendbuf(sendbuf_), recvbuf(recvbuf_), count(count_), root(root_),
     comm(comm_.get_comm()), rank(comm_.rank()) {}
 
   ~ScatterAlState() override {}
 
-  void start() override {
-    AlState::start();
-    if (sendbuf == IN_PLACE<T>() && rank == root) {
+  std::string get_name() const override { return "MPIScatter"; }
+
+protected:
+  void start_mpi_op() override {
+        if (sendbuf == IN_PLACE<T>() && rank == root) {
       sendbuf = recvbuf;
       recvbuf = IN_PLACE<T>();
     }
     MPI_Iscatter(sendbuf, count, TypeMap<T>(),
                  buf_or_inplace(recvbuf), count, TypeMap<T>(),
-                 root, comm, &mpi_req);
+                 root, comm, get_mpi_req());
   }
-
-  PEAction step() override {
-    int flag;
-    MPI_Test(&mpi_req, &flag, MPI_STATUS_IGNORE);
-    if (flag) {
-      return PEAction::complete;
-    }
-    return PEAction::cont;
-  }
-
-  std::string get_name() const override { return "MPIScatter"; }
 
 private:
   const T* sendbuf;
@@ -88,7 +80,6 @@ private:
   int root;
   MPI_Comm comm;
   int rank;
-  MPI_Request mpi_req;
 };
 
 // When in-place, it is recvbuf that uses IN_PLACE.

@@ -28,6 +28,7 @@
 #pragma once
 
 #include "progress.hpp"
+#include "mpi/base_state.hpp"
 #include "mpi/communicator.hpp"
 #include "mpi/utils.hpp"
 
@@ -45,39 +46,29 @@ void passthrough_send(const T* sendbuf, size_t count, int dest,
 
 /** GPU point-to-point send operation. */
 template <typename T>
-class SendAlState : public AlState {
+class SendAlState : public MPIState {
  public:
   SendAlState(const T* sendbuf_, size_t count_, int dest_,
               MPICommunicator& comm_, AlRequest req_) :
-    AlState(req_),
+    MPIState(req_),
     sendbuf(sendbuf_), count(count_), dest(dest_),
     comm(comm_.get_comm()) {}
 
   ~SendAlState() override {}
 
-  void start() override {
-    AlState::start();
-    MPI_Isend(sendbuf, count, TypeMap<T>(), dest, pt2pt_tag, comm, &mpi_req);
-  }
-
-  PEAction step() override {
-    int flag;
-    MPI_Test(&mpi_req, &flag, MPI_STATUS_IGNORE);
-    if (flag) {
-      return PEAction::complete;
-    }
-    return PEAction::cont;
-  }
-
   RunType get_run_type() const override { return RunType::unbounded; }
   std::string get_name() const override { return "MPISend"; }
+
+protected:
+  void start_mpi_op() override {
+    MPI_Isend(sendbuf, count, TypeMap<T>(), dest, pt2pt_tag, comm, get_mpi_req());
+  }
 
  private:
   const T* sendbuf;
   size_t count;
   int dest;
   MPI_Comm comm;
-  MPI_Request mpi_req;
 };
 
 template <typename T>
@@ -98,39 +89,29 @@ void passthrough_recv(T* recvbuf, size_t count, int src,
 }
 
 template <typename T>
-class RecvAlState : public AlState {
+class RecvAlState : public MPIState {
  public:
   RecvAlState(T* recvbuf_, size_t count_, int src_,
               MPICommunicator& comm_, AlRequest req_) :
-    AlState(req_),
+    MPIState(req_),
     recvbuf(recvbuf_), count(count_), src(src_),
     comm(comm_.get_comm()) {}
 
   ~RecvAlState() override {}
 
-  void start() override {
-    AlState::start();
-    MPI_Irecv(recvbuf, count, mpi::TypeMap<T>(), src, pt2pt_tag, comm, &mpi_req);
-  }
-
-  PEAction step() override {
-    int flag;
-    MPI_Test(&mpi_req, &flag, MPI_STATUS_IGNORE);
-    if (flag) {
-      return PEAction::complete;
-    }
-    return PEAction::cont;
-  }
-
   RunType get_run_type() const override { return RunType::unbounded; }
   std::string get_name() const override { return "MPIRecv"; }
+
+protected:
+  void start_mpi_op() override {
+    MPI_Irecv(recvbuf, count, mpi::TypeMap<T>(), src, pt2pt_tag, comm, get_mpi_req());
+  }
 
  private:
   T* recvbuf;
   size_t count;
   int src;
   MPI_Comm comm;
-  MPI_Request mpi_req;
 };
 
 template <typename T>
@@ -153,35 +134,32 @@ void passthrough_sendrecv(const T* sendbuf, size_t send_count, int dest,
 }
 
 template <typename T>
-class SendRecvAlState : public AlState {
+class SendRecvAlState : public MPIState {
  public:
   SendRecvAlState(const T* sendbuf_, size_t send_count_, int dest_,
                   T* recvbuf_, size_t recv_count_, int src_,
                   MPICommunicator& comm_, AlRequest req_) :
-    AlState(req_),
+    MPIState(req_),
     sendbuf(sendbuf_), send_count(send_count_), dest(dest_),
     recvbuf(recvbuf_), recv_count(recv_count_), src(src_),
     comm(comm_.get_comm()) {}
 
-  void start() override {
-    AlState::start();
+  RunType get_run_type() const override { return RunType::unbounded; }
+  std::string get_name() const override { return "MPISendRecv"; }
+
+protected:
+  void start_mpi_op() override {
     MPI_Irecv(recvbuf, recv_count, TypeMap<T>(), src, pt2pt_tag, comm,
               &mpi_reqs[0]);
     MPI_Isend(sendbuf, send_count, TypeMap<T>(), dest, pt2pt_tag, comm,
               &mpi_reqs[1]);
   }
 
-  PEAction step() override {
+  bool poll_mpi() override {
     int flag;
     MPI_Testall(2, mpi_reqs, &flag, MPI_STATUSES_IGNORE);
-    if (flag) {
-      return PEAction::complete;
-    }
-    return PEAction::cont;
+    return flag;
   }
-
-  RunType get_run_type() const override { return RunType::unbounded; }
-  std::string get_name() const override { return "MPISendRecv"; }
 
  private:
   const T* sendbuf;

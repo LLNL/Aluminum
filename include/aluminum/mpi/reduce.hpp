@@ -28,6 +28,7 @@
 #pragma once
 
 #include "progress.hpp"
+#include "mpi/base_state.hpp"
 #include "mpi/communicator.hpp"
 #include "mpi/utils.hpp"
 
@@ -47,36 +48,27 @@ void passthrough_reduce(const T* sendbuf, T* recvbuf, size_t count,
 }
 
 template <typename T>
-class ReduceAlState : public AlState {
+class ReduceAlState : public MPIState {
 public:
   ReduceAlState(const T* sendbuf_, T* recvbuf_, size_t count_, ReductionOperator op_,
                 int root_, MPICommunicator& comm_, AlRequest req_) :
-    AlState(req_),
+    MPIState(req_),
     sendbuf(sendbuf_), recvbuf(recvbuf_), count(count_),
     op(ReductionOperator2MPI_Op(op_)), root(root_),
     comm(comm_.get_comm()), rank(comm_.rank()) {}
 
   ~ReduceAlState() override {}
 
-  void start() override {
-    AlState::start();
+  std::string get_name() const override { return "MPIReduce"; }
+
+protected:
+  void start_mpi_op() {
     if (sendbuf == IN_PLACE<T>() && rank != root) {
       sendbuf = recvbuf;
     }
     MPI_Ireduce(buf_or_inplace(sendbuf), recvbuf, count, TypeMap<T>(),
-                op, root, comm, &mpi_req);
+                op, root, comm, get_mpi_req());
   }
-
-  PEAction step() override {
-    int flag;
-    MPI_Test(&mpi_req, &flag, MPI_STATUS_IGNORE);
-    if (flag) {
-      return PEAction::complete;
-    }
-    return PEAction::cont;
-  }
-
-  std::string get_name() const override { return "MPIReduce"; }
 
 private:
   const T* sendbuf;
@@ -86,7 +78,6 @@ private:
   int root;
   MPI_Comm comm;
   int rank;
-  MPI_Request mpi_req;
 };
 
 // Data is passed in recvbuf on non-root processes when in-place.

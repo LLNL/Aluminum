@@ -28,6 +28,7 @@
 #pragma once
 
 #include "progress.hpp"
+#include "mpi/base_state.hpp"
 #include "mpi/communicator.hpp"
 #include "mpi/utils.hpp"
 
@@ -47,35 +48,26 @@ void passthrough_gather(const T* sendbuf, T* recvbuf, size_t count, int root,
 }
 
 template <typename T>
-class GatherAlState : public AlState {
+class GatherAlState : public MPIState {
 public:
   GatherAlState(const T* sendbuf_, T* recvbuf_, size_t count_, int root_,
                 MPICommunicator& comm_, AlRequest req_) :
-    AlState(req_),
+    MPIState(req_),
     sendbuf(sendbuf_), recvbuf(recvbuf_), count(count_), root(root_),
     comm(comm_.get_comm()), rank(comm_.rank()) {}
 
   ~GatherAlState() override {}
 
-  void start() override {
-    AlState::start();
+  std::string get_name() const override { return "MPIGather"; }
+
+protected:
+  void start_mpi_op() override {
     if (sendbuf == IN_PLACE<T>() && rank != root) {
       sendbuf = recvbuf;
     }
     MPI_Igather(buf_or_inplace(sendbuf), count, TypeMap<T>(),
-                recvbuf, count, TypeMap<T>(), root, comm, &mpi_req);
+                recvbuf, count, TypeMap<T>(), root, comm, get_mpi_req());
   }
-
-  PEAction step() override {
-    int flag;
-    MPI_Test(&mpi_req, &flag, MPI_STATUS_IGNORE);
-    if (flag) {
-      return PEAction::complete;
-    }
-    return PEAction::cont;
-  }
-
-  std::string get_name() const override { return "MPIGather"; }
 
 private:
   const T* sendbuf;
@@ -84,7 +76,6 @@ private:
   int root;
   MPI_Comm comm;
   int rank;
-  MPI_Request mpi_req;
 };
 
 // Data is passed in recvbuf on non-root processes when in-place.

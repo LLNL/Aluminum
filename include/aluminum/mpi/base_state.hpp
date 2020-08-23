@@ -28,56 +28,43 @@
 #pragma once
 
 #include "progress.hpp"
-#include "mpi/base_state.hpp"
-#include "mpi/communicator.hpp"
-#include "mpi/utils.hpp"
 
 namespace Al {
 namespace internal {
 namespace mpi {
 
-template <typename T>
-void passthrough_allgather(const T* sendbuf, T* recvbuf, size_t count,
-                           MPICommunicator& comm) {
-  MPI_Allgather(buf_or_inplace(sendbuf), count, TypeMap<T>(),
-                recvbuf, count, TypeMap<T>(), comm.get_comm());
-}
-
-template <typename T>
-class AllgatherAlState : public MPIState {
+class MPIState : public AlState {
 public:
-  AllgatherAlState(const T* sendbuf_, T* recvbuf_, size_t count_,
-                   MPICommunicator& comm_, AlRequest req_) :
-    MPIState(req_),
-    sendbuf(sendbuf_), recvbuf(recvbuf_), count(count_),
-    comm(comm_.get_comm()) {}
+  MPIState(AlRequest req_) : AlState(req_) {}
 
-  ~AllgatherAlState() override {}
+  void start() override {
+    AlState::start();
+    start_mpi_op();
+  }
 
-  std::string get_name() const override { return "MPIAllgather"; }
+  PEAction step() override {
+    if (poll_mpi()) {
+      return PEAction::complete;
+    } else {
+      return PEAction::cont;
+    }
+  }
 
 protected:
-  void start_mpi_op() override {
-    MPI_Iallgather(buf_or_inplace(sendbuf), count, TypeMap<T>(),
-                   recvbuf, count, TypeMap<T>(), comm, get_mpi_req());
+  /** Start the MPI operation and set the request. */
+  virtual void start_mpi_op() = 0;
+  /** Return the MPI request that will be polled on. */
+  MPI_Request* get_mpi_req() { return &mpi_req; }
+  /** Return true when the MPI operation is complete. */
+  virtual bool poll_mpi() {
+    int flag;
+    MPI_Test(get_mpi_req(), &flag, MPI_STATUS_IGNORE);
+    return flag;
   }
 
 private:
-  const T* sendbuf;
-  T* recvbuf;
-  size_t count;
-  MPI_Comm comm;
+  MPI_Request mpi_req = MPI_REQUEST_NULL;
 };
-
-template <typename T>
-void passthrough_nb_allgather(const T* sendbuf, T* recvbuf, size_t count,
-                              MPICommunicator& comm, AlRequest& req) {
-  req = internal::get_free_request();
-  internal::mpi::AllgatherAlState<T>* state =
-    new internal::mpi::AllgatherAlState<T>(
-      sendbuf, recvbuf, count, comm, req);
-  get_progress_engine()->enqueue(state);
-}
 
 }  // namespace mpi
 }  // namespace internal
