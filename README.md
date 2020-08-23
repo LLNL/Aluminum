@@ -110,13 +110,17 @@ path/to/aluminum/source
 The `MPI`, `NCCL`/`RCCL`, and `HostTransfer` backends support the following operations, including non-blocking and in-place (where meaingful) versions:
 * Collectives:
   * Allgather
+  * Vector allgather
   * Allreduce
   * Alltoall
+  * Vector alltoall
   * Broadcast
   * Gather
+  * Vector gather
   * Reduce
   * ReduceScatter (the block, not vector, version)
   * Scatter
+  * Vector scatter
 * Point-to-point:
   * Send
   * Recv
