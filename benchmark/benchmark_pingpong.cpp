@@ -28,113 +28,143 @@
 #include <iostream>
 #include "Al.hpp"
 #include "test_utils.hpp"
+#ifdef AL_HAS_NCCL
+#include "test_utils_nccl_cuda.hpp"
+#endif
 #ifdef AL_HAS_HOST_TRANSFER
-#include "test_utils_cuda.hpp"
 #include "test_utils_ht.hpp"
+#endif
+#ifdef AL_HAS_CUDA
 #include "wait.hpp"
 #endif
 
-size_t start_size = 1;
-size_t max_size = 1<<18;
-//size_t start_size = 256;
-//size_t max_size = 256;
 size_t num_trials = 10000;
+size_t num_warmups = 100;
+
+template <typename Backend>
+void do_wait(double length, typename Backend::comm_type& comm);
+
+// This is a NOP.
+template <>
+void do_wait<Al::MPIBackend>(double,
+                             typename Al::MPIBackend::comm_type&) {}
+
+#ifdef AL_HAS_NCCL
+template <>
+void do_wait<Al::NCCLBackend>(
+  double length,
+  typename Al::NCCLBackend::comm_type& comm) {
+  gpu_wait(length, comm.get_stream());
+}
+#endif
 
 #ifdef AL_HAS_HOST_TRANSFER
+template <>
+void do_wait<Al::HostTransferBackend>(
+  double length, typename Al::HostTransferBackend::comm_type& comm) {
+  gpu_wait(length, comm.get_stream());
+}
+#endif
 
-void do_benchmark() {
-  cudaStream_t stream;
-  cudaStreamCreate(&stream);
-  typename Al::HostTransferBackend::comm_type comm(MPI_COMM_WORLD, stream);
-  for (size_t size = start_size; size <= max_size; size *= 2) {
-    if (comm.rank() == 0) std::cout << "Benchmarking size " << human_readable_size(size) << std::endl;
-    std::vector<double> times, sendrecv_times, host_times;
-    std::vector<float> host_sendbuf(size, comm.rank());
-    std::vector<float> host_recvbuf(size, 0);
-    CUDAVector<float> sendbuf(host_sendbuf);
-    CUDAVector<float> recvbuf(host_recvbuf);
-    MPI_Barrier(MPI_COMM_WORLD);
-    for (size_t trial = 0; trial < num_trials; ++trial) {
-      // Launch a dummy kernel just to match what the GPU version does.
-      gpu_wait(0.0001, stream);
-      start_timer<Al::MPIBackend>(comm);
-      if (comm.rank() == 0) {
-        MPI_Send(host_sendbuf.data(), size, MPI_FLOAT, 1, 1, MPI_COMM_WORLD);
-        MPI_Recv(host_recvbuf.data(), size, MPI_FLOAT, 1, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-      } else if (comm.rank() == 1) {
-        MPI_Recv(host_recvbuf.data(), size, MPI_FLOAT, 0, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        MPI_Send(host_sendbuf.data(), size, MPI_FLOAT, 0, 1, MPI_COMM_WORLD);
-      }
-      host_times.push_back(finish_timer<Al::MPIBackend>(comm) / 2);
-      if (trial % 4 == 0) {
-        cudaStreamSynchronize(stream);
-      }
+template <typename Backend>
+void time_send_then_recv(typename VectorType<Backend>::type input,
+                         typename Backend::comm_type& comm,
+                         PtToPtProfile<Backend>& prof) {
+  auto recv = get_vector<Backend>(input.size());
+  MPI_Barrier(MPI_COMM_WORLD);
+  for (size_t trial = 0; trial < num_trials + num_warmups; ++trial) {
+    do_wait<Backend>(0.0001, comm);  // To hide launch latency on GPUs.
+    start_timer<Backend>(comm);
+    if (comm.rank() % 2 == 0) {
+      Al::Send<Backend>(input.data(), input.size(), comm.rank() + 1, comm);
+      Al::Recv<Backend>(recv.data(), recv.size(), comm.rank() + 1, comm);
+    } else {
+      Al::Recv<Backend>(recv.data(), recv.size(), comm.rank() - 1, comm);
+      Al::Send<Backend>(input.data(), input.size(), comm.rank() - 1, comm);
     }
-    MPI_Barrier(MPI_COMM_WORLD);
-    for (size_t trial = 0; trial < num_trials; ++trial) {
-      gpu_wait(0.0001, stream);
-      start_timer<Al::HostTransferBackend>(comm);
-      if (comm.rank() == 0) {
-        Al::Send<Al::HostTransferBackend>(sendbuf.data(), size, 1, comm);
-        Al::Recv<Al::HostTransferBackend>(recvbuf.data(), size, 1, comm);
-      } else if (comm.rank() == 1) {
-        Al::Recv<Al::HostTransferBackend>(recvbuf.data(), size, 0, comm);
-        Al::Send<Al::HostTransferBackend>(sendbuf.data(), size, 0, comm);
-      }
-      times.push_back(finish_timer<Al::HostTransferBackend>(comm) / 2);
+    if (trial > num_warmups) {
+      prof.add_result(comm, input.size(), finish_timer<Backend>(comm) / 2);
     }
-    MPI_Barrier(MPI_COMM_WORLD);
-    for (size_t trial = 0; trial < num_trials; ++trial) {
-      gpu_wait(0.0001, stream);
-      start_timer<Al::HostTransferBackend>(comm);
-      if (comm.rank() == 0) {
-        Al::SendRecv<Al::HostTransferBackend>(
-          sendbuf.data(), size, 1, recvbuf.data(), size, 1, comm);
-      } else if (comm.rank() == 1) {
-        Al::SendRecv<Al::HostTransferBackend>(
-          sendbuf.data(), size, 0, recvbuf.data(), size, 0, comm);
-      }
-      sendrecv_times.push_back(finish_timer<Al::HostTransferBackend>(comm) / 2);
-    }
-    times.erase(times.begin());
-    host_times.erase(host_times.begin());
-    sendrecv_times.erase(sendrecv_times.begin());
-    if (comm.rank() == 0) {
-      std::cout << "Rank 0:" << std::endl;
-      std::cout << "host ";
-      print_stats(host_times);
-      std::cout << "mpicuda ";
-      print_stats(times);
-      std::cout << "mpicuda SR ";
-      print_stats(times);
-    }
-    MPI_Barrier(MPI_COMM_WORLD);
-    if (comm.rank() == 1) {
-      std::cout << "Rank 1:" << std::endl;
-      std::cout << "host ";
-      print_stats(host_times);
-      std::cout << "mpicuda ";
-      print_stats(times);
-      std::cout << "mpicuda SR ";
-      print_stats(times);
-    }
-    MPI_Barrier(MPI_COMM_WORLD);
   }
-  cudaStreamDestroy(stream);
 }
 
-#endif  // AL_HAS_HOST_TRANSFER
+template <typename Backend>
+void time_sendrecv(typename VectorType<Backend>::type input,
+                   typename Backend::comm_type& comm,
+                   PtToPtProfile<Backend>& prof) {
+  auto recv = get_vector<Backend>(input.size());
+  MPI_Barrier(MPI_COMM_WORLD);
+  for (size_t trial = 0; trial < num_trials + num_warmups; ++trial) {
+    do_wait<Backend>(0.0001, comm);  // To hide launch latency on GPUs.
+    start_timer<Backend>(comm);
+    if (comm.rank() % 2 == 0) {
+      Al::SendRecv<Backend>(input.data(), input.size(), comm.rank() + 1,
+                            recv.data(), recv.size(), comm.rank() + 1, comm);
+    } else {
+      Al::SendRecv<Backend>(input.data(), input.size(), comm.rank() - 1,
+                            recv.data(), recv.size(), comm.rank() - 1, comm);
+    }
+    if (trial > num_warmups) {
+      prof.add_result(comm, input.size(), finish_timer<Backend>(comm) / 2);
+    }
+  }
+}
+
+template <typename Backend>
+void do_benchmark(const std::vector<size_t>& sizes) {
+  typename Backend::comm_type comm = get_comm_with_stream<Backend>(MPI_COMM_WORLD);
+  if (comm.size() % 2 != 0) {
+    std::cerr << "Must use an even number of processes" << std::endl;
+    std::abort();
+  }
+  PtToPtProfile<Backend> prof("SendThenRecv");
+  PtToPtProfile<Backend> prof_sr("SendRecv");
+  for (const auto& size : sizes) {
+    auto data = gen_data<Backend>(size);
+    time_send_then_recv<Backend>(data, comm, prof);
+    time_sendrecv<Backend>(data, comm, prof_sr);
+  }
+  if (comm.rank() == 0) {
+    prof.print_result_table();
+    prof_sr.print_result_table();
+  }
+  MPI_Barrier(MPI_COMM_WORLD);
+  if (comm.rank() == 1) {
+    prof.print_result_table();
+    prof_sr.print_result_table();
+  }
+  free_comm_with_stream<Backend>(comm);
+}
 
 int main(int argc, char** argv) {
-#ifdef AL_HAS_HOST_TRANSFER
+#ifdef AL_HAS_CUDA
   set_device();
-  Al::Initialize(argc, argv);
-  do_benchmark();
-  Al::Finalize();
-#else
-  (void) argc;
-  (void) argv;
-  std::cout << "Host-transfer support required" << std::endl;
 #endif
+  Al::Initialize(argc, argv);
+
+  std::string backend = "MPI";
+  size_t start_size = 1;
+  size_t max_size = 1<<28;
+  parse_args(argc, argv, backend, start_size, max_size);
+  std::vector<size_t> sizes = get_sizes(start_size, max_size);
+
+  if (backend == "MPI") {
+    do_benchmark<Al::MPIBackend>(sizes);
+#ifdef AL_HAS_NCCL
+  } else if (backend == "NCCL") {
+    do_benchmark<Al::NCCLBackend>(sizes);
+#endif    
+#ifdef AL_HAS_MPI_CUDA
+  } else if (backend == "MPI-CUDA") {
+    std::cout << "Alltoall not supported on MPI-CUDA backend." << std::endl;
+    std::abort();
+#endif    
+#ifdef AL_HAS_HOST_TRANSFER
+  } else if (backend == "HT") {
+    do_benchmark<Al::HostTransferBackend>(sizes);
+#endif
+  }
+
+  Al::Finalize();
   return 0;
 }

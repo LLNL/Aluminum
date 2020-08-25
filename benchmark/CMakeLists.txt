@@ -3,9 +3,14 @@ set_source_path(BENCHMARK_HDRS
 
 set_source_path(BENCHMARK_SRCS
   benchmark_allgather.cpp
-  benchmark_allreduces.cpp
+  benchmark_allreduce.cpp
+  benchmark_alltoall.cpp
+  benchmark_bcast.cpp
+  benchmark_gather.cpp
   benchmark_nballreduces.cpp
+  benchmark_reduce.cpp
   benchmark_reduce_scatter.cpp
+  benchmark_scatter.cpp
   benchmark_segallreduces.cpp)
 
 if (AL_HAS_ROCM)

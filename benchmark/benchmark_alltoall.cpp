@@ -35,33 +35,31 @@
 #include "test_utils_ht.hpp"
 #endif
 
-size_t start_size = 1;
-size_t max_size = 1<<28;
 const size_t num_trials = 20;
 
 template <typename Backend>
-void time_allreduce_algo(typename VectorType<Backend>::type input,
-                         typename Backend::comm_type& comm,
-                         typename Backend::allreduce_algo_type algo,
-                         CollectiveProfile<Backend, typename Backend::allreduce_algo_type>& prof) {
+void time_alltoall_algo(typename VectorType<Backend>::type input,
+                        typename Backend::comm_type& comm,
+                        typename Backend::alltoall_algo_type algo,
+                        CollectiveProfile<Backend, typename Backend::alltoall_algo_type>& prof) {
   auto recv = get_vector<Backend>(input.size());
   auto in_place_input(input);
   for (size_t trial = 0; trial < num_trials + 1; ++trial) {
     MPI_Barrier(MPI_COMM_WORLD);
     start_timer<Backend>(comm);
-    Al::Allreduce<Backend>(input.data(), recv.data(), input.size(),
-                           Al::ReductionOperator::sum, comm, algo);
+    Al::Alltoall<Backend>(input.data(), recv.data(), input.size() / comm.size(),
+                          comm, algo);
     if (trial > 0) {  // Skip warmup.
-      prof.add_result(comm, input.size(), algo, false,
+      prof.add_result(comm, input.size() / comm.size(), algo, false,
                       finish_timer<Backend>(comm));
     }
     in_place_input = input;
     MPI_Barrier(MPI_COMM_WORLD);
     start_timer<Backend>(comm);
-    Al::Allreduce<Backend>(in_place_input.data(), input.size(),
-                           Al::ReductionOperator::sum, comm, algo);
+    Al::Alltoall<Backend>(in_place_input.data(), input.size() / comm.size(),
+                          comm, algo);
     if (trial > 0) {  // Skip warmup.
-      prof.add_result(comm, input.size(), algo, true,
+      prof.add_result(comm, input.size() / comm.size(), algo, true,
                       finish_timer<Backend>(comm));
     }
   }
@@ -69,16 +67,16 @@ void time_allreduce_algo(typename VectorType<Backend>::type input,
 
 template <typename Backend>
 void do_benchmark(const std::vector<size_t> &sizes) {
-  std::vector<typename Backend::allreduce_algo_type> algos
-      = get_allreduce_algorithms<Backend>();
+  std::vector<typename Backend::alltoall_algo_type> algos
+      = get_alltoall_algorithms<Backend>();
   typename Backend::comm_type comm;  // Use COMM_WORLD.
-  CollectiveProfile<Backend, typename Backend::allreduce_algo_type> prof("allreduce");
+  CollectiveProfile<Backend, typename Backend::alltoall_algo_type> prof("alltoall");
   for (const auto& size : sizes) {
     auto data = gen_data<Backend>(size);
     // Benchmark algorithms.
     for (auto&& algo : algos) {
       MPI_Barrier(MPI_COMM_WORLD);
-      time_allreduce_algo<Backend>(data, comm, algo, prof);
+      time_alltoall_algo<Backend>(data, comm, algo, prof);
     }
   }
   if (comm.rank() == 0) {
@@ -93,23 +91,13 @@ int main(int argc, char** argv) {
   set_device();
 #endif
   Al::Initialize(argc, argv);
-  // Add algorithms to test here.
 
   std::string backend = "MPI";
-  if (argc >= 2) {
-    backend = argv[1];
-  }
-
-  if (argc == 3) {
-    start_size = std::atoi(argv[2]);
-    max_size = start_size;
-  }
-  if (argc == 4) {
-    start_size = std::atoi(argv[2]);
-    max_size = std::atoi(argv[3]);
-  }
+  size_t start_size = 1;
+  size_t max_size = 1<<28;
+  parse_args(argc, argv, backend, start_size, max_size);
   std::vector<size_t> sizes = get_sizes(start_size, max_size);
-  
+
   if (backend == "MPI") {
     do_benchmark<Al::MPIBackend>(sizes);
 #ifdef AL_HAS_NCCL
@@ -118,29 +106,15 @@ int main(int argc, char** argv) {
 #endif    
 #ifdef AL_HAS_MPI_CUDA
   } else if (backend == "MPI-CUDA") {
-    std::cout << "Allreduce not supported on MPI-CUDA backend." << std::endl;
+    std::cout << "Alltoall not supported on MPI-CUDA backend." << std::endl;
     std::abort();
 #endif    
 #ifdef AL_HAS_HOST_TRANSFER
   } else if (backend == "HT") {
     do_benchmark<Al::HostTransferBackend>(sizes);
 #endif
-  } else {
-    std::cerr << "usage: " << argv[0] << " [MPI";
-#ifdef AL_HAS_NCCL
-    std::cerr << " | NCCL";
-#endif
-#ifdef AL_HAS_MPI_CUDA
-    std::cerr << " | MPI-CUDA";
-#endif
-#ifdef AL_HAS_HOST_TRANSFER
-    std::cerr << " | HT";
-#endif
-    std::cerr << "]" << std::endl;
-    return -1;
   }
 
   Al::Finalize();
   return 0;
-  
 }

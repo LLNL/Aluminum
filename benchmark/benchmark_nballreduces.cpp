@@ -35,8 +35,6 @@
 #include "test_utils_ht.hpp"
 #endif
 
-size_t start_size = 1;
-size_t max_size = 1<<30;
 const size_t num_trials = 10;
 
 template <typename Backend>
@@ -210,14 +208,10 @@ void time_allreduce_algo_wait(typename VectorType<Backend>::type input,
 }
 
 template <typename Backend>
-void do_benchmark() {
+void do_benchmark(const std::vector<size_t>& sizes) {
   std::vector<typename Backend::allreduce_algo_type> algos
       = get_nb_allreduce_algorithms<Backend>();
   typename Backend::comm_type comm = get_comm<Backend>();
-  std::vector<size_t> sizes = {0};
-  for (size_t size = start_size; size <= max_size; size *= 2) {
-    sizes.push_back(size);
-  }
   for (const auto& size : sizes) {
     auto data = gen_data<Backend>(size);
     // Benchmark algorithms.
@@ -239,22 +233,16 @@ int main(int argc, char** argv) {
   Al::Initialize(argc, argv);
 
   std::string backend = "MPI";
-  if (argc >= 2) {
-    backend = argv[1];
-  }
-  if (argc == 3) {
-    max_size = std::atoi(argv[2]);
-  }
-  if (argc == 4) {
-    start_size = std::atoi(argv[2]);
-    max_size = std::atoi(argv[3]);
-  }
+  size_t start_size = 1;
+  size_t max_size = 1<<28;
+  parse_args(argc, argv, backend, start_size, max_size);
+  std::vector<size_t> sizes = get_sizes(start_size, max_size);
 
   if (backend == "MPI") {
-    do_benchmark<Al::MPIBackend>();
+    do_benchmark<Al::MPIBackend>(sizes);
 #ifdef AL_HAS_NCCL
   } else if (backend == "NCCL") {
-    do_benchmark<Al::NCCLBackend>();
+    do_benchmark<Al::NCCLBackend>(sizes);
 #endif    
 #ifdef AL_HAS_MPI_CUDA
   } else if (backend == "MPI-CUDA") {
@@ -263,21 +251,8 @@ int main(int argc, char** argv) {
 #endif    
 #ifdef AL_HAS_HOST_TRANSFER
   } else if (backend == "HT") {
-    do_benchmark<Al::HostTransferBackend>();
+    do_benchmark<Al::HostTransferBackend>(sizes);
 #endif
-  } else {
-    std::cerr << "usage: " << argv[0] << " [MPI";
-#ifdef AL_HAS_NCCL
-    std::cerr << " | NCCL";
-#endif
-#ifdef AL_HAS_MPI_CUDA
-    std::cerr << " | MPI-CUDA";
-#endif
-#ifdef AL_HAS_HOST_TRANSFER
-    std::cerr << " | HT";
-#endif
-    std::cerr << "]" << std::endl;
-    return -1;
   }
 
   Al::Finalize();
