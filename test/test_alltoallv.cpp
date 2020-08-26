@@ -160,7 +160,7 @@ int main(int argc, char** argv) {
     test_correctness<Al::MPIBackend>();
 #ifdef AL_HAS_NCCL
   } else if (backend == "NCCL") {
-    //test_correctness<Al::NCCLBackend>();
+    test_correctness<Al::NCCLBackend>();
 #endif
 #ifdef AL_HAS_MPI_CUDA
   } else if (backend == "MPI-CUDA") {
