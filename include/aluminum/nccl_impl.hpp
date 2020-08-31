@@ -165,6 +165,88 @@ struct NCCLRequest {
   cudaStream_t orig_stream;
 };
 
+/**
+ * Safely execute a loop of grouped NCCL operations within operation limits.
+ *
+ * NCCL groups can contain only a limited number of operations before they
+ * start generating errors. The maximum is hardcoded in NCCL and currently 2048
+ * operations.
+ *
+ * This will safely split execution into multiple groups that stay within the
+ * limit. It will execute a for loop beginning with start and ending with limit
+ * and run func each iteration, with the current iteration value as an argument.
+ * pre_func and post_func will be executed before or after the loop and can also
+ * perform NCCL operations.
+ *
+ * @param start Initial value of the for loop.
+ * @param limit Maximum value of the for loop.
+ * @param func One iteration of the for loop.
+ * @param pre_func Function to execute before for loop begins.
+ * @param post_func Function to execute after for loop completes.
+ * @param func_cond Only execute iterations of function if this returns true.
+ * @tparam num_per_func Maximum number of NCCL calls per iteration.
+ * @tparam num_per_pre Maximum number of NCCL calls in pre_func.
+ * @tparam num_per_post Maximum number of NCCL calls in post_func.
+ * @tparam max_per_group Maximum number of NCCL calls to allow in a group.
+ */
+template <size_t num_per_func,
+          size_t num_per_pre = 0, size_t num_per_post = 0,
+          size_t max_per_group = 1024>
+void safe_nccl_group(size_t start, size_t limit,
+                     std::function<void(int)> func,
+                     std::function<void()> pre_func = [](){},
+                     std::function<void()> post_func = [](){},
+                     std::function<bool()> func_cond = [](){return true;}) {
+  static_assert(num_per_func <= max_per_group,
+                "Cannot have more NCCL calls per iteration than permitted");
+  static_assert(num_per_pre <= max_per_group,
+                "Cannot have more NCCL calls in pre than permitted");
+  static_assert(num_per_post <= max_per_group,
+                "Cannot have more NCCL calls in post than permitted");
+  size_t cur_nccl_calls = 0;
+  // Need this flag to ensure we close this group if no calls are actually made.
+  bool closed = false;
+  AL_CHECK_NCCL(ncclGroupStart());
+  pre_func();
+  if (num_per_pre == max_per_group) {
+    // If there are exactly max_per_group calls, we can keep the count at 0,
+    // since we need a new NCCL group anyway.
+    AL_CHECK_NCCL(ncclGroupEnd());
+    AL_CHECK_NCCL(ncclGroupStart());
+    closed = true;
+  } else {
+    cur_nccl_calls += num_per_pre;
+  }
+
+  if (func_cond()) {
+    for (size_t i = start; i < limit; ++i) {
+      if (cur_nccl_calls + num_per_func > max_per_group) {
+        // Will exceed number of ops per group this iteration, so we close
+        // the existing group and start a new one.
+        AL_CHECK_NCCL(ncclGroupEnd());
+        AL_CHECK_NCCL(ncclGroupStart());
+        closed = true;
+        cur_nccl_calls = 0;
+      }
+      func(i);
+      cur_nccl_calls += num_per_func;
+    }
+  }
+
+  if (cur_nccl_calls + num_per_post > max_per_group) {
+    // Need to close the NCCL group and start a new one.
+    AL_CHECK_NCCL(ncclGroupEnd());
+    AL_CHECK_NCCL(ncclGroupStart());
+    closed = true;
+    cur_nccl_calls = 0;
+  }
+  post_func();
+  cur_nccl_calls += num_per_post;
+  if (cur_nccl_calls > 0 || !closed) {
+    AL_CHECK_NCCL(ncclGroupEnd());
+  }
+}
+
 }  // namespace nccl
 }  // namespace internal
 
@@ -750,18 +832,27 @@ class NCCLBackend {
     if (sendbuf == internal::IN_PLACE<T>()) {
       sendbuf = recvbuf + comm.rank()*count;
     }
-    AL_CHECK_NCCL(ncclGroupStart());
-    if (comm.rank() == root) {
-      for (int rank = 0; rank < comm.size(); ++rank) {
+    internal::nccl::safe_nccl_group<1, 0, 2>(
+      0, comm.size(),
+      [&](int rank) {
+        // The send/recv to/from self must be bundled in the same group.
+        if (rank == root) { return; }
         AL_CHECK_NCCL(ncclRecv((void*) &recvbuf[rank*count], count,
                                internal::nccl::TypeMap<T>(), rank,
                                comm.m_nccl_comm, stream));
-      }
-    }
-    AL_CHECK_NCCL(ncclSend((const void*) sendbuf, count,
-                           internal::nccl::TypeMap<T>(), root,
-                           comm.m_nccl_comm, stream));
-    AL_CHECK_NCCL(ncclGroupEnd());
+      },
+      [](){},
+      [&]() {
+        AL_CHECK_NCCL(ncclSend((const void*) sendbuf, count,
+                               internal::nccl::TypeMap<T>(), root,
+                               comm.m_nccl_comm, stream));
+        if (comm.rank() == root) {
+          AL_CHECK_NCCL(ncclRecv((void*) &recvbuf[root*count], count,
+                                 internal::nccl::TypeMap<T>(), root,
+                                 comm.m_nccl_comm, stream));
+        }
+      },
+      [&]() { return comm.rank() == root; });
   }
 
   /** Do a NCCL vector gather. */
@@ -772,22 +863,29 @@ class NCCLBackend {
     if (sendbuf == internal::IN_PLACE<T>()) {
       sendbuf = recvbuf + displs[comm.rank()];
     }
-    AL_CHECK_NCCL(ncclGroupStart());
-    if (comm.rank() == root) {
-      for (int rank = 0; rank < comm.size(); ++rank) {
-        if (counts[rank] > 0) {
-          AL_CHECK_NCCL(ncclRecv((void*) (recvbuf + displs[rank]), counts[rank],
-                                 internal::nccl::TypeMap<T>(), rank,
+    internal::nccl::safe_nccl_group<1, 0, 2>(
+      0, comm.size(),
+      [&](int rank) {
+        // The send/recv to/from self must be handled in the same group.
+        if (rank == root) { return; }
+        if (counts[rank] == 0) { return; }
+        AL_CHECK_NCCL(ncclRecv((void*) (recvbuf + displs[rank]), counts[rank],
+                               internal::nccl::TypeMap<T>(), rank,
+                               comm.m_nccl_comm, stream));
+      },
+      [](){},
+      [&]() {
+        if (counts[comm.rank()] == 0) { return; }
+        AL_CHECK_NCCL(ncclSend((const void*) sendbuf, counts[comm.rank()],
+                               internal::nccl::TypeMap<T>(), root,
+                               comm.m_nccl_comm, stream));
+        if (comm.rank() == root) {
+          AL_CHECK_NCCL(ncclRecv((void*) (recvbuf + displs[root]), counts[root],
+                                 internal::nccl::TypeMap<T>(), root,
                                  comm.m_nccl_comm, stream));
         }
-      }
-    }
-    if (counts[comm.rank()] > 0) {
-      AL_CHECK_NCCL(ncclSend((const void*) sendbuf, counts[comm.rank()],
-                             internal::nccl::TypeMap<T>(), root,
-                             comm.m_nccl_comm, stream));
-    }
-    AL_CHECK_NCCL(ncclGroupEnd());
+      },
+      [&]() { return comm.rank() == root; });
   }
 
   /** Do a NCCL reduce. */
@@ -830,18 +928,18 @@ class NCCLBackend {
     if (sendbuf == internal::IN_PLACE<T>()) {
       sendbuf = recvbuf + displs[comm.rank()];
     }
-    AL_CHECK_NCCL(ncclGroupStart());
-    for (int rank = 0; rank < comm.size(); ++rank) {
-      if (counts[rank] > 0) {
-        AL_CHECK_NCCL(ncclSend((const void*) sendbuf, counts[comm.rank()],
-                               internal::nccl::TypeMap<T>(), rank,
-                               comm.m_nccl_comm, stream));
-        AL_CHECK_NCCL(ncclRecv((void*) (recvbuf + displs[rank]), counts[rank],
-                               internal::nccl::TypeMap<T>(), rank,
-                               comm.m_nccl_comm, stream));
-      }
-    }
-    AL_CHECK_NCCL(ncclGroupEnd());
+    internal::nccl::safe_nccl_group<2>(
+      0, comm.size(),
+      [&](int rank) {
+        if (counts[rank] > 0) {
+          AL_CHECK_NCCL(ncclSend((const void*) sendbuf, counts[comm.rank()],
+                                 internal::nccl::TypeMap<T>(), rank,
+                                 comm.m_nccl_comm, stream));
+          AL_CHECK_NCCL(ncclRecv((void*) (recvbuf + displs[rank]), counts[rank],
+                                 internal::nccl::TypeMap<T>(), rank,
+                                 comm.m_nccl_comm, stream));
+        }
+      });
   }
 
   /** Do a NCCL alltoall. */
@@ -863,16 +961,16 @@ class NCCLBackend {
                                     count*sizeof(T)*comm.size(),
                                     cudaMemcpyDeviceToDevice, stream));
     }
-    AL_CHECK_NCCL(ncclGroupStart());
-    for (int rank = 0; rank < comm.size(); ++rank) {
-      AL_CHECK_NCCL(ncclSend((const void*) &tmp_sendbuf[rank*count], count,
+    internal::nccl::safe_nccl_group<2>(
+      0, comm.size(),
+      [&](int rank) {
+        AL_CHECK_NCCL(ncclSend((const void*) &tmp_sendbuf[rank*count], count,
                              internal::nccl::TypeMap<T>(), rank,
                              comm.m_nccl_comm, stream));
-      AL_CHECK_NCCL(ncclRecv((void*) &recvbuf[rank*count], count,
-                             internal::nccl::TypeMap<T>(), rank,
-                             comm.m_nccl_comm, stream));
-    }
-    AL_CHECK_NCCL(ncclGroupEnd());
+        AL_CHECK_NCCL(ncclRecv((void*) &recvbuf[rank*count], count,
+                               internal::nccl::TypeMap<T>(), rank,
+                               comm.m_nccl_comm, stream));
+      });
     if (tmp_sendbuf != sendbuf) {
       AL_CHECK_CUDA(cudaFree(tmp_sendbuf));
     }
@@ -906,20 +1004,20 @@ class NCCLBackend {
       // The copied data is contiguous.
       send_displs = contig_displs;
     }
-    AL_CHECK_NCCL(ncclGroupStart());
-    for (int rank = 0; rank < comm.size(); ++rank) {
-      if (send_counts[rank] > 0) {
-        AL_CHECK_NCCL(ncclSend((const void*) (tmp_sendbuf + send_displs[rank]),
-                               send_counts[rank], internal::nccl::TypeMap<T>(),
-                               rank, comm.m_nccl_comm, stream));
-      }
-      if (recv_counts[rank] > 0) {
-        AL_CHECK_NCCL(ncclRecv((void*) (recvbuf + recv_displs[rank]),
-                               recv_counts[rank], internal::nccl::TypeMap<T>(),
-                               rank, comm.m_nccl_comm, stream));
-      }
-    }
-    AL_CHECK_NCCL(ncclGroupEnd());
+    internal::nccl::safe_nccl_group<2>(
+      0, comm.size(),
+      [&](int rank) {
+        if (send_counts[rank] > 0) {
+          AL_CHECK_NCCL(ncclSend((const void*) (tmp_sendbuf + send_displs[rank]),
+                                 send_counts[rank], internal::nccl::TypeMap<T>(),
+                                 rank, comm.m_nccl_comm, stream));
+        }
+        if (recv_counts[rank] > 0) {
+          AL_CHECK_NCCL(ncclRecv((void*) (recvbuf + recv_displs[rank]),
+                                 recv_counts[rank], internal::nccl::TypeMap<T>(),
+                                 rank, comm.m_nccl_comm, stream));
+        }
+      });
     if (tmp_sendbuf != sendbuf) {
       AL_CHECK_CUDA(cudaFree(tmp_sendbuf));
     }
@@ -953,18 +1051,27 @@ class NCCLBackend {
       sendbuf = recvbuf;
       recvbuf = recvbuf + comm.rank()*count;
     }
-    AL_CHECK_NCCL(ncclGroupStart());
-    if (root == comm.rank()) {
-      for (int rank = 0; rank < comm.size(); ++rank) {
+    internal::nccl::safe_nccl_group<1, 0, 2>(
+      0, comm.size(),
+      [&](int rank) {
+        // The send/recv to/from self must be bundled in the same group.
+        if (rank == root) { return; }
         AL_CHECK_NCCL(ncclSend((const void*) &sendbuf[rank*count], count,
                                internal::nccl::TypeMap<T>(), rank,
                                comm.m_nccl_comm, stream));
-      }
-    }
-    AL_CHECK_NCCL(ncclRecv((void*) recvbuf, count,
-                           internal::nccl::TypeMap<T>(), root,
-                           comm.m_nccl_comm, stream));
-    AL_CHECK_NCCL(ncclGroupEnd());
+      },
+      [](){},
+      [&]() {
+        AL_CHECK_NCCL(ncclRecv((void*) recvbuf, count,
+                               internal::nccl::TypeMap<T>(), root,
+                               comm.m_nccl_comm, stream));
+        if (comm.rank() == root) {
+          AL_CHECK_NCCL(ncclSend((const void*) &sendbuf[root*count], count,
+                                 internal::nccl::TypeMap<T>(), root,
+                                 comm.m_nccl_comm, stream));
+        }
+      },
+      [&]() { return comm.rank() == root; });
   }
 
   /** Do a NCCL vector scatter. */
@@ -977,18 +1084,29 @@ class NCCLBackend {
       sendbuf = recvbuf;
       recvbuf = recvbuf + displs[comm.rank()];
     }
-    AL_CHECK_NCCL(ncclGroupStart());
-    if (comm.rank() == root) {
-      for (int rank = 0; rank < comm.size(); ++rank) {
+    internal::nccl::safe_nccl_group<1, 0, 2>(
+      0, comm.size(),
+      [&](int rank) {
+        // The send/recv to/from self must be bundled in the same group.
+        if (rank == root) { return; }
+        if (counts[rank] == 0) { return; }
         AL_CHECK_NCCL(ncclSend((const void*) (sendbuf + displs[rank]),
                                counts[rank], internal::nccl::TypeMap<T>(),
                                rank, comm.m_nccl_comm, stream));
-      }
-    }
-    AL_CHECK_NCCL(ncclRecv((void*) recvbuf, counts[comm.rank()],
-                           internal::nccl::TypeMap<T>(), root,
-                           comm.m_nccl_comm, stream));
-    AL_CHECK_NCCL(ncclGroupEnd());
+      },
+      [](){},
+      [&]() {
+        if (counts[comm.rank()] == 0) { return; }
+        AL_CHECK_NCCL(ncclRecv((void*) recvbuf, counts[comm.rank()],
+                               internal::nccl::TypeMap<T>(), root,
+                               comm.m_nccl_comm, stream));
+        if (comm.rank() == root) {
+          AL_CHECK_NCCL(ncclSend((const void*) (sendbuf + displs[root]),
+                                 counts[root], internal::nccl::TypeMap<T>(),
+                                 root, comm.m_nccl_comm, stream));
+        }
+      },
+      [&]() { return comm.rank() == root; });
   }
 
 };
