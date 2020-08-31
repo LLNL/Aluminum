@@ -213,7 +213,6 @@ void safe_nccl_group(size_t start, size_t limit,
     // since we need a new NCCL group anyway.
     AL_CHECK_NCCL(ncclGroupEnd());
     AL_CHECK_NCCL(ncclGroupStart());
-    closed = true;
   } else {
     cur_nccl_calls += num_per_pre;
   }
