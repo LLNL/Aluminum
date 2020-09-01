@@ -62,6 +62,16 @@ const void* buf_or_inplace(const T* buf) {
   return buf == IN_PLACE<T>() ? MPI_IN_PLACE : buf;
 }
 
+/**
+ * Convert a vector of size_ts to a vector of ints.
+ *
+ * This is used since MPI requires arrays of ints, which are a different size
+ * than size_t.
+ */
+inline std::vector<int> intify_size_t_vector(const std::vector<size_t> v) {
+  return std::vector<int>(v.begin(), v.end());
+}
+
 /** True if count elements can be sent by MPI. */
 inline bool check_count_fits_mpi(size_t count) {
   return count <= static_cast<size_t>(std::numeric_limits<int>::max());

@@ -36,45 +36,56 @@ namespace Al {
 namespace internal {
 namespace mpi {
 
-// Data is passed on recvbuf on non-root processes when in-place.
+// Data is passed in recvbuf on non-root processes when in-place.
 template <typename T>
-void passthrough_reduce(const T* sendbuf, T* recvbuf, size_t count,
-                        ReductionOperator op, int root, MPICommunicator& comm) {
+void passthrough_gatherv(const T* sendbuf, T* recvbuf, 
+                         std::vector<size_t> counts,
+                         std::vector<size_t> displs,
+                         int root, MPICommunicator& comm) {
+  std::vector<int> counts_ = intify_size_t_vector(counts);
+  std::vector<int> displs_ = intify_size_t_vector(displs);
   if (sendbuf == IN_PLACE<T>() && comm.rank() != root) {
     sendbuf = recvbuf;
   }
-  MPI_Reduce(buf_or_inplace(sendbuf), recvbuf, count, TypeMap<T>(),
-             ReductionOperator2MPI_Op(op), root, comm.get_comm());
+  MPI_Gatherv(buf_or_inplace(sendbuf), counts[comm.rank()], TypeMap<T>(),
+              recvbuf, counts_.data(), displs_.data(), TypeMap<T>(), root,
+              comm.get_comm());
 }
 
 template <typename T>
-class ReduceAlState : public MPIState {
+class GathervAlState : public MPIState {
 public:
-  ReduceAlState(const T* sendbuf_, T* recvbuf_, size_t count_, ReductionOperator op_,
-                int root_, MPICommunicator& comm_, AlRequest req_) :
+  GathervAlState(const T* sendbuf_, T* recvbuf_,
+                 std::vector<size_t> counts_,
+                 std::vector<size_t> displs_,
+                 int root_,
+                 MPICommunicator& comm_, AlRequest req_) :
     MPIState(req_),
-    sendbuf(sendbuf_), recvbuf(recvbuf_), count(count_),
-    op(ReductionOperator2MPI_Op(op_)), root(root_),
+    sendbuf(sendbuf_), recvbuf(recvbuf_),
+    counts(intify_size_t_vector(counts_)),
+    displs(intify_size_t_vector(displs_)),
+    root(root_),
     comm(comm_.get_comm()), rank(comm_.rank()) {}
 
-  ~ReduceAlState() override {}
+  ~GathervAlState() override {}
 
-  std::string get_name() const override { return "MPIReduce"; }
+  std::string get_name() const override { return "MPIGatherv"; }
 
 protected:
-  void start_mpi_op() {
+  void start_mpi_op() override {
     if (sendbuf == IN_PLACE<T>() && rank != root) {
       sendbuf = recvbuf;
     }
-    MPI_Ireduce(buf_or_inplace(sendbuf), recvbuf, count, TypeMap<T>(),
-                op, root, comm, get_mpi_req());
+    MPI_Igatherv(buf_or_inplace(sendbuf), counts[rank], TypeMap<T>(),
+                 recvbuf, counts.data(), displs.data(), TypeMap<T>(), root,
+                 comm, get_mpi_req());
   }
 
 private:
   const T* sendbuf;
   T* recvbuf;
-  size_t count;
-  MPI_Op op;
+  std::vector<int> counts;
+  std::vector<int> displs;
   int root;
   MPI_Comm comm;
   int rank;
@@ -82,13 +93,15 @@ private:
 
 // Data is passed in recvbuf on non-root processes when in-place.
 template <typename T>
-void passthrough_nb_reduce(const T* sendbuf, T* recvbuf, size_t count,
-                           ReductionOperator op, int root,
-                           MPICommunicator& comm, AlRequest& req) {
+void passthrough_nb_gatherv(const T* sendbuf, T* recvbuf,
+                            std::vector<size_t> counts,
+                            std::vector<size_t> displs,
+                            int root,
+                            MPICommunicator& comm, AlRequest& req) {
   req = internal::get_free_request();
-  internal::mpi::ReduceAlState<T>* state =
-    new internal::mpi::ReduceAlState<T>(
-      sendbuf, recvbuf, count, op, root, comm, req);
+  internal::mpi::GathervAlState<T>* state =
+    new internal::mpi::GathervAlState<T>(
+      sendbuf, recvbuf, counts, displs, root, comm, req);
   get_progress_engine()->enqueue(state);
 }
 

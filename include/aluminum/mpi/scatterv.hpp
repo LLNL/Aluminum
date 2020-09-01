@@ -38,45 +38,57 @@ namespace mpi {
 
 // Data is passed in recvbuf on root processes when in-place.
 template <typename T>
-void passthrough_scatter(const T* sendbuf, T* recvbuf, size_t count, int root,
-                         MPICommunicator& comm) {
+void passthrough_scatterv(const T* sendbuf, T* recvbuf,
+                          std::vector<size_t> counts,
+                          std::vector<size_t> displs,
+                          int root,
+                          MPICommunicator& comm) {
+  std::vector<int> counts_ = intify_size_t_vector(counts);
+  std::vector<int> displs_ = intify_size_t_vector(displs);
   if (sendbuf == IN_PLACE<T>() && comm.rank() == root) {
     sendbuf = recvbuf;
     recvbuf = IN_PLACE<T>();
   }
-  MPI_Scatter(sendbuf, count, TypeMap<T>(),
-              buf_or_inplace(recvbuf), count, TypeMap<T>(),
-              root, comm.get_comm());
+  MPI_Scatterv(sendbuf, counts_.data(), displs_.data(), TypeMap<T>(),
+               buf_or_inplace(recvbuf), counts[comm.rank()], TypeMap<T>(),
+               root, comm.get_comm());
 }
 
 template <typename T>
-class ScatterAlState : public MPIState {
+class ScattervAlState : public MPIState {
 public:
-  ScatterAlState(const T* sendbuf_, T* recvbuf_, size_t count_, int root_,
-                 MPICommunicator& comm_, AlRequest req_) :
+  ScattervAlState(const T* sendbuf_, T* recvbuf_,
+                  std::vector<size_t> counts_,
+                  std::vector<size_t> displs_,
+                  int root_,
+                  MPICommunicator& comm_, AlRequest req_) :
     MPIState(req_),
-    sendbuf(sendbuf_), recvbuf(recvbuf_), count(count_), root(root_),
+    sendbuf(sendbuf_), recvbuf(recvbuf_),
+    counts(intify_size_t_vector(counts_)),
+    displs(intify_size_t_vector(displs_)),
+    root(root_),
     comm(comm_.get_comm()), rank(comm_.rank()) {}
 
-  ~ScatterAlState() override {}
+  ~ScattervAlState() override {}
 
-  std::string get_name() const override { return "MPIScatter"; }
+  std::string get_name() const override { return "MPIScatterv"; }
 
 protected:
   void start_mpi_op() override {
-        if (sendbuf == IN_PLACE<T>() && rank == root) {
+    if (sendbuf == IN_PLACE<T>() && rank == root) {
       sendbuf = recvbuf;
       recvbuf = IN_PLACE<T>();
     }
-    MPI_Iscatter(sendbuf, count, TypeMap<T>(),
-                 buf_or_inplace(recvbuf), count, TypeMap<T>(),
-                 root, comm, get_mpi_req());
+    MPI_Iscatterv(sendbuf, counts.data(), displs.data(), TypeMap<T>(),
+                  buf_or_inplace(recvbuf), counts[rank], TypeMap<T>(),
+                  root, comm, get_mpi_req());
   }
 
 private:
   const T* sendbuf;
   T* recvbuf;
-  size_t count;
+  std::vector<int> counts;
+  std::vector<int> displs;
   int root;
   MPI_Comm comm;
   int rank;
@@ -84,12 +96,14 @@ private:
 
 // When in-place, it is recvbuf that uses IN_PLACE.
 template <typename T>
-void passthrough_nb_scatter(const T* sendbuf, T* recvbuf, size_t count,
-                            int root, MPICommunicator& comm, AlRequest& req) {
+void passthrough_nb_scatterv(const T* sendbuf, T* recvbuf,
+                             std::vector<size_t> counts,
+                             std::vector<size_t> displs,
+                             int root, MPICommunicator& comm, AlRequest& req) {
   req = internal::get_free_request();
-  internal::mpi::ScatterAlState<T>* state =
-    new internal::mpi::ScatterAlState<T>(
-      sendbuf, recvbuf, count, root, comm, req);
+  internal::mpi::ScattervAlState<T>* state =
+    new internal::mpi::ScattervAlState<T>(
+      sendbuf, recvbuf, counts, displs, root, comm, req);
   get_progress_engine()->enqueue(state);
 }
 

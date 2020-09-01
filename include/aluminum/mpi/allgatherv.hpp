@@ -37,45 +37,59 @@ namespace internal {
 namespace mpi {
 
 template <typename T>
-void passthrough_allgather(const T* sendbuf, T* recvbuf, size_t count,
-                           MPICommunicator& comm) {
-  MPI_Allgather(buf_or_inplace(sendbuf), count, TypeMap<T>(),
-                recvbuf, count, TypeMap<T>(), comm.get_comm());
+void passthrough_allgatherv(const T* sendbuf, T* recvbuf,
+                            std::vector<size_t> counts,
+                            std::vector<size_t> displs,
+                            MPICommunicator& comm) {
+  std::vector<int> counts_ = intify_size_t_vector(counts);
+  std::vector<int> displs_ = intify_size_t_vector(displs);
+  MPI_Allgatherv(buf_or_inplace(sendbuf), counts[comm.rank()], TypeMap<T>(),
+                 recvbuf, counts_.data(), displs_.data(), TypeMap<T>(),
+                 comm.get_comm());
 }
 
 template <typename T>
-class AllgatherAlState : public MPIState {
+class AllgathervAlState : public MPIState {
 public:
-  AllgatherAlState(const T* sendbuf_, T* recvbuf_, size_t count_,
-                   MPICommunicator& comm_, AlRequest req_) :
+  AllgathervAlState(const T* sendbuf_, T* recvbuf_,
+                    std::vector<size_t> counts_,
+                    std::vector<size_t> displs_,
+                    MPICommunicator& comm_, AlRequest req_) :
     MPIState(req_),
-    sendbuf(sendbuf_), recvbuf(recvbuf_), count(count_),
-    comm(comm_.get_comm()) {}
+    sendbuf(sendbuf_), recvbuf(recvbuf_),
+    counts(intify_size_t_vector(counts_)),
+    displs(intify_size_t_vector(displs_)),
+    rank(comm_.rank()), comm(comm_.get_comm()) {}
 
-  ~AllgatherAlState() override {}
+  ~AllgathervAlState() override {}
 
-  std::string get_name() const override { return "MPIAllgather"; }
+  std::string get_name() const override { return "MPIAllgatherv"; }
 
 protected:
   void start_mpi_op() override {
-    MPI_Iallgather(buf_or_inplace(sendbuf), count, TypeMap<T>(),
-                   recvbuf, count, TypeMap<T>(), comm, get_mpi_req());
+    MPI_Iallgatherv(buf_or_inplace(sendbuf), counts[rank], TypeMap<T>(),
+                    recvbuf, counts.data(), displs.data(), TypeMap<T>(),
+                    comm, get_mpi_req());
   }
 
 private:
   const T* sendbuf;
   T* recvbuf;
-  size_t count;
+  std::vector<int> counts;
+  std::vector<int> displs;
+  int rank;
   MPI_Comm comm;
 };
 
 template <typename T>
-void passthrough_nb_allgather(const T* sendbuf, T* recvbuf, size_t count,
-                              MPICommunicator& comm, AlRequest& req) {
+void passthrough_nb_allgatherv(const T* sendbuf, T* recvbuf,
+                               std::vector<size_t> counts,
+                               std::vector<size_t> displs,
+                               MPICommunicator& comm, AlRequest& req) {
   req = internal::get_free_request();
-  internal::mpi::AllgatherAlState<T>* state =
-    new internal::mpi::AllgatherAlState<T>(
-      sendbuf, recvbuf, count, comm, req);
+  internal::mpi::AllgathervAlState<T>* state =
+    new internal::mpi::AllgathervAlState<T>(
+      sendbuf, recvbuf, counts, displs, comm, req);
   get_progress_engine()->enqueue(state);
 }
 

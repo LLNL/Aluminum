@@ -1,5 +1,6 @@
 set_source_path(THIS_DIR_HEADERS
   allgather.hpp
+  allgatherv.hpp
   allreduce.hpp
   alltoall.hpp
   bcast.hpp

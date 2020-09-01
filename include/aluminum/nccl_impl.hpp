@@ -176,11 +176,15 @@ class NCCLBackend {
   using allreduce_algo_type = NCCLCollectiveAlgorithm;
   using bcast_algo_type = NCCLCollectiveAlgorithm;
   using gather_algo_type = NCCLCollectiveAlgorithm;
+  using gatherv_algo_type = NCCLCollectiveAlgorithm;
   using reduce_algo_type = NCCLCollectiveAlgorithm;
   using allgather_algo_type = NCCLCollectiveAlgorithm;
+  using allgatherv_algo_type = NCCLCollectiveAlgorithm;
   using alltoall_algo_type = NCCLCollectiveAlgorithm;
+  using alltoallv_algo_type = NCCLCollectiveAlgorithm;
   using reduce_scatter_algo_type = NCCLCollectiveAlgorithm;
   using scatter_algo_type = NCCLCollectiveAlgorithm;
+  using scatterv_algo_type = NCCLCollectiveAlgorithm;
   using comm_type = NCCLCommunicator;
   using req_type = std::shared_ptr<internal::nccl::NCCLRequest>;
   static constexpr std::nullptr_t null_req = nullptr;
@@ -308,6 +312,43 @@ class NCCLBackend {
   }
 
   template <typename T>
+  static void Gatherv(const T* sendbuf, T* recvbuf,
+                      std::vector<size_t> counts,
+                      std::vector<size_t> displs,
+                      int root, comm_type& comm, gatherv_algo_type) {
+    do_gatherv(sendbuf, recvbuf, counts, displs, root, comm, comm.get_stream());
+  }
+
+  template <typename T>
+  static void Gatherv(T* buffer,
+                      std::vector<size_t> counts,
+                      std::vector<size_t> displs,
+                      int root, comm_type& comm, gatherv_algo_type algo) {
+    Gatherv(buffer, buffer, counts, displs, root, comm, algo);
+  }
+
+  template <typename T>
+  static void NonblockingGatherv(const T* sendbuf, T* recvbuf,
+                                 std::vector<size_t> counts,
+                                 std::vector<size_t> displs,
+                                 int root, comm_type& comm, req_type& req,
+                                 gatherv_algo_type) {
+    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+    sync_internal_stream_with_comm(internal_stream, comm);
+    do_gatherv(sendbuf, recvbuf, counts, displs, root, comm, internal_stream);
+    setup_completion_event(internal_stream, comm, req);
+  }
+
+  template <typename T>
+  static void NonblockingGatherv(T* buffer,
+                                 std::vector<size_t> counts,
+                                 std::vector<size_t> displs,
+                                 int root, comm_type& comm, req_type& req,
+                                 gatherv_algo_type algo) {
+    NonblockingGatherv(buffer, buffer, counts, displs, root, comm, req, algo);
+  }
+
+  template <typename T>
   static void Reduce(const T* sendbuf, T* recvbuf, size_t count,
                      ReductionOperator op, int root, comm_type& comm,
                      reduce_algo_type) {
@@ -370,6 +411,44 @@ class NCCLBackend {
   }
 
   template <typename T>
+  static void Allgatherv(const T* sendbuf, T* recvbuf,
+                         std::vector<size_t> counts,
+                         std::vector<size_t> displs,
+                         comm_type& comm, allgatherv_algo_type) {
+    do_allgatherv(sendbuf, recvbuf, counts, displs, comm, comm.get_stream());
+  }
+
+  template <typename T>
+  static void Allgatherv(T* buffer,
+                         std::vector<size_t> counts,
+                         std::vector<size_t> displs,
+                         comm_type& comm, allgatherv_algo_type algo) {
+    Allgatherv(internal::IN_PLACE<T>(), buffer, counts, displs, comm, algo);
+  }
+
+  template <typename T>
+  static void NonblockingAllgatherv(const T* sendbuf, T* recvbuf,
+                                    std::vector<size_t> counts,
+                                    std::vector<size_t> displs,
+                                    comm_type& comm, req_type& req,
+                                    allgatherv_algo_type) {
+    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+    sync_internal_stream_with_comm(internal_stream, comm);
+    do_allgatherv(sendbuf, recvbuf, counts, displs, comm, internal_stream);
+    setup_completion_event(internal_stream, comm, req);
+  }
+
+  template <typename T>
+  static void NonblockingAllgatherv(T* buffer,
+                                    std::vector<size_t> counts,
+                                    std::vector<size_t> displs,
+                                    comm_type& comm, req_type& req,
+                                    allgatherv_algo_type algo) {
+    NonblockingAllgatherv(internal::IN_PLACE<T>(), buffer, counts, displs,
+                          comm, req, algo);
+  }
+
+  template <typename T>
   static void Alltoall(const T* sendbuf, T* recvbuf, size_t count,
                        comm_type& comm, alltoall_algo_type) {
     do_alltoall(sendbuf, recvbuf, count, comm, comm.get_stream());
@@ -378,7 +457,7 @@ class NCCLBackend {
   template <typename T>
   static void Alltoall(T* buffer, size_t count, comm_type& comm,
                        alltoall_algo_type algo) {
-    Alltoall(buffer, buffer, count, comm, algo);
+    Alltoall(internal::IN_PLACE<T>(), buffer, count, comm, algo);
   }
 
   template <typename T>
@@ -394,7 +473,59 @@ class NCCLBackend {
   template <typename T>
   static void NonblockingAlltoall(T* buffer, size_t count, comm_type& comm,
                                   req_type& req, alltoall_algo_type algo) {
-    NonblockingAlltoall(buffer, buffer, count, comm, req, algo);
+    NonblockingAlltoall(internal::IN_PLACE<T>(), buffer, count, comm, req, algo);
+  }
+
+  template <typename T>
+  static void Alltoallv(const T* sendbuf,
+                        std::vector<size_t> send_counts,
+                        std::vector<size_t> send_displs,
+                        T* recvbuf,
+                        std::vector<size_t> recv_counts,
+                        std::vector<size_t> recv_displs,
+                        comm_type& comm,
+                        alltoallv_algo_type) {
+    do_alltoallv(sendbuf, send_counts, send_displs,
+                 recvbuf, recv_counts, recv_displs,
+                 comm, comm.get_stream());
+  }
+
+  template <typename T>
+  static void Alltoallv(T* buffer,
+                        std::vector<size_t> counts,
+                        std::vector<size_t> displs,
+                        comm_type& comm,
+                        alltoallv_algo_type algo) {
+    Alltoallv(internal::IN_PLACE<T>(), counts, displs, buffer, counts, displs,
+              comm, algo);
+  }
+
+  template <typename T>
+  static void NonblockingAlltoallv(const T* sendbuf,
+                                   std::vector<size_t> send_counts,
+                                   std::vector<size_t> send_displs,
+                                   T* recvbuf,
+                                   std::vector<size_t> recv_counts,
+                                   std::vector<size_t> recv_displs,
+                                   comm_type& comm, req_type& req,
+                                   alltoallv_algo_type) {
+    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+    sync_internal_stream_with_comm(internal_stream, comm);
+    do_alltoallv(sendbuf, send_counts, send_displs,
+                 recvbuf, recv_counts, recv_displs,
+                 comm, internal_stream);
+    setup_completion_event(internal_stream, comm, req);
+  }
+
+  template <typename T>
+  static void NonblockingAlltoallv(T* buffer,
+                                   std::vector<size_t> counts,
+                                   std::vector<size_t> displs,
+                                   comm_type& comm, req_type& req,
+                                   alltoallv_algo_type algo) {
+    NonblockingAlltoallv(internal::IN_PLACE<T>(), counts, displs,
+                         buffer, counts, displs,
+                         comm, req, algo);
   }
 
   template <typename T>
@@ -459,6 +590,47 @@ class NCCLBackend {
                                  comm_type& comm, req_type& req,
                                  scatter_algo_type algo) {
     NonblockingScatter(buffer, buffer, count, root, comm, req, algo);
+  }
+
+  template <typename T>
+  static void Scatterv(const T* sendbuf, T* recvbuf,
+                       std::vector<size_t> counts,
+                       std::vector<size_t> displs,
+                       int root, comm_type& comm,
+                       scatterv_algo_type) {
+    do_scatterv(sendbuf, recvbuf, counts, displs, root, comm,
+                comm.get_stream());
+  }
+
+  template <typename T>
+  static void Scatterv(T* buffer,
+                       std::vector<size_t> counts,
+                       std::vector<size_t> displs,
+                       int root, comm_type& comm,
+                       scatterv_algo_type algo) {
+    Scatterv(buffer, buffer, counts, displs, root, comm, algo);
+  }
+
+  template <typename T>
+  static void NonblockingScatterv(const T* sendbuf, T* recvbuf,
+                                  std::vector<size_t> counts,
+                                  std::vector<size_t> displs,
+                                  int root, comm_type& comm, req_type& req,
+                                  scatterv_algo_type) {
+    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+    sync_internal_stream_with_comm(internal_stream, comm);
+    do_scatterv(sendbuf, recvbuf, counts, displs, root, comm,
+                internal_stream);
+    setup_completion_event(internal_stream, comm, req);
+  }
+
+  template <typename T>
+  static void NonblockingScatterv(T* buffer,
+                                  std::vector<size_t> counts,
+                                  std::vector<size_t> displs,
+                                  int root, comm_type& comm, req_type& req,
+                                  scatterv_algo_type algo) {
+    NonblockingScatterv(buffer, buffer, counts, displs, root, comm, req, algo);
   }
 
   static std::string Name() { return "NCCLBackend"; }
@@ -592,6 +764,32 @@ class NCCLBackend {
     AL_CHECK_NCCL(ncclGroupEnd());
   }
 
+  /** Do a NCCL vector gather. */
+  template <typename T>
+  static void do_gatherv(const T* sendbuf, T* recvbuf,
+                         std::vector<size_t> counts, std::vector<size_t> displs,
+                         int root, comm_type& comm, cudaStream_t stream) {
+    if (sendbuf == internal::IN_PLACE<T>()) {
+      sendbuf = recvbuf + displs[comm.rank()];
+    }
+    AL_CHECK_NCCL(ncclGroupStart());
+    if (comm.rank() == root) {
+      for (int rank = 0; rank < comm.size(); ++rank) {
+        if (counts[rank] > 0) {
+          AL_CHECK_NCCL(ncclRecv((void*) (recvbuf + displs[rank]), counts[rank],
+                                 internal::nccl::TypeMap<T>(), rank,
+                                 comm.m_nccl_comm, stream));
+        }
+      }
+    }
+    if (counts[comm.rank()] > 0) {
+      AL_CHECK_NCCL(ncclSend((const void*) sendbuf, counts[comm.rank()],
+                             internal::nccl::TypeMap<T>(), root,
+                             comm.m_nccl_comm, stream));
+    }
+    AL_CHECK_NCCL(ncclGroupEnd());
+  }
+
   /** Do a NCCL reduce. */
   template <typename T>
   static void do_reduce(const T* sendbuf, T* recvbuf, size_t count,
@@ -624,6 +822,28 @@ class NCCLBackend {
                                 comm.m_nccl_comm, stream));
   }
 
+  /** Do a NCCL vector allgather. */
+  template <typename T>
+  static void do_allgatherv(const T* sendbuf, T* recvbuf,
+                            std::vector<size_t> counts, std::vector<size_t> displs,
+                            comm_type& comm, cudaStream_t stream) {
+    if (sendbuf == internal::IN_PLACE<T>()) {
+      sendbuf = recvbuf + displs[comm.rank()];
+    }
+    AL_CHECK_NCCL(ncclGroupStart());
+    for (int rank = 0; rank < comm.size(); ++rank) {
+      if (counts[rank] > 0) {
+        AL_CHECK_NCCL(ncclSend((const void*) sendbuf, counts[comm.rank()],
+                               internal::nccl::TypeMap<T>(), rank,
+                               comm.m_nccl_comm, stream));
+        AL_CHECK_NCCL(ncclRecv((void*) (recvbuf + displs[rank]), counts[rank],
+                               internal::nccl::TypeMap<T>(), rank,
+                               comm.m_nccl_comm, stream));
+      }
+    }
+    AL_CHECK_NCCL(ncclGroupEnd());
+  }
+
   /** Do a NCCL alltoall. */
   template <typename T>
   static void do_alltoall(const T* sendbuf, T* recvbuf, size_t count,
@@ -651,6 +871,53 @@ class NCCLBackend {
       AL_CHECK_NCCL(ncclRecv((void*) &recvbuf[rank*count], count,
                              internal::nccl::TypeMap<T>(), rank,
                              comm.m_nccl_comm, stream));
+    }
+    AL_CHECK_NCCL(ncclGroupEnd());
+    if (tmp_sendbuf != sendbuf) {
+      AL_CHECK_CUDA(cudaFree(tmp_sendbuf));
+    }
+  }
+
+  /** Do a NCCL vector alltoall. */
+  template <typename T>
+  static void do_alltoallv(const T* sendbuf,
+                           std::vector<size_t> send_counts,
+                           std::vector<size_t> send_displs,
+                           T* recvbuf,
+                           std::vector<size_t> recv_counts,
+                           std::vector<size_t> recv_displs,
+                           comm_type& comm, cudaStream_t stream) {
+    T* tmp_sendbuf = const_cast<T*>(sendbuf);
+    if (sendbuf == internal::IN_PLACE<T>()) {
+      // We send and receive to this buffer, so we need a temporary one.
+      // For simplicity, we will ensure it is contiguous.
+      // TODO: Optimize this.
+      size_t sendbuf_len = std::accumulate(send_counts.begin(),
+                                           send_counts.end(), 0);
+      std::vector<size_t> contig_displs = excl_prefix_sum(send_counts);
+      AL_CHECK_CUDA(cudaMalloc(&tmp_sendbuf, sendbuf_len*sizeof(T)));
+      // TODO: Optimize for the case where everything is contiguous.
+      for (size_t i = 0; i < send_counts.size(); ++i) {
+        AL_CHECK_CUDA(cudaMemcpyAsync((void*) (tmp_sendbuf + contig_displs[i]),
+                                      (const void*) (recvbuf + send_displs[i]),
+                                      send_counts[i]*sizeof(T),
+                                      cudaMemcpyDeviceToDevice, stream));
+      }
+      // The copied data is contiguous.
+      send_displs = contig_displs;
+    }
+    AL_CHECK_NCCL(ncclGroupStart());
+    for (int rank = 0; rank < comm.size(); ++rank) {
+      if (send_counts[rank] > 0) {
+        AL_CHECK_NCCL(ncclSend((const void*) (tmp_sendbuf + send_displs[rank]),
+                               send_counts[rank], internal::nccl::TypeMap<T>(),
+                               rank, comm.m_nccl_comm, stream));
+      }
+      if (recv_counts[rank] > 0) {
+        AL_CHECK_NCCL(ncclRecv((void*) (recvbuf + recv_displs[rank]),
+                               recv_counts[rank], internal::nccl::TypeMap<T>(),
+                               rank, comm.m_nccl_comm, stream));
+      }
     }
     AL_CHECK_NCCL(ncclGroupEnd());
     if (tmp_sendbuf != sendbuf) {
@@ -695,6 +962,30 @@ class NCCLBackend {
       }
     }
     AL_CHECK_NCCL(ncclRecv((void*) recvbuf, count,
+                           internal::nccl::TypeMap<T>(), root,
+                           comm.m_nccl_comm, stream));
+    AL_CHECK_NCCL(ncclGroupEnd());
+  }
+
+  /** Do a NCCL vector scatter. */
+  template <typename T>
+  static void do_scatterv(const T* sendbuf, T* recvbuf,
+                          std::vector<size_t> counts,
+                          std::vector<size_t> displs,
+                          int root, comm_type& comm, cudaStream_t stream) {
+    if (sendbuf == internal::IN_PLACE<T>() && comm.rank() == root) {
+      sendbuf = recvbuf;
+      recvbuf = recvbuf + displs[comm.rank()];
+    }
+    AL_CHECK_NCCL(ncclGroupStart());
+    if (comm.rank() == root) {
+      for (int rank = 0; rank < comm.size(); ++rank) {
+        AL_CHECK_NCCL(ncclSend((const void*) (sendbuf + displs[rank]),
+                               counts[rank], internal::nccl::TypeMap<T>(),
+                               rank, comm.m_nccl_comm, stream));
+      }
+    }
+    AL_CHECK_NCCL(ncclRecv((void*) recvbuf, counts[comm.rank()],
                            internal::nccl::TypeMap<T>(), root,
                            comm.m_nccl_comm, stream));
     AL_CHECK_NCCL(ncclGroupEnd());

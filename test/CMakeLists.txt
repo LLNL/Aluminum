@@ -42,10 +42,14 @@ set_source_path(TEST_SRCS
   test_reduce.cpp
   test_reduce_scatter.cpp
   test_allgather.cpp
+  test_allgatherv.cpp
   test_alltoall.cpp
+  test_alltoallv.cpp
   test_bcast.cpp
   test_gather.cpp
+  test_gatherv.cpp
   test_scatter.cpp
+  test_scatterv.cpp
   test_pt2pt.cpp
   test_exchange.cpp
   test_transfer_to_one.cpp
