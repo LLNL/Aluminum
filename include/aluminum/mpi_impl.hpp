@@ -47,6 +47,7 @@
 #include "mpi/gatherv.hpp"
 #include "mpi/reduce.hpp"
 #include "mpi/reduce_scatter.hpp"
+#include "mpi/reduce_scatterv.hpp"
 #include "mpi/scatter.hpp"
 #include "mpi/scatterv.hpp"
 #include "mpi/pt2pt.hpp"
@@ -126,6 +127,7 @@ class MPIBackend {
   using gatherv_algo_type = MPICollectiveAlgorithm;
   using reduce_algo_type = MPICollectiveAlgorithm;
   using reduce_scatter_algo_type = MPICollectiveAlgorithm;
+  using reduce_scatterv_algo_type = MPICollectiveAlgorithm;
   using scatter_algo_type = MPICollectiveAlgorithm;
   using scatterv_algo_type = MPICollectiveAlgorithm;
   using comm_type = internal::mpi::MPICommunicator;
@@ -693,6 +695,58 @@ class MPIBackend {
     comm_type& comm, req_type& req, reduce_scatter_algo_type algo) {
     NonblockingReduce_scatter(internal::IN_PLACE<T>(), buffer, count, op, comm,
                               req, algo);
+  }
+
+  template <typename T>
+  static void Reduce_scatterv(
+    const T* sendbuf, T* recvbuf,
+    std::vector<size_t> counts, ReductionOperator op,
+    comm_type& comm, reduce_scatterv_algo_type algo) {
+    for (size_t i = 0; i < counts.size(); ++i) {
+      internal::mpi::assert_count_fits_mpi(counts[i]);
+    }
+    switch (algo) {
+    case MPICollectiveAlgorithm::automatic:
+      internal::mpi::passthrough_reduce_scatterv(
+        sendbuf, recvbuf, counts, op, comm);
+      break;
+    default:
+      throw_al_exception("Invalid algorithm");
+    }
+  }
+
+  template <typename T>
+  static void Reduce_scatterv(
+    T* buffer, std::vector<size_t> counts, ReductionOperator op,
+    comm_type& comm, reduce_scatterv_algo_type algo) {
+    Reduce_scatterv(internal::IN_PLACE<T>(), buffer, counts, op,
+                    comm, algo);
+  }
+
+  template <typename T>
+  static void NonblockingReduce_scatterv(
+    const T* sendbuf, T* recvbuf,
+    std::vector<size_t> counts, ReductionOperator op,
+    comm_type& comm, req_type& req, reduce_scatterv_algo_type algo) {
+    for (size_t i = 0; i < counts.size(); ++i) {
+      internal::mpi::assert_count_fits_mpi(counts[i]);
+    }
+    switch (algo) {
+    case MPICollectiveAlgorithm::automatic:
+      internal::mpi::passthrough_nb_reduce_scatterv(
+        sendbuf, recvbuf, counts, op, comm, req);
+      break;
+    default:
+      throw_al_exception("Invalid algorithm");
+    }
+  }
+
+  template <typename T>
+  static void NonblockingReduce_scatterv(
+    T* buffer, std::vector<size_t> counts, ReductionOperator op,
+    comm_type& comm, req_type& req, reduce_scatterv_algo_type algo) {
+    NonblockingReduce_scatterv(
+      internal::IN_PLACE<T>(), buffer, counts, op, comm, req, algo);
   }
 
   template <typename T>

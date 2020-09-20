@@ -11,6 +11,7 @@ set_source_path(THIS_DIR_HEADERS
   gatherv.hpp
   reduce.hpp
   reduce_scatter.hpp
+  reduce_scatterv.hpp
   scatter.hpp
   scatterv.hpp
   pt2pt.hpp
