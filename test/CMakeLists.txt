@@ -41,6 +41,7 @@ set_source_path(TEST_SRCS
   test_allreduce.cpp
   test_reduce.cpp
   test_reduce_scatter.cpp
+  test_reduce_scatterv.cpp
   test_allgather.cpp
   test_allgatherv.cpp
   test_alltoall.cpp
