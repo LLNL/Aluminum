@@ -199,6 +199,13 @@ std::vector<typename Backend::reduce_scatter_algo_type> get_reduce_scatter_algor
 }
 
 template <typename Backend>
+std::vector<typename Backend::reduce_scatterv_algo_type> get_reduce_scatterv_algorithms() {
+  std::vector<typename Backend::reduce_scatterv_algo_type> algos = {
+    Backend::reduce_scatterv_algo_type::automatic};
+  return algos;
+}
+
+template <typename Backend>
 std::vector<typename Backend::allgather_algo_type> get_allgather_algorithms() {
   std::vector<typename Backend::allgather_algo_type> algos = {
     Backend::allgather_algo_type::automatic};
@@ -293,6 +300,13 @@ template <typename Backend>
 std::vector<typename Backend::reduce_scatter_algo_type> get_nb_reduce_scatter_algorithms() {
   std::vector<typename Backend::reduce_scatter_algo_type> algos = {
     Backend::reduce_scatter_algo_type::automatic};
+  return algos;
+}
+
+template <typename Backend>
+std::vector<typename Backend::reduce_scatterv_algo_type> get_nb_reduce_scatterv_algorithms() {
+  std::vector<typename Backend::reduce_scatterv_algo_type> algos = {
+    Backend::reduce_scatterv_algo_type::automatic};
   return algos;
 }
 

@@ -335,6 +335,85 @@ void NonblockingReduce_scatter(
 }
 
 /**
+ * @brief Perform a vector reduce-scatter.
+ *
+ * This is analogous to "MPI_Reduce_scatter".
+ *
+ * @param sendbuf Input data.
+ * @param recvbuf Output data.
+ * @param counts Amount of data each rank should receive.
+ * @param op The reduction operation to perform.
+ * @param comm The communicator to reduce/scatter over.
+ * @param algo Request a particular vector reduce-scatter algorithm.
+ */
+template <typename Backend, typename T>
+void Reduce_scatterv(
+  const T* sendbuf, T* recvbuf, std::vector<size_t> counts,
+  ReductionOperator op, typename Backend::comm_type& comm,
+  typename Backend::reduce_scatterv_algo_type algo =
+  Backend::reduce_scatterv_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>(
+    "reduce_scatterv", comm, sendbuf, recvbuf, counts);
+  Backend::template Reduce_scatterv<T>(sendbuf, recvbuf, counts,
+                                       op, comm, algo);
+}
+
+/**
+ * @brief Perform an in-place vector reduce-scatter.
+ *
+ * This is analogous to "MPI_Reduce_scatter".
+ *
+ * @param buf Input and output data.
+ * @param counts Amount of data each rank should receive.
+ * @param op The reduction operation to perform.
+ * @param comm The communicator to reduce/scatter over.
+ * @param algo Request a particular vector reduce-scatter algorithm.
+ */
+template <typename Backend, typename T>
+void Reduce_scatterv(
+  T* buf, std::vector<size_t> counts,
+  ReductionOperator op, typename Backend::comm_type& comm,
+  typename Backend::reduce_scatterv_algo_type algo =
+  Backend::reduce_scatterv_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>(
+    "reduce_scatterv", comm, buf, counts);
+  Backend::template Reduce_scatterv<T>(buf, counts,
+                                       op, comm, algo);
+}
+
+/**
+ * Non-blocking vector reduce-scatter.
+ */
+template <typename Backend, typename T>
+void NonblockingReduce_scatterv(
+  const T* sendbuf, T* recvbuf, std::vector<size_t> counts,
+  ReductionOperator op, typename Backend::comm_type& comm,
+  typename Backend::req_type& req,
+  typename Backend::reduce_scatterv_algo_type algo =
+  Backend::reduce_scatterv_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>(
+    "nonblocking-reduce_scatterv", comm, sendbuf, recvbuf, counts);
+  Backend::template NonblockingReduce_scatterv<T>(
+    sendbuf, recvbuf, counts, op, comm, req, algo);
+}
+
+/**
+ * In-place non-blocking vector reduce-scatter.
+ */
+template <typename Backend, typename T>
+void NonblockingReduce_scatterv(
+  T* buf, std::vector<size_t> counts,
+  ReductionOperator op, typename Backend::comm_type& comm,
+  typename Backend::req_type& req,
+  typename Backend::reduce_scatterv_algo_type algo =
+  Backend::reduce_scatterv_algo_type::automatic) {
+  internal::trace::record_op<Backend, T>(
+    "nonblocking-reduce_scatterv", comm, buf, counts);
+  Backend::template NonblockingReduce_scatterv<T>(
+    buf, counts, op, comm, req, algo);
+}
+
+/**
  * Perform an allgather.
  * @param sendbuf Input data.
  * @param recvbuf Output data; should already be allocated.
