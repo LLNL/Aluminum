@@ -998,7 +998,7 @@ class NCCLBackend {
     // TODO: Optimize this.
     T* tmp_sendbuf = const_cast<T*>(sendbuf);
     if (sendbuf == recvbuf) {
-      AL_CHECK_CUDA(cudaMalloc(&tmp_sendbuf, count*sizeof(T)*comm.size()));
+      tmp_sendbuf = internal::get_gpu_memory<T>(count*comm.size(), stream);
       AL_CHECK_CUDA(cudaMemcpyAsync(tmp_sendbuf, sendbuf,
                                     count*sizeof(T)*comm.size(),
                                     cudaMemcpyDeviceToDevice, stream));
@@ -1014,7 +1014,8 @@ class NCCLBackend {
                                comm.m_nccl_comm, stream));
       });
     if (tmp_sendbuf != sendbuf) {
-      AL_CHECK_CUDA(cudaFree(tmp_sendbuf));
+      internal::release_gpu_memory(tmp_sendbuf);
+      //AL_CHECK_CUDA(cudaFree(tmp_sendbuf));
     }
   }
 
@@ -1035,7 +1036,7 @@ class NCCLBackend {
       size_t sendbuf_len = std::accumulate(send_counts.begin(),
                                            send_counts.end(), 0);
       std::vector<size_t> contig_displs = excl_prefix_sum(send_counts);
-      AL_CHECK_CUDA(cudaMalloc(&tmp_sendbuf, sendbuf_len*sizeof(T)));
+      tmp_sendbuf = internal::get_gpu_memory<T>(sendbuf_len, stream);
       // TODO: Optimize for the case where everything is contiguous.
       for (size_t i = 0; i < send_counts.size(); ++i) {
         AL_CHECK_CUDA(cudaMemcpyAsync((void*) (tmp_sendbuf + contig_displs[i]),
@@ -1061,7 +1062,7 @@ class NCCLBackend {
         }
       });
     if (tmp_sendbuf != sendbuf) {
-      AL_CHECK_CUDA(cudaFree(tmp_sendbuf));
+      internal::release_gpu_memory(tmp_sendbuf);
     }
   }
 
@@ -1098,12 +1099,12 @@ class NCCLBackend {
     if (sendbuf == internal::IN_PLACE<T>()) {
       sendbuf = recvbuf;
     } else {
-      AL_CHECK_CUDA(cudaMalloc(&tmp_redbuf, count*sizeof(T)));
+      tmp_redbuf = internal::get_gpu_memory<T>(count, stream);
     }
     do_reduce(sendbuf, tmp_redbuf, count, op, 0, comm, stream);
     do_scatterv(tmp_redbuf, recvbuf, counts, displs, 0, comm, stream);
     if (tmp_redbuf != recvbuf) {
-      AL_CHECK_CUDA(cudaFree(tmp_redbuf));
+      internal::release_gpu_memory(tmp_redbuf);
     }
   }
 

@@ -189,6 +189,7 @@ if (ALUMINUM_ENABLE_CUDA)
   if (CUDA_FOUND)
     enable_language(CUDA)
     set(AL_HAS_CUDA TRUE)
+
     if (ALUMINUM_ENABLE_MPI_CUDA)
       set(AL_HAS_CUDA TRUE)
       set(AL_HAS_MPI_CUDA TRUE)
@@ -225,6 +226,10 @@ if (ALUMINUM_ENABLE_CUDA)
       find_package(NVTX REQUIRED)
       set(AL_HAS_NVPROF ON)
     endif ()
+
+    find_package(CUB REQUIRED)
+    set_property(TARGET cuda::cuda APPEND
+        PROPERTY INTERFACE_LINK_LIBRARIES cuda::CUB)
   else ()
     message(WARNING "CUDA support requested but not found. Disabling.")
     set(ALUMINUM_ENABLE_CUDA OFF)
