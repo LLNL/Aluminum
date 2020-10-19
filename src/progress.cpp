@@ -27,27 +27,130 @@
 
 #include <hwloc.h>
 #include <cstdlib>
+#include <vector>
 #include "Al.hpp"
 #include "progress.hpp"
 #include "trace.hpp"
-
-// For ancient versions of hwloc.
-#if HWLOC_API_VERSION < 0x00010b00
-#define HWLOC_OBJ_NUMANODE HWLOC_OBJ_NODE
-// Ported from more recent hwloc versions.
-hwloc_obj_t hwloc_get_numanode_obj_by_os_index(hwloc_topology_t topology, unsigned os_index) {
-  hwloc_obj_t obj = NULL;
-  while ((obj = hwloc_get_next_obj_by_type(topology, HWLOC_OBJ_NUMANODE, obj)) != NULL) {
-    if (obj->os_index == os_index) {
-      return obj;
-    }
-  }
-  return NULL;
-}
+#ifdef AL_HAS_CUDA
+#include <hwloc/cudart.h>
 #endif
 
 namespace Al {
 namespace internal {
+
+namespace {
+
+// Implement these manually because we often don't have a new enough hwloc
+// version.
+
+// Equivalent of hwloc_bitmap_nr_ulongs.
+int get_bitmap_len(hwloc_const_bitmap_t bitmap) {
+  int last = hwloc_bitmap_last(bitmap);
+  if (last == -1 && !hwloc_bitmap_iszero(bitmap)) {
+    // hwloc internally handles this better, but this should disambiguate
+    // between infinite bitmaps (an error) and empty bitmaps.
+    throw_al_exception("Tried to exchange infinite bitmap");
+  }
+  constexpr int bits_per_ulong = sizeof(unsigned long) * 8;
+  return (last + bits_per_ulong - 1) / bits_per_ulong;
+}
+
+// Equivalent of hwloc_bitmap_to_ulongs.
+void bitmap_to_ulongs(hwloc_const_bitmap_t bitmap, unsigned nr,
+                            unsigned long* masks) {
+  for (unsigned i = 0; i < nr; ++i) {
+    masks[i] = hwloc_bitmap_to_ith_ulong(bitmap, i);
+  }
+}
+
+// Equivalent of hwloc_bitmap_from_ulongs.
+void bitmap_from_ulongs(hwloc_bitmap_t bitmap, unsigned nr,
+                        const unsigned long* masks) {
+  for (unsigned i = 0; i < nr; ++i) {
+    hwloc_bitmap_set_ith_ulong(bitmap, i, masks[i]);
+  }
+}
+
+// Exchange hwloc bitmaps among processes in the local communicator.
+// Returns one bitmap for each processor, in their local rank order.
+// Bitmaps must be freed by the caller.
+std::vector<hwloc_bitmap_t> local_exchange_hwloc_bitmaps(
+  mpi::MPICommunicator* comm, hwloc_const_bitmap_t bitmap) {
+  // Extract the bitmap into longs for exchanging.
+  int len = get_bitmap_len(bitmap);
+  if (len == -1) {
+    throw_al_exception("Tried to exchange infinite bitmap");
+  }
+  std::vector<unsigned long> ul_bitmap = std::vector<unsigned long>(len);
+  bitmap_to_ulongs(bitmap, len, ul_bitmap.data());
+
+  // Exchange bitmap sizes (in case they are different lengths).
+  MPI_Comm local_comm = comm->get_local_comm();
+  std::vector<int> bitmap_lens = std::vector<int>(comm->local_size());
+  MPI_Allgather(&len, 1, MPI_INT,
+                bitmap_lens.data(), 1, MPI_INT,
+                local_comm);
+
+  // Collect all the bitmaps.
+  size_t total_len = std::accumulate(bitmap_lens.begin(),
+                                     bitmap_lens.end(), 0);
+  std::vector<unsigned long> gathered_bitmaps = std::vector<unsigned long>(total_len);
+  // Compute displacements (TODO: Should generalize excl_prefix_sum).
+  std::vector<int> displs = std::vector<int>(bitmap_lens.size(), 0);
+  for (size_t i = 1; i < bitmap_lens.size(); ++i) {
+    displs[i] = bitmap_lens[i-1] + displs[i-1];
+  }
+  MPI_Allgatherv(ul_bitmap.data(), len, MPI_UNSIGNED_LONG,
+                 gathered_bitmaps.data(), bitmap_lens.data(), displs.data(),
+                 MPI_UNSIGNED_LONG, local_comm);
+
+  // Extract back to real bitmaps.
+  std::vector<hwloc_bitmap_t> bitmaps = std::vector<hwloc_bitmap_t>(comm->local_size());
+  for (int i = 0; i < comm->local_size(); ++i) {
+    bitmaps[i] = hwloc_bitmap_alloc();
+    bitmap_from_ulongs(bitmaps[i], bitmap_lens[i],
+                       gathered_bitmaps.data() + displs[i]);
+  }
+  return bitmaps;
+}
+
+// Return a vector marking which indices have bitmaps that are the same as the
+// one for the local rank.
+// This will include the current local rank.
+std::vector<bool> get_same_indices(
+  const std::vector<hwloc_bitmap_t>& bitmaps,
+  mpi::MPICommunicator* comm) {
+  std::vector<bool> marks = std::vector<bool>(bitmaps.size());
+  size_t local_rank = static_cast<size_t>(comm->local_rank());
+  for (size_t i = 0; i < bitmaps.size(); ++i) {
+    if (i == local_rank ||
+        hwloc_bitmap_isequal(bitmaps[local_rank], bitmaps[i])) {
+      marks[i] = true;
+    } else {
+      marks[i] = false;
+    }
+  }
+  return marks;
+}
+
+// Return the offset to be used for assinging the local rank to a core.
+// This assumes that if bitmaps are different, there is no overlap.
+// If two ranks have the same bitmap, their offsets are ordered by rank.
+int get_hwloc_offset(
+  const std::vector<hwloc_bitmap_t>& bitmaps,
+  mpi::MPICommunicator* comm) {
+  std::vector<bool> marks = get_same_indices(bitmaps, comm);
+  int offset = 0;
+  for (int i = 0; i < comm->local_rank(); ++i) {
+    if (marks[i]) {
+      ++offset;
+    }
+  }
+  return offset;
+}
+
+}  // anonymous namespace
+
 
 AlState::~AlState() {
   profiling::prof_end(prof_range);
@@ -174,67 +277,95 @@ void ProgressEngine::bind() {
   hwloc_topology_t topo;
   hwloc_topology_init(&topo);
   hwloc_topology_load(topo);
-  // Determine how many NUMA nodes there are.
-  int num_numa_nodes = hwloc_get_nbobjs_by_type(topo, HWLOC_OBJ_NUMANODE);
-  if (num_numa_nodes == -1) {
-    throw_al_exception("Cannot determine number of NUMA nodes.");
-  }
-  // Determine the NUMA node we're currently on.
+  // cpuset will be filled out with the set of CPUs we might want to
+  // bind this rank to.
   hwloc_cpuset_t cpuset = hwloc_bitmap_alloc();
-  hwloc_get_cpubind(topo, cpuset, 0);
-  hwloc_nodeset_t nodeset = hwloc_bitmap_alloc();
-  hwloc_cpuset_to_nodeset(topo, cpuset, nodeset);
-  hwloc_bitmap_singlify(nodeset);
-  hwloc_obj_t numa_node = hwloc_get_numanode_obj_by_os_index(
-    topo, hwloc_bitmap_first(nodeset));
-  if (numa_node == NULL) {
-    throw_al_exception("Could not get NUMA node.");
+#ifdef AL_HAS_CUDA
+  {
+    // If we have CUDA support, always assume we're using GPUs.
+    // This also assumes the CUDA device has already been set.
+    // Get the locality domain for the current GPU.
+    int device;
+    AL_CHECK_CUDA(cudaGetDevice(&device));
+    hwloc_cudart_get_device_cpuset(topo, device, cpuset);
   }
-  int core_to_bind = -1;
-  // Check if the core has been manually set.
-  char* env = std::getenv("AL_PROGRESS_CORE");
-  if (env) {
-    // Note: This still binds within the current NUMA node.
-    core_to_bind = std::atoi(env);
-  } else {
-    // Determine how many cores are in this NUMA node.
-    int num_cores = hwloc_get_nbobjs_inside_cpuset_by_type(
-      topo, numa_node->cpuset, HWLOC_OBJ_CORE);
-    if (num_cores <= 0) {
-      throw_al_exception("Could not determine number of cores.");
-    }
-    // Determine which core on this NUMA node to map us to.
-    // Support specifying this in the environment too.
-    int ranks_per_numa_node = -1;
-    env = std::getenv("AL_PROGRESS_RANKS_PER_NUMA_NODE");
-    if (env) {
-      ranks_per_numa_node = std::atoi(env);
-    } else {
-      // Note: This doesn't handle the case where things aren't evenly divisible.
-      ranks_per_numa_node = std::max(
-        1, world_comm->local_size() / num_numa_nodes);
-    }
-    int numa_rank = world_comm->local_rank() % ranks_per_numa_node;
-    if (numa_rank > num_cores) {
-      throw_al_exception("Not enough cores to bind to.");
-    }
-    // Assume the NUMA node is partitioned among the ranks on it, and bind to
-    // the last core in our chunk.
-    core_to_bind = (numa_rank + 1)*(num_cores / ranks_per_numa_node) - 1;
+#else
+  {
+    // Use the NUMA node we're currently on.
+    hwloc_get_cpubind(topo, cpuset, 0);
+    hwloc_nodeset_t nodeset = hwloc_bitmap_alloc();
+    hwloc_cpuset_to_nodeset(topo, cpuset, nodeset);
+    hwloc_bitmap_singlify(nodeset);
+    hwloc_cpuset_from_nodeset(topo, cpuset, nodeset);
+    hwloc_bitmap_free(nodeset);
   }
+#endif
+  if (hwloc_bitmap_iszero(cpuset)) {
+    std::cerr << world_comm->rank()
+              << ": Could not get starting cpuset; not binding progress thread"
+              << std::endl;
+    hwloc_bitmap_free(cpuset);
+    hwloc_topology_destroy(topo);
+    return;
+  }
+  // Now identify how we want to share the CPU among local ranks and compute
+  // appropriate offsets.
+  std::vector<hwloc_bitmap_t> local_cpusets = local_exchange_hwloc_bitmaps(
+    world_comm, cpuset);
+  int offset = get_hwloc_offset(local_cpusets, world_comm);
+  // Free local_cpusets.
+  for (auto& local_cpuset : local_cpusets) {
+    hwloc_bitmap_free(local_cpuset);
+  }
+
+  // Figure out how many cores we have.
+  int num_cores = hwloc_get_nbobjs_inside_cpuset_by_type(
+    topo, cpuset, HWLOC_OBJ_CORE);
+  if (num_cores <= 0) {
+    std::cerr << world_comm->rank()
+              << ": Could not get cores for cpuset; not binding progress thread"
+              << std::endl;
+    hwloc_bitmap_free(cpuset);
+    hwloc_topology_destroy(topo);
+    return;
+  }
+  if (offset >= num_cores) {
+    std::cerr << world_comm->rank()
+              << ": computed cores offset of "
+              << offset
+              << " but have only "
+              << num_cores
+              << " available; not binding progress thread"
+              << std::endl;
+    hwloc_bitmap_free(cpuset);
+    hwloc_topology_destroy(topo);
+    return;
+  }
+
+  // Bind to the core.
+  int core_to_bind = num_cores - offset - 1;
   hwloc_obj_t core = hwloc_get_obj_inside_cpuset_by_type(
-    topo, numa_node->cpuset, HWLOC_OBJ_CORE, core_to_bind);
+    topo, cpuset, HWLOC_OBJ_CORE, core_to_bind);
   if (core == NULL) {
-    throw_al_exception("Could not get core.");
+    std::cerr << world_comm->rank()
+              << ": could not get core "
+              << core_to_bind
+              << "; not binding progress thread"
+              << std::endl;
+    hwloc_bitmap_free(cpuset);
+    hwloc_topology_destroy(topo);
+    return;
   }
   hwloc_cpuset_t coreset = hwloc_bitmap_dup(core->cpuset);
   hwloc_bitmap_singlify(coreset);
   if (hwloc_set_cpubind(topo, coreset, HWLOC_CPUBIND_THREAD) == -1) {
-    throw_al_exception("Cannot bind progress engine");
+    std::cerr << world_comm->rank()
+              << ": failed to bind progress thread"
+              << std::endl;
   }
-  hwloc_bitmap_free(cpuset);
-  hwloc_bitmap_free(nodeset);
+
   hwloc_bitmap_free(coreset);
+  hwloc_bitmap_free(cpuset);
   hwloc_topology_destroy(topo);
 }
 

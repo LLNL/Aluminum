@@ -47,6 +47,11 @@ namespace Al {
 // Forward declaration.
 class Communicator;
 
+}  // namespace Al
+
+#include "mpi/communicator.hpp"
+
+namespace Al {
 namespace internal {
 // Forward declaration.
 namespace profiling {
@@ -366,7 +371,7 @@ class ProgressEngine {
    */
   std::unordered_map<AlState*, size_t> blocking_reqs;
   /** World communicator. */
-  Communicator* world_comm;
+  mpi::MPICommunicator* world_comm;
 #ifdef AL_HAS_CUDA
   /** Used to pass the original CUDA device to the progress engine thread. */
   std::atomic<int> cur_device;
