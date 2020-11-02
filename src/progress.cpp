@@ -31,7 +31,9 @@
 #include "Al.hpp"
 #include "progress.hpp"
 #include "trace.hpp"
-#ifdef AL_HAS_CUDA
+#if defined AL_HAS_ROCM
+#include <hwloc/rsmi.h>
+#elif defined AL_HAS_CUDA
 #include <hwloc/cudart.h>
 #endif
 
@@ -280,7 +282,14 @@ void ProgressEngine::bind() {
   // cpuset will be filled out with the set of CPUs we might want to
   // bind this rank to.
   hwloc_cpuset_t cpuset = hwloc_bitmap_alloc();
-#ifdef AL_HAS_CUDA
+#ifdef AL_HAS_ROCM
+  {
+    int device;
+    // The macro will be hipified.
+    AL_CHECK_CUDA(hipGetDevice(&device));
+    hwloc_rsmi_get_device_cpuset(topo, device, cpuset);
+  }
+#elif defined AL_HAS_CUDA
   {
     // If we have CUDA support, always assume we're using GPUs.
     // This also assumes the CUDA device has already been set.
