@@ -35,6 +35,7 @@ namespace cuda {
 __global__ void spin_wait_kernel(int32_t wait_value, volatile int32_t* wait_mem) {
   for (;;)
   {
+    __threadfence_system();
     int32_t value = *wait_mem;
     if (value == wait_value) break;
   }
