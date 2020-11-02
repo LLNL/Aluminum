@@ -31,7 +31,10 @@
 #include <vector>
 #include <unordered_map>
 #include <utility>
-#ifdef AL_HAS_CUDA
+#if defined AL_HAS_ROCM
+#include "cuda.hpp"
+#include <hipcub/hipcub.hpp>
+#elif defined AL_HAS_CUDA
 #include "cuda.hpp"
 #include <cub/util_allocator.cuh>
 #endif
