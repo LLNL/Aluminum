@@ -31,8 +31,12 @@
 #include <vector>
 #include <unordered_map>
 #include <utility>
-#ifdef AL_HAS_CUDA
+#if defined AL_HAS_ROCM
 #include "cuda.hpp"
+#include <hipcub/hipcub.hpp>
+#elif defined AL_HAS_CUDA
+#include "cuda.hpp"
+#include <cub/util_allocator.cuh>
 #endif
 
 namespace Al {
@@ -177,6 +181,32 @@ void release_pinned_memory(T* mem) {
       return;
     }
   }
+}
+
+/** Get the CUB memory pool. */
+inline cub::CachingDeviceAllocator& get_gpu_mempool() {
+  static std::unique_ptr<cub::CachingDeviceAllocator> cub_pool;
+  if (!cub_pool) {
+    cub_pool.reset(new cub::CachingDeviceAllocator(2U));
+  }
+  return *cub_pool;
+}
+
+/** Get GPU memory of type T. */
+template <typename T>
+T* get_gpu_memory(size_t count, cudaStream_t stream = 0) {
+  auto& pool = get_gpu_mempool();
+  T* mem = nullptr;
+  AL_CHECK_CUDA(pool.DeviceAllocate(reinterpret_cast<void**>(&mem),
+                                    sizeof(T)*count, stream));
+  return mem;
+}
+
+/** Release memory that you got with get_gpu_memory. */
+template <typename T>
+void release_gpu_memory(T* mem) {
+  auto& pool = get_gpu_mempool();
+  AL_CHECK_CUDA(pool.DeviceFree(mem));
 }
 
 #endif  // AL_HAS_CUDA

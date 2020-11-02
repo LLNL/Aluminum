@@ -189,6 +189,7 @@ if (ALUMINUM_ENABLE_CUDA)
   if (CUDA_FOUND)
     enable_language(CUDA)
     set(AL_HAS_CUDA TRUE)
+
     if (ALUMINUM_ENABLE_MPI_CUDA)
       set(AL_HAS_CUDA TRUE)
       set(AL_HAS_MPI_CUDA TRUE)
@@ -225,6 +226,10 @@ if (ALUMINUM_ENABLE_CUDA)
       find_package(NVTX REQUIRED)
       set(AL_HAS_NVPROF ON)
     endif ()
+
+    find_package(CUB REQUIRED)
+    set_property(TARGET cuda::cuda APPEND
+        PROPERTY INTERFACE_LINK_LIBRARIES cuda::CUB)
   else ()
     message(WARNING "CUDA support requested but not found. Disabling.")
     set(ALUMINUM_ENABLE_CUDA OFF)
@@ -251,7 +256,7 @@ if (ALUMINUM_ENABLE_ROCM)
   include(HipBuildSystem)
 
   # Provides hip_add_executable
-  set(CMAKE_MODULE_PATH "/opt/rocm-3.6.0/hip/cmake" ${CMAKE_MODULE_PATH})
+  set(CMAKE_MODULE_PATH "/opt/rocm-3.8.0/hip/cmake" ${CMAKE_MODULE_PATH})
 
   # hip-runtime library
   find_package(HIP REQUIRED)
@@ -281,6 +286,13 @@ if (ALUMINUM_ENABLE_ROCM)
     message(STATUS "Found RCCL: ${rccl_DIR}")
     set(AL_HAS_NCCL TRUE)
   endif ()
+
+  # Find CUB
+  set(CMAKE_PREFIX_PATH "/opt/rocm/hip" ${CMAKE_PREFIX_PATH})
+  set(HIP_FOUND FALSE)
+  find_package(HIP CONFIG REQUIRED)
+  find_package(rocPRIM REQUIRED)
+  find_package(hipCUB REQUIRED)
 
   # Just in case any of the previous commands turned this on.
   set(CMAKE_CXX_EXTENSIONS FALSE)
