@@ -294,6 +294,14 @@ if (ALUMINUM_ENABLE_ROCM)
   find_package(rocPRIM REQUIRED)
   find_package(hipCUB REQUIRED)
 
+  # (trb 11/02/2020): This is not ideal; when things stabilize, I'll
+  # clean this up. Ideally we'll have a CMake config file for this.
+  find_path(ROCM_SMI_INCLUDE_DIR rocm_smi/rocm_smi.h REQUIRED
+    HINTS /opt/rocm-3.8.0/rocm_smi/include)
+
+  find_library(ROCM_SMI_LIBRARY rocm_smi64 REQUIRED
+    HINTS /opt/rocm-3.8.0/rocm_smi/lib)
+
   # Just in case any of the previous commands turned this on.
   set(CMAKE_CXX_EXTENSIONS FALSE)
 

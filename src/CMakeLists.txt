@@ -67,6 +67,11 @@ target_link_libraries(Al PUBLIC
   $<TARGET_NAME_IF_EXISTS:roc::rccl>
   $<TARGET_NAME_IF_EXISTS:hip::rocprim_hip>
   $<TARGET_NAME_IF_EXISTS:hip::hipcub>)
+if (AL_HAS_ROCM)
+  target_include_directories(Al PRIVATE
+    $<BUILD_INTERFACE:${ROCM_SMI_INCLUDE_DIR}>)
+  target_link_libraries(Al PUBLIC ${ROCM_SMI_LIBRARY})
+endif (AL_HAS_ROCM)
 
 target_compile_features(Al PUBLIC cxx_std_11)
 
