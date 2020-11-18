@@ -54,7 +54,7 @@ private:
   /** Constructed error message. */
   std::string err;
 };
-#define throw_al_exception(s) throw al_exception(s, __FILE__, __LINE__)
+#define throw_al_exception(s) throw Al::al_exception(s, __FILE__, __LINE__)
 
 /** Predefined reduction operations. */
 enum class ReductionOperator {
