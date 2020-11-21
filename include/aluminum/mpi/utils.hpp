@@ -178,6 +178,18 @@ template <>
 inline void bxor_reduction<double>(const double*, double*, size_t) {
   throw_al_exception("BXOR not supported for double");
 }
+template <>
+inline void bor_reduction<long double>(const long double*, long double*, size_t) {
+  throw_al_exception("BOR not supported for long double");
+}
+template <>
+inline void band_reduction<long double>(const long double*, long double*, size_t) {
+  throw_al_exception("BAND not supported for long double");
+}
+template <>
+inline void bxor_reduction<long double>(const long double*, long double*, size_t) {
+  throw_al_exception("BXOR not supported for long double");
+}
 
 /** Return the associated reduction function for an operator. */
 template <typename T>
