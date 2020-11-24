@@ -1,15 +1,15 @@
-set_source_path(TEST_BASE_HDRS test_utils.hpp)
+set_source_path(TEST_BASE_HDRS test_utils.hpp op_dispatcher.hpp op_runner_impl.hpp)
 if (AL_HAS_CUDA)
-  set_source_path(TEST_CUDA_HDRS test_utils_cuda.hpp)
+  set_source_path(TEST_CUDA_HDRS cuda_vector.hpp)
 endif ()
 if (AL_HAS_MPI_CUDA)
-  set_source_path(TEST_MPI_CUDA_HDRS test_utils_mpi_cuda.hpp)
+  #set_source_path(TEST_MPI_CUDA_HDRS test_utils_mpi_cuda.hpp)
 endif ()
 if (AL_HAS_HOST_TRANSFER)
   set_source_path(TEST_HOST_TRANSFER_HDRS test_utils_ht.hpp)
 endif ()
 if (AL_HAS_NCCL)
-  set_source_path(TEST_NCCL_HDRS test_utils_nccl_cuda.hpp)
+  set_source_path(TEST_NCCL_HDRS test_utils_nccl.hpp)
 endif ()
 
 set(TEST_HDRS
@@ -38,24 +38,13 @@ else ()
 endif ()
 
 set_source_path(TEST_SRCS
-  test_allreduce.cpp
-  test_reduce.cpp
-  test_reduce_scatter.cpp
-  test_reduce_scatterv.cpp
-  test_allgather.cpp
-  test_allgatherv.cpp
-  test_alltoall.cpp
-  test_alltoallv.cpp
-  test_bcast.cpp
-  test_gather.cpp
-  test_gatherv.cpp
-  test_scatter.cpp
-  test_scatterv.cpp
-  test_pt2pt.cpp
-  test_exchange.cpp
-  test_transfer_to_one.cpp
-  test_transfer_from_one.cpp
-  test_multi_nballreduces.cpp)
+  test_ops.cpp
+  #test_pt2pt.cpp
+  #test_exchange.cpp
+  #test_transfer_to_one.cpp
+  #test_transfer_from_one.cpp
+  #test_multi_nballreduces.cpp
+)
 
 if (AL_HAS_ROCM)
   hipify_source_files(AL_TEST_SOURCES ${TEST_SRCS})
@@ -67,6 +56,8 @@ foreach(src ${AL_TEST_SOURCES})
   string(REPLACE ".cpp" ".exe" _tmp_test_exe_name "${src}")
   get_filename_component(_test_exe_name "${_tmp_test_exe_name}" NAME)
   add_executable(${_test_exe_name} ${src})
+  target_include_directories(
+    ${_test_exe_name} SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/third_party/cxxopts/include)
   target_link_libraries(${_test_exe_name} PRIVATE Al aluminum_test_headers)
   if (AL_HAS_CUDA AND NOT AL_HAS_ROCM)
     target_link_libraries(${_test_exe_name} PUBLIC cuda)
@@ -81,12 +72,12 @@ if (AL_HAS_CUDA AND NOT AL_HAS_ROCM)
   target_link_libraries(test_stream_mem_ops.exe PUBLIC cuda)
 endif ()
 
-if (AL_HAS_MPI_CUDA_RMA AND NOT AL_HAS_ROCM)
-  add_executable(test_rma_ring.exe test_rma_ring.cpp ${TEST_HEADERS})
-  target_link_libraries(test_rma_ring.exe PRIVATE Al)
-  target_link_libraries(test_rma_ring.exe PUBLIC cuda)
-  add_executable(test_rma_halo_exchange.exe
-    test_rma_halo_exchange.cpp ${TEST_HEADERS})
-  target_link_libraries(test_rma_halo_exchange.exe PRIVATE Al)
-  target_link_libraries(test_rma_halo_exchange.exe PUBLIC cuda)
-endif ()
+#if (AL_HAS_MPI_CUDA_RMA AND NOT AL_HAS_ROCM)
+#  add_executable(test_rma_ring.exe test_rma_ring.cpp ${TEST_HEADERS})
+#  target_link_libraries(test_rma_ring.exe PRIVATE Al)
+#  target_link_libraries(test_rma_ring.exe PUBLIC cuda)
+#  add_executable(test_rma_halo_exchange.exe
+#    test_rma_halo_exchange.cpp ${TEST_HEADERS})
+#  target_link_libraries(test_rma_halo_exchange.exe PRIVATE Al)
+#  target_link_libraries(test_rma_halo_exchange.exe PUBLIC cuda)
+#endif ()

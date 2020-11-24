@@ -349,7 +349,7 @@ add_subdirectory(test)
 
 # The benchmarks depend on some test utility headers, so it must come
 # after the test/ directory.
-add_subdirectory(benchmark)
+#add_subdirectory(benchmark)
 
 #
 # Install target

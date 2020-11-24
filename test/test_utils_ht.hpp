@@ -27,73 +27,74 @@
 
 #pragma once
 
-#include <memory>
-#include <cuda_runtime.h>
-#include "test_utils_cuda.hpp"
+#include "Al.hpp"
 
-template <>
-struct VectorType<Al::HostTransferBackend> {
-  using type = CUDAVector<float>;
+#include "test_utils.hpp"
+#include "test_utils_mpi.hpp"
+#include "cuda_vector.hpp"
+
+
+template <typename T>
+struct VectorType<T, Al::HostTransferBackend> {
+  using type = CUDAVector<T>;
+
+  static type gen_data(size_t count) {
+    auto&& host_data = VectorType<T, Al::MPIBackend>::gen_data(count);
+    CUDAVector<T> data(host_data);
+    return data;
+  }
+
+  static std::vector<T> copy_to_host(const type& v) {
+    return v.copyout();
+  }
 };
 
+// Specialize to create a CUDA stream with the communicator.
 template <>
-typename VectorType<Al::HostTransferBackend>::type
-gen_data<Al::HostTransferBackend>(size_t count) {
-  auto &&host_data = gen_data<Al::MPIBackend>(count);
-  CUDAVector<float> data(host_data);
-  return data;
-}
-
-template <>
-inline void start_timer<Al::HostTransferBackend>(typename Al::HostTransferBackend::comm_type& comm) {
-  cudaEvent_t start = get_timer_events().first;
-  AL_FORCE_CHECK_CUDA_NOSYNC(cudaEventRecord(start, comm.get_stream()));
-}
-
-template <>
-inline double finish_timer<Al::HostTransferBackend>(typename Al::HostTransferBackend::comm_type& comm) {
-  std::pair<cudaEvent_t, cudaEvent_t> events = get_timer_events();
-  AL_FORCE_CHECK_CUDA_NOSYNC(cudaEventRecord(events.second, comm.get_stream()));
-  AL_FORCE_CHECK_CUDA_NOSYNC(cudaEventSynchronize(events.second));
-  float elapsed;
-  AL_FORCE_CHECK_CUDA_NOSYNC(cudaEventElapsedTime(&elapsed, events.first, events.second));
-  return elapsed/1000.0;  // ms -> s
-}
-
-template <>
-std::vector<typename Al::HostTransferBackend::allreduce_algo_type>
-get_allreduce_algorithms<Al::HostTransferBackend>() {
-  std::vector<typename Al::HostTransferBackend::allreduce_algo_type> algos = {
-    Al::HostTransferBackend::allreduce_algo_type::host_transfer
-  };
-  return algos;
-}
-
-template <>
-std::vector<typename Al::HostTransferBackend::allreduce_algo_type>
-get_nb_allreduce_algorithms<Al::HostTransferBackend>() {
-  std::vector<typename Al::HostTransferBackend::allreduce_algo_type> algos = {
-    Al::HostTransferBackend::allreduce_algo_type::host_transfer
-  };
-  return algos;
-}
-
-template <>
-inline typename Al::HostTransferBackend::req_type
-get_request<Al::HostTransferBackend>() {
-  return Al::HostTransferBackend::null_req;
-}
-
-template <>
-inline typename Al::HostTransferBackend::comm_type get_comm_with_stream<Al::HostTransferBackend>(
-  MPI_Comm c) {
+CommWrapper<Al::HostTransferBackend>::CommWrapper(MPI_Comm mpi_comm) {
   cudaStream_t stream;
   AL_FORCE_CHECK_CUDA_NOSYNC(cudaStreamCreate(&stream));
-  return Al::HostTransferBackend::comm_type(c, stream);
+  comm = Al::HostTransferBackend::comm_type(mpi_comm, stream);
+}
+template <>
+CommWrapper<Al::HostTransferBackend>::~CommWrapper() noexcept(false) {
+  AL_FORCE_CHECK_CUDA_NOSYNC(cudaStreamDestroy(comm.get_stream()));
 }
 
-template <>
-inline void free_comm_with_stream<Al::HostTransferBackend>(
-  typename Al::HostTransferBackend::comm_type& c) {
-  AL_FORCE_CHECK_CUDA_NOSYNC(cudaStreamDestroy(c.get_stream()));
-}
+// Operator support.
+template <> struct IsOpSupported<AlOperation::allgather, Al::HostTransferBackend> : std::true_type {};
+//template <> struct IsOpSupported<AlOperation::allgatherv, Al::HostTransferBackend> : std::true_type {};
+template <> struct IsOpSupported<AlOperation::allreduce, Al::HostTransferBackend> : std::true_type {};
+template <> struct IsOpSupported<AlOperation::alltoall, Al::HostTransferBackend> : std::true_type {};
+//template <> struct IsOpSupported<AlOperation::alltoallv, Al::HostTransferBackend> : std::true_type {};
+template <> struct IsOpSupported<AlOperation::bcast, Al::HostTransferBackend> : std::true_type {};
+template <> struct IsOpSupported<AlOperation::gather, Al::HostTransferBackend> : std::true_type {};
+//template <> struct IsOpSupported<AlOperation::gatherv, Al::HostTransferBackend> : std::true_type {};
+template <> struct IsOpSupported<AlOperation::reduce, Al::HostTransferBackend> : std::true_type {};
+template <> struct IsOpSupported<AlOperation::reduce_scatter, Al::HostTransferBackend> : std::true_type {};
+//template <> struct IsOpSupported<AlOperation::reduce_scatterv, Al::HostTransferBackend> : std::true_type {};
+template <> struct IsOpSupported<AlOperation::scatter, Al::HostTransferBackend> : std::true_type {};
+//template <> struct IsOpSupported<AlOperation::scatterv, Al::HostTransferBackend> : std::true_type {};
+template <> struct IsOpSupported<AlOperation::send, Al::HostTransferBackend> : std::true_type {};
+template <> struct IsOpSupported<AlOperation::recv, Al::HostTransferBackend> : std::true_type {};
+template <> struct IsOpSupported<AlOperation::sendrecv, Al::HostTransferBackend> : std::true_type {};
+
+// Type support.
+template <> struct IsTypeSupported<Al::HostTransferBackend, char> : std::true_type {};
+template <> struct IsTypeSupported<Al::HostTransferBackend, signed char> : std::true_type {};
+template <> struct IsTypeSupported<Al::HostTransferBackend, unsigned char> : std::true_type {};
+template <> struct IsTypeSupported<Al::HostTransferBackend, short> : std::true_type {};
+template <> struct IsTypeSupported<Al::HostTransferBackend, unsigned short> : std::true_type {};
+template <> struct IsTypeSupported<Al::HostTransferBackend, int> : std::true_type {};
+template <> struct IsTypeSupported<Al::HostTransferBackend, unsigned int> : std::true_type {};
+template <> struct IsTypeSupported<Al::HostTransferBackend, long> : std::true_type {};
+template <> struct IsTypeSupported<Al::HostTransferBackend, unsigned long> : std::true_type {};
+template <> struct IsTypeSupported<Al::HostTransferBackend, long long> : std::true_type {};
+template <> struct IsTypeSupported<Al::HostTransferBackend, unsigned long long> : std::true_type {};
+template <> struct IsTypeSupported<Al::HostTransferBackend, float> : std::true_type {};
+template <> struct IsTypeSupported<Al::HostTransferBackend, double> : std::true_type {};
+template <> struct IsTypeSupported<Al::HostTransferBackend, long double> : std::true_type {};
+
+// Reduction operator support (all are supported).
+template <Al::ReductionOperator op>
+struct IsReductionOpSupported<Al::HostTransferBackend, op> : std::true_type {};
