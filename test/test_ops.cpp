@@ -127,13 +127,7 @@ void run_test(cxxopts::ParseResult& parsed_opts) {
   }
   op_options.root = parsed_opts["root"].as<int>();
 
-  size_t min_size = parsed_opts["min-size"].as<size_t>();
-  size_t max_size = parsed_opts["max-size"].as<size_t>();
-  if (parsed_opts.count("size")) {
-    min_size = parsed_opts["size"].as<size_t>();
-    max_size = min_size;
-  }
-  auto sizes = get_sizes(min_size, max_size);
+  auto sizes = get_sizes_from_opts(parsed_opts);
 
   CommWrapper<Backend> comm_wrapper(MPI_COMM_WORLD);
 
@@ -259,55 +253,12 @@ void run_test(cxxopts::ParseResult& parsed_opts) {
   std::abort();
 }
 
-template <typename Backend>
-void dispatch_test_to_backend_and_type(cxxopts::ParseResult& parsed_opts) {
-  const std::unordered_map<std::string, std::function<void()>> dispatch = {
-    {"char", [&]() { run_test<Backend, char>(parsed_opts); } },
-    {"schar", [&]() { run_test<Backend, signed char>(parsed_opts); } },
-    {"uchar", [&]() { run_test<Backend, unsigned char>(parsed_opts); } },
-    {"short", [&]() { run_test<Backend, short>(parsed_opts); } },
-    {"ushort", [&]() { run_test<Backend, unsigned short>(parsed_opts); } },
-    {"int", [&]() { run_test<Backend, int>(parsed_opts); } },
-    {"uint", [&]() { run_test<Backend, unsigned int>(parsed_opts); } },
-    {"long", [&]() { run_test<Backend, long>(parsed_opts); } },
-    {"ulong", [&]() { run_test<Backend, unsigned long>(parsed_opts); } },
-    {"longlong", [&]() { run_test<Backend, long long>(parsed_opts); } },
-    {"ulonglong", [&]() { run_test<Backend, unsigned long long>(parsed_opts); } },
-    {"float", [&]() { run_test<Backend, float>(parsed_opts); } },
-    {"double", [&]() { run_test<Backend, double>(parsed_opts); } },
-    {"longdouble", [&]() { run_test<Backend, long double>(parsed_opts); } },
-#ifdef AL_HAS_NCCL
-    {"half", [&]() { run_test<Backend, __half>(parsed_opts); } },
-#endif
-  };
-  auto datatype = parsed_opts["datatype"].as<std::string>();
-  auto i = dispatch.find(datatype);
-  if (i == dispatch.end()) {
-    std::cerr << "Unknown datatype " << datatype << std::endl;
-    std::abort();
+struct test_dispatcher {
+  template <typename Backend, typename T>
+  void operator()(cxxopts::ParseResult& parsed_opts) {
+    run_test<Backend, T>(parsed_opts);
   }
-  i->second();
-}
-
-void dispatch_test_to_backend(cxxopts::ParseResult& parsed_opts) {
-  const std::unordered_map <std::string, std::function<void()>> dispatch = {
-    {"mpi", [&](){ dispatch_test_to_backend_and_type<Al::MPIBackend>(parsed_opts); } },
-#ifdef AL_HAS_NCCL
-    {"nccl", [&](){ dispatch_test_to_backend_and_type<Al::NCCLBackend>(parsed_opts); } },
-#endif
-#ifdef AL_HAS_HOST_TRANSFER
-    {"ht", [&](){ dispatch_test_to_backend_and_type<Al::HostTransferBackend>(parsed_opts); } },
-#endif
-  };
-  auto backend = parsed_opts["backend"].as<std::string>();
-  auto i = dispatch.find(backend);
-  if (i == dispatch.end()) {
-    std::cerr << "Unsupported backend " << backend << std::endl;
-    std::abort();
-  }
-  i->second();
-}
-
+};
 
 int main(int argc, char** argv) {
   test_init_aluminum(argc, argv);
@@ -330,18 +281,7 @@ int main(int argc, char** argv) {
   auto parsed_opts = options.parse(argc, argv);
 
   if (parsed_opts.count("hang-rank")) {
-    int hang_rank = parsed_opts["hang-rank"].as<int>();
-    int rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    if (hang_rank < 0 || rank == hang_rank) {
-      if (hang_rank < 0 && rank == 0) {
-        std::cout << "Hanging all ranks" << std::endl;
-      } else if (rank == hang_rank) {
-        std::cout << "Hanging rank " << rank << std::endl;
-      }
-      volatile bool hang = true;
-      while (hang) {}
-    }
+    hang_for_debugging(parsed_opts["hang-rank"].as<int>());
   }
 
   // Simple validation.
@@ -354,7 +294,8 @@ int main(int argc, char** argv) {
     std::abort();
   }
 
-  dispatch_test_to_backend(parsed_opts);
+  dispatch_to_backend(parsed_opts, test_dispatcher());
 
   test_fini_aluminum();
+  return 0;
 }

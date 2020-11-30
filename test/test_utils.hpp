@@ -34,6 +34,7 @@
 #include <limits>
 #include <random>
 #include <cstdlib>
+#include <cxxopts.hpp>
 
 
 /** Helper for generating random data. */
@@ -104,6 +105,82 @@ struct CommWrapper {
   typename Backend::comm_type& comm() { return *comm_; }
   const typename Backend::comm_type& comm() const { return *comm_; }
 };
+
+/**
+ * Helper to hang for debugging.
+ *
+ * If non-negative, hangs that rank; if negative, hangs all ranks.
+ */
+void hang_for_debugging(int hang_rank) {
+  int rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  if (hang_rank < 0 || rank == hang_rank) {
+    if (hang_rank < 0 && rank == 0) {
+      std::cout << "Hanging all ranks" << std::endl;
+    } else if (rank == hang_rank) {
+      std::cout << "Hanging rank " << rank << std::endl;
+    }
+    volatile bool hang = true;
+    while (hang) {}
+  }
+}
+
+/** Helper for dispatch_from_args, handles type dispatch. */
+template <typename Backend, typename F>
+void dispatch_to_backend_type_helper(cxxopts::ParseResult& parsed_opts,
+                                     F functor) {
+  const std::unordered_map<std::string, std::function<void()>> dispatch = {
+    {"char", [&]() { functor.template operator()<Backend, char>(parsed_opts); } },
+    {"schar", [&]() { functor.template operator()<Backend, signed char>(parsed_opts); } },
+    {"uchar", [&]() { functor.template operator()<Backend, unsigned char>(parsed_opts); } },
+    {"short", [&]() { functor.template operator()<Backend, short>(parsed_opts); } },
+    {"ushort", [&]() { functor.template operator()<Backend, unsigned short>(parsed_opts); } },
+    {"int", [&]() { functor.template operator()<Backend, int>(parsed_opts); } },
+    {"uint", [&]() { functor.template operator()<Backend, unsigned int>(parsed_opts); } },
+    {"long", [&]() { functor.template operator()<Backend, long>(parsed_opts); } },
+    {"ulong", [&]() { functor.template operator()<Backend, unsigned long>(parsed_opts); } },
+    {"longlong", [&]() { functor.template operator()<Backend, long long>(parsed_opts); } },
+    {"ulonglong", [&]() { functor.template operator()<Backend, unsigned long long>(parsed_opts); } },
+    {"float", [&]() { functor.template operator()<Backend, float>(parsed_opts); } },
+    {"double", [&]() { functor.template operator()<Backend, double>(parsed_opts); } },
+    {"longdouble", [&]() { functor.template operator()<Backend, long double>(parsed_opts); } },
+#ifdef AL_HAS_NCCL
+    {"half", [&]() { functor.template operator()<Backend, __half>(parsed_opts); } },
+#endif
+  };
+  auto datatype = parsed_opts["datatype"].as<std::string>();
+  auto i = dispatch.find(datatype);
+  if (i == dispatch.end()) {
+    std::cerr << "Unknown datatype " << datatype << std::endl;
+    std::abort();
+  }
+  i->second();
+}
+
+/**
+ * Run a functor with a backend and type given in parsed_opts.
+ *
+ * Excepts a "backend" and "datatype" argument.
+ */
+template <typename F>
+void dispatch_to_backend(cxxopts::ParseResult& parsed_opts, F functor) {
+  const std::unordered_map <std::string, std::function<void()>> dispatch = {
+    {"mpi", [&](){ dispatch_to_backend_type_helper<Al::MPIBackend>(parsed_opts, functor); } },
+#ifdef AL_HAS_NCCL
+    {"nccl", [&](){ dispatch_to_backend_type_helper<Al::NCCLBackend>(parsed_opts, functor); } },
+#endif
+#ifdef AL_HAS_HOST_TRANSFER
+    {"ht", [&](){ dispatch_to_backend_type_helper<Al::HostTransferBackend>(parsed_opts, functor); } },
+#endif
+  };
+  auto backend = parsed_opts["backend"].as<std::string>();
+  auto i = dispatch.find(backend);
+  if (i == dispatch.end()) {
+    std::cerr << "Unsupported backend " << backend << std::endl;
+    std::abort();
+  }
+  i->second();
+}
 
 #ifdef AL_HAS_CUDA
 
@@ -242,6 +319,21 @@ std::vector<size_t> get_sizes(size_t start_size, size_t max_size,
     }
   }
   return sizes;
+}
+
+/**
+ * Helper to call get_sizes based on parsed options.
+ *
+ * Expects the options "size", "min-size", and "max-size".
+ */
+std::vector<size_t> get_sizes_from_opts(cxxopts::ParseResult& parsed_opts) {
+  size_t min_size = parsed_opts["min-size"].as<size_t>();
+  size_t max_size = parsed_opts["max-size"].as<size_t>();
+  if (parsed_opts.count("size")) {
+    min_size = parsed_opts["size"].as<size_t>();
+    max_size = min_size;
+  }
+  return get_sizes(min_size, max_size);
 }
 
 /** Return a human-readable string for size. */
