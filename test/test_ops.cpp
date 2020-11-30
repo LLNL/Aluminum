@@ -137,9 +137,33 @@ void run_test(cxxopts::ParseResult& parsed_opts) {
 
   CommWrapper<Backend> comm_wrapper(MPI_COMM_WORLD);
 
-  if (is_pt2pt_op(op) && comm_wrapper.comm.size() == 1) {
-    std::cerr << "Cannot test point-to-point with a single rank" << std::endl;
-    std::abort();
+  bool participates_in_pt2pt = true;
+  if (is_pt2pt_op(op)) {
+    if (comm_wrapper.comm.size() == 1) {
+      std::cerr << "Cannot test point-to-point with a single rank" << std::endl;
+      std::abort();
+    }
+    // If there is an odd number of ranks, the last one sits out.
+    if (!((comm_wrapper.comm.size() % 2 != 0) &&
+          (comm_wrapper.comm.rank() == comm_wrapper.comm.size() - 1))) {
+      // Even ranks send to rank + 1, odd ranks receive from rank - 1.
+      // If this is not sendrecv, we need to adjust the op.
+      if (comm_wrapper.comm.rank() % 2 == 0) {
+        op_options.src = comm_wrapper.comm.rank() + 1;
+        op_options.dst = comm_wrapper.comm.rank() + 1;
+        if (op != AlOperation::sendrecv) {
+          op = AlOperation::send;
+        }
+      } else {
+        op_options.src = comm_wrapper.comm.rank() - 1;
+        op_options.dst = comm_wrapper.comm.rank() - 1;
+        if (op != AlOperation::sendrecv) {
+          op = AlOperation::recv;
+        }
+      }
+    } else {
+      participates_in_pt2pt = false;
+    }
   }
   for (const auto &size : sizes) {
     // Set up counts and displacements for vector operations.
@@ -181,21 +205,16 @@ void run_test(cxxopts::ParseResult& parsed_opts) {
 
     MPI_Barrier(MPI_COMM_WORLD);
 
-    if (is_pt2pt_op(op)) {
-      // Pair up ranks to do send/recv or sendrecvs.
-      // If there is an odd number of ranks, the last one sits out.
-      if (!((comm_wrapper.comm.size() % 2 != 0)
-            && (comm_wrapper.comm.rank() == comm_wrapper.comm.size() - 1))) {
-        // TODO.
-      }
-    } else {
+    if (!is_pt2pt_op(op) || participates_in_pt2pt) {
       op_runner.run(input, output, comm_wrapper.comm);
       if (op_options.nonblocking) {
         Al::Wait<Backend>(op_options.req);
       }
+    }
 
-      MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(MPI_COMM_WORLD);
 
+    if (!is_pt2pt_op(op) || participates_in_pt2pt) {
       op_runner.run_mpi(mpi_input, mpi_output, comm_wrapper.comm);
     }
 
