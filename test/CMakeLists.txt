@@ -39,7 +39,7 @@ endif ()
 
 set_source_path(TEST_SRCS
   test_ops.cpp
-  #test_exchange.cpp
+  test_exchange.cpp
   #test_transfer_to_one.cpp
   #test_transfer_from_one.cpp
   #test_multi_nballreduces.cpp
