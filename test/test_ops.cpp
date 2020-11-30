@@ -139,24 +139,24 @@ void run_test(cxxopts::ParseResult& parsed_opts) {
 
   bool participates_in_pt2pt = true;
   if (is_pt2pt_op(op)) {
-    if (comm_wrapper.comm.size() == 1) {
+    if (comm_wrapper.comm().size() == 1) {
       std::cerr << "Cannot test point-to-point with a single rank" << std::endl;
       std::abort();
     }
     // If there is an odd number of ranks, the last one sits out.
-    if (!((comm_wrapper.comm.size() % 2 != 0) &&
-          (comm_wrapper.comm.rank() == comm_wrapper.comm.size() - 1))) {
+    if (!((comm_wrapper.comm().size() % 2 != 0) &&
+          (comm_wrapper.comm().rank() == comm_wrapper.comm().size() - 1))) {
       // Even ranks send to rank + 1, odd ranks receive from rank - 1.
       // If this is not sendrecv, we need to adjust the op.
-      if (comm_wrapper.comm.rank() % 2 == 0) {
-        op_options.src = comm_wrapper.comm.rank() + 1;
-        op_options.dst = comm_wrapper.comm.rank() + 1;
+      if (comm_wrapper.comm().rank() % 2 == 0) {
+        op_options.src = comm_wrapper.comm().rank() + 1;
+        op_options.dst = comm_wrapper.comm().rank() + 1;
         if (op != AlOperation::sendrecv) {
           op = AlOperation::send;
         }
       } else {
-        op_options.src = comm_wrapper.comm.rank() - 1;
-        op_options.dst = comm_wrapper.comm.rank() - 1;
+        op_options.src = comm_wrapper.comm().rank() - 1;
+        op_options.dst = comm_wrapper.comm().rank() - 1;
         if (op != AlOperation::sendrecv) {
           op = AlOperation::recv;
         }
@@ -169,7 +169,7 @@ void run_test(cxxopts::ParseResult& parsed_opts) {
     // Set up counts and displacements for vector operations.
     // TODO: Generalize to support more complex counts/displacements.
     if (is_vector_op(op)) {
-      op_options.send_counts = std::vector<size_t>(comm_wrapper.comm.size(), size);
+      op_options.send_counts = std::vector<size_t>(comm_wrapper.comm().size(), size);
       op_options.send_displs = Al::excl_prefix_sum(op_options.send_counts);
       op_options.recv_counts = op_options.send_counts;
       op_options.recv_displs = op_options.send_displs;
@@ -177,9 +177,9 @@ void run_test(cxxopts::ParseResult& parsed_opts) {
     OpDispatcher<Backend, T> op_runner(op, op_options);
     // The size is the amount each processor sends to another processor.
     // (Roughly equivalent to the sendcount parameter in MPI.)
-    size_t in_size = op_runner.get_input_size(size, comm_wrapper.comm);
+    size_t in_size = op_runner.get_input_size(size, comm_wrapper.comm());
     // Get output buffer size.
-    size_t out_size = op_runner.get_output_size(size, comm_wrapper.comm);
+    size_t out_size = op_runner.get_output_size(size, comm_wrapper.comm());
     // Ensure sizes are reasonable for MPI.
     if (!Al::internal::mpi::check_count_fits_mpi(size)
         || !Al::internal::mpi::check_count_fits_mpi(out_size)) {
@@ -206,7 +206,7 @@ void run_test(cxxopts::ParseResult& parsed_opts) {
     MPI_Barrier(MPI_COMM_WORLD);
 
     if (!is_pt2pt_op(op) || participates_in_pt2pt) {
-      op_runner.run(input, output, comm_wrapper.comm);
+      op_runner.run(input, output, comm_wrapper.comm());
       if (op_options.nonblocking) {
         Al::Wait<Backend>(op_options.req);
       }
@@ -215,33 +215,33 @@ void run_test(cxxopts::ParseResult& parsed_opts) {
     MPI_Barrier(MPI_COMM_WORLD);
 
     if (!is_pt2pt_op(op) || participates_in_pt2pt) {
-      op_runner.run_mpi(mpi_input, mpi_output, comm_wrapper.comm);
+      op_runner.run_mpi(mpi_input, mpi_output, comm_wrapper.comm());
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
 
     bool err = false;
     if (!op_options.inplace && !check_vector(mpi_input, input)) {
-      std::cerr << comm_wrapper.comm.rank() << ": input does not match for size "
+      std::cerr << comm_wrapper.comm().rank() << ": input does not match for size "
                 << size << std::endl;
       err = true;
     }
     if (!check_vector(mpi_output, output)) {
-      std::cerr << comm_wrapper.comm.rank() << ": output does not match for size "
+      std::cerr << comm_wrapper.comm().rank() << ": output does not match for size "
                 << size << std::endl;
       err = true;
     }
     // Check if any process reported an error.
     MPI_Allreduce(MPI_IN_PLACE, &err, 1, MPI_BYTE, MPI_LOR,
-                  comm_wrapper.comm.get_comm());
+                  comm_wrapper.comm().get_comm());
     if (err) {
       if (parsed_opts.count("dump-on-error")) {
         if (op_options.inplace) {
           dump_data<Backend>(orig_input, output, orig_mpi_input, mpi_output,
-                             comm_wrapper.comm);
+                             comm_wrapper.comm());
         } else {
           dump_data<Backend>(input, output, mpi_input, mpi_output,
-                             comm_wrapper.comm);
+                             comm_wrapper.comm());
         }
       }
       std::abort();

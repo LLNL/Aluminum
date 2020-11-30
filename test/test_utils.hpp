@@ -96,10 +96,13 @@ typename VectorType<T, Backend>::type get_vector(size_t count) {
 /** RAII manager for a communicator. */
 template <typename Backend>
 struct CommWrapper {
-  typename Backend::comm_type comm;
-  CommWrapper(MPI_Comm mpi_comm) : comm(mpi_comm) {}
+  std::unique_ptr<typename Backend::comm_type> comm_;
+  CommWrapper(MPI_Comm mpi_comm) :
+    comm_(std::make_unique<typename Backend::comm_type>(mpi_comm)) {}
   // Not noexcept because CUDA specializations might throw.
   ~CommWrapper() noexcept(false) {};
+  typename Backend::comm_type& comm() { return *comm_; }
+  const typename Backend::comm_type& comm() const { return *comm_; }
 };
 
 #ifdef AL_HAS_CUDA

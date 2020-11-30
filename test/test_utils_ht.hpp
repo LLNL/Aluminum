@@ -54,11 +54,12 @@ template <>
 CommWrapper<Al::HostTransferBackend>::CommWrapper(MPI_Comm mpi_comm) {
   cudaStream_t stream;
   AL_FORCE_CHECK_CUDA_NOSYNC(cudaStreamCreate(&stream));
-  comm = Al::HostTransferBackend::comm_type(mpi_comm, stream);
+  comm_ = std::make_unique<typename Al::HostTransferBackend::comm_type>(
+    mpi_comm, stream);
 }
 template <>
 CommWrapper<Al::HostTransferBackend>::~CommWrapper() noexcept(false) {
-  AL_FORCE_CHECK_CUDA_NOSYNC(cudaStreamDestroy(comm.get_stream()));
+  AL_FORCE_CHECK_CUDA_NOSYNC(cudaStreamDestroy(comm_->get_stream()));
 }
 
 // Operator support.
