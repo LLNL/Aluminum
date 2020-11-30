@@ -104,6 +104,8 @@ struct CommWrapper {
   ~CommWrapper() noexcept(false) {};
   typename Backend::comm_type& comm() { return *comm_; }
   const typename Backend::comm_type& comm() const { return *comm_; }
+  int rank() const { return comm_->rank(); }
+  int size() const { return comm_->size(); }
 };
 
 /**
@@ -362,4 +364,7 @@ std::string human_readable_size(size_t size_) {
 #endif
 #ifdef AL_HAS_HOST_TRANSFER
 #include "test_utils_ht.hpp"
+#endif
+#ifdef AL_HAS_MPI_CUDA
+#include "test_utils_mpi_cuda.hpp"
 #endif

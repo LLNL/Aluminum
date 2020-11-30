@@ -28,9 +28,6 @@
 #include <iostream>
 #include "Al.hpp"
 #include "test_utils.hpp"
-#ifdef AL_HAS_MPI_CUDA
-#include "test_utils_mpi_cuda.hpp"
-#endif
 
 #include <stdlib.h>
 #include <math.h>
@@ -38,7 +35,7 @@
 
 size_t max_size = 1<<30;
 
-template <typename Backend>
+template <typename Backend, typename T>
 void test_rma_ring() {
   typename Backend::comm_type comm;  // Use COMM_WORLD.
 
@@ -60,8 +57,8 @@ void test_rma_ring() {
     if (comm.rank() == 0) {
       std::cout << "Testing size " << human_readable_size(size) << std::endl;
     }
-    auto &&buf = get_vector<Backend>(size);
-    auto &&ref = gen_data<Backend>(size);
+    auto &&buf = get_vector<T, Backend>(size);
+    auto &&ref = VectorType<T, Backend>::gen_data(size);
     float *rhs_buf = nullptr;
     float *lhs_buf = nullptr;
     if (rank % 2) {
@@ -81,7 +78,7 @@ void test_rma_ring() {
     Al::ext::Notify<Backend>(rhs, comm);
     if (rank == 0) {
       Al::ext::Wait<Backend>(lhs, comm);
-      if (!check_vector(ref, buf)) {
+      if (!check_vector(VectorType<T, Backend>::copy_to_host(ref), buf)) {
         std::cout << "Ring transfer from LHS to RHS does not match" <<
             std::endl;
         std::abort();
@@ -98,7 +95,7 @@ void test_rma_ring() {
     Al::ext::Notify<Backend>(lhs, comm);
     if (rank == np - 1) {
       Al::ext::Wait<Backend>(rhs, comm);
-      if (!check_vector(ref, buf)) {
+      if (!check_vector(VectorType<T, Backend>::copy_to_host(ref), buf)) {
         std::cout << "Ring transfer from RHS to LHS does not match" <<
             std::endl;
         std::abort();
@@ -129,7 +126,7 @@ int main(int argc, char** argv) {
     std::cerr << "MPI backend is not supported" << std::endl;
 #ifdef AL_HAS_MPI_CUDA
   } else if (backend == "MPI-CUDA") {
-    test_rma_ring<Al::MPICUDABackend>();
+    test_rma_ring<Al::MPICUDABackend, float>();
 #endif
   } else {
     std::cerr << "usage: " << argv[0] << " [";
