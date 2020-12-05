@@ -53,22 +53,42 @@ void print_vector(std::ostream& os, std::vector<T> v,
   os << ss.str();
 }
 
+template <typename Backend>
+std::vector<int> gather_vector_sizes(int count,
+                                     typename Backend::comm_type& comm) {
+  std::vector<int> gathered_counts;
+  if (comm.rank() == 0) {
+    gathered_counts.resize(comm.size());
+    MPI_Gather(&count, 1, MPI_INT, gathered_counts.data(), 1, MPI_INT, 0,
+               comm.get_comm());
+  } else {
+    MPI_Gather(&count, 1, MPI_INT, nullptr, 0, MPI_INT, 0, comm.get_comm());
+  }
+  return gathered_counts;
+}
+
 template <typename Backend, typename T,
           std::enable_if_t<IsTypeSupportedByMPI<T>::value, bool> = true>
 void do_mpi_gather(const T* input, T* output, size_t count,
+                   std::vector<int> counts,  // Only significant at root.
                    typename Backend::comm_type& comm) {
-  MPI_Gather(input, count, Al::internal::mpi::TypeMap<T>(),
-             output, count, Al::internal::mpi::TypeMap<T>(),
-             0, comm.get_comm());
+  std::vector<int> displs = Al::excl_prefix_sum(counts);
+  MPI_Gatherv(input, count,
+              Al::internal::mpi::TypeMap<T>(),
+              output, counts.data(), displs.data(),
+              Al::internal::mpi::TypeMap<T>(),
+              0, comm.get_comm());
 }
 template <typename Backend, typename T,
           std::enable_if_t<!IsTypeSupportedByMPI<T>::value, bool> = true>
 void do_mpi_gather(const T* input, T* output, size_t count,
+                   std::vector<int> counts,  // Only significant at root.
                    typename Backend::comm_type& comm) {
   const size_t num_bytes = count * sizeof(T);
-  MPI_Gather(input, num_bytes, MPI_BYTE,
-             output, num_bytes, MPI_BYTE,
-             0, comm.get_comm());
+  std::vector<int> displs = Al::excl_prefix_sum(counts);
+  MPI_Gatherv(input, num_bytes, MPI_BYTE,
+              output, counts.data(), displs.data(), MPI_BYTE,
+              0, comm.get_comm());
 }
 
 template <typename Backend, typename T>
@@ -76,16 +96,21 @@ void print_vectors_from_root(std::vector<T>& v,
                              typename Backend::comm_type& comm,
                              std::string prefix = "") {
   if (comm.rank() == 0) {
+    std::vector<int> counts = gather_vector_sizes<Backend>(v.size(), comm);
+    std::vector<int> displs = Al::excl_prefix_sum(counts);
+    displs.push_back(displs.back() + counts.back());
+    std::vector<T> gathered_v(std::accumulate(
+                                counts.begin(), counts.end(), 0));
+    do_mpi_gather<Backend>(v.data(), gathered_v.data(), v.size(), counts, comm);
     std::cout << prefix;
-    std::vector<T> gathered_v(v.size() * comm.size());
-    do_mpi_gather<Backend>(v.data(), gathered_v.data(), v.size(), comm);
     for (int rank = 0; rank < comm.size(); ++rank) {
       std::cout << rank << ": ";
-      print_vector(std::cout, gathered_v, rank*v.size(), (rank+1)*v.size());
+      print_vector(std::cout, gathered_v, displs[rank], displs[rank + 1]);
       std::cout << std::endl;
     }
   } else {
-    do_mpi_gather<Backend, T>(v.data(), nullptr, v.size(), comm);
+    gather_vector_sizes<Backend>(v.size(), comm);
+    do_mpi_gather<Backend, T>(v.data(), nullptr, v.size(), {},  comm);
   }
   MPI_Barrier(comm.get_comm());
 }

@@ -44,8 +44,9 @@ inline double get_time() {
  *
  * This is mostly meant to help with vector collectives.
  */
-inline std::vector<size_t> excl_prefix_sum(const std::vector<size_t>& v) {
-  std::vector<size_t> r = std::vector<size_t>(v.size(), size_t{0});
+template <typename T>
+inline std::vector<T> excl_prefix_sum(const std::vector<T>& v) {
+  std::vector<T> r = std::vector<T>(v.size(), T{0});
   for (size_t i = 1; i < v.size(); ++i) {
     r[i] = v[i-1] + r[i-1];
   }
