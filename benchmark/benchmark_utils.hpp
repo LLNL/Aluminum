@@ -78,6 +78,15 @@ struct SummaryStats {
   double max = std::numeric_limits<double>::quiet_NaN();
 };
 
+inline std::ostream& operator<<(std::ostream& os, const SummaryStats& summary) {
+  os << summary.mean << " "
+     << summary.median << " "
+     << summary.stdev << " "
+     << summary.min << " "
+     << summary.max;
+  return os;
+}
+
 
 /** Collect and output performance results. */
 template <AlOperation Op, typename Backend, typename T>

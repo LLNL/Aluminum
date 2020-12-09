@@ -132,14 +132,9 @@ void run_benchmark(cxxopts::ParseResult& parsed_opts) {
     auto summaries = profile.get_summary_stats(
       parsed_opts["summarize"].as<int>());
     if (comm_wrapper.rank() == 0) {
+      std::cout << "Size Mean Median Stdev Min Max" << std::endl;
       for (const auto& p : summaries) {
-        std::cout << "Size " << p.first << ":"
-                  << " mean: " << p.second.mean
-                  << " median: " << p.second.median
-                  << " stdev: " << p.second.stdev
-                  << " min: " << p.second.min
-                  << " max: " << p.second.max
-                  << std::endl;
+        std::cout << p.first << " " << p.second << std::endl;
       }
     }
   }
