@@ -99,3 +99,6 @@ template <> struct IsTypeSupported<Al::HostTransferBackend, long double> : std::
 // Reduction operator support (all are supported).
 template <Al::ReductionOperator op>
 struct IsReductionOpSupported<Al::HostTransferBackend, op> : std::true_type {};
+
+// Backend name.
+template <> constexpr char AlBackendName<Al::HostTransferBackend>[] = "ht";

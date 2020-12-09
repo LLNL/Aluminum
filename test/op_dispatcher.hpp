@@ -151,6 +151,14 @@ template <> struct IsPt2PtOp<AlOperation::send> : std::true_type {};
 template <> struct IsPt2PtOp<AlOperation::recv> : std::true_type {};
 template <> struct IsPt2PtOp<AlOperation::sendrecv> : std::true_type {};
 
+template <AlOperation Op> struct IsRootedOp : std::false_type {};
+template <> struct IsRootedOp<AlOperation::bcast> : std::true_type {};
+template <> struct IsRootedOp<AlOperation::gather> : std::true_type {};
+template <> struct IsRootedOp<AlOperation::gatherv> : std::true_type {};
+template <> struct IsRootedOp<AlOperation::reduce> : std::true_type {};
+template <> struct IsRootedOp<AlOperation::scatter> : std::true_type {};
+template <> struct IsRootedOp<AlOperation::scatterv> : std::true_type {};
+
 // Traits for MPI type support.
 template <typename T> struct IsTypeSupportedByMPI : std::false_type {};
 template <> struct IsTypeSupportedByMPI<char> : std::true_type {};
@@ -171,6 +179,9 @@ template <> struct IsTypeSupportedByMPI<long double> : std::true_type {};
 // Traits for reduction operator support.
 template <typename Backend, Al::ReductionOperator op>
 struct IsReductionOpSupported : std::false_type {};
+
+// Backend names.
+template <typename Backend> constexpr char AlBackendName[] = "unknown";
 
 
 /** Helper to call a functor with the right op as a template parameter. */

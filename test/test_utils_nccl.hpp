@@ -120,3 +120,6 @@ template <>
 struct IsReductionOpSupported<Al::NCCLBackend, Al::ReductionOperator::min> : std::true_type {};
 template <>
 struct IsReductionOpSupported<Al::NCCLBackend, Al::ReductionOperator::max> : std::true_type {};
+
+// Backend name.
+template <> constexpr char AlBackendName<Al::NCCLBackend>[] = "nccl";

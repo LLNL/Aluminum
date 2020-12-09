@@ -69,3 +69,6 @@ template <> struct IsTypeSupported<Al::MPIBackend, long double> : std::true_type
 // Reduction operator support (all are supported).
 template <Al::ReductionOperator op>
 struct IsReductionOpSupported<Al::MPIBackend, op> : std::true_type {};
+
+// Backend name.
+template <> constexpr char AlBackendName<Al::MPIBackend>[] = "mpi";
