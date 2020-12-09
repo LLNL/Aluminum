@@ -37,47 +37,49 @@ else ()
     aluminum_test_headers INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}")
 endif ()
 
-set_source_path(TEST_SRCS
-  test_ops.cpp
-  test_exchange.cpp
-)
+if (AL_ENABLE_TESTS)
+  set_source_path(TEST_SRCS
+    test_ops.cpp
+    test_exchange.cpp
+    )
 
-if (AL_HAS_ROCM)
-  hipify_source_files(AL_TEST_SOURCES ${TEST_SRCS})
-else ()
-  set(AL_TEST_SOURCES ${TEST_SRCS})
-endif ()
+  if (AL_HAS_ROCM)
+    hipify_source_files(AL_TEST_SOURCES ${TEST_SRCS})
+  else ()
+    set(AL_TEST_SOURCES ${TEST_SRCS})
+  endif ()
 
-foreach(src ${AL_TEST_SOURCES})
-  string(REPLACE ".cpp" ".exe" _tmp_test_exe_name "${src}")
-  get_filename_component(_test_exe_name "${_tmp_test_exe_name}" NAME)
-  add_executable(${_test_exe_name} ${src})
-  target_include_directories(
-    ${_test_exe_name} SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/third_party/cxxopts/include)
-  target_link_libraries(${_test_exe_name} PRIVATE Al aluminum_test_headers)
+  foreach(src ${AL_TEST_SOURCES})
+    string(REPLACE ".cpp" ".exe" _tmp_test_exe_name "${src}")
+    get_filename_component(_test_exe_name "${_tmp_test_exe_name}" NAME)
+    add_executable(${_test_exe_name} ${src})
+    target_include_directories(
+      ${_test_exe_name} SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/third_party/cxxopts/include)
+    target_link_libraries(${_test_exe_name} PRIVATE Al aluminum_test_headers)
+    if (AL_HAS_CUDA AND NOT AL_HAS_ROCM)
+      target_link_libraries(${_test_exe_name} PUBLIC cuda)
+    endif()
+  endforeach()
+
+  # FIXME: Should any of these tests be enabled with ROCm?
   if (AL_HAS_CUDA AND NOT AL_HAS_ROCM)
-    target_link_libraries(${_test_exe_name} PUBLIC cuda)
-  endif()
-endforeach()
+    add_executable(test_stream_mem_ops.exe
+      test_stream_mem_ops.cpp ${TEST_HEADERS})
+    target_link_libraries(test_stream_mem_ops.exe PRIVATE Al)
+    target_link_libraries(test_stream_mem_ops.exe PUBLIC cuda)
+  endif ()
 
-# FIXME: Should any of these tests be enabled with ROCm?
-if (AL_HAS_CUDA AND NOT AL_HAS_ROCM)
-  add_executable(test_stream_mem_ops.exe
-  test_stream_mem_ops.cpp ${TEST_HEADERS})
-  target_link_libraries(test_stream_mem_ops.exe PRIVATE Al)
-  target_link_libraries(test_stream_mem_ops.exe PUBLIC cuda)
-endif ()
-
-if (AL_HAS_MPI_CUDA_RMA AND NOT AL_HAS_ROCM)
-  add_executable(test_rma_ring.exe test_rma_ring.cpp ${TEST_HEADERS})
-  target_include_directories(
-    test_rma_ring.exe SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/third_party/cxxopts/include)
-  target_link_libraries(test_rma_ring.exe PRIVATE Al)
-  target_link_libraries(test_rma_ring.exe PUBLIC cuda)
-  add_executable(test_rma_halo_exchange.exe
-    test_rma_halo_exchange.cpp ${TEST_HEADERS})
-  target_include_directories(
-    test_rma_halo_exchange.exe SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/third_party/cxxopts/include)
-  target_link_libraries(test_rma_halo_exchange.exe PRIVATE Al)
-  target_link_libraries(test_rma_halo_exchange.exe PUBLIC cuda)
+  if (AL_HAS_MPI_CUDA_RMA AND NOT AL_HAS_ROCM)
+    add_executable(test_rma_ring.exe test_rma_ring.cpp ${TEST_HEADERS})
+    target_include_directories(
+      test_rma_ring.exe SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/third_party/cxxopts/include)
+    target_link_libraries(test_rma_ring.exe PRIVATE Al)
+    target_link_libraries(test_rma_ring.exe PUBLIC cuda)
+    add_executable(test_rma_halo_exchange.exe
+      test_rma_halo_exchange.cpp ${TEST_HEADERS})
+    target_include_directories(
+      test_rma_halo_exchange.exe SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/third_party/cxxopts/include)
+    target_link_libraries(test_rma_halo_exchange.exe PRIVATE Al)
+    target_link_libraries(test_rma_halo_exchange.exe PUBLIC cuda)
+  endif ()
 endif ()
