@@ -7,8 +7,6 @@ set_source_path(BENCHMARK_HDRS
 
 set_source_path(BENCHMARK_SRCS
   benchmark_ops.cpp)
-#  benchmark_nballreduces.cpp
-#  benchmark_segallreduces.cpp)
 
 if (AL_HAS_ROCM)
   hipify_source_files(AL_BENCHMARK_HEADERS ${BENCHMARK_HDRS})
@@ -42,9 +40,7 @@ foreach(src ${AL_BENCHMARK_SOURCES})
 endforeach()
 
 # Do it all again for "special" benchmarks...
-#set_source_path(SPECIAL_BENCHMARK_BASE_SRCS
-#  benchmark_overlap.cpp
-#  benchmark_pingpong.cpp)
+#set_source_path(SPECIAL_BENCHMARK_BASE_SRCS)
 #if (AL_HAS_CUDA OR AL_HAS_ROCM)
 #  set_source_path(SPECIAL_BENCHMARK_WAIT_SRCS wait.cu)
 #  set_source_path(SPECIAL_BENCHMARK_WAIT_HDRS wait.hpp)
