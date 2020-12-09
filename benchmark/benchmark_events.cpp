@@ -3,8 +3,7 @@
 #include <iostream>
 #include <cuda.h>
 #include "Al.hpp"
-#include "test_utils.hpp"
-#include "test_utils_cuda.hpp"
+#include "benchmark_utils.hpp"
 #include "wait.hpp"
 
 class Event {
@@ -59,20 +58,18 @@ void do_benchmark(cudaStream_t stream, Event& event) {
   const double wait_time = 0.0001;
   std::vector<double> times, launch_times;
   for (int i = 0; i < 100000; ++i) {
-    double launch_start = get_time();
+    double launch_start = Al::get_time();
     gpu_wait(wait_time, stream);
     event.record(stream);
-    double start = get_time();
+    double start = Al::get_time();
     while (!event.query()) {}
-    double end = get_time();
+    double end = Al::get_time();
     launch_times.push_back(start - launch_start);
     times.push_back(end - start);
     cudaStreamSynchronize(stream);
   }
-  std::cout << "Launch: ";
-  print_stats(launch_times);
-  std::cout << "Query: ";
-  print_stats(times);
+  std::cout << "Launch: " << SummaryStats(launch_times) << std::endl;
+  std::cout << "Query: " << SummaryStats(times) << std::endl;
 }
 
 int main(int, char**) {
