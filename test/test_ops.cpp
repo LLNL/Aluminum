@@ -302,8 +302,19 @@ int main(int argc, char** argv) {
     ("max-size", "Maximum size of message to test", cxxopts::value<size_t>()->default_value("4194304"))
     ("datatype", "Message datatype", cxxopts::value<std::string>()->default_value("float"))
     ("dump-on-error", "Dump vectors on error")
-    ("hang-rank", "Hang a specific or all ranks at startup", cxxopts::value<int>()->default_value("-1"));
+    ("hang-rank", "Hang a specific or all ranks at startup", cxxopts::value<int>()->default_value("-1"))
+    ("help", "Print help");
   auto parsed_opts = options.parse(argc, argv);
+
+  if (parsed_opts.count("help")) {
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    if (rank == 0) {
+      std::cout << options.help() << std::endl;
+    }
+    test_fini_aluminum();
+    std::exit(0);
+  }
 
   if (parsed_opts.count("hang-rank")) {
     hang_for_debugging(parsed_opts["hang-rank"].as<int>());
