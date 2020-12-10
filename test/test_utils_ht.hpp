@@ -102,3 +102,78 @@ struct IsReductionOpSupported<Al::HostTransferBackend, op> : std::true_type {};
 
 // Backend name.
 template <> constexpr char AlBackendName<Al::HostTransferBackend>[] = "ht";
+
+// Algorithm types.
+template <> struct OpAlgoType<AlOperation::allgather, Al::HostTransferBackend> {
+  using type = Al::HostTransferBackend::allgather_algo_type;
+};
+/*template <> struct OpAlgoType<AlOperation::allgatherv, Al::HostTransferBackend> {
+  using type = Al::HostTransferBackend::allgatherv_algo_type;
+  };*/
+template <> struct OpAlgoType<AlOperation::allreduce, Al::HostTransferBackend> {
+  using type = Al::HostTransferBackend::allreduce_algo_type;
+};
+template <> struct OpAlgoType<AlOperation::alltoall, Al::HostTransferBackend> {
+  using type = Al::HostTransferBackend::alltoall_algo_type;
+};
+/*template <> struct OpAlgoType<AlOperation::alltoallv, Al::HostTransferBackend> {
+  using type = Al::HostTransferBackend::alltoallv_algo_type;
+  };*/
+template <> struct OpAlgoType<AlOperation::bcast, Al::HostTransferBackend> {
+  using type = Al::HostTransferBackend::bcast_algo_type;
+};
+template <> struct OpAlgoType<AlOperation::gather, Al::HostTransferBackend> {
+  using type = Al::HostTransferBackend::gather_algo_type;
+};
+/*template <> struct OpAlgoType<AlOperation::gatherv, Al::HostTransferBackend> {
+  using type = Al::HostTransferBackend::gatherv_algo_type;
+  };*/
+template <> struct OpAlgoType<AlOperation::reduce, Al::HostTransferBackend> {
+  using type = Al::HostTransferBackend::reduce_algo_type;
+};
+template <> struct OpAlgoType<AlOperation::reduce_scatter, Al::HostTransferBackend> {
+  using type = Al::HostTransferBackend::reduce_scatter_algo_type;
+};
+/*template <> struct OpAlgoType<AlOperation::reduce_scatterv, Al::HostTransferBackend> {
+  using type = Al::HostTransferBackend::reduce_scatterv_algo_type;
+  };*/
+template <> struct OpAlgoType<AlOperation::scatter, Al::HostTransferBackend> {
+  using type = Al::HostTransferBackend::scatter_algo_type;
+};
+/*template <> struct OpAlgoType<AlOperation::scatterv, Al::HostTransferBackend> {
+  using type = Al::HostTransferBackend::scatterv_algo_type;
+  };*/
+
+// Supported algorithms.
+template <>
+std::vector<std::pair<std::string, typename OpAlgoType<AlOperation::allreduce, Al::HostTransferBackend>::type>> get_supported_algos<AlOperation::allreduce, Al::HostTransferBackend>() {
+  using algo_type = Al::HostTransferBackend::allreduce_algo_type;
+  return {{"automatic", algo_type::automatic},
+          {"host_transfer", algo_type::host_transfer}};
+}
+
+// Algorithms.
+template <>
+struct AlgorithmOptions<Al::HostTransferBackend> {
+  typename Al::HostTransferBackend::allgather_algo_type allgather_algo =
+    Al::HostTransferBackend::allgather_algo_type::automatic;
+  //typename Al::HostTransferBackend::allgatherv_algo_type allgatherv_algo;
+  typename Al::HostTransferBackend::allreduce_algo_type allreduce_algo =
+    Al::HostTransferBackend::allreduce_algo_type::automatic;
+  typename Al::HostTransferBackend::alltoall_algo_type alltoall_algo =
+    Al::HostTransferBackend::alltoall_algo_type::automatic;
+  //typename Al::HostTransferBackend::alltoallv_algo_type alltoallv_algo;
+  typename Al::HostTransferBackend::bcast_algo_type bcast_algo =
+    Al::HostTransferBackend::bcast_algo_type::automatic;
+  typename Al::HostTransferBackend::gather_algo_type gather_algo =
+    Al::HostTransferBackend::gather_algo_type::automatic;
+  //typename Al::HostTransferBackend::gatherv_algo_type gatherv_algo;
+  typename Al::HostTransferBackend::reduce_algo_type reduce_algo =
+    Al::HostTransferBackend::reduce_algo_type::automatic;
+  typename Al::HostTransferBackend::reduce_scatter_algo_type reduce_scatter_algo =
+    Al::HostTransferBackend::reduce_scatter_algo_type::automatic;
+  //typename Al::HostTransferBackend::reduce_scatterv_algo_type reduce_scatterv_algo;
+  typename Al::HostTransferBackend::scatter_algo_type scatter_algo =
+    Al::HostTransferBackend::scatter_algo_type::automatic;
+  //typename Al::HostTransferBackend::scatterv_algo_type scatterv_algo;
+};

@@ -151,6 +151,8 @@ void run_test(cxxopts::ParseResult& parsed_opts) {
       parsed_opts["reduction-op"].as<std::string>());
   }
   op_options.root = parsed_opts["root"].as<int>();
+  auto algorithms = get_algorithms<Backend>(
+    op, parsed_opts["algorithm"].as<std::string>());
 
   auto sizes = get_sizes_from_opts(parsed_opts);
 
@@ -193,77 +195,81 @@ void run_test(cxxopts::ParseResult& parsed_opts) {
       op_options.recv_counts = op_options.send_counts;
       op_options.recv_displs = op_options.send_displs;
     }
-    OpDispatcher<Backend, T> op_runner(op, op_options);
-    // The size is the amount each processor sends to another processor.
-    // (Roughly equivalent to the sendcount parameter in MPI.)
-    size_t in_size = op_runner.get_input_size(size, comm_wrapper.comm());
-    // Get output buffer size.
-    size_t out_size = op_runner.get_output_size(size, comm_wrapper.comm());
-    // Ensure sizes are reasonable for MPI.
-    if (!Al::internal::mpi::check_count_fits_mpi(size)
-        || !Al::internal::mpi::check_count_fits_mpi(out_size)) {
-      std::cout << "Input size " << size << " or output size " << out_size
-                << " too large for MPI, skipping this and future sizes"
-                << std::endl;
-      break;
-    }
 
-    typename VectorType<T, Backend>::type input =
-      VectorType<T, Backend>::gen_data(in_size);
-    typename VectorType<T, Backend>::type output =
-      VectorType<T, Backend>::gen_data(out_size);
-    std::vector<T> mpi_input = VectorType<T, Backend>::copy_to_host(input);
-    std::vector<T> mpi_output = VectorType<T, Backend>::copy_to_host(output);
-    // Save originals when in-place if we might print an error.
-    typename VectorType<T, Backend>::type orig_input;
-    std::vector<T> orig_mpi_input;
-    if (op_options.inplace && parsed_opts.count("dump-on-error")) {
-      orig_input = output;
-      orig_mpi_input = mpi_output;
-    }
-
-    MPI_Barrier(MPI_COMM_WORLD);
-
-    if (!is_pt2pt_op(op) || participates_in_pt2pt) {
-      op_runner.run(input, output, comm_wrapper.comm());
-      if (op_options.nonblocking) {
-        Al::Wait<Backend>(op_options.req);
+    for (auto&& algo_opt : algorithms) {
+      op_options.algos = algo_opt;
+      OpDispatcher<Backend, T> op_runner(op, op_options);
+      // The size is the amount each processor sends to another processor.
+      // (Roughly equivalent to the sendcount parameter in MPI.)
+      size_t in_size = op_runner.get_input_size(size, comm_wrapper.comm());
+      // Get output buffer size.
+      size_t out_size = op_runner.get_output_size(size, comm_wrapper.comm());
+      // Ensure sizes are reasonable for MPI.
+      if (!Al::internal::mpi::check_count_fits_mpi(size)
+          || !Al::internal::mpi::check_count_fits_mpi(out_size)) {
+        std::cout << "Input size " << size << " or output size " << out_size
+                  << " too large for MPI, skipping this and future sizes"
+                  << std::endl;
+        break;
       }
-    }
 
-    MPI_Barrier(MPI_COMM_WORLD);
+      typename VectorType<T, Backend>::type input =
+        VectorType<T, Backend>::gen_data(in_size);
+      typename VectorType<T, Backend>::type output =
+        VectorType<T, Backend>::gen_data(out_size);
+      std::vector<T> mpi_input = VectorType<T, Backend>::copy_to_host(input);
+      std::vector<T> mpi_output = VectorType<T, Backend>::copy_to_host(output);
+      // Save originals when in-place if we might print an error.
+      typename VectorType<T, Backend>::type orig_input;
+      std::vector<T> orig_mpi_input;
+      if (op_options.inplace && parsed_opts.count("dump-on-error")) {
+        orig_input = output;
+        orig_mpi_input = mpi_output;
+      }
 
-    if (!is_pt2pt_op(op) || participates_in_pt2pt) {
-      op_runner.run_mpi(mpi_input, mpi_output, comm_wrapper.comm());
-    }
+      MPI_Barrier(MPI_COMM_WORLD);
 
-    MPI_Barrier(MPI_COMM_WORLD);
-
-    bool err = false;
-    if (!op_options.inplace && !check_vector(mpi_input, input)) {
-      std::cerr << comm_wrapper.comm().rank() << ": input does not match for size "
-                << size << std::endl;
-      err = true;
-    }
-    if (!check_vector(mpi_output, output)) {
-      std::cerr << comm_wrapper.comm().rank() << ": output does not match for size "
-                << size << std::endl;
-      err = true;
-    }
-    // Check if any process reported an error.
-    MPI_Allreduce(MPI_IN_PLACE, &err, 1, MPI_BYTE, MPI_LOR,
-                  comm_wrapper.comm().get_comm());
-    if (err) {
-      if (parsed_opts.count("dump-on-error")) {
-        if (op_options.inplace) {
-          dump_data<Backend>(orig_input, output, orig_mpi_input, mpi_output,
-                             comm_wrapper.comm());
-        } else {
-          dump_data<Backend>(input, output, mpi_input, mpi_output,
-                             comm_wrapper.comm());
+      if (!is_pt2pt_op(op) || participates_in_pt2pt) {
+        op_runner.run(input, output, comm_wrapper.comm());
+        if (op_options.nonblocking) {
+          Al::Wait<Backend>(op_options.req);
         }
       }
-      std::abort();
+
+      MPI_Barrier(MPI_COMM_WORLD);
+
+      if (!is_pt2pt_op(op) || participates_in_pt2pt) {
+        op_runner.run_mpi(mpi_input, mpi_output, comm_wrapper.comm());
+      }
+
+      MPI_Barrier(MPI_COMM_WORLD);
+
+      bool err = false;
+      if (!op_options.inplace && !check_vector(mpi_input, input)) {
+        std::cerr << comm_wrapper.comm().rank() << ": input does not match for size "
+                  << size << std::endl;
+        err = true;
+      }
+      if (!check_vector(mpi_output, output)) {
+        std::cerr << comm_wrapper.comm().rank() << ": output does not match for size "
+                  << size << std::endl;
+        err = true;
+      }
+      // Check if any process reported an error.
+      MPI_Allreduce(MPI_IN_PLACE, &err, 1, MPI_BYTE, MPI_LOR,
+                    comm_wrapper.comm().get_comm());
+      if (err) {
+        if (parsed_opts.count("dump-on-error")) {
+          if (op_options.inplace) {
+            dump_data<Backend>(orig_input, output, orig_mpi_input, mpi_output,
+                               comm_wrapper.comm());
+          } else {
+            dump_data<Backend>(input, output, mpi_input, mpi_output,
+                               comm_wrapper.comm());
+          }
+        }
+        std::abort();
+      }
     }
   }
 }

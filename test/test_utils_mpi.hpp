@@ -72,3 +72,87 @@ struct IsReductionOpSupported<Al::MPIBackend, op> : std::true_type {};
 
 // Backend name.
 template <> constexpr char AlBackendName<Al::MPIBackend>[] = "mpi";
+
+// Algorithm types.
+template <> struct OpAlgoType<AlOperation::allgather, Al::MPIBackend> {
+  using type = Al::MPIBackend::allgather_algo_type;
+};
+template <> struct OpAlgoType<AlOperation::allgatherv, Al::MPIBackend> {
+  using type = Al::MPIBackend::allgatherv_algo_type;
+};
+template <> struct OpAlgoType<AlOperation::allreduce, Al::MPIBackend> {
+  using type = Al::MPIBackend::allreduce_algo_type;
+};
+template <> struct OpAlgoType<AlOperation::alltoall, Al::MPIBackend> {
+  using type = Al::MPIBackend::alltoall_algo_type;
+};
+template <> struct OpAlgoType<AlOperation::alltoallv, Al::MPIBackend> {
+  using type = Al::MPIBackend::alltoallv_algo_type;
+};
+template <> struct OpAlgoType<AlOperation::bcast, Al::MPIBackend> {
+  using type = Al::MPIBackend::bcast_algo_type;
+};
+template <> struct OpAlgoType<AlOperation::gather, Al::MPIBackend> {
+  using type = Al::MPIBackend::gather_algo_type;
+};
+template <> struct OpAlgoType<AlOperation::gatherv, Al::MPIBackend> {
+  using type = Al::MPIBackend::gatherv_algo_type;
+};
+template <> struct OpAlgoType<AlOperation::reduce, Al::MPIBackend> {
+  using type = Al::MPIBackend::reduce_algo_type;
+};
+template <> struct OpAlgoType<AlOperation::reduce_scatter, Al::MPIBackend> {
+  using type = Al::MPIBackend::reduce_scatter_algo_type;
+};
+template <> struct OpAlgoType<AlOperation::reduce_scatterv, Al::MPIBackend> {
+  using type = Al::MPIBackend::reduce_scatterv_algo_type;
+};
+template <> struct OpAlgoType<AlOperation::scatter, Al::MPIBackend> {
+  using type = Al::MPIBackend::scatter_algo_type;
+};
+template <> struct OpAlgoType<AlOperation::scatterv, Al::MPIBackend> {
+  using type = Al::MPIBackend::scatterv_algo_type;
+};
+
+// Supported algorithms.
+template <>
+std::vector<std::pair<std::string, typename OpAlgoType<AlOperation::allreduce, Al::MPIBackend>::type>> get_supported_algos<AlOperation::allreduce, Al::MPIBackend>() {
+  using algo_type = Al::MPIBackend::allreduce_algo_type;
+  return {{"automatic", algo_type::automatic},
+          {"passthrough", algo_type::mpi_passthrough},
+          {"recursive_doubling", algo_type::mpi_recursive_doubling},
+          {"ring", algo_type::mpi_ring},
+          {"rabenseifner", algo_type::mpi_rabenseifner},
+          {"biring", algo_type::mpi_biring}};
+}
+
+// Algorithms.
+template <>
+struct AlgorithmOptions<Al::MPIBackend> {
+  typename Al::MPIBackend::allgather_algo_type allgather_algo =
+    Al::MPIBackend::allgather_algo_type::automatic;
+  typename Al::MPIBackend::allgatherv_algo_type allgatherv_algo =
+    Al::MPIBackend::allgatherv_algo_type::automatic;
+  typename Al::MPIBackend::allreduce_algo_type allreduce_algo =
+    Al::MPIBackend::allreduce_algo_type::automatic;
+  typename Al::MPIBackend::alltoall_algo_type alltoall_algo =
+    Al::MPIBackend::alltoall_algo_type::automatic;
+  typename Al::MPIBackend::alltoallv_algo_type alltoallv_algo =
+    Al::MPIBackend::alltoallv_algo_type::automatic;
+  typename Al::MPIBackend::bcast_algo_type bcast_algo =
+    Al::MPIBackend::bcast_algo_type::automatic;
+  typename Al::MPIBackend::gather_algo_type gather_algo =
+    Al::MPIBackend::gather_algo_type::automatic;
+  typename Al::MPIBackend::gatherv_algo_type gatherv_algo =
+    Al::MPIBackend::gatherv_algo_type::automatic;
+  typename Al::MPIBackend::reduce_algo_type reduce_algo =
+    Al::MPIBackend::reduce_algo_type::automatic;
+  typename Al::MPIBackend::reduce_scatter_algo_type reduce_scatter_algo =
+    Al::MPIBackend::reduce_scatter_algo_type::automatic;
+  typename Al::MPIBackend::reduce_scatterv_algo_type reduce_scatterv_algo =
+    Al::MPIBackend::reduce_scatterv_algo_type::automatic;
+  typename Al::MPIBackend::scatter_algo_type scatter_algo =
+    Al::MPIBackend::scatter_algo_type::automatic;
+  typename Al::MPIBackend::scatterv_algo_type scatterv_algo =
+    Al::MPIBackend::scatterv_algo_type::automatic;
+};

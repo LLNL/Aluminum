@@ -46,11 +46,12 @@ public:
       ? output.size() / comm.size()
       : input.size();
     typename Backend::req_type& req = this->get_options().req;
+    auto algo = this->get_options().algos.allgather_algo;
     this->inplace_nb_dispatch(
-      [&]() { Al::Allgather<Backend>(input.data(), output.data(), size, comm); },
-      [&]() { Al::Allgather<Backend>(output.data(), size, comm); },
-      [&]() { Al::NonblockingAllgather<Backend>(input.data(), output.data(), size, comm, req); },
-      [&]() { Al::NonblockingAllgather<Backend>(output.data(), size, comm, req); });
+      [&]() { Al::Allgather<Backend>(input.data(), output.data(), size, comm, algo); },
+      [&]() { Al::Allgather<Backend>(output.data(), size, comm, algo); },
+      [&]() { Al::NonblockingAllgather<Backend>(input.data(), output.data(), size, comm, req, algo); },
+      [&]() { Al::NonblockingAllgather<Backend>(output.data(), size, comm, req, algo); });
   }
 
   template <typename T2 = T,
@@ -97,11 +98,12 @@ public:
     auto send_counts = this->get_options().send_counts;
     auto send_displs = this->get_options().send_displs;
     typename Backend::req_type& req = this->get_options().req;
+    auto algo = this->get_options().algos.allgatherv_algo;
     this->inplace_nb_dispatch(
-      [&]() { Al::Allgatherv<Backend>(input.data(), output.data(), send_counts, send_displs, comm); },
-      [&]() { Al::Allgatherv<Backend>(output.data(), send_counts, send_displs, comm); },
-      [&]() { Al::NonblockingAllgatherv<Backend>(input.data(), output.data(), send_counts, send_displs, comm, req); },
-      [&]() { Al::NonblockingAllgatherv<Backend>(output.data(), send_counts, send_displs, comm, req); });
+      [&]() { Al::Allgatherv<Backend>(input.data(), output.data(), send_counts, send_displs, comm, algo); },
+      [&]() { Al::Allgatherv<Backend>(output.data(), send_counts, send_displs, comm, algo); },
+      [&]() { Al::NonblockingAllgatherv<Backend>(input.data(), output.data(), send_counts, send_displs, comm, req, algo); },
+      [&]() { Al::NonblockingAllgatherv<Backend>(output.data(), send_counts, send_displs, comm, req, algo); });
   }
 
   template <typename T2 = T,
@@ -150,11 +152,12 @@ public:
                 typename Backend::comm_type& comm) {
     auto reduction_op = this->get_options().reduction_op;
     typename Backend::req_type& req = this->get_options().req;
+    auto algo = this->get_options().algos.allreduce_algo;
     this->inplace_nb_dispatch(
-      [&]() { Al::Allreduce<Backend>(input.data(), output.data(), input.size(), reduction_op, comm); },
-      [&]() { Al::Allreduce<Backend>(output.data(), output.size(), reduction_op, comm); },
-      [&]() { Al::NonblockingAllreduce<Backend>(input.data(), output.data(), input.size(), reduction_op, comm, req); },
-      [&]() { Al::NonblockingAllreduce<Backend>(output.data(), output.size(), reduction_op, comm, req); });
+      [&]() { Al::Allreduce<Backend>(input.data(), output.data(), input.size(), reduction_op, comm, algo); },
+      [&]() { Al::Allreduce<Backend>(output.data(), output.size(), reduction_op, comm, algo); },
+      [&]() { Al::NonblockingAllreduce<Backend>(input.data(), output.data(), input.size(), reduction_op, comm, req, algo); },
+      [&]() { Al::NonblockingAllreduce<Backend>(output.data(), output.size(), reduction_op, comm, req, algo); });
   }
 
   template <typename T2 = T,
@@ -202,11 +205,12 @@ public:
       ? output.size() / comm.size()
       : input.size() / comm.size();
     typename Backend::req_type& req = this->get_options().req;
+    auto algo = this->get_options().algos.alltoall_algo;
     this->inplace_nb_dispatch(
-      [&]() { Al::Alltoall<Backend>(input.data(), output.data(), size, comm); },
-      [&]() { Al::Alltoall<Backend>(output.data(), size, comm); },
-      [&]() { Al::NonblockingAlltoall<Backend>(input.data(), output.data(), size, comm, req); },
-      [&]() { Al::NonblockingAlltoall<Backend>(output.data(), size, comm, req); });
+      [&]() { Al::Alltoall<Backend>(input.data(), output.data(), size, comm, algo); },
+      [&]() { Al::Alltoall<Backend>(output.data(), size, comm, algo); },
+      [&]() { Al::NonblockingAlltoall<Backend>(input.data(), output.data(), size, comm, req, algo); },
+      [&]() { Al::NonblockingAlltoall<Backend>(output.data(), size, comm, req, algo); });
   }
 
   template <typename T2 = T,
@@ -257,11 +261,12 @@ public:
     auto send_displs = this->get_options().send_displs;
     auto recv_displs = this->get_options().recv_displs;
     typename Backend::req_type& req = this->get_options().req;
+    auto algo = this->get_options().algos.alltoallv_algo;
     this->inplace_nb_dispatch(
-      [&]() { Al::Alltoallv<Backend>(input.data(), send_counts, send_displs, output.data(), recv_counts, recv_displs, comm); },
-      [&]() { Al::Alltoallv<Backend>(output.data(), send_counts, send_displs, comm); },
-      [&]() { Al::NonblockingAlltoallv<Backend>(input.data(), send_counts, send_displs, output.data(), recv_counts, recv_displs, comm, req); },
-      [&]() { Al::NonblockingAlltoallv<Backend>(output.data(), send_counts, send_displs, comm, req); });
+      [&]() { Al::Alltoallv<Backend>(input.data(), send_counts, send_displs, output.data(), recv_counts, recv_displs, comm, algo); },
+      [&]() { Al::Alltoallv<Backend>(output.data(), send_counts, send_displs, comm, algo); },
+      [&]() { Al::NonblockingAlltoallv<Backend>(input.data(), send_counts, send_displs, output.data(), recv_counts, recv_displs, comm, req, algo); },
+      [&]() { Al::NonblockingAlltoallv<Backend>(output.data(), send_counts, send_displs, comm, req, algo); });
   }
 
   template <typename T2 = T,
@@ -322,11 +327,12 @@ public:
     }
     int root = this->get_options().root;
     typename Backend::req_type& req = this->get_options().req;
+    auto algo = this->get_options().algos.allgather_algo;
     this->inplace_nb_dispatch(
       [&]() {},
-      [&]() { Al::Bcast<Backend>(output.data(), output.size(), root, comm); },
+      [&]() { Al::Bcast<Backend>(output.data(), output.size(), root, comm, algo); },
       [&]() {},
-      [&]() { Al::NonblockingBcast<Backend>(output.data(), output.size(), root, comm, req); });
+      [&]() { Al::NonblockingBcast<Backend>(output.data(), output.size(), root, comm, req, algo); });
   }
 
   template <typename T2 = T,
@@ -372,11 +378,12 @@ public:
       ? (this->get_options().inplace ? output.size() / comm.size() : input.size())
       : (this->get_options().inplace ? output.size() : input.size());
     typename Backend::req_type& req = this->get_options().req;
+    auto algo = this->get_options().algos.gather_algo;
     this->inplace_nb_dispatch(
-      [&]() { Al::Gather<Backend>(input.data(), output.data(), size, root, comm); },
-      [&]() { Al::Gather<Backend>(output.data(), size, root, comm); },
-      [&]() { Al::NonblockingGather<Backend>(input.data(), output.data(), size, root, comm, req); },
-      [&]() { Al::NonblockingGather<Backend>(output.data(), size, root, comm, req); });
+      [&]() { Al::Gather<Backend>(input.data(), output.data(), size, root, comm, algo); },
+      [&]() { Al::Gather<Backend>(output.data(), size, root, comm, algo); },
+      [&]() { Al::NonblockingGather<Backend>(input.data(), output.data(), size, root, comm, req, algo); },
+      [&]() { Al::NonblockingGather<Backend>(output.data(), size, root, comm, req, algo); });
   }
 
   template <typename T2 = T,
@@ -439,11 +446,12 @@ public:
     auto send_counts = this->get_options().send_counts;
     auto send_displs = this->get_options().send_displs;
     typename Backend::req_type& req = this->get_options().req;
+    auto algo = this->get_options().algos.gatherv_algo;
     this->inplace_nb_dispatch(
-      [&]() { Al::Gatherv<Backend>(input.data(), output.data(), send_counts, send_displs, root, comm); },
-      [&]() { Al::Gatherv<Backend>(output.data(), send_counts, send_displs, root, comm); },
-      [&]() { Al::NonblockingGatherv<Backend>(input.data(), output.data(), send_counts, send_displs, root, comm, req); },
-      [&]() { Al::NonblockingGatherv<Backend>(output.data(), send_counts, send_displs, root, comm, req); });
+      [&]() { Al::Gatherv<Backend>(input.data(), output.data(), send_counts, send_displs, root, comm, algo); },
+      [&]() { Al::Gatherv<Backend>(output.data(), send_counts, send_displs, root, comm, algo); },
+      [&]() { Al::NonblockingGatherv<Backend>(input.data(), output.data(), send_counts, send_displs, root, comm, req, algo); },
+      [&]() { Al::NonblockingGatherv<Backend>(output.data(), send_counts, send_displs, root, comm, req, algo); });
   }
 
   template <typename T2 = T,
@@ -508,11 +516,12 @@ public:
     int root = this->get_options().root;
     auto reduction_op = this->get_options().reduction_op;
     typename Backend::req_type& req = this->get_options().req;
+    auto algo = this->get_options().algos.reduce_algo;
     this->inplace_nb_dispatch(
-      [&]() { Al::Reduce<Backend>(input.data(), output.data(), input.size(), reduction_op, root, comm); },
-      [&]() { Al::Reduce<Backend>(output.data(), output.size(), reduction_op, root, comm); },
-      [&]() { Al::NonblockingReduce<Backend>(input.data(), output.data(), input.size(), reduction_op, root, comm, req); },
-      [&]() { Al::NonblockingReduce<Backend>(output.data(), output.size(), reduction_op, root, comm, req); });
+      [&]() { Al::Reduce<Backend>(input.data(), output.data(), input.size(), reduction_op, root, comm, algo); },
+      [&]() { Al::Reduce<Backend>(output.data(), output.size(), reduction_op, root, comm, algo); },
+      [&]() { Al::NonblockingReduce<Backend>(input.data(), output.data(), input.size(), reduction_op, root, comm, req, algo); },
+      [&]() { Al::NonblockingReduce<Backend>(output.data(), output.size(), reduction_op, root, comm, req, algo); });
   }
 
   template <typename T2 = T,
@@ -574,11 +583,12 @@ public:
       ? output.size() / comm.size()
       : input.size() / comm.size();
     typename Backend::req_type& req = this->get_options().req;
+    auto algo = this->get_options().algos.reduce_scatter_algo;
     this->inplace_nb_dispatch(
-      [&]() { Al::Reduce_scatter<Backend>(input.data(), output.data(), size, reduction_op, comm); },
-      [&]() { Al::Reduce_scatter<Backend>(output.data(), size, reduction_op, comm); },
-      [&]() { Al::NonblockingReduce_scatter<Backend>(input.data(), output.data(), size, reduction_op, comm, req); },
-      [&]() { Al::NonblockingReduce_scatter<Backend>(output.data(), size, reduction_op, comm, req); });
+      [&]() { Al::Reduce_scatter<Backend>(input.data(), output.data(), size, reduction_op, comm, algo); },
+      [&]() { Al::Reduce_scatter<Backend>(output.data(), size, reduction_op, comm, algo); },
+      [&]() { Al::NonblockingReduce_scatter<Backend>(input.data(), output.data(), size, reduction_op, comm, req, algo); },
+      [&]() { Al::NonblockingReduce_scatter<Backend>(output.data(), size, reduction_op, comm, req, algo); });
   }
 
   template <typename T2 = T,
@@ -629,11 +639,12 @@ public:
     auto reduction_op = this->get_options().reduction_op;
     auto recv_counts = this->get_options().recv_counts;
     typename Backend::req_type& req = this->get_options().req;
+    auto algo = this->get_options().algos.reduce_scatterv_algo;
     this->inplace_nb_dispatch(
-      [&]() { Al::Reduce_scatterv<Backend>(input.data(), output.data(), recv_counts, reduction_op, comm); },
-      [&]() { Al::Reduce_scatterv<Backend>(output.data(), recv_counts, reduction_op, comm); },
-      [&]() { Al::NonblockingReduce_scatterv<Backend>(input.data(), output.data(), recv_counts, reduction_op, comm, req); },
-      [&]() { Al::NonblockingReduce_scatterv<Backend>(output.data(), recv_counts, reduction_op, comm, req); });
+      [&]() { Al::Reduce_scatterv<Backend>(input.data(), output.data(), recv_counts, reduction_op, comm, algo); },
+      [&]() { Al::Reduce_scatterv<Backend>(output.data(), recv_counts, reduction_op, comm, algo); },
+      [&]() { Al::NonblockingReduce_scatterv<Backend>(input.data(), output.data(), recv_counts, reduction_op, comm, req, algo); },
+      [&]() { Al::NonblockingReduce_scatterv<Backend>(output.data(), recv_counts, reduction_op, comm, req, algo); });
   }
 
   template <typename T2 = T,
@@ -690,11 +701,12 @@ public:
       ? (this->get_options().inplace ? output.size() : input.size()) / comm.size()
       : output.size();
     typename Backend::req_type& req = this->get_options().req;
+    auto algo = this->get_options().algos.scatter_algo;
     this->inplace_nb_dispatch(
-      [&]() { Al::Scatter<Backend>(input.data(), output.data(), size, root, comm); },
-      [&]() { Al::Scatter<Backend>(output.data(), size, root, comm); },
-      [&]() { Al::NonblockingScatter<Backend>(input.data(), output.data(), size, root, comm, req); },
-      [&]() { Al::NonblockingScatter<Backend>(output.data(), size, root, comm, req); });
+      [&]() { Al::Scatter<Backend>(input.data(), output.data(), size, root, comm, algo); },
+      [&]() { Al::Scatter<Backend>(output.data(), size, root, comm, algo); },
+      [&]() { Al::NonblockingScatter<Backend>(input.data(), output.data(), size, root, comm, req, algo); },
+      [&]() { Al::NonblockingScatter<Backend>(output.data(), size, root, comm, req, algo); });
   }
 
   template <typename T2 = T,
@@ -763,11 +775,12 @@ public:
     auto send_counts = this->get_options().send_counts;
     auto send_displs = this->get_options().send_displs;
     typename Backend::req_type& req = this->get_options().req;
+    auto algo = this->get_options().algos.scatterv_algo;
     this->inplace_nb_dispatch(
-      [&]() { Al::Scatterv<Backend>(input.data(), output.data(), send_counts, send_displs, root, comm); },
-      [&]() { Al::Scatterv<Backend>(output.data(), send_counts, send_displs, root, comm); },
-      [&]() { Al::NonblockingScatterv<Backend>(input.data(), output.data(), send_counts, send_displs, root, comm, req); },
-      [&]() { Al::NonblockingScatterv<Backend>(output.data(), send_counts, send_displs, root, comm, req); });
+      [&]() { Al::Scatterv<Backend>(input.data(), output.data(), send_counts, send_displs, root, comm, algo); },
+      [&]() { Al::Scatterv<Backend>(output.data(), send_counts, send_displs, root, comm, algo); },
+      [&]() { Al::NonblockingScatterv<Backend>(input.data(), output.data(), send_counts, send_displs, root, comm, req, algo); },
+      [&]() { Al::NonblockingScatterv<Backend>(output.data(), send_counts, send_displs, root, comm, req, algo); });
   }
 
   template <typename T2 = T,

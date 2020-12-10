@@ -151,6 +151,7 @@ template <> struct IsPt2PtOp<AlOperation::send> : std::true_type {};
 template <> struct IsPt2PtOp<AlOperation::recv> : std::true_type {};
 template <> struct IsPt2PtOp<AlOperation::sendrecv> : std::true_type {};
 
+// Traits for whether an operator has a root.
 template <AlOperation Op> struct IsRootedOp : std::false_type {};
 template <> struct IsRootedOp<AlOperation::bcast> : std::true_type {};
 template <> struct IsRootedOp<AlOperation::gather> : std::true_type {};
@@ -179,6 +180,34 @@ template <> struct IsTypeSupportedByMPI<long double> : std::true_type {};
 // Traits for reduction operator support.
 template <typename Backend, Al::ReductionOperator op>
 struct IsReductionOpSupported : std::false_type {};
+
+// Traits for whether an operator supports different algorithms.
+template <AlOperation Op> struct OpSupportsAlgos : std::false_type {};
+template <> struct OpSupportsAlgos<AlOperation::allgather> : std::true_type {};
+template <> struct OpSupportsAlgos<AlOperation::allgatherv> : std::true_type {};
+template <> struct OpSupportsAlgos<AlOperation::allreduce> : std::true_type {};
+template <> struct OpSupportsAlgos<AlOperation::alltoall> : std::true_type {};
+template <> struct OpSupportsAlgos<AlOperation::alltoallv> : std::true_type {};
+template <> struct OpSupportsAlgos<AlOperation::bcast> : std::true_type {};
+template <> struct OpSupportsAlgos<AlOperation::gather> : std::true_type {};
+template <> struct OpSupportsAlgos<AlOperation::gatherv> : std::true_type {};
+template <> struct OpSupportsAlgos<AlOperation::reduce> : std::true_type {};
+template <> struct OpSupportsAlgos<AlOperation::reduce_scatter> : std::true_type {};
+template <> struct OpSupportsAlgos<AlOperation::reduce_scatterv> : std::true_type {};
+template <> struct OpSupportsAlgos<AlOperation::scatter> : std::true_type {};
+template <> struct OpSupportsAlgos<AlOperation::scatterv> : std::true_type {};
+
+// Identify algorithm types for operators for a backend.
+// TODO: It seems like this should be able to be generic for any backend
+// because they all use the same naming pattern, but I couldn't figure out
+// the right enable_if incantations.
+template <AlOperation Op, typename Backend> struct OpAlgoType {};
+
+// Algorithms and string name supported by a particular backend/operator.
+template <AlOperation Op, typename Backend>
+std::vector<std::pair<std::string, typename OpAlgoType<Op, Backend>::type>> get_supported_algos() {
+  return {{"automatic", OpAlgoType<Op, Backend>::type::automatic}};
+}
 
 // Backend names.
 template <typename Backend> constexpr char AlBackendName[] = "unknown";
@@ -354,6 +383,185 @@ bool is_reduction_operator_supported(Al::ReductionOperator op) {
   return i->second;
 }
 
+/** Contains algorithms for all supported operations. */
+template <typename Backend> struct AlgorithmOptions {};
+
+/** Helpers to set an algorithm for a particular op. */
+template <AlOperation Op, typename Backend> struct AlgoAccessor {};
+template <typename Backend> struct AlgoAccessor<AlOperation::allgather, Backend> {
+  typename OpAlgoType<AlOperation::allgather, Backend>::type get(
+    AlgorithmOptions<Backend>& algo_opts) {
+    return algo_opts.allgather_algo;
+  }
+  void set(AlgorithmOptions<Backend>& algo_opts,
+           typename OpAlgoType<AlOperation::allgather, Backend>::type algo) {
+    algo_opts.allgather_algo = algo;
+  }
+};
+template <typename Backend> struct AlgoAccessor<AlOperation::allgatherv, Backend> {
+  typename OpAlgoType<AlOperation::allgatherv, Backend>::type get(
+    AlgorithmOptions<Backend>& algo_opts) {
+    return algo_opts.allgatherv_algo;
+  }
+  void set(AlgorithmOptions<Backend>& algo_opts,
+           typename OpAlgoType<AlOperation::allgatherv, Backend>::type algo) {
+    algo_opts.allgatherv_algo = algo;
+  }
+};
+template <typename Backend> struct AlgoAccessor<AlOperation::allreduce, Backend> {
+  typename OpAlgoType<AlOperation::allreduce, Backend>::type get(
+    AlgorithmOptions<Backend>& algo_opts) {
+    return algo_opts.allreduce_algo;
+  }
+  void set(AlgorithmOptions<Backend>& algo_opts,
+           typename OpAlgoType<AlOperation::allreduce, Backend>::type algo) {
+    algo_opts.allreduce_algo = algo;
+  }
+};
+template <typename Backend> struct AlgoAccessor<AlOperation::alltoall, Backend> {
+  typename OpAlgoType<AlOperation::alltoall, Backend>::type get(
+    AlgorithmOptions<Backend>& algo_opts) {
+    return algo_opts.alltoall_algo;
+  }
+  void set(AlgorithmOptions<Backend>& algo_opts,
+           typename OpAlgoType<AlOperation::alltoall, Backend>::type algo) {
+    algo_opts.alltoall_algo = algo;
+  }
+};
+template <typename Backend> struct AlgoAccessor<AlOperation::alltoallv, Backend> {
+  typename OpAlgoType<AlOperation::alltoallv, Backend>::type get(
+    AlgorithmOptions<Backend>& algo_opts) {
+    return algo_opts.alltoallv_algo;
+  }
+  void set(AlgorithmOptions<Backend>& algo_opts,
+           typename OpAlgoType<AlOperation::alltoallv, Backend>::type algo) {
+    algo_opts.alltoallv_algo = algo;
+  }
+};
+template <typename Backend> struct AlgoAccessor<AlOperation::bcast, Backend> {
+  typename OpAlgoType<AlOperation::bcast, Backend>::type get(
+    AlgorithmOptions<Backend>& algo_opts) {
+    return algo_opts.bcast_algo;
+  }
+  void set(AlgorithmOptions<Backend>& algo_opts,
+           typename OpAlgoType<AlOperation::bcast, Backend>::type algo) {
+    algo_opts.bcast_algo = algo;
+  }
+};
+template <typename Backend> struct AlgoAccessor<AlOperation::gather, Backend> {
+  typename OpAlgoType<AlOperation::gather, Backend>::type get(
+    AlgorithmOptions<Backend>& algo_opts) {
+    return algo_opts.gather_algo;
+  }
+  void set(AlgorithmOptions<Backend>& algo_opts,
+           typename OpAlgoType<AlOperation::gather, Backend>::type algo) {
+    algo_opts.gather_algo = algo;
+  }
+};
+template <typename Backend> struct AlgoAccessor<AlOperation::gatherv, Backend> {
+  typename OpAlgoType<AlOperation::gatherv, Backend>::type get(
+    AlgorithmOptions<Backend>& algo_opts) {
+    return algo_opts.gatherv_algo;
+  }
+  void set(AlgorithmOptions<Backend>& algo_opts,
+           typename OpAlgoType<AlOperation::gatherv, Backend>::type algo) {
+    algo_opts.gatherv_algo = algo;
+  }
+};
+template <typename Backend> struct AlgoAccessor<AlOperation::reduce, Backend> {
+  typename OpAlgoType<AlOperation::reduce, Backend>::type get(
+    AlgorithmOptions<Backend>& algo_opts) {
+    return algo_opts.reduce_algo;
+  }
+  void set(AlgorithmOptions<Backend>& algo_opts,
+           typename OpAlgoType<AlOperation::reduce, Backend>::type algo) {
+    algo_opts.reduce_algo = algo;
+  }
+};
+template <typename Backend> struct AlgoAccessor<AlOperation::reduce_scatter, Backend> {
+  typename OpAlgoType<AlOperation::reduce_scatter, Backend>::type get(
+    AlgorithmOptions<Backend>& algo_opts) {
+    return algo_opts.reduce_scatter_algo;
+  }
+  void set(AlgorithmOptions<Backend>& algo_opts,
+           typename OpAlgoType<AlOperation::reduce_scatter, Backend>::type algo) {
+    algo_opts.reduce_scatter_algo = algo;
+  }
+};
+template <typename Backend> struct AlgoAccessor<AlOperation::reduce_scatterv, Backend> {
+  typename OpAlgoType<AlOperation::reduce_scatterv, Backend>::type get(
+    AlgorithmOptions<Backend>& algo_opts) {
+    return algo_opts.reduce_scatterv_algo;
+  }
+  void set(AlgorithmOptions<Backend>& algo_opts,
+           typename OpAlgoType<AlOperation::reduce_scatterv, Backend>::type algo) {
+    algo_opts.reduce_scatterv_algo = algo;
+  }
+};
+template <typename Backend> struct AlgoAccessor<AlOperation::scatter, Backend> {
+  typename OpAlgoType<AlOperation::scatter, Backend>::type get(
+    AlgorithmOptions<Backend>& algo_opts) {
+    return algo_opts.scatter_algo;
+  }
+  void set(AlgorithmOptions<Backend>& algo_opts,
+           typename OpAlgoType<AlOperation::scatter, Backend>::type algo) {
+    algo_opts.scatter_algo = algo;
+  }
+};
+template <typename Backend> struct AlgoAccessor<AlOperation::scatterv, Backend> {
+  typename OpAlgoType<AlOperation::scatterv, Backend>::type get(
+    AlgorithmOptions<Backend>& algo_opts) {
+    return algo_opts.scatterv_algo;
+  }
+  void set(AlgorithmOptions<Backend>& algo_opts,
+           typename OpAlgoType<AlOperation::scatterv, Backend>::type algo) {
+    algo_opts.scatterv_algo = algo;
+  }
+};
+
+template <typename Backend>
+struct get_algorithms_functor {
+  std::string algo;
+  get_algorithms_functor(std::string algo_) : algo(algo_) {}
+
+  template <AlOperation Op,
+            std::enable_if_t<IsOpSupported<Op, Backend>::value && OpSupportsAlgos<Op>::value, bool> = true>
+  std::vector<AlgorithmOptions<Backend>> operator()() {
+    auto supported_algos = get_supported_algos<Op, Backend>();
+    std::vector<AlgorithmOptions<Backend>> algos;
+    AlgoAccessor<Op, Backend> setter;
+    for (const auto& p : supported_algos) {
+      if (algo == "all" || p.first == algo) {
+        AlgorithmOptions<Backend> algo_opts;
+        setter.set(algo_opts, p.second);
+        algos.push_back(algo_opts);
+      }
+    }
+    return algos;
+  }
+  template <AlOperation Op,
+            std::enable_if_t<!IsOpSupported<Op, Backend>::value || !OpSupportsAlgos<Op>::value, bool> = true>
+  std::vector<AlgorithmOptions<Backend>> operator()() {
+    return {};
+  }
+};
+
+/**
+ * Return a vector of AlgorithmOptions corresponding to what is requested
+ * in algo.
+ *
+ * If algo is "all", all supported algorithms are returned.
+ * If algo is an empty string, the automatic algorithm is returned.
+ */
+template <typename Backend>
+std::vector<AlgorithmOptions<Backend>> get_algorithms(
+  AlOperation op, std::string algo) {
+  if (algo == "") {
+    algo = "automatic";
+  }
+  return call_op_functor(op, get_algorithms_functor<Backend>(algo));
+}
+
 /** Pass options that may be used by an operator. */
 template <typename Backend>
 struct OpOptions {
@@ -368,6 +576,7 @@ struct OpOptions {
   std::vector<size_t> recv_displs = {};
   Al::ReductionOperator reduction_op = Al::ReductionOperator::sum;
   typename Backend::req_type req = Backend::null_req;
+  AlgorithmOptions<Backend> algos;
 };
 
 /** Abstract base class for running an operator. */
