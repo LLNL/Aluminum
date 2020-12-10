@@ -140,7 +140,8 @@ public:
   }
 
   template <AlOperation Op2 = Op,
-            std::enable_if_t<IsCollectiveOp<Op2>::value, bool> = true>
+            std::enable_if_t<IsCollectiveOp<Op2>::value
+                             && IsOpSupported<Op2, Backend>::value, bool> = true>
   void write_results(std::ostream& os) {
     // Write times.
     auto gathered_times = gather_results_to_root();
@@ -148,10 +149,12 @@ public:
       // Header.
       os << "Backend Type Operation Algo NonBlocking InPlace"
          << " Root CommSize Size CommRank Time\n";
+      AlgoAccessor<Op, Backend> getter;
       const std::string common_start =
         std::string(AlBackendName<Backend>) + " "
         + std::string(typeid(T).name()) + " "
         + std::string(AlOperationName<Op>) + " "
+        + Al::algorithm_name(getter.get(options.algos)) + " "
         + std::string("default") + " "
         + (options.nonblocking ? "1" : "0") + " "
         + (options.inplace ? "1" : "0") + " "
@@ -176,7 +179,8 @@ public:
   }
 
   template <AlOperation Op2 = Op,
-            std::enable_if_t<IsPt2PtOp<Op2>::value, bool> = true>
+            std::enable_if_t<IsPt2PtOp<Op2>::value
+                             && IsOpSupported<Op2, Backend>::value, bool> = true>
   void write_results(std::ostream& os) {
     // Write times.
     auto gathered_times = gather_results_to_root();
@@ -204,6 +208,13 @@ public:
         }
       }
     }
+  }
+
+  template <AlOperation Op2 = Op,
+            std::enable_if_t<(!IsCollectiveOp<Op2>::value && !IsPt2PtOp<Op2>::value)
+                             || !IsOpSupported<Op2, Backend>::value, bool> = true>
+  void write_results(std::ostream& os) {
+    os << "Unsupported operation" << std::endl;
   }
 
 private:

@@ -46,6 +46,14 @@ void run_benchmark(cxxopts::ParseResult& parsed_opts) {
       parsed_opts["reduction-op"].as<std::string>());
   }
   op_options.root = parsed_opts["root"].as<int>();
+  // TODO: Support multiple algorithms -- needs support in OpProfile.
+  auto algorithms = get_algorithms<Backend>(
+    op, parsed_opts["algorithm"].as<std::string>());
+  if (algorithms.size() != 1) {
+    std::cerr << "Can only benchmark one algorithm at a time." << std::endl;
+    std::abort();
+  }
+  op_options.algos = algorithms[0];
 
   auto sizes = get_sizes_from_opts(parsed_opts);
 
