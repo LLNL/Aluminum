@@ -30,6 +30,7 @@
 #include <sstream>
 #include <cxxopts.hpp>
 #include "test_utils.hpp"
+#include "hang_watchdog.hpp"
 
 
 template <typename T>
@@ -157,6 +158,7 @@ void run_test(cxxopts::ParseResult& parsed_opts) {
   auto sizes = get_sizes_from_opts(parsed_opts);
 
   CommWrapper<Backend> comm_wrapper(MPI_COMM_WORLD);
+  HangWatchdog watchdog;
 
   bool participates_in_pt2pt = true;
   if (is_pt2pt_op(op)) {
@@ -230,16 +232,20 @@ void run_test(cxxopts::ParseResult& parsed_opts) {
       MPI_Barrier(MPI_COMM_WORLD);
 
       if (!is_pt2pt_op(op) || participates_in_pt2pt) {
+        watchdog.start(std::string("Al size=") + std::to_string(size));
         op_runner.run(input, output, comm_wrapper.comm());
         if (op_options.nonblocking) {
           Al::Wait<Backend>(op_options.req);
         }
+        watchdog.finish();
       }
 
       MPI_Barrier(MPI_COMM_WORLD);
 
       if (!is_pt2pt_op(op) || participates_in_pt2pt) {
+        watchdog.start(std::string("MPI size=") + std::to_string(size));
         op_runner.run_mpi(mpi_input, mpi_output, comm_wrapper.comm());
+        watchdog.finish();
       }
 
       MPI_Barrier(MPI_COMM_WORLD);

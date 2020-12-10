@@ -1,4 +1,8 @@
-set_source_path(TEST_BASE_HDRS test_utils.hpp op_dispatcher.hpp op_runner_impl.hpp)
+set_source_path(TEST_BASE_HDRS
+  test_utils.hpp
+  op_dispatcher.hpp
+  op_runner_impl.hpp
+  hang_watchdog.hpp)
 if (AL_HAS_CUDA)
   set_source_path(TEST_CUDA_HDRS cuda_vector.hpp)
 endif ()
