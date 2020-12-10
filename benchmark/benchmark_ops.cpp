@@ -123,6 +123,11 @@ void run_benchmark(cxxopts::ParseResult& parsed_opts) {
           profile.add_result(size, t);
         }
       }
+    } else if (IsPt2PtOp<Op>::value && !participates_in_pt2pt) {
+      // These ranks still need to participate in the barriers.
+      for (size_t trial = 0; trial < num_warmup + num_iters; ++trial) {
+        MPI_Barrier(MPI_COMM_WORLD);
+      }
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
