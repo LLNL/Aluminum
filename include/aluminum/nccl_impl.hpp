@@ -373,7 +373,7 @@ class NCCLBackend {
   template <typename T>
   static void Gather(T* buffer, size_t count, int root, comm_type& comm,
                      gather_algo_type algo) {
-    Gather(buffer, buffer, count, root, comm, algo);
+    Gather(internal::IN_PLACE<T>(), buffer, count, root, comm, algo);
   }
 
   template <typename T>
@@ -390,7 +390,7 @@ class NCCLBackend {
   static void NonblockingGather(T* buffer, size_t count, int root,
                                 comm_type& comm, req_type& req,
                                 gather_algo_type algo) {
-    NonblockingGather(buffer, buffer, count, root, comm, req, algo);
+    NonblockingGather(internal::IN_PLACE<T>(), buffer, count, root, comm, req, algo);
   }
 
   template <typename T>
@@ -406,7 +406,7 @@ class NCCLBackend {
                       std::vector<size_t> counts,
                       std::vector<size_t> displs,
                       int root, comm_type& comm, gatherv_algo_type algo) {
-    Gatherv(buffer, buffer, counts, displs, root, comm, algo);
+    Gatherv(internal::IN_PLACE<T>(), buffer, counts, displs, root, comm, algo);
   }
 
   template <typename T>
@@ -427,7 +427,7 @@ class NCCLBackend {
                                  std::vector<size_t> displs,
                                  int root, comm_type& comm, req_type& req,
                                  gatherv_algo_type algo) {
-    NonblockingGatherv(buffer, buffer, counts, displs, root, comm, req, algo);
+    NonblockingGatherv(internal::IN_PLACE<T>(), buffer, counts, displs, root, comm, req, algo);
   }
 
   template <typename T>
@@ -696,7 +696,7 @@ class NCCLBackend {
   template <typename T>
   static void Scatter(T* buffer, size_t count, int root,
                       comm_type& comm, scatter_algo_type algo) {
-    Scatter(buffer, buffer, count, root, comm, algo);
+    Scatter(internal::IN_PLACE<T>(), buffer, count, root, comm, algo);
   }
 
   template <typename T>
@@ -713,7 +713,7 @@ class NCCLBackend {
   static void NonblockingScatter(T* buffer, size_t count, int root,
                                  comm_type& comm, req_type& req,
                                  scatter_algo_type algo) {
-    NonblockingScatter(buffer, buffer, count, root, comm, req, algo);
+    NonblockingScatter(internal::IN_PLACE<T>(), buffer, count, root, comm, req, algo);
   }
 
   template <typename T>
@@ -732,7 +732,7 @@ class NCCLBackend {
                        std::vector<size_t> displs,
                        int root, comm_type& comm,
                        scatterv_algo_type algo) {
-    Scatterv(buffer, buffer, counts, displs, root, comm, algo);
+    Scatterv(internal::IN_PLACE<T>(), buffer, counts, displs, root, comm, algo);
   }
 
   template <typename T>
@@ -754,7 +754,7 @@ class NCCLBackend {
                                   std::vector<size_t> displs,
                                   int root, comm_type& comm, req_type& req,
                                   scatterv_algo_type algo) {
-    NonblockingScatterv(buffer, buffer, counts, displs, root, comm, req, algo);
+    NonblockingScatterv(internal::IN_PLACE<T>(), buffer, counts, displs, root, comm, req, algo);
   }
 
   static std::string Name() { return "NCCLBackend"; }
@@ -872,7 +872,11 @@ class NCCLBackend {
       return;
     }
     if (sendbuf == internal::IN_PLACE<T>()) {
-      sendbuf = recvbuf + comm.rank()*count;
+      if (comm.rank() == root) {
+        sendbuf = recvbuf + comm.rank() * count;
+      } else {
+        sendbuf = recvbuf;
+      }
     }
     internal::nccl::safe_nccl_group<1, 0, 2>(
       0, comm.size(),
@@ -903,7 +907,11 @@ class NCCLBackend {
                          std::vector<size_t> counts, std::vector<size_t> displs,
                          int root, comm_type& comm, cudaStream_t stream) {
     if (sendbuf == internal::IN_PLACE<T>()) {
-      sendbuf = recvbuf + displs[comm.rank()];
+      if (comm.rank() == root) {
+        sendbuf = recvbuf + displs[comm.rank()];
+      } else {
+        sendbuf = recvbuf;
+      }
     }
     internal::nccl::safe_nccl_group<1, 0, 2>(
       0, comm.size(),
