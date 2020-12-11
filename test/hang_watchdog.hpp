@@ -41,7 +41,8 @@
 class HangWatchdog {
 public:
   /** Hang with a timeout in seconds. */
-  HangWatchdog(size_t timeout_ = 60) : timeout(timeout_) {
+  HangWatchdog(size_t timeout_ = 60, bool do_abort_ = true) :
+    timeout(timeout_), do_abort(do_abort_) {
     watchdog = std::thread(&HangWatchdog::run, this);
   }
 
@@ -90,6 +91,7 @@ public:
 
 private:
   size_t timeout;
+  bool do_abort;
   std::thread watchdog;
   std::mutex watchdog_mutex;
   std::condition_variable cv;
@@ -117,7 +119,9 @@ private:
         if (!cv.wait_for(lock, std::chrono::seconds(timeout),
                          [&] { return event_finished; })) {
           std::cerr << "Aborting after hang in " << event_desc << std::endl;
-          std::abort();
+          if (do_abort) {
+            std::abort();
+          }
         }
         event_started = false;
         watching_hang = false;
