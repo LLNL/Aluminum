@@ -158,7 +158,8 @@ void run_test(cxxopts::ParseResult& parsed_opts) {
   auto sizes = get_sizes_from_opts(parsed_opts);
 
   CommWrapper<Backend> comm_wrapper(MPI_COMM_WORLD);
-  HangWatchdog watchdog;
+  HangWatchdog watchdog(parsed_opts["hang-timeout"].as<size_t>(),
+                        parsed_opts.count("no-abort-on-hang") ? false : true);
 
   bool participates_in_pt2pt = true;
   if (is_pt2pt_op(op)) {
@@ -315,6 +316,8 @@ int main(int argc, char** argv) {
     ("datatype", "Message datatype", cxxopts::value<std::string>()->default_value("float"))
     ("dump-on-error", "Dump vectors on error")
     ("hang-rank", "Hang a specific or all ranks at startup", cxxopts::value<int>()->default_value("-1"))
+    ("hang-timeout", "How long to wait for an operation to complete", cxxopts::value<size_t>()->default_value("60"))
+    ("no-abort-on-hang", "Do not abort if a hang is detected")
     ("help", "Print help");
   auto parsed_opts = options.parse(argc, argv);
 
