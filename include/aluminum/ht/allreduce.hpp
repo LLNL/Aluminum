@@ -95,7 +95,11 @@ class HostTransferState : public AlState {
       }
     }
     if (!ar_started) {
-      host_ar->setup();
+      if (host_ar->setup()) {
+        // Allreduce finishes immediately.
+        ar_done = true;
+        gpu_wait.signal();
+      }
       ar_started = true;
     }
     if (!ar_done) {
