@@ -28,8 +28,8 @@ nccl_datatypes = ['char', 'uchar', 'int', 'uint', 'longlong', 'ulonglong',
 # Standard sets of operations.
 # inplace is one of 'both', True, or False.
 # root is either True or False.
-OpDesc = namedtuple('OpDesc', ['op', 'inplace', 'root'],
-                    defaults=['both', False])
+OpDesc = namedtuple('OpDesc', ['op', 'inplace', 'root', 'min_procs'],
+                    defaults=['both', False, 1])
 coll_ops = [OpDesc('allgather'),
             OpDesc('allreduce'),
             OpDesc('bcast', inplace=True, root=True),
@@ -42,9 +42,9 @@ vector_coll_ops = [OpDesc('allgatherv'),
                    OpDesc('gatherv', root=True),
                    OpDesc('reduce_scatterv'),
                    OpDesc('scatterv', root=True)]
-pt2pt_ops = [OpDesc('send', inplace=False),
-             OpDesc('recv', inplace=False),
-             OpDesc('sendrecv', inplace=False)]
+pt2pt_ops = [OpDesc('send', inplace=False, min_procs=2),
+             OpDesc('recv', inplace=False, min_procs=2),
+             OpDesc('sendrecv', inplace=False, min_procs=2)]
 
 # Full set of cases.
 test_cases = {
@@ -144,6 +144,8 @@ def run_all_tests(args):
     for num_procs in procs:
         for backend, cases in test_cases.items():
             for opdesc in cases['ops']:
+                if num_procs < opdesc.min_procs:
+                    continue
                 for datatype in cases['datatypes']:
                     for nonblocking in [True, False]:
                         inplace_cases = [True, False] if opdesc.inplace == 'both' else [opdesc.inplace]
