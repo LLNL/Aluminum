@@ -99,6 +99,13 @@ option(ALUMINUM_ENABLE_TRACE
   "Enable runtime tracing."
   OFF)
 
+option(ALUMINUM_ENABLE_TESTS
+  "Build tests."
+  OFF)
+option(ALUMINUM_ENABLE_BENCHMAKRS
+  "Build benchmarks."
+  OFF)
+
 if (ALUMINUM_HAS_GPU
     AND NOT ALUMINUM_ENABLE_NCCL
     AND NOT ALUMINUM_ENABLE_MPI_CUDA
@@ -114,6 +121,7 @@ endif ()
 string(TOUPPER "${CMAKE_BUILD_TYPE}" AL_BUILD_TYPE_UPPER)
 if (AL_BUILD_TYPE_UPPER MATCHES "DEBUG")
   set(AL_DEBUG ON)
+  set(AL_ENABLE_TESTS ON)
 endif ()
 if (ALUMINUM_DEBUG_HANG_CHECK)
   set(AL_DEBUG_HANG_CHECK ON)
@@ -126,6 +134,12 @@ if (ALUMINUM_HT_USE_PASSTHROUGH)
 endif ()
 if (ALUMINUM_ENABLE_TRACE)
   set(AL_TRACE ON)
+endif ()
+if (ALUMINUM_ENABLE_TESTS)
+  set(AL_ENABLE_TESTS ON)
+endif ()
+if (ALUMINUM_ENABLE_BENCHMARKS)
+  set(AL_ENABLE_BENCHMARKS ON)
 endif ()
 
 # Setup CXX requirements
@@ -349,7 +363,9 @@ add_subdirectory(test)
 
 # The benchmarks depend on some test utility headers, so it must come
 # after the test/ directory.
-add_subdirectory(benchmark)
+if (AL_ENABLE_BENCHMARKS)
+  add_subdirectory(benchmark)
+endif ()
 
 #
 # Install target

@@ -27,30 +27,36 @@
 
 #pragma once
 
-#include <chrono>
-#include <vector>
+#include "Al.hpp"
+#include "benchmark_utils.hpp"
 
-namespace Al {
 
-/** Return time, in seconds (with decimal), since a fixed epoch. */
-inline double get_time() {
-  using namespace std::chrono;
-  return duration_cast<duration<double>>(
-    steady_clock::now().time_since_epoch()).count();
-}
-
-/**
- * Compute an exclusive prefix sum.
- *
- * This is mostly meant to help with vector collectives.
- */
-template <typename T>
-inline std::vector<T> excl_prefix_sum(const std::vector<T>& v) {
-  auto r = std::vector<T>(v.size(), T{0});
-  for (size_t i = 1; i < v.size(); ++i) {
-    r[i] = v[i-1] + r[i-1];
+template <>
+struct Timer<Al::HostTransferBackend> {
+  Timer() {
+    AL_FORCE_CHECK_CUDA(cudaEventCreate(&start_event));
+    AL_FORCE_CHECK_CUDA(cudaEventCreate(&end_event));
   }
-  return r;
-}
 
-}  // namespace Al
+  ~Timer() noexcept(false) {
+    AL_FORCE_CHECK_CUDA(cudaEventDestroy(start_event));
+    AL_FORCE_CHECK_CUDA(cudaEventDestroy(end_event));
+  }
+
+  void start_timer(typename Al::HostTransferBackend::comm_type& comm) {
+    AL_FORCE_CHECK_CUDA_NOSYNC(cudaEventRecord(start_event, comm.get_stream()));
+  }
+
+  double end_timer(typename Al::HostTransferBackend::comm_type &comm) {
+    AL_FORCE_CHECK_CUDA_NOSYNC(cudaEventRecord(end_event, comm.get_stream()));
+    AL_FORCE_CHECK_CUDA_NOSYNC(cudaEventSynchronize(end_event));
+    float elapsed_time;
+    AL_FORCE_CHECK_CUDA_NOSYNC(cudaEventElapsedTime(
+                                 &elapsed_time, start_event, end_event));
+    // Convert milliseconds to seconds.
+    return elapsed_time / 1000.0;
+  }
+
+  cudaEvent_t start_event;
+  cudaEvent_t end_event;
+};

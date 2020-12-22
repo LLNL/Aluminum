@@ -28,9 +28,6 @@
 #include <iostream>
 #include "Al.hpp"
 #include "test_utils.hpp"
-#ifdef AL_HAS_MPI_CUDA
-#include "test_utils_mpi_cuda.hpp"
-#endif
 
 #include <stdlib.h>
 #include <math.h>
@@ -79,13 +76,15 @@ T &get(std::vector<T> &vec, int dim) {
   return vec[dim];
 }
 
-template <typename Backend>
+template <typename Backend, typename T>
 void test_rma_halo_exchange(int px, int py) {
+  // Ugly hack.
   std::vector<typename Backend::comm_type> comms = {
-    get_comm_with_stream<Backend>(MPI_COMM_WORLD),
-    get_comm_with_stream<Backend>(MPI_COMM_WORLD),
-    get_comm_with_stream<Backend>(MPI_COMM_WORLD),
-    get_comm_with_stream<Backend>(MPI_COMM_WORLD)};
+    *(CommWrapper<Backend>(MPI_COMM_WORLD).comm_.release()),
+    *(CommWrapper<Backend>(MPI_COMM_WORLD).comm_.release()),
+    *(CommWrapper<Backend>(MPI_COMM_WORLD).comm_.release()),
+    *(CommWrapper<Backend>(MPI_COMM_WORLD).comm_.release())
+  };
   typename Backend::comm_type &comm = comms[0];
 
   int rank = comm.rank();
@@ -125,13 +124,15 @@ void test_rma_halo_exchange(int px, int py) {
     if (comm.rank() == 0) {
       std::cout << "Testing size " << human_readable_size(size) << std::endl;
     }
-    std::vector<typename VectorType<Backend>::type> data({
-        gen_data<Backend>(size), gen_data<Backend>(size),
-            gen_data<Backend>(size), gen_data<Backend>(size)});
+    std::vector<typename VectorType<T, Backend>::type> data({
+        VectorType<T, Backend>::gen_data(size),
+        VectorType<T, Backend>::gen_data(size),
+        VectorType<T, Backend>::gen_data(size),
+        VectorType<T, Backend>::gen_data(size)});
     auto ref(data);
-    std::vector<typename VectorType<Backend>::type> tmp({
-        get_vector<Backend>(size), get_vector<Backend>(size),
-            get_vector<Backend>(size), get_vector<Backend>(size)});
+    std::vector<typename VectorType<T, Backend>::type> tmp({
+        get_vector<T, Backend>(size), get_vector<T, Backend>(size),
+        get_vector<T, Backend>(size), get_vector<T, Backend>(size)});
     std::vector<float*> dest_data(4, nullptr);
     std::vector<float*> dest_tmp(4, nullptr);
     for (int dim = 0; dim < 2; ++dim) {
@@ -210,7 +211,7 @@ void test_rma_halo_exchange(int px, int py) {
     }
     for (int dim = 0; dim < 2; ++dim) {
       for (int side = 0; side < 2; ++side) {
-        if (!check_vector(get(data, dim, side), get(ref, dim, side))) {
+        if (!check_vector(VectorType<T, Backend>::copy_to_host(get(data, dim, side)), get(ref, dim, side))) {
           std::cout << "Buffer does not match on dimension " << dim << std::endl;
           std::abort();
         }
@@ -272,7 +273,7 @@ int main(int argc, char** argv) {
     std::cerr << "MPI backend is not supported" << std::endl;
 #ifdef AL_HAS_MPI_CUDA
   } else if (backend == "MPI-CUDA") {
-    test_rma_halo_exchange<Al::MPICUDABackend>(px, py);
+    test_rma_halo_exchange<Al::MPICUDABackend, float>(px, py);
 #endif
   } else {
     std::cerr << "usage: " << argv[0] << " [";

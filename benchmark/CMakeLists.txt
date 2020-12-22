@@ -1,17 +1,12 @@
 set_source_path(BENCHMARK_HDRS
+  benchmark_utils.hpp
+  benchmark_utils_mpi.hpp
+  benchmark_utils_nccl.hpp
+  benchmark_utils_ht.hpp
   wait.hpp)
 
 set_source_path(BENCHMARK_SRCS
-  benchmark_allgather.cpp
-  benchmark_allreduce.cpp
-  benchmark_alltoall.cpp
-  benchmark_bcast.cpp
-  benchmark_gather.cpp
-  benchmark_nballreduces.cpp
-  benchmark_reduce.cpp
-  benchmark_reduce_scatter.cpp
-  benchmark_scatter.cpp
-  benchmark_segallreduces.cpp)
+  benchmark_ops.cpp)
 
 if (AL_HAS_ROCM)
   hipify_source_files(AL_BENCHMARK_HEADERS ${BENCHMARK_HDRS})
@@ -35,6 +30,8 @@ foreach(src ${AL_BENCHMARK_SOURCES})
   # Get the test headers
   target_link_libraries(${_benchmark_exe_name}
     PRIVATE Al aluminum_test_headers)
+  target_include_directories(
+    ${_benchmark_exe_name} SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/third_party/cxxopts/include)
 
   # Use more caution now that "AL_HAS_CUDA" is overloaded.
   if (AL_HAS_CUDA AND NOT AL_HAS_ROCM)
@@ -43,9 +40,7 @@ foreach(src ${AL_BENCHMARK_SOURCES})
 endforeach()
 
 # Do it all again for "special" benchmarks...
-set_source_path(SPECIAL_BENCHMARK_BASE_SRCS
-  benchmark_overlap.cpp
-  benchmark_pingpong.cpp)
+set_source_path(SPECIAL_BENCHMARK_BASE_SRCS)
 if (AL_HAS_CUDA OR AL_HAS_ROCM)
   set_source_path(SPECIAL_BENCHMARK_WAIT_SRCS wait.cu)
   set_source_path(SPECIAL_BENCHMARK_WAIT_HDRS wait.hpp)
@@ -91,6 +86,8 @@ foreach(src ${AL_SPECIAL_BENCHMARK_SOURCES})
 
   target_link_libraries(${_benchmark_exe_name}
     PRIVATE Al aluminum_test_headers)
+  target_include_directories(
+    ${_benchmark_exe_name} SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/third_party/cxxopts/include)
 
   if (AL_HAS_CUDA AND NOT AL_HAS_ROCM)
     target_link_libraries(${_benchmark_exe_name} PRIVATE cuda)

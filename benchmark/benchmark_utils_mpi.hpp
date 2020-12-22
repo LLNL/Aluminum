@@ -27,30 +27,19 @@
 
 #pragma once
 
-#include <chrono>
-#include <vector>
+#include "Al.hpp"
+#include "benchmark_utils.hpp"
 
-namespace Al {
 
-/** Return time, in seconds (with decimal), since a fixed epoch. */
-inline double get_time() {
-  using namespace std::chrono;
-  return duration_cast<duration<double>>(
-    steady_clock::now().time_since_epoch()).count();
-}
-
-/**
- * Compute an exclusive prefix sum.
- *
- * This is mostly meant to help with vector collectives.
- */
-template <typename T>
-inline std::vector<T> excl_prefix_sum(const std::vector<T>& v) {
-  auto r = std::vector<T>(v.size(), T{0});
-  for (size_t i = 1; i < v.size(); ++i) {
-    r[i] = v[i-1] + r[i-1];
+template <>
+struct Timer<Al::MPIBackend> {
+  void start_timer(typename Al::MPIBackend::comm_type&) {
+    start_time = Al::get_time();
   }
-  return r;
-}
 
-}  // namespace Al
+  double end_timer(typename Al::MPIBackend::comm_type&) {
+    return Al::get_time() - start_time;
+  }
+
+  double start_time = 0.0;
+};

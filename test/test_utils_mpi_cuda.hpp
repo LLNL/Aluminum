@@ -27,55 +27,37 @@
 
 #pragma once
 
-#include <memory>
-#include <cuda_runtime.h>
-#include "test_utils_cuda.hpp"
+#include "Al.hpp"
 
-template <>
-struct VectorType<Al::MPICUDABackend> {
-  using type = CUDAVector<float>;
+#include "test_utils.hpp"
+#include "test_utils_mpi.hpp"
+#include "cuda_vector.hpp"
+
+
+template <typename T>
+struct VectorType<T, Al::MPICUDABackend> {
+  using type = CUDAVector<T>;
+
+  static type gen_data(size_t count) {
+    auto&& host_data = VectorType<T, Al::MPIBackend>::gen_data(count);
+    CUDAVector<T> data(host_data);
+    return data;
+  }
+
+  static std::vector<T> copy_to_host(const type& v) {
+    return v.copyout();
+  }
 };
 
+// Specialize to create a CUDA stream with the communicator.
 template <>
-typename VectorType<Al::MPICUDABackend>::type
-gen_data<Al::MPICUDABackend>(size_t count) {
-  auto &&host_data = gen_data<Al::MPIBackend>(count);
-  CUDAVector<float> data(host_data);
-  return data;
-}
-
-template <>
-inline void start_timer<Al::MPICUDABackend>(typename Al::MPICUDABackend::comm_type& comm) {
-  cudaEvent_t start = get_timer_events().first;
-  AL_FORCE_CHECK_CUDA_NOSYNC(cudaEventRecord(start, comm.get_stream()));
-}
-
-template <>
-inline double finish_timer<Al::MPICUDABackend>(typename Al::MPICUDABackend::comm_type& comm) {
-  std::pair<cudaEvent_t, cudaEvent_t> events = get_timer_events();
-  AL_FORCE_CHECK_CUDA_NOSYNC(cudaEventRecord(events.second, comm.get_stream()));
-  AL_FORCE_CHECK_CUDA_NOSYNC(cudaEventSynchronize(events.second));
-  float elapsed;
-  AL_FORCE_CHECK_CUDA_NOSYNC(cudaEventElapsedTime(&elapsed, events.first, events.second));
-  return elapsed/1000.0;  // ms -> s
-}
-
-template <>
-inline typename Al::MPICUDABackend::req_type
-get_request<Al::MPICUDABackend>() {
-  return Al::MPICUDABackend::null_req;
-}
-
-template <>
-inline typename Al::MPICUDABackend::comm_type get_comm_with_stream<Al::MPICUDABackend>(
-  MPI_Comm c) {
+CommWrapper<Al::MPICUDABackend>::CommWrapper(MPI_Comm mpi_comm) {
   cudaStream_t stream;
   AL_FORCE_CHECK_CUDA_NOSYNC(cudaStreamCreate(&stream));
-  return Al::MPICUDABackend::comm_type(c, stream);
+  comm_ = std::make_unique<typename Al::MPICUDABackend::comm_type>(
+    mpi_comm, stream);
 }
-
 template <>
-inline void free_comm_with_stream<Al::MPICUDABackend>(
-  typename Al::MPICUDABackend::comm_type& c) {
-  AL_FORCE_CHECK_CUDA_NOSYNC(cudaStreamDestroy(c.get_stream()));
+CommWrapper<Al::MPICUDABackend>::~CommWrapper() noexcept(false) {
+  AL_FORCE_CHECK_CUDA_NOSYNC(cudaStreamDestroy(comm_->get_stream()));
 }

@@ -27,83 +27,292 @@
 
 #pragma once
 
-#include <vector>
-#include <random>
-#include <chrono>
-#include <sstream>
-
 #include "Al.hpp"
 
-namespace {
-static std::mt19937 rng_gen;
-static bool rng_seeded = false;
+#include <iostream>
+#include <vector>
+#include <limits>
+#include <random>
+#include <cstdlib>
+#include <cxxopts.hpp>
+
+
+/** Helper for generating random data. */
+template <typename T, typename Generator,
+          std::enable_if_t<std::is_floating_point<T>::value, bool> = true>
+T gen_random_val(Generator& g) {
+  std::uniform_real_distribution<T> rng;
+  return rng(g);
 }
-
-template <typename Backend>
-struct VectorType {
-  using type = std::vector<float>;
-};
-
-template <typename Backend>
-typename VectorType<Backend>::type get_vector(size_t count) {
-  return typename VectorType<Backend>::type(count);
-}
-
-/** Parse input arguments. */
-void parse_args(int argc, char** argv,
-                std::string& backend, size_t& start_size, size_t& max_size) {
-  if (argc == 1) {
-    backend = "MPI";
-    return;
-  } else {
-    backend = argv[1];
-    if (argc == 3) {
-      start_size = std::stoul(argv[2]);
-      max_size = start_size;
-    } else if (argc == 4) {
-      start_size = std::stoul(argv[2]);
-      max_size = std::stoul(argv[3]);
-    } else if (argc > 5) {
-      std::cerr << "Unexpected argument." << std::endl;
-      std::abort();
-    }
-  }
-  if (backend != "MPI"
-#ifdef AL_HAS_NCCL
-      && backend != "NCCL"
-#endif
-#ifdef AL_HAS_MPI_CUDA
-      && backend != "MPI-CUDA"
-#endif
-#ifdef AL_HAS_HOST_TRANSFER
-      && backend != "HT"
-#endif
-    ) {
-    std::cerr << "Usage: " << argv[0] << " [MPI"
-#ifdef AL_HAS_NCCL
-              << " | NCCL"
-#endif
-#ifdef AL_HAS_MPI_CUDA
-              << " | MPI-CUDA"
-#endif
-#ifdef AL_HAS_HOST_TRANSFER
-              << " | HT"
-#endif
-              << "] [start size] [max size]"
-              << std::endl;
-    std::abort();
-  }
+template <typename T, typename Generator,
+          std::enable_if_t<std::is_integral<T>::value, bool> = true>
+T gen_random_val(Generator& g) {
+  std::uniform_int_distribution<T> rng;
+  return rng(g);
 }
 
 /**
- * Return every size to test between start_size and max_size (inclusive).
- * If odds is true, generate odd-numbered values too.
+ * Identify the type of vector to be used for each backend.
+ *
+ * By default this is std::vector<T>.
+ */
+template <typename T, typename Backend>
+struct VectorType {
+  using type = std::vector<T>;
+
+  /** Generate a vector of random data of size count. */
+  static type gen_data(size_t count) {
+    static bool rng_seeded = false;
+    static std::minstd_rand rng_gen;
+    if (!rng_seeded) {
+      // Seed using the MPI rank (only if MPI has been initialized).
+      int flag;
+      MPI_Initialized(&flag);
+      if (flag) {
+        int rank;
+        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        rng_gen.seed(rank + 1);
+        rng_seeded = true;
+      }
+    }
+    type v(count);
+    for (size_t i = 0; i < count; ++i) {
+      v[i] = gen_random_val<T>(rng_gen);
+    }
+    return v;
+  }
+
+  /** Return a copy of the data on the host. */
+  static std::vector<T> copy_to_host(const type& v) {
+    return std::vector<T>(v);
+  }
+};
+
+/** Return a vector of size count. */
+template <typename T, typename Backend>
+typename VectorType<T, Backend>::type get_vector(size_t count) {
+  return typename VectorType<T, Backend>::type(count);
+}
+
+/** RAII manager for a communicator. */
+template <typename Backend>
+struct CommWrapper {
+  std::unique_ptr<typename Backend::comm_type> comm_;
+  CommWrapper(MPI_Comm mpi_comm) :
+    comm_(std::make_unique<typename Backend::comm_type>(mpi_comm)) {}
+  // Not noexcept because CUDA specializations might throw.
+  ~CommWrapper() noexcept(false) {};
+  typename Backend::comm_type& comm() { return *comm_; }
+  const typename Backend::comm_type& comm() const { return *comm_; }
+  int rank() const { return comm_->rank(); }
+  int size() const { return comm_->size(); }
+};
+
+/**
+ * Helper to hang for debugging.
+ *
+ * If non-negative, hangs that rank; if negative, hangs all ranks.
+ */
+void hang_for_debugging(int hang_rank) {
+  int rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  if (hang_rank < 0 || rank == hang_rank) {
+    if (hang_rank < 0 && rank == 0) {
+      std::cout << "Hanging all ranks" << std::endl;
+    } else if (rank == hang_rank) {
+      std::cout << "Hanging rank " << rank << std::endl;
+    }
+    volatile bool hang = true;
+    while (hang) {}
+  }
+}
+
+/** Helper for dispatch_from_args, handles type dispatch. */
+template <typename Backend, typename F>
+void dispatch_to_backend_type_helper(cxxopts::ParseResult& parsed_opts,
+                                     F functor) {
+  const std::unordered_map<std::string, std::function<void()>> dispatch = {
+    {"char", [&]() { functor.template operator()<Backend, char>(parsed_opts); } },
+    {"schar", [&]() { functor.template operator()<Backend, signed char>(parsed_opts); } },
+    {"uchar", [&]() { functor.template operator()<Backend, unsigned char>(parsed_opts); } },
+    {"short", [&]() { functor.template operator()<Backend, short>(parsed_opts); } },
+    {"ushort", [&]() { functor.template operator()<Backend, unsigned short>(parsed_opts); } },
+    {"int", [&]() { functor.template operator()<Backend, int>(parsed_opts); } },
+    {"uint", [&]() { functor.template operator()<Backend, unsigned int>(parsed_opts); } },
+    {"long", [&]() { functor.template operator()<Backend, long>(parsed_opts); } },
+    {"ulong", [&]() { functor.template operator()<Backend, unsigned long>(parsed_opts); } },
+    {"longlong", [&]() { functor.template operator()<Backend, long long>(parsed_opts); } },
+    {"ulonglong", [&]() { functor.template operator()<Backend, unsigned long long>(parsed_opts); } },
+    {"float", [&]() { functor.template operator()<Backend, float>(parsed_opts); } },
+    {"double", [&]() { functor.template operator()<Backend, double>(parsed_opts); } },
+    {"longdouble", [&]() { functor.template operator()<Backend, long double>(parsed_opts); } },
+#ifdef AL_HAS_NCCL
+    {"half", [&]() { functor.template operator()<Backend, __half>(parsed_opts); } },
+#endif
+  };
+  auto datatype = parsed_opts["datatype"].as<std::string>();
+  auto i = dispatch.find(datatype);
+  if (i == dispatch.end()) {
+    std::cerr << "Unknown datatype " << datatype << std::endl;
+    std::abort();
+  }
+  i->second();
+}
+
+/**
+ * Run a functor with a backend and type given in parsed_opts.
+ *
+ * Excepts a "backend" and "datatype" argument.
+ */
+template <typename F>
+void dispatch_to_backend(cxxopts::ParseResult& parsed_opts, F functor) {
+  const std::unordered_map <std::string, std::function<void()>> dispatch = {
+    {"mpi", [&](){ dispatch_to_backend_type_helper<Al::MPIBackend>(parsed_opts, functor); } },
+#ifdef AL_HAS_NCCL
+    {"nccl", [&](){ dispatch_to_backend_type_helper<Al::NCCLBackend>(parsed_opts, functor); } },
+#endif
+#ifdef AL_HAS_HOST_TRANSFER
+    {"ht", [&](){ dispatch_to_backend_type_helper<Al::HostTransferBackend>(parsed_opts, functor); } },
+#endif
+  };
+  auto backend = parsed_opts["backend"].as<std::string>();
+  auto i = dispatch.find(backend);
+  if (i == dispatch.end()) {
+    std::cerr << "Unsupported backend " << backend << std::endl;
+    std::abort();
+  }
+  i->second();
+}
+
+#ifdef AL_HAS_CUDA
+
+/**
+ * Return the number of GPUs to use on the system.
+ *
+ * By default this will use CUDA to determine how many GPUs there are.
+ * This can be overridden using the AL_NUM_GPUS environment variable.
+ */
+inline int get_number_of_gpus() {
+  int num_gpus = 0;
+  char* env = std::getenv("AL_NUM_GPUS");
+  if (env) {
+    num_gpus = std::atoi(env);
+    if (num_gpus == 0) {
+      std::cerr << "AL_NUM_GPUS either 0 or invalid value: "
+                << env << std::endl;
+      std::abort();
+    }
+  } else {
+    AL_FORCE_CHECK_CUDA_NOSYNC(cudaGetDeviceCount(&num_gpus));
+  }
+  return num_gpus;
+}
+
+#endif  /** AL_HAS_CUDA */
+
+/** Attempt to identify the local rank on a node from the environment. */
+inline int get_local_rank() {
+  char* env = std::getenv("MV2_COMM_WORLD_LOCAL_RANK");
+  if (!env) {
+    env = std::getenv("OMPI_COMM_WORLD_LOCAL_RANK");
+  }
+  if (!env) {
+    env = std::getenv("SLURM_LOCALID");
+  }
+  if (!env) {
+    std::cerr << "Cannot determine local rank" << std::endl;
+    std::abort();
+  }
+  return std::atoi(env);
+}
+
+/** Attempt to identify the number of ranks on a node from the environment. */
+inline int get_local_size() {
+  char *env = std::getenv("MV2_COMM_WORLD_LOCAL_SIZE");
+  if (!env) {
+    env = std::getenv("OMPI_COMM_WORLD_LOCAL_SIZE");
+  }
+  if (!env) {
+    env = std::getenv("SLURM_NTASKS_PER_NODE");
+  }
+  if (!env) {
+    std::cerr << "Cannot determine local size" << std::endl;
+    std::abort();
+  }
+  return std::atoi(env);
+}
+
+#ifdef AL_HAS_CUDA
+
+/**
+ * Attempt to automatically set the CUDA device to something reasonable.
+ *
+ * Returns the index of the device that was selected.
+ */
+inline int set_device() {
+  const int num_gpus = get_number_of_gpus();
+  const int local_rank = get_local_rank();
+  const int local_size = get_local_size();
+  if (num_gpus < local_size) {
+    std::cerr << "Number of available GPUs (" << num_gpus << ")"
+              << " is smaller than the number of local MPI ranks"
+              << "(" << local_size << ")" << std::endl;
+    std::abort();
+  }
+  AL_FORCE_CHECK_CUDA_NOSYNC(cudaSetDevice(local_rank));
+  return local_rank;
+}
+
+#endif  /** AL_HAS_CUDA */
+
+/** Attempt to nicely initialize Aluminum. */
+inline void test_init_aluminum(int& argc, char**& argv) {
+#ifdef AL_HAS_CUDA
+  set_device();
+#endif
+  Al::Initialize(argc, argv);
+}
+
+/** Attempt to nicely finalize Aluminum. */
+inline void test_fini_aluminum() {
+  Al::Finalize();
+}
+
+/** Compare two vectors with a given tolerance. */
+template <typename T>
+bool check_vector(const std::vector<T> &expected,
+                  const std::vector<T> &actual,
+                  size_t start = 0,
+                  size_t end = std::numeric_limits<size_t>::max(),
+                  const T eps = T(1e-4)) {
+  if (end == std::numeric_limits<size_t>::max()) {
+    end = expected.size();
+  }
+  if (expected.size() != actual.size()) {
+    return false;
+  }
+  for (size_t i = start; i < end; ++i) {
+    const T diff = (expected[i] > actual[i])
+      ? expected[i] - actual[i]
+      : actual[i] - expected[i];
+    if (diff > eps) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Return a set of sizes to test between start_size and max_size (inclusive).
+ *
+ * If odds is true, ensure odd-numbered sizes are generated.
  */
 std::vector<size_t> get_sizes(size_t start_size, size_t max_size,
                               bool odds = false) {
   std::vector<size_t> sizes;
   if (start_size == 0) {
     sizes.push_back(0);
+    start_size = 1;
   }
   for (size_t size = start_size; size <= max_size; size *= 2) {
     sizes.push_back(size);
@@ -114,49 +323,19 @@ std::vector<size_t> get_sizes(size_t start_size, size_t max_size,
   return sizes;
 }
 
-/** Generate random data of length count. */
-template <typename Backend=Al::MPIBackend>
-typename VectorType<Backend>::type gen_data(size_t count);
-
-template <>
-typename VectorType<Al::MPIBackend>::type
-gen_data<Al::MPIBackend>(size_t count) {
-  if (!rng_seeded) {
-    int flag;
-    MPI_Initialized(&flag);
-    if (flag) {
-      int rank;
-      MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-      rng_gen.seed(rank);
-      rng_seeded = true;
-    }
+/**
+ * Helper to call get_sizes based on parsed options.
+ *
+ * Expects the options "size", "min-size", and "max-size".
+ */
+std::vector<size_t> get_sizes_from_opts(cxxopts::ParseResult& parsed_opts) {
+  size_t min_size = parsed_opts["min-size"].as<size_t>();
+  size_t max_size = parsed_opts["max-size"].as<size_t>();
+  if (parsed_opts.count("size")) {
+    min_size = parsed_opts["size"].as<size_t>();
+    max_size = min_size;
   }
-  std::uniform_real_distribution<float> rng;
-  std::vector<float> v(count);
-  for (size_t i = 0; i < count; ++i) {
-    v[i] = rng(rng_gen);
-  }
-  return v;
-}
-
-template <typename Backend=Al::MPIBackend>
-typename VectorType<Backend>::type create_data(size_t count);
-
-template <>
-typename VectorType<Al::MPIBackend>::type
-create_data<Al::MPIBackend>(size_t count) {
-  std::vector<float> v(count);
-  for (size_t i = 0; i < count; ++i) {
-    v[i] = 0.0;
-  }
-  return v;
-}
-
-/** Get current time. */
-inline double get_time() {                                                      
-  using namespace std::chrono;                                                  
-  return duration_cast<duration<double>>(                                       
-    steady_clock::now().time_since_epoch()).count();                            
+  return get_sizes(min_size, max_size);
 }
 
 /** Return a human-readable string for size. */
@@ -177,485 +356,15 @@ std::string human_readable_size(size_t size_) {
   return std::to_string(size) + " G";
 }
 
-template <typename Backend>
-std::vector<typename Backend::allreduce_algo_type> get_allreduce_algorithms() {
-  std::vector<typename Backend::allreduce_algo_type> algos = {
-    Backend::allreduce_algo_type::automatic};
-  return algos;
-}
-
-template <typename Backend>
-std::vector<typename Backend::reduce_algo_type> get_reduce_algorithms() {
-  std::vector<typename Backend::reduce_algo_type> algos = {
-    Backend::reduce_algo_type::automatic};
-  return algos;
-}
-
-template <typename Backend>
-std::vector<typename Backend::reduce_scatter_algo_type> get_reduce_scatter_algorithms() {
-  std::vector<typename Backend::reduce_scatter_algo_type> algos = {
-    Backend::reduce_scatter_algo_type::automatic};
-  return algos;
-}
-
-template <typename Backend>
-std::vector<typename Backend::reduce_scatterv_algo_type> get_reduce_scatterv_algorithms() {
-  std::vector<typename Backend::reduce_scatterv_algo_type> algos = {
-    Backend::reduce_scatterv_algo_type::automatic};
-  return algos;
-}
-
-template <typename Backend>
-std::vector<typename Backend::allgather_algo_type> get_allgather_algorithms() {
-  std::vector<typename Backend::allgather_algo_type> algos = {
-    Backend::allgather_algo_type::automatic};
-  return algos;
-}
-
-template <typename Backend>
-std::vector<typename Backend::allgatherv_algo_type> get_allgatherv_algorithms() {
-  std::vector<typename Backend::allgatherv_algo_type> algos = {
-    Backend::allgatherv_algo_type::automatic};
-  return algos;
-}
-
-template <typename Backend>
-std::vector<typename Backend::bcast_algo_type> get_bcast_algorithms() {
-  std::vector<typename Backend::bcast_algo_type> algos = {
-    Backend::bcast_algo_type::automatic};
-  return algos;
-}
-
-template <typename Backend>
-std::vector<typename Backend::alltoall_algo_type> get_alltoall_algorithms() {
-  std::vector<typename Backend::alltoall_algo_type> algos = {
-    Backend::alltoall_algo_type::automatic};
-  return algos;
-}
-
-template <typename Backend>
-std::vector<typename Backend::alltoallv_algo_type> get_alltoallv_algorithms() {
-  std::vector<typename Backend::alltoallv_algo_type> algos = {
-    Backend::alltoallv_algo_type::automatic};
-  return algos;
-}
-
-template <typename Backend>
-std::vector<typename Backend::gather_algo_type> get_gather_algorithms() {
-  std::vector<typename Backend::gather_algo_type> algos = {
-    Backend::gather_algo_type::automatic};
-  return algos;
-}
-
-template <typename Backend>
-std::vector<typename Backend::scatter_algo_type> get_scatter_algorithms() {
-  std::vector<typename Backend::scatter_algo_type> algos = {
-    Backend::scatter_algo_type::automatic};
-  return algos;
-}
-
-template <typename Backend>
-std::vector<typename Backend::gatherv_algo_type> get_gatherv_algorithms() {
-  std::vector<typename Backend::gatherv_algo_type> algos = {
-    Backend::gatherv_algo_type::automatic};
-  return algos;
-}
-
-template <typename Backend>
-std::vector<typename Backend::scatterv_algo_type> get_scatterv_algorithms() {
-  std::vector<typename Backend::scatterv_algo_type> algos = {
-    Backend::scatterv_algo_type::automatic};
-  return algos;
-}
-
-template <>
-std::vector<Al::MPIBackend::allreduce_algo_type>
-get_allreduce_algorithms<Al::MPIBackend>() {  
-   std::vector<Al::MPIAllreduceAlgorithm> algos = {
-     Al::MPIAllreduceAlgorithm::automatic,
-     Al::MPIAllreduceAlgorithm::mpi_passthrough,
-     Al::MPIAllreduceAlgorithm::mpi_recursive_doubling,
-     Al::MPIAllreduceAlgorithm::mpi_ring,
-     Al::MPIAllreduceAlgorithm::mpi_rabenseifner,
-     Al::MPIAllreduceAlgorithm::mpi_biring
-  };
-  return algos;
-}
-
-template <typename Backend>
-std::vector<typename Backend::allreduce_algo_type> get_nb_allreduce_algorithms() {
-  std::vector<typename Backend::allreduce_algo_type> algos = {
-    Backend::allreduce_algo_type::automatic};
-  return algos;
-}
-
-template <typename Backend>
-std::vector<typename Backend::reduce_algo_type> get_nb_reduce_algorithms() {
-  std::vector<typename Backend::reduce_algo_type> algos = {
-    Backend::reduce_algo_type::automatic};
-  return algos;
-}
-
-template <typename Backend>
-std::vector<typename Backend::reduce_scatter_algo_type> get_nb_reduce_scatter_algorithms() {
-  std::vector<typename Backend::reduce_scatter_algo_type> algos = {
-    Backend::reduce_scatter_algo_type::automatic};
-  return algos;
-}
-
-template <typename Backend>
-std::vector<typename Backend::reduce_scatterv_algo_type> get_nb_reduce_scatterv_algorithms() {
-  std::vector<typename Backend::reduce_scatterv_algo_type> algos = {
-    Backend::reduce_scatterv_algo_type::automatic};
-  return algos;
-}
-
-template <typename Backend>
-std::vector<typename Backend::allgather_algo_type> get_nb_allgather_algorithms() {
-  std::vector<typename Backend::allgather_algo_type> algos = {
-    Backend::allgather_algo_type::automatic};
-  return algos;
-}
-
-template <typename Backend>
-std::vector<typename Backend::allgatherv_algo_type> get_nb_allgatherv_algorithms() {
-  std::vector<typename Backend::allgatherv_algo_type> algos = {
-    Backend::allgatherv_algo_type::automatic};
-  return algos;
-}
-
-template <typename Backend>
-std::vector<typename Backend::bcast_algo_type> get_nb_bcast_algorithms() {
-  std::vector<typename Backend::bcast_algo_type> algos = {
-    Backend::bcast_algo_type::automatic};
-  return algos;
-}
-
-template <typename Backend>
-std::vector<typename Backend::alltoall_algo_type> get_nb_alltoall_algorithms() {
-  std::vector<typename Backend::alltoall_algo_type> algos = {
-    Backend::alltoall_algo_type::automatic};
-  return algos;
-}
-
-template <typename Backend>
-std::vector<typename Backend::alltoallv_algo_type> get_nb_alltoallv_algorithms() {
-  std::vector<typename Backend::alltoallv_algo_type> algos = {
-    Backend::alltoallv_algo_type::automatic};
-  return algos;
-}
-
-template <typename Backend>
-std::vector<typename Backend::gather_algo_type> get_nb_gather_algorithms() {
-  std::vector<typename Backend::gather_algo_type> algos = {
-    Backend::gather_algo_type::automatic};
-  return algos;
-}
-
-template <typename Backend>
-std::vector<typename Backend::scatter_algo_type> get_nb_scatter_algorithms() {
-  std::vector<typename Backend::scatter_algo_type> algos = {
-    Backend::scatter_algo_type::automatic};
-  return algos;
-}
-
-template <typename Backend>
-std::vector<typename Backend::gatherv_algo_type> get_nb_gatherv_algorithms() {
-  std::vector<typename Backend::gatherv_algo_type> algos = {
-    Backend::gatherv_algo_type::automatic};
-  return algos;
-}
-
-template <typename Backend>
-std::vector<typename Backend::scatterv_algo_type> get_nb_scatterv_algorithms() {
-  std::vector<typename Backend::scatterv_algo_type> algos = {
-    Backend::scatterv_algo_type::automatic};
-  return algos;
-}
- 
-template <>
-std::vector<Al::MPIBackend::allreduce_algo_type>
-get_nb_allreduce_algorithms<Al::MPIBackend>() {  
-  std::vector<Al::MPIAllreduceAlgorithm> algos = {
-    Al::MPIAllreduceAlgorithm::automatic,
-    Al::MPIAllreduceAlgorithm::mpi_passthrough,
-    Al::MPIAllreduceAlgorithm::mpi_recursive_doubling,
-    Al::MPIAllreduceAlgorithm::mpi_ring,
-    Al::MPIAllreduceAlgorithm::mpi_rabenseifner
-  };
-  return algos;
-}
-
-#define eps (1e-4)
-
-bool check_vector(const std::vector<float>& expected,
-                  const std::vector<float>& actual,
-                  size_t start = 0,
-                  size_t end = std::numeric_limits<size_t>::max()) {
-  int rank;
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  if (end == std::numeric_limits<size_t>::max()) {
-    end = expected.size();
-  }
-  for (size_t i = start; i < end; ++i) {
-    float e = expected[i];
-    if (std::abs(e - actual[i]) > eps) {
-#ifdef AL_DEBUG
-      std::stringstream ss;
-      ss << "[" << rank << "] @" << i << " Expected: " << e
-                << ", Actual: " << actual[i] << "\n";
-      // Helpful for debugging to print out small vectors completely.
-      if (expected.size() < 128) {
-        ss << "[" << rank << "] expected: ";
-        for (const auto& v : expected) ss << v << " ";
-        ss << "actual: ";
-        for (const auto& v : actual) ss << v << " ";
-        ss << "\n";
-      }
-      std::cerr << ss.str();
+// Pull in relevant headers for simplicity.
+#include "op_dispatcher.hpp"
+#include "test_utils_mpi.hpp"
+#ifdef AL_HAS_NCCL
+#include "test_utils_nccl.hpp"
 #endif
-      return false;
-    }
-  }
-  return true;
-}
-
-// Stores statistics related to a set of measurements.
-struct MeasurementStats {
-  // This is not const or by reference so we can use nth_element.
-  MeasurementStats(std::vector<double> times) {
-    const double sum = std::accumulate(times.begin(), times.end(), 0.0);
-    mean = sum / times.size();
-    if (times.size() > 1) {
-      double sqsum = 0.0;
-      for (const auto& t : times) sqsum += (t - mean) * (t - mean);
-      stdev = std::sqrt(1.0 / (times.size() - 1) * sqsum);
-    }
-    std::nth_element(times.begin(), times.begin() + times.size() / 2, times.end());
-    median = times[times.size() / 2];
-    auto minmax = std::minmax_element(times.begin(), times.end());
-    min = *(minmax.first);
-    max = *(minmax.second);
-  }
-  double mean = 0.0;
-  double median = 0.0;
-  double min = 0.0;
-  double max = 0.0;
-  double stdev = 0.0;
-};
-
-void print_stats(std::vector<double>& times) {
-  MeasurementStats stats(times);
-  std::cout << "mean=" << stats.mean << " median=" << stats.median <<
-    " min=" << stats.min << " max=" << stats.max << " stdev=" << stats.stdev <<
-    std::endl;
-}
-
-// Stores runs for profiling a collective.
-template <typename Backend, typename AlgoType>
-struct CollectiveProfile {
-  CollectiveProfile(std::string coll_name_) : coll_name(coll_name_) {}
-  // Size is expected to be the size of a single segment.
-  void add_result(const typename Backend::comm_type& comm,
-                  size_t size, AlgoType algo,
-                  bool inplace, double t,
-                  size_t num_segments = 1, bool mod_segments = true) {
-    results.emplace_back(
-      std::make_tuple(
-        comm.size(), comm.rank(), size, algo, inplace, t,
-        num_segments, mod_segments));
-  }
-  void print_result_table() {
-    // Print header.
-    std::cout << "Backend Collective CommSize Segments ModSeg CommRank "
-              << "CollSize Algo InPlace Time" << std::endl;
-    for (const auto& result : results) {
-      size_t segments = std::get<6>(result);
-      std::cout << Backend::Name() << " "
-                << coll_name << " "
-                << (std::get<0>(result)*segments) << " "
-                << segments << " "
-                << std::get<7>(result) << " "
-                << std::get<1>(result) << " "
-                << std::get<2>(result) << " "
-                << Al::algorithm_name(std::get<3>(result)) << " "
-                << std::get<4>(result) << " "
-                << std::get<5>(result) << "\n";
-    }
-    std::flush(std::cout);
-  }
-  std::string coll_name;
-  // Communicator size, rank, collective size, algorithm, inplace, time,
-  // number of segments, whether segments are computed modulo rank
-  std::vector<std::tuple<int,
-                         int,
-                         size_t,
-                         AlgoType,
-                         bool,
-                         double,
-                         size_t,
-                         bool>>
-                   results;
-};
-
-// Stores runs for profiling point-to-point operations.
-template <typename Backend>
-struct PtToPtProfile {
-  PtToPtProfile(std::string op_name_) : op_name(op_name_) {}
-
-  void add_result(const typename Backend::comm_type& comm,
-                  size_t size, double t) {
-    results.emplace_back(
-      std::make_tuple(
-        comm.rank(), size, t));
-  }
-
-  void print_result_table() {
-    // Print header.
-    std::stringstream ss;
-    ss << "Backend Op CommRank Size Time\n";
-    for (const auto& result : results) {
-      ss << Backend::Name() << " "
-         << op_name << " "
-         << std::get<0>(result) << " "
-         << std::get<1>(result) << " "
-         << std::get<2>(result) << "\n";
-    }
-    std::cout << ss.str();
-    std::flush(std::cout);
-  }
-
-  std::string op_name;
-  // Rank, message size, time.
-  std::vector<std::tuple<int, size_t, double>> results;
-};
-
-template <typename Backend>
-void start_timer(typename Backend::comm_type& comm);
-
-template <typename Backend>
-double finish_timer(typename Backend::comm_type& comm);
-
-inline double& get_cur_time() {
-  static double t = 0.0;
-  return t;
-}
-
-template <>
-inline void start_timer<Al::MPIBackend>(typename Al::MPIBackend::comm_type&) {
-  double& t = get_cur_time();
-  t = get_time();
-}
-
-template <>
-inline double finish_timer<Al::MPIBackend>(typename Al::MPIBackend::comm_type&) {
-  double& t = get_cur_time();
-  return get_time() - t;
-}
-
-template <typename Backend>
-typename Backend::req_type get_request();
-
-template <>
-inline typename Al::MPIBackend::req_type
-get_request<Al::MPIBackend>() {
-  return Al::MPIBackend::null_req;
-}
-
-template <typename Backend>
-typename Backend::comm_type get_comm_with_stream(MPI_Comm c);
-
-template <typename Backend>
-void free_comm_with_stream(typename Backend::comm_type& c);
-
-template <>
-inline typename Al::MPIBackend::comm_type get_comm_with_stream<Al::MPIBackend>(
-  MPI_Comm c) {
-  return Al::MPIBackend::comm_type(c);
-}
-
-template <>
-inline void free_comm_with_stream<Al::MPIBackend>(
-  typename Al::MPIBackend::comm_type&) {}
-
-void get_expected_allreduce_result(std::vector<float>& expected) {
-  MPI_Allreduce(MPI_IN_PLACE, expected.data(), expected.size(),
-                MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
-}
-
-void get_expected_reduce_scatter_result(std::vector<float>& expected) {
-  int nprocs;
-  MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
-  MPI_Reduce_scatter_block(MPI_IN_PLACE, expected.data(),
-                           expected.size() / nprocs,
-                           MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
-}
-
-void get_expected_allgather_result(std::vector<float>& input,
-                                   std::vector<float>& expected) {
-  MPI_Allgather(input.data(), input.size(), MPI_FLOAT,
-                expected.data(), input.size(), MPI_FLOAT,
-                MPI_COMM_WORLD);
-}
-
-void get_expected_allgather_inplace_result(std::vector<float>& expected) {
-  int nprocs;
-  MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
-  MPI_Allgather(MPI_IN_PLACE, expected.size() / nprocs, MPI_FLOAT,
-                expected.data(), expected.size() / nprocs, MPI_FLOAT,
-                MPI_COMM_WORLD);
-}
-
-void get_expected_alltoall_result(std::vector<float>& expected) {
-  int nprocs;
-  MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
-  MPI_Alltoall(MPI_IN_PLACE, expected.size() / nprocs, MPI_FLOAT,
-               expected.data(), expected.size() / nprocs, MPI_FLOAT,
-               MPI_COMM_WORLD);
-}
-
-void get_expected_reduce_result(std::vector<float>& expected) {
-  int rank;
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  if (rank == 0) {
-    MPI_Reduce(MPI_IN_PLACE, expected.data(), expected.size(),
-               MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
-  } else {
-    MPI_Reduce(expected.data(), expected.data(), expected.size(),
-               MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
-  }
-}
-
-void get_expected_bcast_result(std::vector<float>& expected) {
-  MPI_Bcast(expected.data(), expected.size(), MPI_FLOAT, 0, MPI_COMM_WORLD);
-}
-
-void get_expected_gather_result(std::vector<float>& expected) {
-  int rank, nprocs;
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
-  if (rank == 0) {
-    MPI_Gather(MPI_IN_PLACE, expected.size() / nprocs, MPI_FLOAT,
-               expected.data(), expected.size() / nprocs, MPI_FLOAT,
-               0, MPI_COMM_WORLD);
-  } else {
-    MPI_Gather(expected.data(), expected.size() / nprocs, MPI_FLOAT,
-               expected.data(), expected.size() / nprocs, MPI_FLOAT,
-               0, MPI_COMM_WORLD);
-  }
-}
-
-void get_expected_scatter_result(std::vector<float>& expected) {
-  int rank, nprocs;
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
-  if (rank == 0) {
-    MPI_Scatter(expected.data(), expected.size() / nprocs, MPI_FLOAT,
-                MPI_IN_PLACE, expected.size() / nprocs, MPI_FLOAT,
-                0, MPI_COMM_WORLD);
-  } else {
-    MPI_Scatter(expected.data(), expected.size() / nprocs, MPI_FLOAT,
-                expected.data(), expected.size() / nprocs, MPI_FLOAT,
-                0, MPI_COMM_WORLD);
-  }
-}
+#ifdef AL_HAS_HOST_TRANSFER
+#include "test_utils_ht.hpp"
+#endif
+#ifdef AL_HAS_MPI_CUDA
+#include "test_utils_mpi_cuda.hpp"
+#endif
