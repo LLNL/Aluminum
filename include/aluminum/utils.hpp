@@ -46,7 +46,7 @@ inline double get_time() {
  */
 template <typename T>
 inline std::vector<T> excl_prefix_sum(const std::vector<T>& v) {
-  std::vector<T> r = std::vector<T>(v.size(), T{0});
+  auto r = std::vector<T>(v.size(), T{0});
   for (size_t i = 1; i < v.size(); ++i) {
     r[i] = v[i-1] + r[i-1];
   }

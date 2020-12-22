@@ -141,7 +141,8 @@ int main(int argc, char** argv) {
   // Simple validation.
   if (!parsed_opts.count("backend")) {
     std::cerr << "Must provide a backend to use" << std::endl;
-    std::abort();
+    test_fini_aluminum();
+    return EXIT_FAILURE;
   }
 
   test_fini_aluminum();

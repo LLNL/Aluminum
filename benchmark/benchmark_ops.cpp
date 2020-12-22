@@ -230,11 +230,13 @@ int main(int argc, char** argv) {
   // Simple validation.
   if (!parsed_opts.count("op")) {
     std::cerr << "Must provide an operator to test" << std::endl;
-    std::abort();
+    test_fini_aluminum();
+    return EXIT_FAILURE;
   }
   if (!parsed_opts.count("backend")) {
     std::cerr << "Must provide a backend to use" << std::endl;
-    std::abort();
+    test_fini_aluminum();
+    return EXIT_FAILURE;
   }
 
   dispatch_to_backend(parsed_opts, benchmark_dispatcher());
