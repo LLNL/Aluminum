@@ -43,7 +43,7 @@ template <> inline MPI_Datatype TypeMap<short>() { return MPI_SHORT; }
 template <> inline MPI_Datatype TypeMap<unsigned short>() { return MPI_UNSIGNED_SHORT; }
 template <> inline MPI_Datatype TypeMap<int>() { return MPI_INT; }
 template <> inline MPI_Datatype TypeMap<unsigned int>() { return MPI_UNSIGNED; }
-template <> inline MPI_Datatype TypeMap<long int>() { return MPI_LONG_INT; }
+template <> inline MPI_Datatype TypeMap<long int>() { return MPI_LONG; }
 template <> inline MPI_Datatype TypeMap<unsigned long int>() { return MPI_UNSIGNED_LONG; }
 template <> inline MPI_Datatype TypeMap<long long int>() { return MPI_LONG_LONG_INT; }
 template <> inline MPI_Datatype TypeMap<unsigned long long int>() { return MPI_UNSIGNED_LONG_LONG; }
