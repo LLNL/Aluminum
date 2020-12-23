@@ -17,6 +17,8 @@ parser.add_argument('--launcher', type=str, default='jsrun',
                     help='Which parallel launcher to use')
 parser.add_argument('--test-ops', type=str, default='./test_ops.exe',
                     help='Path to test_ops binary')
+parser.add_argument('--extra-args', type=str,
+                    help='Extra arguments to pass to launcher')
 
 
 # Supported datatypes for backends.
@@ -107,6 +109,8 @@ def run_test(args, num_procs, backend, operator, datatype, inplace,
              nonblocking, root):
     """Run a specified test."""
     launcher_cmd = launcher_funcs[args.launcher](num_procs, args)
+    if args.extra_args:
+        launcher_cmd += args.extra_args.split(' ')
     test_cmd = [args.test_ops,
                 '--op', operator,
                 '--backend', backend,
