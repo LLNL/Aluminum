@@ -14,6 +14,10 @@ set(ALUMINUM_VERSION_MINOR 5)
 set(ALUMINUM_VERSION_PATCH 0)
 set(ALUMINUM_VERSION "${ALUMINUM_VERSION_MAJOR}.${ALUMINUM_VERSION_MINOR}.${ALUMINUM_VERSION_PATCH}")
 
+if (NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif ()
+
 project(ALUMINUM VERSION ${ALUMINUM_VERSION} LANGUAGES CXX)
 # Not "CUDA" just yet since that's only one possible device paradigm.
 
@@ -143,7 +147,7 @@ if (ALUMINUM_ENABLE_BENCHMARKS)
 endif ()
 
 # Setup CXX requirements
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic -g")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic -g3")
 # -faligned-new is needed to use new alignment-aware new when available.
 include(CheckCXXCompilerFlag)
 check_cxx_compiler_flag("-faligned-new" CXX_COMPILER_HAS_FALIGNED_NEW)
@@ -151,6 +155,8 @@ if (CXX_COMPILER_HAS_FALIGNED_NEW)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -faligned-new")
 endif ()
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(CMAKE_CXX_FLAGS_DEBUG "-Og")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
 if (NOT DEFINED BUILD_SHARED_LIBS)
   set(BUILD_SHARED_LIBS ON)
