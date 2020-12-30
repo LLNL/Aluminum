@@ -147,7 +147,7 @@ if (ALUMINUM_ENABLE_BENCHMARKS)
 endif ()
 
 # Setup CXX requirements
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic -g3")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic")
 # -faligned-new is needed to use new alignment-aware new when available.
 include(CheckCXXCompilerFlag)
 check_cxx_compiler_flag("-faligned-new" CXX_COMPILER_HAS_FALIGNED_NEW)
@@ -155,8 +155,18 @@ if (CXX_COMPILER_HAS_FALIGNED_NEW)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -faligned-new")
 endif ()
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-set(CMAKE_CXX_FLAGS_DEBUG "-Og")
-set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+# Set -g3 if supported to get better debugging experience.
+check_cxx_compiler_flag("-g3" CXX_COMPILER_HAS_G3)
+if (CXX_COMPILER_HAS_G3)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g3")
+else ()
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
+endif ()
+# Set -Og for debug builds when supported.
+check_cxx_compiler_flag("-Og" CXX_COMPILER_HAS_OG)
+if (CXX_COMPILER_HAS_OG)
+  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Og")
+endif ()
 
 if (NOT DEFINED BUILD_SHARED_LIBS)
   set(BUILD_SHARED_LIBS ON)
