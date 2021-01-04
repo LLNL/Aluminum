@@ -62,7 +62,7 @@ public:
   std::string get_name() const override { return "MPIReduce"; }
 
 protected:
-  void start_mpi_op() {
+  void start_mpi_op() override {
     if (sendbuf == IN_PLACE<T>() && rank != root) {
       sendbuf = recvbuf;
     }
