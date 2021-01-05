@@ -106,7 +106,7 @@ option(ALUMINUM_ENABLE_TRACE
 option(ALUMINUM_ENABLE_TESTS
   "Build tests."
   OFF)
-option(ALUMINUM_ENABLE_BENCHMAKRS
+option(ALUMINUM_ENABLE_BENCHMARKS
   "Build benchmarks."
   OFF)
 
