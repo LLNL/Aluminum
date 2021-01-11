@@ -136,6 +136,10 @@ public:
 
   void save_results(std::string filename) {
     std::ofstream f(filename);
+    if (f.fail()) {
+      std::cerr << "Error opening " << filename << std::endl;
+      std::abort();
+    }
     write_results(f);
   }
 
