@@ -383,6 +383,17 @@ bool is_reduction_operator_supported(Al::ReductionOperator op) {
   return i->second;
 }
 
+struct supports_algos_functor {
+  template <AlOperation Op>
+  bool operator()() {
+    return OpSupportsAlgos<Op>::value;
+  }
+};
+/** Return true if the operator supports different algorithms. */
+bool op_supports_algos(AlOperation op) {
+  return call_op_functor(op, supports_algos_functor());
+}
+
 /** Contains algorithms for all supported operations. */
 template <typename Backend> struct AlgorithmOptions {};
 
