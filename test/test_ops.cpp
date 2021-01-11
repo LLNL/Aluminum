@@ -154,6 +154,10 @@ void run_test(cxxopts::ParseResult& parsed_opts) {
   op_options.root = parsed_opts["root"].as<int>();
   auto algorithms = get_algorithms<Backend>(
     op, parsed_opts["algorithm"].as<std::string>());
+  // Add a dummy entry if algorithms are not supported.
+  if (!op_supports_algos(op)) {
+    algorithms.emplace_back();
+  }
 
   auto sizes = get_sizes_from_opts(parsed_opts);
 
@@ -200,7 +204,9 @@ void run_test(cxxopts::ParseResult& parsed_opts) {
     }
 
     for (auto&& algo_opt : algorithms) {
-      op_options.algos = algo_opt;
+      if (op_supports_algos(op)) {
+        op_options.algos = algo_opt;
+      }
       OpDispatcher<Backend, T> op_runner(op, op_options);
       // The size is the amount each processor sends to another processor.
       // (Roughly equivalent to the sendcount parameter in MPI.)
