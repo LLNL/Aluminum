@@ -159,7 +159,6 @@ public:
         + std::string(typeid(T).name()) + " "
         + std::string(AlOperationName<Op>) + " "
         + Al::algorithm_name(getter.get(options.algos)) + " "
-        + std::string("default") + " "
         + (options.nonblocking ? "1" : "0") + " "
         + (options.inplace ? "1" : "0") + " "
         + std::to_string(options.root) + " "
