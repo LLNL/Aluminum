@@ -212,7 +212,7 @@ def plot_time_v_sizes(df, out_dir, name):
         ax.set_yscale('log')
         ymax = min(estimate_reasonable_max(proc_df, 'Size'),
                    ax.get_ylim()[1])
-        ax.set_ylim(bottom=0.0000001, top=ymax)
+        ax.set_ylim(top=ymax)
         ax.set_xticklabels(ax.get_xticklabels(), rotation='vertical',
                            fontsize='small')
         ax.legend(fontsize='x-small')
