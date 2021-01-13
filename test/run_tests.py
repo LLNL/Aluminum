@@ -34,6 +34,7 @@ OpDesc = namedtuple('OpDesc', ['op', 'inplace', 'root', 'min_procs'],
                     defaults=['both', False, 1])
 coll_ops = [OpDesc('allgather'),
             OpDesc('allreduce'),
+            OpDesc('alltoall'),
             OpDesc('bcast', inplace=True, root=True),
             OpDesc('gather', root=True),
             OpDesc('reduce', root=True),
@@ -155,7 +156,7 @@ def run_all_tests(args):
                         inplace_cases = [True, False] if opdesc.inplace == 'both' else [opdesc.inplace]
                         for inplace in inplace_cases:
                             root_cases = [0] if opdesc.root else [None]
-                            if num_procs > 1:
+                            if num_procs > 1 and opdesc.root:
                                 root_cases += [1]
                             for root in root_cases:
                                 run_test(args, num_procs, backend, opdesc.op,
