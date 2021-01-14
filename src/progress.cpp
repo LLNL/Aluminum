@@ -43,7 +43,7 @@ namespace internal {
 namespace {
 
 std::string print_hwloc_version(unsigned long ver) {
-  return std::string{} + std::to_string(ver >> 16) + "." + std::to_string((ver & 0x00ff00) >> 8);
+  return std::to_string(ver >> 16) + "." + std::to_string((ver & 0x00ff00) >> 8);
 }
 
 // Adapted from
