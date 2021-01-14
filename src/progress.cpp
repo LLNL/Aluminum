@@ -42,6 +42,30 @@ namespace internal {
 
 namespace {
 
+std::string print_hwloc_version(unsigned long ver) {
+  return std::string{} + std::to_string(ver >> 16) + "." + std::to_string((ver & 0x00ff00) >> 8);
+}
+
+void check_hwloc_api_version() {
+#if HWLOC_API_VERSION >= 0x00020000
+  /* headers are recent */
+  if (hwloc_get_api_version() < 0x20000) {
+    throw_al_exception("HWLOC runtime library "
+                       + print_hwloc_version(hwloc_get_api_version())
+                       +" is older than 2.0 but Alumium was compile with HWLOC API version "
+                       + print_hwloc_version(HWLOC_API_VERSION));
+  }
+#else
+  /* headers are pre-2.0 */
+  if (hwloc_get_api_version() >= 0x20000) {
+    throw_al_exception("HWLOC runtime library "
+                       + print_hwloc_version(hwloc_get_api_version())
+                       + " is more recent than 2.0 but Aluminum was compile with HWLOC API version "
+                       + print_hwloc_version(HWLOC_API_VERSION));
+  }
+#endif
+}
+
 // Implement these manually because we often don't have a new enough hwloc
 // version.
 
@@ -275,6 +299,7 @@ std::ostream& ProgressEngine::dump_state(std::ostream& ss) {
 }
 
 void ProgressEngine::bind() {
+  check_hwloc_api_version();
   // Determine topology information.
   hwloc_topology_t topo;
   hwloc_topology_init(&topo);
