@@ -27,6 +27,17 @@ parser.add_argument('--benchmarks', type=str, nargs='+',
                     help='Specify particular benchmarks to run')
 parser.add_argument('--datatypes', type=str, nargs='+',
                     help='Specify particular datatypes to use')
+parser.add_argument('--backends', type=str, nargs='+',
+                    choices=['mpi', 'nccl', 'ht'],
+                    help='Specify which backends to use')
+parser.add_argument('--inplace', default=None, action='store_true',
+                    help='Run only inplace algorithms')
+parser.add_argument('--notinplace', default=None, action='store_true',
+                    help='Run only out-of-place algorithms')
+parser.add_argument('--blocking', default=None, action='store_true',
+                    help='Run only blocking algorithms')
+parser.add_argument('--nonblocking', default=None, action='store_true',
+                    help='Run only nonblocking algorithms')
 
 
 # TODO: This is copied from run_tests.py, I'd prefer to have a single source.
@@ -178,6 +189,8 @@ def run_all_benchmarks(args):
         procs = list(filter(lambda x: x >= args.min_procs, procs))
     for num_procs in procs:
         for backend, cases in test_cases.items():
+            if args.backends and backend not in args.backends:
+                continue
             for opdesc in cases['ops']:
                 if args.benchmarks and opdesc.op not in args.benchmarks:
                     continue
@@ -186,8 +199,25 @@ def run_all_benchmarks(args):
                 for datatype in cases['datatypes']:
                     if args.datatypes and datatype not in args.datatypes:
                         continue
-                    for nonblocking in [True, False]:
-                        inplace_cases = [True, False] if opdesc.inplace == 'both' else [opdesc.inplace]
+                    blocking_cases = []
+                    if args.blocking is not None:
+                        blocking_cases.append(False)
+                    if args.nonblocking is not None:
+                        blocking_cases.append(True)
+                    if args.blocking is None and args.nonblocking is None:
+                        blocking_cases = [False, True]
+                    for nonblocking in blocking_cases:
+                        # If operator only supports one mode, always use it.
+                        if opdesc.inplace == 'both':
+                            inplace_cases = []
+                            if args.inplace:
+                                inplace_cases.append(True)
+                            if args.notinplace:
+                                inplace_cases.append(False)
+                            if not args.inplace and not args.notinplace:
+                                inplace_cases = [True, False]
+                        else:
+                            inplace_cases = [opdesc.inplace]
                         for inplace in inplace_cases:
                             root = 0 if opdesc.root else None
                             for algorithm in opdesc.algorithms[backend]:

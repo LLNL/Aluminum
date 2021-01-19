@@ -285,7 +285,7 @@ def plot_all_results(args):
 
     coll_dfs = []
     pt2pt_dfs = []
-    for run_name, result_dir in zip(args.results, args.run_names):
+    for result_dir, run_name in zip(args.results, args.run_names):
         coll_df, pt2pt_df = load_result_directory(
             result_dir, not args.out_of_place, args.nonblocking)
         # Create a column to identify run/backend/algorithm combinations.
