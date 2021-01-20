@@ -91,15 +91,15 @@ inline std::string algorithm_name(MPIAllreduceAlgorithm algo) {
   case MPIAllreduceAlgorithm::automatic:
     return "automatic";
   case MPIAllreduceAlgorithm::mpi_passthrough:
-    return "MPI passthrough";
+    return "passthrough";
   case MPIAllreduceAlgorithm::mpi_recursive_doubling:
-    return "MPI recursive doubling";
+    return "recursive_doubling";
   case MPIAllreduceAlgorithm::mpi_ring:
-    return "MPI ring";
+    return "ring";
   case MPIAllreduceAlgorithm::mpi_rabenseifner:
-    return "MPI Rabenseifner";
+    return "rabenseifner";
   case MPIAllreduceAlgorithm::mpi_biring:
-    return "MPI biring";
+    return "biring";
   default:
     return "unknown";
   }
