@@ -27,10 +27,10 @@
 
 #pragma once
 
-#include "cuda.hpp"
-#include "progress.hpp"
-#include "ht/communicator.hpp"
-#include "mpi_impl.hpp"
+#include "aluminum/cuda.hpp"
+#include "aluminum/progress.hpp"
+#include "aluminum/ht/communicator.hpp"
+#include "aluminum/mpi_impl.hpp"
 #include <cassert>
 
 namespace Al {

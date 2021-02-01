@@ -27,7 +27,7 @@
 
 #pragma once
 
-#include "Al_config.hpp"
+#include <Al_config.hpp>
 
 #include <utility>
 #include <sstream>

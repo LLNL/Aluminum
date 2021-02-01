@@ -27,7 +27,7 @@
 
 #pragma once
 
-#include "Al.hpp"
+#include "aluminum/Al.hpp"
 #include <cstdint>
 #include "test_utils.hpp"
 

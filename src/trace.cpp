@@ -30,7 +30,7 @@
 #include <iostream>
 #include <vector>
 #include <fstream>
-#include "Al.hpp"
+#include "aluminum/Al.hpp"
 
 namespace Al {
 namespace internal {

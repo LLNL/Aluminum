@@ -27,10 +27,10 @@
 
 #pragma once
 
-#include "Al.hpp"
-#include "mpi_cuda/communicator.hpp"
+#include "aluminum/Al.hpp"
+#include "aluminum/mpi_cuda/communicator.hpp"
 #ifdef AL_HAS_MPI_CUDA_RMA
-#include "mpi_cuda/rma.hpp"
+#include "aluminum/mpi_cuda/rma.hpp"
 #endif
 
 namespace Al {

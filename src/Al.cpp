@@ -32,13 +32,13 @@
 #include <string>
 #include <sstream>
 #include <fstream>
-#include "Al.hpp"
-#include "internal.hpp"
-#include "progress.hpp"
+#include "aluminum/Al.hpp"
+#include "aluminum/internal.hpp"
+#include "aluminum/progress.hpp"
 #ifdef AL_HAS_CUDA
-#include "cuda.hpp"
+#include "aluminum/cuda.hpp"
 #endif
-#include "trace.hpp"
+#include "aluminum/trace.hpp"
 
 namespace Al {
 

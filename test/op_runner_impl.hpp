@@ -27,7 +27,7 @@
 
 #pragma once
 
-#include "Al.hpp"
+#include "aluminum/Al.hpp"
 
 template <typename Backend, typename T>
 class OpRunner<AlOperation::allgather, Backend, T> :

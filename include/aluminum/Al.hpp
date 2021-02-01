@@ -34,12 +34,12 @@
 #include <iostream>
 #include <mpi.h>
 
-#include "Al_config.hpp"
-#include "base.hpp"
-#include "tuning_params.hpp"
-#include "utils.hpp"
-#include "profiling.hpp"
-#include "trace.hpp"
+#include <Al_config.hpp>
+#include "aluminum/base.hpp"
+#include "aluminum/tuning_params.hpp"
+#include "aluminum/utils.hpp"
+#include "aluminum/profiling.hpp"
+#include "aluminum/trace.hpp"
 
 namespace Al {
 

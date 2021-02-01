@@ -27,7 +27,7 @@
 
 #pragma once
 
-#include "cudacommunicator.hpp"
+#include "aluminum/cudacommunicator.hpp"
 #include <memory>
 
 namespace Al {

@@ -27,7 +27,7 @@
 
 #pragma once
 
-#include "mpi_cuda/rma.hpp"
+#include "aluminum/mpi_cuda/rma.hpp"
 #include <cstring>
 #include <set>
 

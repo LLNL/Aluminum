@@ -26,7 +26,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include <iostream>
-#include "Al.hpp"
+#include "aluminum/Al.hpp"
 #include "test_utils.hpp"
 
 #include <stdlib.h>

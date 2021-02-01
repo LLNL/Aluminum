@@ -26,7 +26,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include <iostream>
-#include "Al.hpp"
+#include "aluminum/Al.hpp"
 
 int main(int argc, char** argv) {
   cudaSetDevice(0);

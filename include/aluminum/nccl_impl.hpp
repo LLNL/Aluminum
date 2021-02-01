@@ -27,7 +27,7 @@
 
 #pragma once
 
-#include "Al_config.hpp"
+#include <Al_config.hpp>
 
 #if defined(AL_HAS_ROCM)
 #include <rccl.h>
@@ -35,10 +35,10 @@
 #include <nccl.h>
 #endif // defined(AL_HAS_ROCM)
 
-#include "Al.hpp"
-#include "internal.hpp"
-#include "cuda.hpp"
-#include "cudacommunicator.hpp"
+#include "aluminum/Al.hpp"
+#include "aluminum/internal.hpp"
+#include "aluminum/cuda.hpp"
+#include "aluminum/cudacommunicator.hpp"
 
 #define AL_FORCE_CHECK_NCCL(nccl_call)                                \
   do {                                                                \

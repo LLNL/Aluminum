@@ -25,7 +25,7 @@
 // permissions and limitations under the license.
 ////////////////////////////////////////////////////////////////////////////////
 
-#include "nccl_impl.hpp"
+#include "aluminum/nccl_impl.hpp"
 
 namespace Al {
 

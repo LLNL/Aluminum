@@ -25,11 +25,11 @@
 // permissions and limitations under the license.
 ////////////////////////////////////////////////////////////////////////////////
 
-#include "Al.hpp"
-#include "mpi_cuda/rma.hpp"
-#include "mpi_cuda/rma_ipc.hpp"
-#include "mpi_cuda/rma_self.hpp"
-#include "mpi_cuda/rma_null.hpp"
+#include "aluminum/Al.hpp"
+#include "aluminum/mpi_cuda/rma.hpp"
+#include "aluminum/mpi_cuda/rma_ipc.hpp"
+#include "aluminum/mpi_cuda/rma_self.hpp"
+#include "aluminum/mpi_cuda/rma_null.hpp"
 
 namespace Al {
 namespace internal {

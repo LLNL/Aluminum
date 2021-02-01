@@ -25,7 +25,7 @@
 // permissions and limitations under the license.
 ////////////////////////////////////////////////////////////////////////////////
 
-#include "Al.hpp"
+#include "aluminum/Al.hpp"
 
 namespace Al {
 namespace internal {

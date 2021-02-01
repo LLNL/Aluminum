@@ -28,9 +28,9 @@
 #include <hwloc.h>
 #include <cstdlib>
 #include <vector>
-#include "Al.hpp"
-#include "progress.hpp"
-#include "trace.hpp"
+#include "aluminum/Al.hpp"
+#include "aluminum/progress.hpp"
+#include "aluminum/trace.hpp"
 #if defined AL_HAS_ROCM
 #include <hwloc/rsmi.h>
 #elif defined AL_HAS_CUDA

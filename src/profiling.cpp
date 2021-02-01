@@ -25,7 +25,7 @@
 // permissions and limitations under the license.
 ////////////////////////////////////////////////////////////////////////////////
 
-#include "profiling.hpp"
+#include "aluminum/profiling.hpp"
 
 namespace Al {
 namespace internal {

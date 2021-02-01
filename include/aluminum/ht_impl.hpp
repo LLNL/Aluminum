@@ -27,17 +27,17 @@
 
 #pragma once
 
-#include "Al.hpp"
-#include "ht/communicator.hpp"
-#include "ht/allgather.hpp"
-#include "ht/allreduce.hpp"
-#include "ht/alltoall.hpp"
-#include "ht/bcast.hpp"
-#include "ht/gather.hpp"
-#include "ht/reduce.hpp"
-#include "ht/reduce_scatter.hpp"
-#include "ht/scatter.hpp"
-#include "ht/pt2pt.hpp"
+#include "aluminum/Al.hpp"
+#include "aluminum/ht/communicator.hpp"
+#include "aluminum/ht/allgather.hpp"
+#include "aluminum/ht/allreduce.hpp"
+#include "aluminum/ht/alltoall.hpp"
+#include "aluminum/ht/bcast.hpp"
+#include "aluminum/ht/gather.hpp"
+#include "aluminum/ht/reduce.hpp"
+#include "aluminum/ht/reduce_scatter.hpp"
+#include "aluminum/ht/scatter.hpp"
+#include "aluminum/ht/pt2pt.hpp"
 
 namespace Al {
 

@@ -27,10 +27,10 @@
 
 #include <vector>
 #include <mutex>
-#include "Al.hpp"
-#include "cuda.hpp"
-#include "mempool.hpp"
-#include "helper_kernels.hpp"
+#include "aluminum/Al.hpp"
+#include "aluminum/cuda.hpp"
+#include "aluminum/mempool.hpp"
+#include "aluminum/helper_kernels.hpp"
 
 namespace Al {
 namespace internal {

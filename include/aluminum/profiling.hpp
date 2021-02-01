@@ -30,7 +30,7 @@
 #include <thread>
 #include <string>
 
-#include "Al_config.hpp"
+#include <Al_config.hpp>
 
 #ifdef AL_HAS_NVPROF
 #include <nvToolsExt.h>
