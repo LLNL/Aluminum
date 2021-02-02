@@ -60,8 +60,7 @@ inline hipError_t cuGetErrorString(hipError_t /* error */, const char** pStr)
     /* Synchronize GPU and check for errors. */                 \
     cudaError_t status_CUDA_SYNC = cudaDeviceSynchronize();     \
     if (status_CUDA_SYNC != cudaSuccess) {                      \
-      cudaDeviceReset();                                        \
-      std::stringstream err_CUDA_SYNC;                          \
+      std::ostringstream err_CUDA_SYNC;                         \
       if (async) { err_CUDA_SYNC << "Asynchronous "; }          \
       err_CUDA_SYNC << "CUDA error: "                           \
                     << cudaGetErrorString(status_CUDA_SYNC);    \
