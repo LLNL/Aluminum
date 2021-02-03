@@ -27,7 +27,7 @@
 
 #pragma once
 
-#include "aluminum/Al.hpp"
+#include "Al.hpp"
 #include "benchmark_utils.hpp"
 
 

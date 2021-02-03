@@ -27,7 +27,7 @@
 
 #pragma once
 
-#include "aluminum/Al.hpp"
+#include "Al.hpp"
 #include "aluminum/mpi_cuda/communicator.hpp"
 #ifdef AL_HAS_MPI_CUDA_RMA
 #include "aluminum/mpi_cuda/rma.hpp"

@@ -28,7 +28,7 @@
 #include <hwloc.h>
 #include <cstdlib>
 #include <vector>
-#include "aluminum/Al.hpp"
+#include "Al.hpp"
 #include "aluminum/progress.hpp"
 #include "aluminum/trace.hpp"
 #if defined AL_HAS_ROCM

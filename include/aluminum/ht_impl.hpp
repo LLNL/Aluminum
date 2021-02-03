@@ -27,7 +27,7 @@
 
 #pragma once
 
-#include "aluminum/Al.hpp"
+#include "Al.hpp"
 #include "aluminum/ht/communicator.hpp"
 #include "aluminum/ht/allgather.hpp"
 #include "aluminum/ht/allreduce.hpp"

@@ -27,7 +27,7 @@
 
 #include <vector>
 #include <mutex>
-#include "aluminum/Al.hpp"
+#include "Al.hpp"
 #include "aluminum/cuda.hpp"
 #include "aluminum/mempool.hpp"
 #include "aluminum/helper_kernels.hpp"

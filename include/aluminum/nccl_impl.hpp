@@ -35,7 +35,7 @@
 #include <nccl.h>
 #endif // defined(AL_HAS_ROCM)
 
-#include "aluminum/Al.hpp"
+#include "Al.hpp"
 #include "aluminum/internal.hpp"
 #include "aluminum/cuda.hpp"
 #include "aluminum/cudacommunicator.hpp"

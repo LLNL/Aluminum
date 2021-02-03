@@ -27,7 +27,7 @@
 
 #pragma once
 
-#include "aluminum/Al.hpp"
+#include "Al.hpp"
 #include <iostream>
 #include <unordered_set>
 #include <unordered_map>

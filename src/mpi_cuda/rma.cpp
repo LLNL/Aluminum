@@ -25,7 +25,7 @@
 // permissions and limitations under the license.
 ////////////////////////////////////////////////////////////////////////////////
 
-#include "aluminum/Al.hpp"
+#include "Al.hpp"
 #include "aluminum/mpi_cuda/rma.hpp"
 #include "aluminum/mpi_cuda/rma_ipc.hpp"
 #include "aluminum/mpi_cuda/rma_self.hpp"

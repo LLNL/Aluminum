@@ -73,7 +73,10 @@ if (AL_HAS_ROCM)
   target_link_libraries(Al PUBLIC ${ROCM_SMI_LIBRARY})
 endif (AL_HAS_ROCM)
 
-target_compile_features(Al PUBLIC cxx_std_11)
+target_compile_features(Al PUBLIC cxx_std_14)
+if (AL_HAS_CUDA)
+  target_compile_features(Al PUBLIC cuda_std_14)
+endif ()
 
 # Header installation. For HIP, install the generated files. For
 # NOGPU/CUDA, install the real files.
@@ -82,11 +85,17 @@ if (AL_HAS_ROCM)
     DIRECTORY ${CMAKE_BINARY_DIR}/include/aluminum
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     FILES_MATCHING PATTERN "*.hpp")
+  install(
+    FILES ${CMAKE_BINARY_DIR}/include/Al.hpp
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 else ()
   install(
     DIRECTORY ${CMAKE_SOURCE_DIR}/include/aluminum
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     FILES_MATCHING PATTERN "*.hpp")
+  install(
+    FILES ${CMAKE_SOURCE_DIR}/include/Al.hpp
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 endif ()
 
 install(TARGETS Al

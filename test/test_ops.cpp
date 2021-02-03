@@ -25,7 +25,7 @@
 // permissions and limitations under the license.
 ////////////////////////////////////////////////////////////////////////////////
 
-#include "aluminum/Al.hpp"
+#include "Al.hpp"
 #include <iostream>
 #include <sstream>
 #include <cxxopts.hpp>

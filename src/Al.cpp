@@ -32,7 +32,7 @@
 #include <string>
 #include <sstream>
 #include <fstream>
-#include "aluminum/Al.hpp"
+#include "Al.hpp"
 #include "aluminum/internal.hpp"
 #include "aluminum/progress.hpp"
 #ifdef AL_HAS_CUDA

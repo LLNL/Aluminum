@@ -383,6 +383,11 @@ macro(set_source_path VAR)
 endmacro()
 
 add_subdirectory(include/aluminum)
+
+# Add in the master header
+list(APPEND ALUMINUM_HEADERS "${CMAKE_SOURCE_DIR}/include/Al.hpp")
+
+# Add the library targets
 add_subdirectory(src)
 
 # Testing

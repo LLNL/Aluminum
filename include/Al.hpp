@@ -1231,14 +1231,14 @@ void Put(const T* srcbuf, int dest, T *destbuf,
 
 }  // namespace Al
 
-#include "mpi_impl.hpp"
+#include "aluminum/mpi_impl.hpp"
 
 #ifdef AL_HAS_NCCL
-#include "nccl_impl.hpp"
+#include "aluminum/nccl_impl.hpp"
 #endif
 #ifdef AL_HAS_MPI_CUDA
-#include "mpi_cuda_impl.hpp"
+#include "aluminum/mpi_cuda_impl.hpp"
 #endif
 #ifdef AL_HAS_HOST_TRANSFER
-#include "ht_impl.hpp"
+#include "aluminum/ht_impl.hpp"
 #endif

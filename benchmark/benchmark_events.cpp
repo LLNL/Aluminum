@@ -2,7 +2,7 @@
 
 #include <iostream>
 #include <cuda.h>
-#include "aluminum/Al.hpp"
+#include "Al.hpp"
 #include "benchmark_utils.hpp"
 #include "wait.hpp"
 
