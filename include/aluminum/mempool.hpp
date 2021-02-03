@@ -32,10 +32,10 @@
 #include <unordered_map>
 #include <utility>
 #if defined AL_HAS_ROCM
-#include "cuda.hpp"
+#include "aluminum/cuda.hpp"
 #include <hipcub/hipcub.hpp>
 #elif defined AL_HAS_CUDA
-#include "cuda.hpp"
+#include "aluminum/cuda.hpp"
 #include <cub/util_allocator.cuh>
 #endif
 

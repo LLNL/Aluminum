@@ -27,9 +27,9 @@
 
 #pragma once
 
-#include "progress.hpp"
-#include "mpi/communicator.hpp"
-#include "mpi/utils.hpp"
+#include "aluminum/progress.hpp"
+#include "aluminum/mpi/communicator.hpp"
+#include "aluminum/mpi/utils.hpp"
 
 namespace Al {
 namespace internal {

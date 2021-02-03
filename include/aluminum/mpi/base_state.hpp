@@ -27,7 +27,7 @@
 
 #pragma once
 
-#include "progress.hpp"
+#include "aluminum/progress.hpp"
 
 namespace Al {
 namespace internal {

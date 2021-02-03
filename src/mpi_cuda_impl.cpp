@@ -25,7 +25,7 @@
 // permissions and limitations under the license.
 ////////////////////////////////////////////////////////////////////////////////
 
-#include "mpi_cuda_impl.hpp"
+#include "aluminum/mpi_cuda_impl.hpp"
 
 namespace Al {
 

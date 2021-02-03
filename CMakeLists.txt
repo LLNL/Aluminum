@@ -383,6 +383,11 @@ macro(set_source_path VAR)
 endmacro()
 
 add_subdirectory(include/aluminum)
+
+# Add in the master header
+list(APPEND ALUMINUM_HEADERS "${CMAKE_SOURCE_DIR}/include/Al.hpp")
+
+# Add the library targets
 add_subdirectory(src)
 
 # Testing
@@ -420,7 +425,7 @@ set(CMAKE_INSTALL_PREFIX "${REAL_CMAKE_INSTALL_PREFIX}")
 
 # Install directory
 
-set(INCLUDE_INSTALL_DIRS ${CMAKE_INSTALL_INCLUDEDIR}/aluminum)
+set(INCLUDE_INSTALL_DIRS ${CMAKE_INSTALL_INCLUDEDIR})
 set(LIB_INSTALL_DIR ${CMAKE_INSTALL_LIBDIR})
 set(CMAKE_INSTALL_DIR ${CMAKE_INSTALL_LIBDIR}/cmake/aluminum)
 set(CMAKE_MODULE_LOCATION "\$\{CMAKE_CURRENT_LIST_DIR\}")

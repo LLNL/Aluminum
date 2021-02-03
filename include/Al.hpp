@@ -34,12 +34,12 @@
 #include <iostream>
 #include <mpi.h>
 
-#include "Al_config.hpp"
-#include "base.hpp"
-#include "tuning_params.hpp"
-#include "utils.hpp"
-#include "profiling.hpp"
-#include "trace.hpp"
+#include <Al_config.hpp>
+#include "aluminum/base.hpp"
+#include "aluminum/tuning_params.hpp"
+#include "aluminum/utils.hpp"
+#include "aluminum/profiling.hpp"
+#include "aluminum/trace.hpp"
 
 namespace Al {
 
@@ -1231,14 +1231,14 @@ void Put(const T* srcbuf, int dest, T *destbuf,
 
 }  // namespace Al
 
-#include "mpi_impl.hpp"
+#include "aluminum/mpi_impl.hpp"
 
 #ifdef AL_HAS_NCCL
-#include "nccl_impl.hpp"
+#include "aluminum/nccl_impl.hpp"
 #endif
 #ifdef AL_HAS_MPI_CUDA
-#include "mpi_cuda_impl.hpp"
+#include "aluminum/mpi_cuda_impl.hpp"
 #endif
 #ifdef AL_HAS_HOST_TRANSFER
-#include "ht_impl.hpp"
+#include "aluminum/ht_impl.hpp"
 #endif

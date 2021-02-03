@@ -48,7 +48,7 @@ if (AL_HAS_ROCM)
   hipify_header_files(ALUMINUM_HIP_HEADERS ${ALUMINUM_HEADERS})
   hip_add_library(Al "${ALUMINUM_HIP_SOURCES}" "${ALUMINUM_HIP_HEADERS}")
   target_include_directories(Al PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include/aluminum>)
+    $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include>)
 else ()
   add_library(Al
     "${ALUMINUM_CXX_SOURCES}" "${ALUMINUM_CUDA_SOURCES}" "${ALUMINUM_HEADERS}")
@@ -56,12 +56,12 @@ else ()
     $<$<BOOL:${AL_HAS_CUDA}>:cuda::cuda>
     $<$<BOOL:${AL_HAS_NVPROF}>:cuda::nvtx>)
   target_include_directories(Al PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include/aluminum>)
+    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>)
 endif ()
 
 target_include_directories(Al PUBLIC
   $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
-  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/aluminum>)
+  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 target_link_libraries(Al PUBLIC
   MPI::MPI_CXX HWLOC::hwloc
   $<TARGET_NAME_IF_EXISTS:roc::rccl>
@@ -73,7 +73,10 @@ if (AL_HAS_ROCM)
   target_link_libraries(Al PUBLIC ${ROCM_SMI_LIBRARY})
 endif (AL_HAS_ROCM)
 
-target_compile_features(Al PUBLIC cxx_std_11)
+target_compile_features(Al PUBLIC cxx_std_14)
+if (AL_HAS_CUDA)
+  target_compile_features(Al PUBLIC cuda_std_14)
+endif ()
 
 # Header installation. For HIP, install the generated files. For
 # NOGPU/CUDA, install the real files.
@@ -82,11 +85,17 @@ if (AL_HAS_ROCM)
     DIRECTORY ${CMAKE_BINARY_DIR}/include/aluminum
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     FILES_MATCHING PATTERN "*.hpp")
+  install(
+    FILES ${CMAKE_BINARY_DIR}/include/Al.hpp
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 else ()
   install(
     DIRECTORY ${CMAKE_SOURCE_DIR}/include/aluminum
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     FILES_MATCHING PATTERN "*.hpp")
+  install(
+    FILES ${CMAKE_SOURCE_DIR}/include/Al.hpp
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 endif ()
 
 install(TARGETS Al
@@ -94,7 +103,7 @@ install(TARGETS Al
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-  INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/aluminum
+  INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
   )
 
 install(EXPORT AluminumTargets

@@ -27,9 +27,9 @@
 
 #pragma once
 
-#include "cuda.hpp"
-#include "ht/communicator.hpp"
-#include "progress.hpp"
+#include "aluminum/cuda.hpp"
+#include "aluminum/ht/communicator.hpp"
+#include "aluminum/progress.hpp"
 
 namespace Al {
 namespace internal {

@@ -49,7 +49,7 @@ class Communicator;
 
 }  // namespace Al
 
-#include "mpi/communicator.hpp"
+#include "aluminum/mpi/communicator.hpp"
 
 namespace Al {
 namespace internal {

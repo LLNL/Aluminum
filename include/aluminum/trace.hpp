@@ -30,8 +30,8 @@
 #include <string>
 #include <sstream>
 
-#include "Al_config.hpp"
-#include "utils.hpp"
+#include <Al_config.hpp>
+#include "aluminum/utils.hpp"
 
 namespace Al {
 namespace internal {
