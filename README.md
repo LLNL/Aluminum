@@ -43,15 +43,18 @@ Aluminum will manage the necessary synchronization and progress, and the communi
 
 ## Getting started
 
+Aluminum is also available via [Spack](https://spack.io/).
+
 ### Dependencies
 For all builds:
-* A compiler with at least C++11 support
+* A compiler with at least C++14 support
 * MPI (at least MPI 3.0)
 * HWLOC (any recent version should work)
 * CMake 3.14 or later
 
 For GPU backends (`NCCL` and `HostTransfer`):
 * CUDA (at least 9.0, for Nvidia GPUs) or HIP/ROCm (at least 3.6, for AMD GPUs)
+* CUB (any recent version)
 
 For the `NCCL`/`RCCL` backend:
 * NCCL (for Nvidia GPUs) or RCCL (for AMD GPUs), at least version 2.7.0
@@ -118,7 +121,8 @@ The `MPI`, `NCCL`/`RCCL`, and `HostTransfer` backends support the following oper
   * Gather
   * Vector gather
   * Reduce
-  * ReduceScatter (the block, not vector, version)
+  * ReduceScatter (equivalent to `MPI_Reduce_scatter_block`)
+  * Vector ReduceScatter (equivalent to `MPI_Reduce_scatter`)
   * Scatter
   * Vector scatter
 * Point-to-point:
@@ -126,17 +130,26 @@ The `MPI`, `NCCL`/`RCCL`, and `HostTransfer` backends support the following oper
   * Recv
   * SendRecv
 
+Note, at the moment, the `HostTransfer` backend does not support vector collectives.
+
 Full API documentation is coming soon...
 
 ## Tests and benchmarks
 
 The `test` directory contains tests for every operation Aluminum supports.
+The tests are only built when `-D ALUMINUM_ENABLE_TESTS=ON` is passed to CMake or a debug build is requested.
+
+The main interface to the tests is `text_ops.exe`, which supports any combination of operation, backend, datatype, and so on that Aluminum supports.
 For example, to test the `Alltoall` operation on the NCCL backend:
 ```
-mpirun -n 128 ./test_alltoall.exe NCCL
+mpirun -n 128 ./test_ops.exe --op alltoall --backend nccl
 ```
+Run it with `--help` for full details.
 
-The `benchmark` directory contains benchmarks for several operations, and can be run similarly.
+The `benchmark` directory contains benchmarks for all operations and can be run similarly using `benchmark_ops.exe`.
+The benchmarks are only built when `-D ALUMINUM_ENABLE_BENCHMARKS=ON` is passed to CMake.
+
+Note that building the benchmarks or tests can take a long time.
 
 ## Authors
 * [Nikoli Dryden](https://github.com/ndryden)
