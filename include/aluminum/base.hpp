@@ -30,6 +30,15 @@
 #include <exception>
 #include <string>
 
+/** HOST_NAME_MAX is a linux only define */
+#ifndef HOST_NAME_MAX
+# if defined(_POSIX_HOST_NAME_MAX)
+#  define HOST_NAME_MAX _POSIX_HOST_NAME_MAX
+# elif defined(MAXHOSTNAMELEN)
+#  define HOST_NAME_MAX MAXHOSTNAMELEN
+# endif
+#endif /* HOST_NAME_MAX */
+
 namespace Al {
 
 /**
