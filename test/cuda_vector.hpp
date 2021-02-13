@@ -29,6 +29,7 @@
 
 #include "Al.hpp"
 #include <cstdint>
+#include <cassert>
 #include "test_utils.hpp"
 
 /** Emulate most std::vector functionality but with CUDA memory. */
