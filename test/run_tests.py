@@ -12,6 +12,8 @@ parser.add_argument('--num-nodes', type=int, required=True,
                     help='Max number of nodes to use')
 parser.add_argument('--procs-per-node', type=int, default=4,
                     help='Number of processes per node')
+parser.add_argument('--min-procs', type=int,
+                    help='Minimum number of processes to use')
 parser.add_argument('--launcher', type=str, default='jsrun',
                     choices=['jsrun', 'srun'],
                     help='Which parallel launcher to use')
@@ -19,6 +21,21 @@ parser.add_argument('--test-ops', type=str, default='./test_ops.exe',
                     help='Path to test_ops binary')
 parser.add_argument('--extra-args', type=str,
                     help='Extra arguments to pass to launcher')
+parser.add_argument('--operations', type=str, nargs='+',
+                    help='Specify particular operations to run')
+parser.add_argument('--datatypes', type=str, nargs='+',
+                    help='Specify particular datatypes to use')
+parser.add_argument('--backends', type=str, nargs='+',
+                    choices=['mpi', 'nccl', 'ht'],
+                    help='Specify which backends to use')
+parser.add_argument('--inplace', default=None, action='store_true',
+                    help='Run only inplace algorithms')
+parser.add_argument('--notinplace', default=None, action='store_true',
+                    help='Run only out-of-place algorithms')
+parser.add_argument('--blocking', default=None, action='store_true',
+                    help='Run only blocking algorithms')
+parser.add_argument('--nonblocking', default=None, action='store_true',
+                    help='Run only nonblocking algorithms')
 
 
 # Supported datatypes for backends.
@@ -146,14 +163,39 @@ def run_all_tests(args):
     """Run the full test suite."""
     procs = [2**x for x in range(
         int(math.log2(args.num_nodes * args.procs_per_node)) + 1)]
+    if args.min_procs:
+        procs = list(filter(lambda x: x >= args.min_procs, procs))
     for num_procs in procs:
         for backend, cases in test_cases.items():
+            if args.backends and backend not in args.backends:
+                continue
             for opdesc in cases['ops']:
+                if args.operations and opdesc.op not in args.operations:
+                    continue
                 if num_procs < opdesc.min_procs:
                     continue
                 for datatype in cases['datatypes']:
-                    for nonblocking in [True, False]:
-                        inplace_cases = [True, False] if opdesc.inplace == 'both' else [opdesc.inplace]
+                    if args.datatypes and datatype not in args.datatypes:
+                        continue
+                    blocking_cases = []
+                    if args.blocking is not None:
+                        blocking_cases.append(False)
+                    if args.nonblocking is not None:
+                        blocking_cases.append(True)
+                    if args.blocking is None and args.nonblocking is None:
+                        blocking_cases = [False, True]
+                    for nonblocking in blocking_cases:
+                        # If operator only supports one mode, always use it.
+                        if opdesc.inplace == 'both':
+                            inplace_cases = []
+                            if args.inplace:
+                                inplace_cases.append(True)
+                            if args.notinplace:
+                                inplace_cases.append(False)
+                            if not args.inplace and not args.notinplace:
+                                inplace_cases = [True, False]
+                        else:
+                            inplace_cases = [opdesc.inplace]
                         for inplace in inplace_cases:
                             root_cases = [0] if opdesc.root else [None]
                             if num_procs > 1 and opdesc.root:
