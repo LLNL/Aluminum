@@ -30,7 +30,6 @@
 #include "aluminum/cuda.hpp"
 #include "aluminum/progress.hpp"
 #include "aluminum/ht/communicator.hpp"
-#include "aluminum/mpi_impl.hpp"
 #include <cassert>
 
 namespace Al {
@@ -39,26 +38,17 @@ namespace ht {
 
 /** Progress engine state for the host-transfer allreduce. */
 template <typename T>
-class HostTransferState : public AlState {
+class AllreduceAlState : public AlState {
  public:
-  HostTransferState(const T* sendbuf, T* recvbuf, size_t count,
-                    ReductionOperator op, HostTransferCommunicator& comm,
-                    cudaStream_t stream, AlRequest req_) :
-    AlState(req_),
-    host_mem(get_pinned_memory<T>(count)),
-    compute_stream(comm.get_stream()) {
-#ifdef AL_HT_USE_PASSTHROUGH
-    host_ar = new mpi::MPIPassthroughAlState<T>(
-      IN_PLACE<T>(), host_mem, count, op, comm, get_free_request());
-#else
-    if (count <= 1<<9) {
-      host_ar = new mpi::MPIRecursiveDoublingAlState<T>(
-        IN_PLACE<T>(), host_mem, count, op, comm, get_free_request());
-    } else {
-      host_ar = new mpi::MPIRabenseifnerAlState<T>(
-        IN_PLACE<T>(), host_mem, count, op, comm, get_free_request());
-    }
-#endif
+  AllreduceAlState(const T* sendbuf, T* recvbuf, size_t count_,
+                    ReductionOperator op_, HostTransferCommunicator& comm_,
+                    cudaStream_t stream) :
+    AlState(nullptr),
+    host_mem(get_pinned_memory<T>(count_)),
+    count(count_),
+    op(mpi::ReductionOperator2MPI_Op(op_)),
+    comm(comm_.get_comm()),
+    compute_stream(comm_.get_stream()) {
 
     // Transfer data from device to host and use an event to determine when it
     // completes. Handle in-place vs non-in-place.
@@ -80,8 +70,7 @@ class HostTransferState : public AlState {
     h2d_event.record(stream);
   }
 
-  ~HostTransferState() {
-    delete host_ar;
+  ~AllreduceAlState() {
     release_pinned_memory(host_mem);
   }
 
@@ -95,16 +84,15 @@ class HostTransferState : public AlState {
       }
     }
     if (!ar_started) {
-      if (host_ar->setup()) {
-        // Allreduce finishes immediately.
-        ar_done = true;
-        gpu_wait.signal();
-      }
+      MPI_Iallreduce(MPI_IN_PLACE, host_mem, count, mpi::TypeMap<T>(),
+                     op, comm, &req);
       ar_started = true;
     }
     if (!ar_done) {
       // Wait for the allreduce to complete.
-      if (host_ar->step() == PEAction::complete) {
+      int flag;
+      MPI_Test(&req, &flag, MPI_STATUS_IGNORE);
+      if (flag) {
         ar_done = true;
         // Mark the sync as done to wake up the device.
         gpu_wait.signal();
@@ -122,14 +110,15 @@ class HostTransferState : public AlState {
   void* get_compute_stream() const override { return compute_stream; }
 
   std::string get_name() const override { return "HTAllreduce"; }
-  std::string get_desc() const override {
-    return host_ar->get_desc();
-  }
+
  private:
   T* host_mem;
-  mpi::MPIAlState<T>* host_ar;
+  size_t count;
   cuda::FastEvent d2h_event, h2d_event;
   cuda::GPUWait gpu_wait;
+  MPI_Op op;
+  MPI_Comm comm;
+  MPI_Request req = MPI_REQUEST_NULL;
   bool mem_xfer_done = false;
   bool ar_started = false;
   bool ar_done = false;
