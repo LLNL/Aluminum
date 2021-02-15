@@ -32,6 +32,10 @@
 template <AlOperation Op, typename Backend, typename T,
           std::enable_if_t<IsTypeSupported<Backend, T>::value, bool> = true>
 void run_benchmark(cxxopts::ParseResult& parsed_opts) {
+  if (!IsOpSupported<Op, Backend>::value) {
+    std::cerr << "Backend does not support operator " << AlOperationName<Op> << std::endl;
+    std::abort();
+  }
   AlOperation op = Op;
   // Set up options.
   OpOptions<Backend> op_options;

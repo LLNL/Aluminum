@@ -139,6 +139,12 @@ void run_test(cxxopts::ParseResult& parsed_opts) {
     std::abort();
   }
   AlOperation op = op_str_to_op(op_str);
+  // Check if operator is supported.
+  // This is not caught later because there would be no algorithms.
+  if (!is_op_supported<Backend>(op)) {
+    std::cerr << "Backend does not support operator " << op_name(op) << std::endl;
+    std::abort();
+  }
   // Set up options.
   OpOptions<Backend> op_options;
   if (parsed_opts.count("inplace")) {
