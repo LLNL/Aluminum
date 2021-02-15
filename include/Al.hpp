@@ -514,6 +514,32 @@ void NonblockingAllgatherv(T* buffer,
   Backend::template NonblockingAllgatherv<T>(buffer, counts, displs, comm, req, algo);
 }
 
+/**
+ * Perform a barrier synchronization.
+ *
+ * This will not complete until every process in comm has entered the barrier.
+ *
+ * @param comm The communicator to synchronize over.
+ * @param algo Request a particular barrier algorithm.
+ */
+template <typename Backend>
+void Barrier(typename Backend::comm_type& comm,
+             typename Backend::barrier_algo_type algo =
+             Backend::barrier_algo_type::automatic) {
+  internal::trace::record_op<Backend, void>("barrier", comm);
+  Backend::Barrier(comm, algo);
+}
+
+/** Non-blocking barrier synchronization. */
+template <typename Backend>
+void NonblockingBarrier(typename Backend::comm_type& comm,
+                        typename Backend::req_type& req,
+                        typename Backend::barrier_algo_type algo =
+                        Backend::barrier_algo_type::automatic) {
+  internal::trace::record_op<Backend, void>("nonblocking-barrier", comm);
+  Backend::NonblockingBarrier(comm, req, algo);
+}
+
 // There are no in-place broadcast versions; it is always in-place.
 
 /**

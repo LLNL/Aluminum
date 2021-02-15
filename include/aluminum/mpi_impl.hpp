@@ -42,6 +42,7 @@
 #include "aluminum/mpi/allreduce.hpp"
 #include "aluminum/mpi/alltoall.hpp"
 #include "aluminum/mpi/alltoallv.hpp"
+#include "aluminum/mpi/barrier.hpp"
 #include "aluminum/mpi/bcast.hpp"
 #include "aluminum/mpi/gather.hpp"
 #include "aluminum/mpi/gatherv.hpp"
@@ -122,6 +123,7 @@ class MPIBackend {
   using allgatherv_algo_type = MPICollectiveAlgorithm;
   using alltoall_algo_type = MPICollectiveAlgorithm;
   using alltoallv_algo_type = MPICollectiveAlgorithm;
+  using barrier_algo_type = MPICollectiveAlgorithm;
   using bcast_algo_type = MPICollectiveAlgorithm;
   using gather_algo_type = MPICollectiveAlgorithm;
   using gatherv_algo_type = MPICollectiveAlgorithm;
@@ -475,6 +477,27 @@ class MPIBackend {
     comm_type& comm, req_type& req, alltoallv_algo_type algo) {
     NonblockingAlltoallv(internal::IN_PLACE<T>(), counts, displs,
                          buffer, counts, displs, comm, req, algo);
+  }
+
+  static void Barrier(comm_type& comm, barrier_algo_type algo) {
+    switch (algo) {
+    case MPICollectiveAlgorithm::automatic:
+      internal::mpi::passthrough_barrier(comm);
+      break;
+    default:
+      throw_al_exception("Invalid algorithm");
+    }
+  }
+
+  static void NonblockingBarrier(comm_type& comm, req_type& req,
+                                 barrier_algo_type algo) {
+    switch (algo) {
+    case MPICollectiveAlgorithm::automatic:
+      internal::mpi::passthrough_nb_barrier(comm, req);
+      break;
+    default:
+      throw_al_exception("Invalid algorithm");
+    }
   }
 
   template <typename T>

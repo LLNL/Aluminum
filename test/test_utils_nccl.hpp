@@ -88,6 +88,7 @@ template <> struct IsOpSupported<AlOperation::allgatherv, Al::NCCLBackend> : std
 template <> struct IsOpSupported<AlOperation::allreduce, Al::NCCLBackend> : std::true_type {};
 template <> struct IsOpSupported<AlOperation::alltoall, Al::NCCLBackend> : std::true_type {};
 template <> struct IsOpSupported<AlOperation::alltoallv, Al::NCCLBackend> : std::true_type {};
+template <> struct IsOpSupported<AlOperation::barrier, Al::NCCLBackend> : std::true_type {};
 template <> struct IsOpSupported<AlOperation::bcast, Al::NCCLBackend> : std::true_type {};
 template <> struct IsOpSupported<AlOperation::gather, Al::NCCLBackend> : std::true_type {};
 template <> struct IsOpSupported<AlOperation::gatherv, Al::NCCLBackend> : std::true_type {};
@@ -140,6 +141,9 @@ template <> struct OpAlgoType<AlOperation::alltoall, Al::NCCLBackend> {
 template <> struct OpAlgoType<AlOperation::alltoallv, Al::NCCLBackend> {
   using type = Al::NCCLBackend::alltoallv_algo_type;
 };
+template <> struct OpAlgoType<AlOperation::barrier, Al::NCCLBackend> {
+  using type = Al::NCCLBackend::barrier_algo_type;
+};
 template <> struct OpAlgoType<AlOperation::bcast, Al::NCCLBackend> {
   using type = Al::NCCLBackend::bcast_algo_type;
 };
@@ -178,6 +182,8 @@ struct AlgorithmOptions<Al::NCCLBackend> {
     Al::NCCLBackend::alltoall_algo_type::automatic;
   typename Al::NCCLBackend::alltoallv_algo_type alltoallv_algo =
     Al::NCCLBackend::alltoallv_algo_type::automatic;
+  typename Al::NCCLBackend::barrier_algo_type barrier_algo =
+    Al::NCCLBackend::barrier_algo_type::automatic;
   typename Al::NCCLBackend::bcast_algo_type bcast_algo =
     Al::NCCLBackend::bcast_algo_type::automatic;
   typename Al::NCCLBackend::gather_algo_type gather_algo =

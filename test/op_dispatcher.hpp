@@ -47,6 +47,7 @@ bool is_operator_name(const std::string str) {
     "allreduce",
     "alltoall",
     "alltoallv",
+    "barrier",
     "bcast",
     "gather",
     "gatherv",
@@ -86,7 +87,7 @@ Al::ReductionOperator get_reduction_op(const std::string redop_str) {
 
 /* Defines supported operations. */
 enum class AlOperation {
-  allgather, allgatherv, allreduce, alltoall, alltoallv, bcast,
+  allgather, allgatherv, allreduce, alltoall, alltoallv, barrier, bcast,
   gather, gatherv, reduce, reduce_scatter, reduce_scatterv,
   scatter, scatterv, send, recv, sendrecv
 };
@@ -96,6 +97,7 @@ template <> constexpr char AlOperationName<AlOperation::allgatherv>[] = "allgath
 template <> constexpr char AlOperationName<AlOperation::allreduce>[] = "allreduce";
 template <> constexpr char AlOperationName<AlOperation::alltoall>[] = "alltoall";
 template <> constexpr char AlOperationName<AlOperation::alltoallv>[] = "alltoallv";
+template <> constexpr char AlOperationName<AlOperation::barrier>[] = "barrier";
 template <> constexpr char AlOperationName<AlOperation::bcast>[] = "bcast";
 template <> constexpr char AlOperationName<AlOperation::gather>[] = "gather";
 template <> constexpr char AlOperationName<AlOperation::gatherv>[] = "gatherv";
@@ -137,6 +139,7 @@ template <> struct IsCollectiveOp<AlOperation::allgatherv> : std::true_type {};
 template <> struct IsCollectiveOp<AlOperation::allreduce> : std::true_type {};
 template <> struct IsCollectiveOp<AlOperation::alltoall> : std::true_type {};
 template <> struct IsCollectiveOp<AlOperation::alltoallv> : std::true_type {};
+template <> struct IsCollectiveOp<AlOperation::barrier> : std::true_type {};
 template <> struct IsCollectiveOp<AlOperation::bcast> : std::true_type {};
 template <> struct IsCollectiveOp<AlOperation::gather> : std::true_type {};
 template <> struct IsCollectiveOp<AlOperation::gatherv> : std::true_type {};
@@ -189,6 +192,7 @@ template <> struct OpSupportsAlgos<AlOperation::allreduce> : std::true_type {};
 template <> struct OpSupportsAlgos<AlOperation::alltoall> : std::true_type {};
 template <> struct OpSupportsAlgos<AlOperation::alltoallv> : std::true_type {};
 template <> struct OpSupportsAlgos<AlOperation::bcast> : std::true_type {};
+template <> struct OpSupportsAlgos<AlOperation::barrier> : std::true_type {};
 template <> struct OpSupportsAlgos<AlOperation::gather> : std::true_type {};
 template <> struct OpSupportsAlgos<AlOperation::gatherv> : std::true_type {};
 template <> struct OpSupportsAlgos<AlOperation::reduce> : std::true_type {};
@@ -227,6 +231,8 @@ auto call_op_functor(AlOperation op, F functor) {
     return functor.template operator()<AlOperation::alltoall>();
   case AlOperation::alltoallv:
     return functor.template operator()<AlOperation::alltoallv>();
+    case AlOperation::barrier:
+    return functor.template operator()<AlOperation::barrier>();
   case AlOperation::bcast:
     return functor.template operator()<AlOperation::bcast>();
   case AlOperation::gather:
@@ -263,6 +269,7 @@ AlOperation op_str_to_op(const std::string op_str) {
     {"allreduce", AlOperation::allreduce},
     {"alltoall", AlOperation::alltoall},
     {"alltoallv", AlOperation::alltoallv},
+    {"barrier", AlOperation::barrier},
     {"bcast", AlOperation::bcast},
     {"gather", AlOperation::gather},
     {"gatherv", AlOperation::gatherv},
@@ -447,6 +454,16 @@ template <typename Backend> struct AlgoAccessor<AlOperation::alltoallv, Backend>
   void set(AlgorithmOptions<Backend>& algo_opts,
            typename OpAlgoType<AlOperation::alltoallv, Backend>::type algo) {
     algo_opts.alltoallv_algo = algo;
+  }
+};
+template <typename Backend> struct AlgoAccessor<AlOperation::barrier, Backend> {
+  typename OpAlgoType<AlOperation::barrier, Backend>::type get(
+    AlgorithmOptions<Backend>& algo_opts) {
+    return algo_opts.barrier_algo;
+  }
+  void set(AlgorithmOptions<Backend>& algo_opts,
+           typename OpAlgoType<AlOperation::barrier, Backend>::type algo) {
+    algo_opts.barrier_algo = algo;
   }
 };
 template <typename Backend> struct AlgoAccessor<AlOperation::bcast, Backend> {
