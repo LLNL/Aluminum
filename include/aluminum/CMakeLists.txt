@@ -3,6 +3,7 @@ set_source_path(THIS_DIR_HEADERS
   progress.hpp
   base.hpp
   mempool.hpp
+  mpi_comm_and_stream_wrapper.hpp
   mpi_impl.hpp
   profiling.hpp
   trace.hpp
@@ -12,7 +13,6 @@ set_source_path(THIS_DIR_HEADERS
 set_source_path(THIS_DIR_CUDA_HEADERS
   cuda.hpp
   helper_kernels.hpp
-  cudacommunicator.hpp
   )
 set_source_path(THIS_DIR_MPI_CUDA_HEADERS
   mpi_cuda_impl.hpp

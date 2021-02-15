@@ -27,8 +27,9 @@
 
 #pragma once
 
-#include "aluminum/cudacommunicator.hpp"
 #include <memory>
+#include "Al.hpp"
+#include "aluminum/mpi_comm_and_stream_wrapper.hpp"
 
 namespace Al {
 namespace internal {
@@ -38,23 +39,29 @@ namespace mpi_cuda {
 class RMA;
 #endif
 
-class MPICUDACommunicator: public CUDACommunicator {
+class MPICUDACommunicator: public MPICommAndStreamWrapper<cudaStream_t, nullptr> {
  public:
   MPICUDACommunicator() : MPICUDACommunicator(MPI_COMM_WORLD, 0) {}
-  MPICUDACommunicator(cudaStream_t stream_) :
-    MPICUDACommunicator(MPI_COMM_WORLD, stream_) {}
   MPICUDACommunicator(MPI_Comm comm_, cudaStream_t stream_)
-    : CUDACommunicator(comm_, stream_)
+    : MPICommAndStreamWrapper(comm_, stream_)
 #ifdef AL_HAS_MPI_CUDA_RMA
     , m_rma(nullptr)
 #endif
   {}
+  MPICUDACommunicator(const MPICUDACommunicator& other) = delete;
+  MPICUDACommunicator(MPICUDACommunicator&& other) = default;
+  MPICUDACommunicator& operator=(const MPICUDACommunicator& other) = delete;
+  MPICUDACommunicator& operator=(MPICUDACommunicator&& other) = default;
 
 #ifdef AL_HAS_MPI_CUDA_RMA
   RMA &get_rma();
 #endif
 
   ~MPICUDACommunicator();
+
+  MPICUDACommunicator copy(cudaStream_t stream = 0) const {
+    return MPICUDACommunicator(get_comm(), stream);
+  }
 
  protected:
 #ifdef AL_HAS_MPI_CUDA_RMA

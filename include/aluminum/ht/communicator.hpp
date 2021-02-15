@@ -27,22 +27,39 @@
 
 #pragma once
 
-#include "aluminum/cudacommunicator.hpp"
 #include <memory>
+#include "Al.hpp"
+#include "aluminum/mpi_comm_and_stream_wrapper.hpp"
 
 namespace Al {
 namespace internal {
 namespace ht {
 
-class HostTransferCommunicator: public CUDACommunicator {
+/** Communicator for host-transfer operations. */
+class HostTransferCommunicator: public MPICommAndStreamWrapper<cudaStream_t, nullptr> {
  public:
+  /** Use MPI_COMM_WORLD and the default CUDA stream. */
   HostTransferCommunicator() : HostTransferCommunicator(MPI_COMM_WORLD, 0) {}
-  HostTransferCommunicator(cudaStream_t stream_) :
-    HostTransferCommunicator(MPI_COMM_WORLD, stream_) {}
+  /** Use a particular MPI communicator and stream. */
   HostTransferCommunicator(MPI_Comm comm_, cudaStream_t stream_)
-    : CUDACommunicator(comm_, stream_) {}
-
+    : MPICommAndStreamWrapper(comm_, stream_) {}
+  /** Cannot copy this. */
+  HostTransferCommunicator(const HostTransferCommunicator& other) = delete;
+  /** Default move constructor. */
+  HostTransferCommunicator(HostTransferCommunicator&& other) = default;
+  /** Cannot copy this. */
+  HostTransferCommunicator& operator=(const HostTransferCommunicator& other) = delete;
+  /** Default move assignment operator. */
+  HostTransferCommunicator& operator=(HostTransferCommunicator&& other) = default;
   ~HostTransferCommunicator() {}
+
+  /**
+   * Create a new HostTransfer communicator with the same processes
+   * and a new stream.
+   */
+  HostTransferCommunicator copy(cudaStream_t stream = 0) {
+    return HostTransferCommunicator(get_comm(), stream);
+  }
 };
 
 } // namespace ht

@@ -32,21 +32,8 @@ namespace Al {
 // Initialize this.
 cudaEvent_t NCCLBackend::sync_event = (cudaEvent_t) 0;
 
-NCCLCommunicator::NCCLCommunicator(MPI_Comm comm_, cudaStream_t stream_)
-  : CUDACommunicator(comm_, stream_) {
-  nccl_setup();
-}
-
-NCCLCommunicator::~NCCLCommunicator() {
-  int d;
-  // Only destroy resources if the driver is still loaded.
-  if (cudaGetDevice(&d) == cudaSuccess)
-      nccl_destroy();
-  // FIXME: This is just awful. We need a more rigorous approach to
-  // these resources.
-}
-
-void NCCLCommunicator::nccl_setup() {
+NCCLCommunicator::NCCLCommunicator(MPI_Comm comm_, cudaStream_t stream_) :
+  MPICommAndStreamWrapper(comm_, stream_) {
   // Get a unique ID for this communicator from NCCL and distribute it.
   ncclUniqueId nccl_id;
   if (rank() == 0) {
@@ -57,8 +44,12 @@ void NCCLCommunicator::nccl_setup() {
   AL_CHECK_NCCL(ncclCommInitRank(&m_nccl_comm, size(), nccl_id, rank()));
 }
 
-void NCCLCommunicator::nccl_destroy() {
-  AL_CHECK_NCCL(ncclCommDestroy(m_nccl_comm));
+NCCLCommunicator::~NCCLCommunicator() {
+  int d;
+  // Only destroy resources if the driver is still loaded.
+  if (cudaGetDevice(&d) == cudaSuccess) {
+    AL_CHECK_NCCL(ncclCommDestroy(m_nccl_comm));
+  }
 }
 
 namespace internal {

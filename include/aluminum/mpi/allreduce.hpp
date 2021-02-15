@@ -40,16 +40,16 @@ template <typename T>
 class MPIAlState : public AlState {
  public:
   MPIAlState(const T* sendbuf_, T* recvbuf_, size_t count_,
-             ReductionOperator op_, Communicator& comm_,
+             ReductionOperator op_, MPICommunicator& comm_,
              AlRequest req_) :
     AlState(req_), sendbuf(sendbuf_), recvbuf(recvbuf_), recv_to(nullptr),
     count(count_) {
-    comm = dynamic_cast<MPICommunicator&>(comm_).get_comm();
+    comm = comm_.get_comm();
     type = TypeMap<T>();
     reduction_op = ReductionMap<T>(op_);
     rank = comm_.rank();
     nprocs = comm_.size();
-    tag = dynamic_cast<MPICommunicator&>(comm_).get_free_tag();
+    tag = comm_.get_free_tag();
   }
   ~MPIAlState() override {
     if (recv_to != nullptr) {
@@ -144,8 +144,8 @@ class MPIAlState : public AlState {
 /** Just call MPI_Allreduce directly. */
 template <typename T>
 void passthrough_allreduce(const T* sendbuf, T* recvbuf, size_t count,
-                           ReductionOperator op, Communicator& comm) {
-  MPI_Comm mpi_comm = dynamic_cast<MPICommunicator&>(comm).get_comm();
+                           ReductionOperator op, MPICommunicator& comm) {
+  MPI_Comm mpi_comm = comm.get_comm();
   MPI_Datatype type = TypeMap<T>();
   MPI_Op mpi_op = ReductionOperator2MPI_Op(op);
   if (sendbuf == IN_PLACE<T>()) {
@@ -160,7 +160,7 @@ class MPIPassthroughAlState : public MPIAlState<T> {
  public:
   MPIPassthroughAlState(
     const T* sendbuf_, T* recvbuf_, size_t count_,
-    ReductionOperator op_, Communicator& comm_, AlRequest req_) :
+    ReductionOperator op_, MPICommunicator& comm_, AlRequest req_) :
     MPIAlState<T>(sendbuf_, recvbuf_, count_, op_, comm_, req_) {
     mpi_op = ReductionOperator2MPI_Op(op_);
   }
@@ -192,7 +192,7 @@ class MPIPassthroughAlState : public MPIAlState<T> {
 /** Just call MPI_Iallreduce directly. */
 template <typename T>
 void nb_passthrough_allreduce(const T* sendbuf, T* recvbuf, size_t count,
-                              ReductionOperator op, Communicator& comm,
+                              ReductionOperator op, MPICommunicator& comm,
                               AlRequest& req) {
   req = get_free_request();
   MPIPassthroughAlState<T>* state =
@@ -206,13 +206,13 @@ void nb_passthrough_allreduce(const T* sendbuf, T* recvbuf, size_t count,
 /** Use a recursive-doubling algorithm to perform the allreduce. */
 template <typename T>
 void recursive_doubling_allreduce(const T* sendbuf, T* recvbuf, size_t count,
-                                  ReductionOperator op, Communicator& comm,
+                                  ReductionOperator op, MPICommunicator& comm,
                                   const int tag) {
   if (count == 0) return;  // Nothing to do.
   assert_count_fits_mpi(count);
   int rank = comm.rank();
   int nprocs = comm.size();
-  MPI_Comm mpi_comm = dynamic_cast<MPICommunicator&>(comm).get_comm();
+  MPI_Comm mpi_comm = comm.get_comm();
   if (sendbuf != IN_PLACE<T>()) {
     // Copy our data into the receive buffer.
     std::copy_n(sendbuf, count, recvbuf);
@@ -276,7 +276,7 @@ class MPIRecursiveDoublingAlState : public MPIAlState<T> {
  public:
   MPIRecursiveDoublingAlState(
     const T* sendbuf_, T* recvbuf_, size_t count_,
-    ReductionOperator op_, Communicator& comm_, AlRequest req_) :
+    ReductionOperator op_, MPICommunicator& comm_, AlRequest req_) :
     MPIAlState<T>(sendbuf_, recvbuf_, count_, op_, comm_, req_) {}
   bool setup() override {
     bool r = MPIAlState<T>::setup();
@@ -382,7 +382,7 @@ class MPIRecursiveDoublingAlState : public MPIAlState<T> {
 /** Non-blocking recursive-doubling allreduce. */
 template <typename T>
 void nb_recursive_doubling_allreduce(const T* sendbuf, T* recvbuf, size_t count,
-                                     ReductionOperator op, Communicator& comm,
+                                     ReductionOperator op, MPICommunicator& comm,
                                      AlRequest& req) {
   req = get_free_request();
   MPIRecursiveDoublingAlState<T>* state =
@@ -399,7 +399,7 @@ void nb_recursive_doubling_allreduce(const T* sendbuf, T* recvbuf, size_t count,
 /** Use a ring-based reduce-scatter then allgather to perform the allreduce. */
 template <typename T>
 void ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
-                    ReductionOperator op, Communicator& comm, const bool bidir,
+                    ReductionOperator op, MPICommunicator& comm, const bool bidir,
                     const size_t num_rings, const int tag) {
   if (count == 0) return;  // Nothing to do.
   if (num_rings != 1) {
@@ -409,7 +409,7 @@ void ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
   assert_count_fits_mpi(count);
   int rank = comm.rank();
   int nprocs = comm.size();
-  MPI_Comm mpi_comm = dynamic_cast<MPICommunicator&>(comm).get_comm();
+  MPI_Comm mpi_comm = comm.get_comm();
   if (sendbuf != IN_PLACE<T>()) {
     // Copy our data into the receive buffer.
     std::copy_n(sendbuf, count, recvbuf);
@@ -600,7 +600,7 @@ class MPIRingAlState : public MPIAlState<T> {
  public:
   MPIRingAlState(
     const T* sendbuf_, T* recvbuf_, size_t count_,
-    ReductionOperator op_, Communicator& comm_, AlRequest req_) :
+    ReductionOperator op_, MPICommunicator& comm_, AlRequest req_) :
     MPIAlState<T>(sendbuf_, recvbuf_, count_, op_, comm_, req_) {}
   bool setup() override {
     bool r = MPIAlState<T>::setup();
@@ -711,7 +711,7 @@ class MPIRingAlState : public MPIAlState<T> {
 /** Non-blocking ring allreduce. */
 template <typename T>
 void nb_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
-                       ReductionOperator op, Communicator& comm,
+                       ReductionOperator op, MPICommunicator& comm,
                        AlRequest& req) {
   req = get_free_request();
   MPIRingAlState<T>* state =
@@ -731,13 +731,13 @@ void nb_ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
  */
 template <typename T>
 void rabenseifner_allreduce(const T* sendbuf, T* recvbuf, size_t count,
-                            ReductionOperator op, Communicator& comm,
+                            ReductionOperator op, MPICommunicator& comm,
                             const int tag) {
   if (count == 0) return;  // Nothing to do.
   assert_count_fits_mpi(count);
   int rank = comm.rank();
   int nprocs = comm.size();
-  MPI_Comm mpi_comm = dynamic_cast<MPICommunicator&>(comm).get_comm();
+  MPI_Comm mpi_comm = comm.get_comm();
   if (sendbuf != IN_PLACE<T>()) {
     // Copy our data into the receive buffer.
     std::copy_n(sendbuf, count, recvbuf);
@@ -883,7 +883,7 @@ class MPIRabenseifnerAlState : public MPIAlState<T> {
  public:
   MPIRabenseifnerAlState(
     const T* sendbuf_, T* recvbuf_, size_t count_,
-    ReductionOperator op_, Communicator& comm_, AlRequest req_) :
+    ReductionOperator op_, MPICommunicator& comm_, AlRequest req_) :
     MPIAlState<T>(sendbuf_, recvbuf_, count_, op_, comm_, req_) {}
   bool setup() override {
     bool r = MPIAlState<T>::setup();
@@ -1114,7 +1114,7 @@ class MPIRabenseifnerAlState : public MPIAlState<T> {
 /** Non-blocking Rabenseifner allreduce. */
 template <typename T>
 void nb_rabenseifner_allreduce(const T* sendbuf, T* recvbuf, size_t count,
-                               ReductionOperator op, Communicator& comm,
+                               ReductionOperator op, MPICommunicator& comm,
                                AlRequest& req) {
   req = get_free_request();
   MPIRabenseifnerAlState<T>* state =

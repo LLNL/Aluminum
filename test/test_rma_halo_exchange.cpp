@@ -79,12 +79,11 @@ T &get(std::vector<T> &vec, int dim) {
 template <typename Backend, typename T>
 void test_rma_halo_exchange(int px, int py) {
   // Ugly hack.
-  std::vector<typename Backend::comm_type> comms = {
-    *(CommWrapper<Backend>(MPI_COMM_WORLD).comm_.release()),
-    *(CommWrapper<Backend>(MPI_COMM_WORLD).comm_.release()),
-    *(CommWrapper<Backend>(MPI_COMM_WORLD).comm_.release()),
-    *(CommWrapper<Backend>(MPI_COMM_WORLD).comm_.release())
-  };
+  std::vector<typename Backend::comm_type> comms;
+  comms.emplace_back(std::move(*(CommWrapper<Backend>(MPI_COMM_WORLD).comm_.release())));
+  comms.emplace_back(std::move(*(CommWrapper<Backend>(MPI_COMM_WORLD).comm_.release())));
+  comms.emplace_back(std::move(*(CommWrapper<Backend>(MPI_COMM_WORLD).comm_.release())));
+  comms.emplace_back(std::move(*(CommWrapper<Backend>(MPI_COMM_WORLD).comm_.release())));
   typename Backend::comm_type &comm = comms[0];
 
   int rank = comm.rank();

@@ -38,7 +38,7 @@
 #include "Al.hpp"
 #include "aluminum/internal.hpp"
 #include "aluminum/cuda.hpp"
-#include "aluminum/cudacommunicator.hpp"
+#include "aluminum/mpi_comm_and_stream_wrapper.hpp"
 
 #define AL_FORCE_CHECK_NCCL(nccl_call)                                \
   do {                                                                \
@@ -82,39 +82,31 @@ inline std::string algorithm_name(NCCLCollectiveAlgorithm algo) {
 // Forward declaration.
 class NCCLBackend;
 
-/**
- * Communicator for NCCL-based allreduces.
- * This requires NCCL version 2.0 or higher.
- */
-class NCCLCommunicator : public CUDACommunicator {
+/** Communicator for NCCL operations. */
+class NCCLCommunicator : public internal::MPICommAndStreamWrapper<cudaStream_t, nullptr> {
   friend class NCCLBackend;
  public:
-  /**
-   *  Initialize a NCCL communicator on the world comm and default stream.
-   */
-  NCCLCommunicator() : NCCLCommunicator(MPI_COMM_WORLD, 0) {}
-  /**
-   * Initialize a NCCL communicator on the world comm and given stream.
-   */
-  NCCLCommunicator(cudaStream_t stream_) : NCCLCommunicator(MPI_COMM_WORLD, stream_) {}
-  /**
-   * Initialize a NCCL communicator.
-   * @param comm_ An MPI_Comm representing the nodes to be in the communicator.
-   * @param stream_ The stream to associate with the communicator.
-   */
-  NCCLCommunicator(MPI_Comm comm_, cudaStream_t stream_);
-  ~NCCLCommunicator() override;
-  Communicator* copy() const override {
-    return new NCCLCommunicator(get_comm(), get_stream());
+  /** Default constructor, uses MPI_COMM_WORLD and the default stream. */
+   NCCLCommunicator() : NCCLCommunicator(MPI_COMM_WORLD, 0) {}
+  /** Use a particular MPI communicator and stream. */
+  NCCLCommunicator(MPI_Comm comm_, cudaStream_t stream_ = 0);
+  /** Cannot copy this. */
+  NCCLCommunicator(const NCCLCommunicator& other) = delete;
+  /** Default move constructor. */
+  NCCLCommunicator(NCCLCommunicator&& other) = default;
+  /** Cannot copy this. */
+  NCCLCommunicator& operator=(const NCCLCommunicator& other) = delete;
+  /** Default move assignment operator. */
+  NCCLCommunicator& operator=(NCCLCommunicator&& other) = default;
+  ~NCCLCommunicator();
+
+  /** Create a new NCCLCommunicator with the same processes and a new stream. */
+  NCCLCommunicator copy(cudaStream_t stream = 0) {
+    return NCCLCommunicator(get_comm(), stream);
   }
 
  private:
-  /** Initialize the internal NCCL communicator. */
-  void nccl_setup();
-  /** Clean up NCCL. */
-  void nccl_destroy();
-
-  /** NCCL communicator. */
+  /** Raw NCCL communicator. */
   ncclComm_t m_nccl_comm;
 };
 

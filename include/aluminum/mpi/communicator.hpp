@@ -27,46 +27,48 @@
 
 #pragma once
 
+#include <mpi.h>
+#include "Al.hpp"
+#include "aluminum/mpi_comm_and_stream_wrapper.hpp"
+
 namespace Al {
 namespace internal {
 namespace mpi {
 
 int get_max_tag();
 
-/**
- * Communicator for MPI-based collectives.
- */
-class MPICommunicator : public Communicator {
+/** Communicator for MPI-based operations. */
+class MPICommunicator : public MPICommAndStreamWrapper<int, 0> {
  public:
   /** Default constructor; use MPI_COMM_WORLD. */
   MPICommunicator() : MPICommunicator(MPI_COMM_WORLD) {}
-  /** Use a particular MPI communicator. */
-  MPICommunicator(MPI_Comm comm_) : Communicator() {
-    // Duplicate the communicator to avoid interference.
-    MPI_Comm_dup(comm_, &comm);
-    MPI_Comm_rank(comm, &rank_in_comm);
-    MPI_Comm_size(comm, &size_of_comm);
-    MPI_Comm_split_type(comm, MPI_COMM_TYPE_SHARED, 0, MPI_INFO_NULL,
-                        &local_comm);
-    MPI_Comm_rank(local_comm, &rank_in_local_comm);
-    MPI_Comm_size(local_comm, &size_of_local_comm);
+  /**
+   * Use a particular MPI communicator and stream.
+   *
+   * The MPI backend currently ignores streams.
+   */
+  MPICommunicator(MPI_Comm comm_, int = 0) :
+    MPICommAndStreamWrapper<int, 0>(comm_, 0) {}
+  /** Cannot copy this. */
+  MPICommunicator(const MPICommunicator& other) = delete;
+  /** Default move constructor. */
+  MPICommunicator(MPICommunicator&& other) = default;
+  /** Cannot copy this. */
+  MPICommunicator& operator=(MPICommunicator& other) = delete;
+  /** Default move assignment operator. */
+  MPICommunicator& operator=(MPICommunicator&& other) = default;
+  ~MPICommunicator() {}
+
+  /** Create a new MPICommunicator with the same processes. */
+  MPICommunicator copy(int stream = 0) const {
+    return MPICommunicator(get_comm(), stream);
   }
-  virtual ~MPICommunicator() override {
-    int finalized;
-    MPI_Finalized(&finalized);
-    if (!finalized) {
-      // TODO: temporary skipping deleting comm
-      //MPI_Comm_free(&comm);
-      //MPI_Comm_free(&local_comm);
-    }
-  }
-  Communicator* copy() const override { return new MPICommunicator(comm); }
-  int rank() const override { return rank_in_comm; }
-  int size() const override { return size_of_comm; }
-  MPI_Comm get_comm() const { return comm; }
-  int local_rank() const override { return rank_in_local_comm; }
-  int local_size() const override { return size_of_local_comm; }
-  MPI_Comm get_local_comm() const { return local_comm; }
+
+  /**
+   * Return the next free tag on this communicator.
+   *
+   * TODO: This is meant for internal use and should be moved / eliminted.
+   */
   int get_free_tag() {
     int tag = free_tag++;
     if (free_tag >= internal::mpi::get_max_tag()
@@ -77,18 +79,6 @@ class MPICommunicator : public Communicator {
   }
 
  private:
-  /** Associated MPI communicator. */
-  MPI_Comm comm;
-  /** Rank in comm. */
-  int rank_in_comm;
-  /** Size of comm. */
-  int size_of_comm;
-  /** Communicator for the local node. */
-  MPI_Comm local_comm;
-  /** Rank in the local communicator. */
-  int rank_in_local_comm;
-  /** Size of the local communicator. */
-  int size_of_local_comm;
   /**
    * Starting tag to use for non-blocking operations.
    * No other operations should use any tag >= to this one.
