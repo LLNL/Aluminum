@@ -92,7 +92,7 @@ test_cases = {
         'datatypes': nccl_datatypes
     },
     'ht': {
-        'ops': coll_ops + pt2pt_ops,
+        'ops': coll_ops + vector_coll_ops + pt2pt_ops,
         'datatypes': mpi_datatypes
     },
 }
