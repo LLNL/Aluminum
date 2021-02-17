@@ -75,6 +75,7 @@ template <> struct IsOpSupported<AlOperation::allreduce, Al::HostTransferBackend
 template <> struct IsOpSupported<AlOperation::alltoall, Al::HostTransferBackend> : std::true_type {};
 //template <> struct IsOpSupported<AlOperation::alltoallv, Al::HostTransferBackend> : std::true_type {};
 template <> struct IsOpSupported<AlOperation::bcast, Al::HostTransferBackend> : std::true_type {};
+template <> struct IsOpSupported<AlOperation::barrier, Al::HostTransferBackend> : std::true_type {};
 template <> struct IsOpSupported<AlOperation::gather, Al::HostTransferBackend> : std::true_type {};
 //template <> struct IsOpSupported<AlOperation::gatherv, Al::HostTransferBackend> : std::true_type {};
 template <> struct IsOpSupported<AlOperation::reduce, Al::HostTransferBackend> : std::true_type {};
@@ -125,6 +126,9 @@ template <> struct OpAlgoType<AlOperation::alltoall, Al::HostTransferBackend> {
 /*template <> struct OpAlgoType<AlOperation::alltoallv, Al::HostTransferBackend> {
   using type = Al::HostTransferBackend::alltoallv_algo_type;
   };*/
+template <> struct OpAlgoType<AlOperation::barrier, Al::HostTransferBackend> {
+  using type = Al::HostTransferBackend::barrier_algo_type;
+};
 template <> struct OpAlgoType<AlOperation::bcast, Al::HostTransferBackend> {
   using type = Al::HostTransferBackend::bcast_algo_type;
 };
@@ -169,6 +173,8 @@ struct AlgorithmOptions<Al::HostTransferBackend> {
   typename Al::HostTransferBackend::alltoall_algo_type alltoall_algo =
     Al::HostTransferBackend::alltoall_algo_type::automatic;
   //typename Al::HostTransferBackend::alltoallv_algo_type alltoallv_algo;
+  typename Al::HostTransferBackend::barrier_algo_type barrier_algo =
+    Al::HostTransferBackend::barrier_algo_type::automatic;
   typename Al::HostTransferBackend::bcast_algo_type bcast_algo =
     Al::HostTransferBackend::bcast_algo_type::automatic;
   typename Al::HostTransferBackend::gather_algo_type gather_algo =

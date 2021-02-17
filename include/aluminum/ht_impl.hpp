@@ -32,6 +32,7 @@
 #include "aluminum/ht/allgather.hpp"
 #include "aluminum/ht/allreduce.hpp"
 #include "aluminum/ht/alltoall.hpp"
+#include "aluminum/ht/barrier.hpp"
 #include "aluminum/ht/bcast.hpp"
 #include "aluminum/ht/gather.hpp"
 #include "aluminum/ht/reduce.hpp"
@@ -100,6 +101,7 @@ class HostTransferBackend {
   using allreduce_algo_type = HostTransferAllreduceAlgorithm;
   using allgather_algo_type = HostTransferCollectiveAlgorithm;
   using alltoall_algo_type = HostTransferCollectiveAlgorithm;
+  using barrier_algo_type = HostTransferCollectiveAlgorithm;
   using bcast_algo_type = HostTransferCollectiveAlgorithm;
   using gather_algo_type = HostTransferCollectiveAlgorithm;
   using reduce_algo_type = HostTransferCollectiveAlgorithm;
@@ -293,6 +295,30 @@ class HostTransferBackend {
     T* buffer, size_t count,
     comm_type& comm, req_type& req, alltoall_algo_type algo) {
     NonblockingAlltoall<T>(buffer, buffer, count, comm, req, algo);
+  }
+
+  static void Barrier(comm_type& comm, barrier_algo_type algo) {
+    switch (algo) {
+    case HostTransferCollectiveAlgorithm::automatic:
+      do_barrier(comm, comm.get_stream());
+      break;
+    default:
+      throw_al_exception("HostTransferBarrier: Invalid algorithm");
+    }
+  }
+
+  static void NonblockingBarrier(
+    comm_type& comm, req_type& req, barrier_algo_type algo) {
+    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+    sync_internal_stream_with_comm(internal_stream, comm);
+    switch (algo) {
+    case HostTransferCollectiveAlgorithm::automatic:
+      do_barrier(comm, internal_stream);
+      break;
+    default:
+      throw_al_exception("HostTransferBarrier: Invalid algorithm");
+    }
+    setup_completion_event(internal_stream, comm, req);
   }
 
   template <typename T>
@@ -589,6 +615,12 @@ class HostTransferBackend {
     internal::ht::AlltoallAlState<T>* state =
       new internal::ht::AlltoallAlState<T>(
         sendbuf, recvbuf, count, comm, stream);
+    internal::get_progress_engine()->enqueue(state);
+  }
+
+  static void do_barrier(comm_type& comm, cudaStream_t stream) {
+    internal::ht::BarrierAlState* state =
+      new internal::ht::BarrierAlState(comm, stream);
     internal::get_progress_engine()->enqueue(state);
   }
 
