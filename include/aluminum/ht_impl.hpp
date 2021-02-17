@@ -30,14 +30,19 @@
 #include "Al.hpp"
 #include "aluminum/ht/communicator.hpp"
 #include "aluminum/ht/allgather.hpp"
+#include "aluminum/ht/allgatherv.hpp"
 #include "aluminum/ht/allreduce.hpp"
 #include "aluminum/ht/alltoall.hpp"
+#include "aluminum/ht/alltoallv.hpp"
 #include "aluminum/ht/barrier.hpp"
 #include "aluminum/ht/bcast.hpp"
 #include "aluminum/ht/gather.hpp"
+#include "aluminum/ht/gatherv.hpp"
 #include "aluminum/ht/reduce.hpp"
 #include "aluminum/ht/reduce_scatter.hpp"
+#include "aluminum/ht/reduce_scatterv.hpp"
 #include "aluminum/ht/scatter.hpp"
+#include "aluminum/ht/scatterv.hpp"
 #include "aluminum/ht/pt2pt.hpp"
 
 namespace Al {
@@ -100,13 +105,18 @@ class HostTransferBackend {
  public:
   using allreduce_algo_type = HostTransferAllreduceAlgorithm;
   using allgather_algo_type = HostTransferCollectiveAlgorithm;
+  using allgatherv_algo_type = HostTransferCollectiveAlgorithm;
   using alltoall_algo_type = HostTransferCollectiveAlgorithm;
+  using alltoallv_algo_type = HostTransferCollectiveAlgorithm;
   using barrier_algo_type = HostTransferCollectiveAlgorithm;
   using bcast_algo_type = HostTransferCollectiveAlgorithm;
   using gather_algo_type = HostTransferCollectiveAlgorithm;
+  using gatherv_algo_type = HostTransferCollectiveAlgorithm;
   using reduce_algo_type = HostTransferCollectiveAlgorithm;
   using reduce_scatter_algo_type = HostTransferCollectiveAlgorithm;
+  using reduce_scatterv_algo_type = HostTransferCollectiveAlgorithm;
   using scatter_algo_type = HostTransferCollectiveAlgorithm;
+  using scatterv_algo_type = HostTransferCollectiveAlgorithm;
   using comm_type = internal::ht::HostTransferCommunicator;
   using req_type = std::shared_ptr<internal::ht::HostTransferRequest>;
   static constexpr std::nullptr_t null_req = nullptr;
@@ -254,6 +264,53 @@ class HostTransferBackend {
   }
 
   template <typename T>
+  static void Allgatherv(
+    const T* sendbuf, T* recvbuf,
+    std::vector<size_t> counts, std::vector<size_t> displs,
+    comm_type& comm, allgatherv_algo_type algo) {
+    switch (algo) {
+    case HostTransferCollectiveAlgorithm::automatic:
+      do_allgatherv(sendbuf, recvbuf, counts, displs, comm, comm.get_stream());
+      break;
+    default:
+      throw_al_exception("HostTransferAllgatherv: Invalid algorithm");
+    }
+  }
+
+  template <typename T>
+  static void Allgatherv(
+    T* buffer,
+    std::vector<size_t> counts, std::vector<size_t> displs,
+    comm_type& comm, allgatherv_algo_type algo) {
+    Allgatherv(buffer, buffer, counts, displs, comm, algo);
+  }
+
+  template <typename T>
+  static void NonblockingAllgatherv(
+    const T* sendbuf, T* recvbuf,
+    std::vector<size_t> counts, std::vector<size_t> displs,
+    comm_type& comm, req_type& req, allgatherv_algo_type algo) {
+    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+    sync_internal_stream_with_comm(internal_stream, comm);
+    switch (algo) {
+    case HostTransferCollectiveAlgorithm::automatic:
+      do_allgatherv(sendbuf, recvbuf, counts, displs, comm, internal_stream);
+      break;
+    default:
+      throw_al_exception("HostTransferAllgatherv: Invalid algorithm");
+    }
+    setup_completion_event(internal_stream, comm, req);
+  }
+
+  template <typename T>
+  static void NonblockingAllgatherv(
+    T* buffer,
+    std::vector<size_t> counts, std::vector<size_t> displs,
+    comm_type& comm, req_type& req, allgatherv_algo_type algo) {
+    NonblockingAllgatherv<T>(buffer, buffer, counts, displs, comm, req, algo);
+  }
+
+  template <typename T>
   static void Alltoall(
     const T* sendbuf, T* recvbuf, size_t count,
     comm_type& comm, alltoall_algo_type algo) {
@@ -295,6 +352,61 @@ class HostTransferBackend {
     T* buffer, size_t count,
     comm_type& comm, req_type& req, alltoall_algo_type algo) {
     NonblockingAlltoall<T>(buffer, buffer, count, comm, req, algo);
+  }
+
+  template <typename T>
+  static void Alltoallv(
+    const T* sendbuf,
+    std::vector<size_t> send_counts, std::vector<size_t> send_displs,
+    T* recvbuf,
+    std::vector<size_t> recv_counts, std::vector<size_t> recv_displs,
+    comm_type& comm, alltoallv_algo_type algo) {
+    switch (algo) {
+    case HostTransferCollectiveAlgorithm::automatic:
+      do_alltoallv(sendbuf, send_counts, send_displs,
+                   recvbuf, recv_counts, recv_displs,
+                   comm, comm.get_stream());
+      break;
+    default:
+      throw_al_exception("HostTransferAlltoallv: Invalid algorithm");
+    }
+  }
+
+  template <typename T>
+  static void Alltoallv(
+    T* buffer, std::vector<size_t> counts, std::vector<size_t> displs,
+    comm_type& comm, alltoallv_algo_type algo) {
+    Alltoallv(buffer, counts, displs, buffer, counts, displs, comm, algo);
+  }
+
+  template <typename T>
+  static void NonblockingAlltoallv(
+    const T* sendbuf,
+    std::vector<size_t> send_counts, std::vector<size_t> send_displs,
+    T* recvbuf,
+    std::vector<size_t> recv_counts, std::vector<size_t> recv_displs,
+    comm_type& comm, req_type& req, alltoallv_algo_type algo) {
+    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+    sync_internal_stream_with_comm(internal_stream, comm);
+    switch (algo) {
+    case HostTransferCollectiveAlgorithm::automatic:
+      do_alltoallv(sendbuf, send_counts, send_displs,
+                   recvbuf, recv_counts, recv_displs,
+                   comm, internal_stream);
+      break;
+    default:
+      throw_al_exception("Invalid algorithm");
+    }
+    setup_completion_event(internal_stream, comm, req);
+  }
+
+  template <typename T>
+  static void NonblockingAlltoallv(
+    T* buffer, std::vector<size_t> counts, std::vector<size_t> displs,
+    comm_type& comm, req_type& req, alltoallv_algo_type algo) {
+    NonblockingAlltoallv<T>(buffer, counts, displs,
+                            buffer, counts, displs,
+                            comm, req, algo);
   }
 
   static void Barrier(comm_type& comm, barrier_algo_type algo) {
@@ -396,6 +508,51 @@ class HostTransferBackend {
   }
 
   template <typename T>
+  static void Gatherv(
+    const T* sendbuf, T* recvbuf,
+    std::vector<size_t> counts, std::vector<size_t> displs, int root,
+    comm_type& comm, gatherv_algo_type algo) {
+    switch (algo) {
+    case HostTransferCollectiveAlgorithm::automatic:
+      do_gatherv(sendbuf, recvbuf, counts, displs, root, comm, comm.get_stream());
+      break;
+    default:
+      throw_al_exception("HostTransferGatherv: Invalid algorithm");
+    }
+  }
+
+  template <typename T>
+  static void Gatherv(
+    T* buffer, std::vector<size_t> counts, std::vector<size_t> displs,
+    int root, comm_type& comm, gatherv_algo_type algo) {
+    Gatherv(buffer, buffer, counts, displs, root, comm, algo);
+  }
+
+  template <typename T>
+  static void NonblockingGatherv(
+    const T* sendbuf, T* recvbuf,
+    std::vector<size_t> counts, std::vector<size_t> displs, int root,
+    comm_type& comm, req_type& req, gatherv_algo_type algo) {
+    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+    sync_internal_stream_with_comm(internal_stream, comm);
+    switch (algo) {
+    case HostTransferCollectiveAlgorithm::automatic:
+      do_gatherv(sendbuf, recvbuf, counts, displs, root, comm, internal_stream);
+      break;
+    default:
+      throw_al_exception("Invalid algorithm");
+    }
+    setup_completion_event(internal_stream, comm, req);
+  }
+
+  template <typename T>
+  static void NonblockingGatherv(
+    T* buffer, std::vector<size_t> counts, std::vector<size_t> displs, int root,
+    comm_type& comm, req_type& req, gatherv_algo_type algo) {
+    NonblockingGatherv<T>(buffer, buffer, counts, displs, root, comm, req, algo);
+  }
+
+  template <typename T>
   static void Reduce(
     const T* sendbuf, T* recvbuf, size_t count, ReductionOperator op, int root,
     comm_type& comm, reduce_algo_type algo) {
@@ -486,6 +643,49 @@ class HostTransferBackend {
   }
 
   template <typename T>
+  static void Reduce_scatterv(
+    const T* sendbuf, T* recvbuf, std::vector<size_t> counts,
+    ReductionOperator op, comm_type& comm, reduce_scatterv_algo_type algo) {
+    switch (algo) {
+    case HostTransferCollectiveAlgorithm::automatic:
+      do_reduce_scatterv(sendbuf, recvbuf, counts, op, comm, comm.get_stream());
+      break;
+    default:
+      throw_al_exception("HostTransferReduce_scatterv: Invalid algorithm");
+    }
+  }
+
+  template <typename T>
+  static void Reduce_scatterv(
+    T* buffer, std::vector<size_t> counts, ReductionOperator op,
+    comm_type& comm, reduce_scatterv_algo_type algo) {
+    Reduce_scatterv(buffer, buffer, counts, op, comm, algo);
+  }
+
+  template <typename T>
+  static void NonblockingReduce_scatterv(
+    const T* sendbuf, T* recvbuf, std::vector<size_t> counts, ReductionOperator op,
+    comm_type& comm, req_type& req, reduce_scatterv_algo_type algo) {
+    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+    sync_internal_stream_with_comm(internal_stream, comm);
+    switch (algo) {
+    case HostTransferCollectiveAlgorithm::automatic:
+      do_reduce_scatterv(sendbuf, recvbuf, counts, op, comm, internal_stream);
+      break;
+    default:
+      throw_al_exception("HostTransferReduce_scatterv: Invalid algorithm");
+    }
+    setup_completion_event(internal_stream, comm, req);
+  }
+
+  template <typename T>
+  static void NonblockingReduce_scatterv(
+    T* buffer, std::vector<size_t> counts, ReductionOperator op,
+    comm_type& comm, req_type& req, reduce_scatterv_algo_type algo) {
+    NonblockingReduce_scatterv(buffer, buffer, counts, op, comm, req, algo);
+  }
+
+  template <typename T>
   static void Scatter(
     const T* sendbuf, T* recvbuf, size_t count, int root,
     comm_type& comm, scatter_algo_type algo) {
@@ -527,6 +727,51 @@ class HostTransferBackend {
     T* buffer, size_t count, int root,
     comm_type& comm, req_type& req, scatter_algo_type algo) {
     NonblockingScatter<T>(buffer, buffer, count, root, comm, req, algo);
+  }
+
+  template <typename T>
+  static void Scatterv(
+    const T* sendbuf, T* recvbuf,
+    std::vector<size_t> counts, std::vector<size_t> displs, int root,
+    comm_type& comm, scatterv_algo_type algo) {
+    switch (algo) {
+    case HostTransferCollectiveAlgorithm::automatic:
+      do_scatterv(sendbuf, recvbuf, counts, displs, root, comm, comm.get_stream());
+      break;
+    default:
+      throw_al_exception("HostTransferScatterv: Invalid algorithm");
+    }
+  }
+
+  template <typename T>
+  static void Scatterv(
+    T* buffer, std::vector<size_t> counts, std::vector<size_t> displs,
+    int root, comm_type& comm, scatterv_algo_type algo) {
+    Scatterv(buffer, buffer, counts, displs, root, comm, algo);
+  }
+
+  template <typename T>
+  static void NonblockingScatterv(
+    const T* sendbuf, T* recvbuf,
+    std::vector<size_t> counts, std::vector<size_t> displs, int root,
+    comm_type& comm, req_type& req, scatterv_algo_type algo) {
+    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+    sync_internal_stream_with_comm(internal_stream, comm);
+    switch (algo) {
+    case HostTransferCollectiveAlgorithm::automatic:
+      do_scatterv(sendbuf, recvbuf, counts, displs, root, comm, internal_stream);
+      break;
+    default:
+      throw_al_exception("Invalid algorithm");
+    }
+    setup_completion_event(internal_stream, comm, req);
+  }
+
+  template <typename T>
+  static void NonblockingScatterv(
+    T* buffer, std::vector<size_t> counts, std::vector<size_t> displs, int root,
+    comm_type& comm, req_type& req, scatterv_algo_type algo) {
+    NonblockingScatterv<T>(buffer, buffer, counts, displs, root, comm, req, algo);
   }
 
   static std::string Name() { return "HostTransferBackend"; }
@@ -609,12 +854,37 @@ class HostTransferBackend {
   }
 
   template <typename T>
+  static void do_allgatherv(
+    const T* sendbuf, T* recvbuf,
+    std::vector<size_t> counts, std::vector<size_t> displs,
+    comm_type& comm, cudaStream_t stream) {
+    internal::ht::AllgathervAlState<T>* state =
+      new internal::ht::AllgathervAlState<T>(
+        sendbuf, recvbuf, counts, displs, comm, stream);
+    internal::get_progress_engine()->enqueue(state);
+  }
+
+  template <typename T>
   static void do_alltoall(
     const T* sendbuf, T* recvbuf, size_t count, comm_type& comm,
     cudaStream_t stream) {
     internal::ht::AlltoallAlState<T>* state =
       new internal::ht::AlltoallAlState<T>(
         sendbuf, recvbuf, count, comm, stream);
+    internal::get_progress_engine()->enqueue(state);
+  }
+
+  template <typename T>
+  static void do_alltoallv(
+    const T* sendbuf,
+    std::vector<size_t> send_counts, std::vector<size_t> send_displs,
+    T* recvbuf,
+    std::vector<size_t> recv_counts, std::vector<size_t> recv_displs,
+    comm_type& comm, cudaStream_t stream) {
+    internal::ht::AlltoallvAlState<T>* state =
+      new internal::ht::AlltoallvAlState<T>(
+        sendbuf, send_counts, send_displs,
+        recvbuf, recv_counts, recv_displs, comm, stream);
     internal::get_progress_engine()->enqueue(state);
   }
 
@@ -645,6 +915,17 @@ class HostTransferBackend {
   }
 
   template <typename T>
+  static void do_gatherv(
+    const T* sendbuf, T* recvbuf,
+    std::vector<size_t> counts, std::vector<size_t> displs,
+    int root, comm_type& comm, cudaStream_t stream) {
+    internal::ht::GathervAlState<T>* state =
+      new internal::ht::GathervAlState<T>(
+        sendbuf, recvbuf, counts, displs, root, comm, stream);
+    internal::get_progress_engine()->enqueue(state);
+  }
+
+  template <typename T>
   static void do_reduce(
     const T* sendbuf, T* recvbuf, size_t count, ReductionOperator op,
     int root, comm_type& comm,
@@ -666,12 +947,33 @@ class HostTransferBackend {
   }
 
   template <typename T>
+  static void do_reduce_scatterv(
+    const T* sendbuf, T* recvbuf, std::vector<size_t> counts,
+    ReductionOperator op, comm_type& comm, cudaStream_t stream) {
+    internal::ht::ReduceScattervAlState<T>* state =
+      new internal::ht::ReduceScattervAlState<T>(
+        sendbuf, recvbuf, counts, op, comm, stream);
+    internal::get_progress_engine()->enqueue(state);
+  }
+
+  template <typename T>
   static void do_scatter(
     const T* sendbuf, T* recvbuf, size_t count, int root, comm_type& comm,
     cudaStream_t stream) {
     internal::ht::ScatterAlState<T>* state =
       new internal::ht::ScatterAlState<T>(
         sendbuf, recvbuf, count, root, comm, stream);
+    internal::get_progress_engine()->enqueue(state);
+  }
+
+  template <typename T>
+  static void do_scatterv(
+    const T* sendbuf, T* recvbuf,
+    std::vector<size_t> counts, std::vector<size_t> displs,
+    int root, comm_type& comm, cudaStream_t stream) {
+    internal::ht::ScattervAlState<T>* state =
+      new internal::ht::ScattervAlState<T>(
+        sendbuf, recvbuf, counts, displs, root, comm, stream);
     internal::get_progress_engine()->enqueue(state);
   }
 };
