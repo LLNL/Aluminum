@@ -2,6 +2,7 @@ set_source_path(THIS_DIR_HEADERS
   allgather.hpp
   allreduce.hpp
   alltoall.hpp
+  base_state.hpp
   bcast.hpp
   communicator.hpp
   gather.hpp

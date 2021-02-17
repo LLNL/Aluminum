@@ -29,110 +29,60 @@
 
 #include "aluminum/cuda.hpp"
 #include "aluminum/ht/communicator.hpp"
-#include "aluminum/progress.hpp"
+#include "aluminum/ht/base_state.hpp"
 
 namespace Al {
 namespace internal {
 namespace ht {
 
 template <typename T>
-class AllgatherAlState : public AlState {
+class AllgatherAlState : public HostTransferCollectiveSignalAtEndState {
 public:
-  AllgatherAlState(const T* sendbuf, T* recvbuf, size_t count,
-                   HostTransferCommunicator& comm, cudaStream_t stream) :
-    AlState(nullptr),
-    host_mem_(get_pinned_memory<T>(comm.size()*count)),
-    count_(count),
-    comm_(comm.get_comm()),
-    compute_stream(comm.get_stream()) {
-
-    int const rank = comm.rank();
-    bool const inplace_operation = sendbuf == recvbuf;
-
-    // Transfer data from device to host and use an event to determine when it
-    // completes.
-    if (inplace_operation) {
-      AL_CHECK_CUDA(cudaMemcpyAsync(host_mem_ + rank*count_,
-                                    sendbuf + rank*count_,
-                                    sizeof(T)*count_, cudaMemcpyDeviceToHost,
-                                    stream));
+  AllgatherAlState(const T* sendbuf, T* recvbuf, size_t count_,
+                   HostTransferCommunicator& comm_, cudaStream_t stream_) :
+    HostTransferCollectiveSignalAtEndState(stream_),
+    host_mem(get_pinned_memory<T>(comm_.size()*count_)),
+    count(count_),
+    comm(comm_.get_comm()) {
+    // Transfer data from device to host.
+    if (sendbuf == recvbuf) {
+      AL_CHECK_CUDA(cudaMemcpyAsync(host_mem + comm_.rank()*count,
+                                    sendbuf + comm_.rank()*count,
+                                    sizeof(T)*count, cudaMemcpyDeviceToHost,
+                                    stream_));
     } else {
-      AL_CHECK_CUDA(cudaMemcpyAsync(host_mem_ + rank*count_,
-                                    sendbuf, sizeof(T)*count_,
-                                    cudaMemcpyDeviceToHost, stream));
+      AL_CHECK_CUDA(cudaMemcpyAsync(host_mem + comm_.rank()*count,
+                                    sendbuf, sizeof(T)*count,
+                                    cudaMemcpyDeviceToHost, stream_));
     }
-    d2h_event_.record(stream);
+    start_event.record(stream_);
 
-    // Enqueue the kernel to wait on the host
-    gpuwait_.wait(stream);
+    // Have the device wait on the host.
+    gpu_wait.wait(stream_);
 
     // Transfer completed buffer back to device.
-    AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, host_mem_, sizeof(T)*count*comm.size(),
-                                  cudaMemcpyHostToDevice, stream));
-    h2d_event_.record(stream);
+    AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, host_mem,
+                                  sizeof(T)*count_*comm_.size(),
+                                  cudaMemcpyHostToDevice, stream_));
+    end_event.record(stream_);
   }
 
   ~AllgatherAlState() override {
-    release_pinned_memory(host_mem_);
+    release_pinned_memory(host_mem);
   }
-
-  PEAction step() override {
-    if (!mem_xfer_done_) {
-      if (d2h_event_.query()) {
-        mem_xfer_done_ = true;
-        return PEAction::advance;
-      } else {
-        return PEAction::cont;
-      }
-    }
-    if (!ag_started_) {
-      MPI_Iallgather(MPI_IN_PLACE, count_, mpi::TypeMap<T>(),
-                     host_mem_, count_, mpi::TypeMap<T>(), comm_, &req_);
-      ag_started_ = true;
-    }
-
-    if (!ag_done_) {
-      // Wait for the all2all to complete
-      int flag;
-      MPI_Test(&req_, &flag, MPI_STATUS_IGNORE);
-      if (flag) {
-        ag_done_ = true;
-        gpuwait_.signal();
-      }
-      else {
-        return PEAction::cont;
-      }
-    }
-
-    // Wait for host-to-device memcopy; cleanup
-    if (h2d_event_.query()) {
-      return PEAction::complete;
-    }
-
-    return PEAction::cont;
-  }
-
-  bool needs_completion() const override { return false; }
-  void* get_compute_stream() const override { return compute_stream; }
 
   std::string get_name() const override { return "HTAllgather"; }
 
+protected:
+  void start_mpi_op() override {
+    MPI_Iallgather(MPI_IN_PLACE, count, mpi::TypeMap<T>(),
+                   host_mem, count, mpi::TypeMap<T>(), comm, get_mpi_req());
+  }
+
 private:
-  T* host_mem_;
-  size_t count_;
-
-  cuda::GPUWait gpuwait_;
-
-  cuda::FastEvent d2h_event_, h2d_event_;
-
-  MPI_Comm comm_;
-  MPI_Request req_ = MPI_REQUEST_NULL;
-
-  bool mem_xfer_done_ = false;
-  bool ag_started_ = false;
-  bool ag_done_ = false;
-
-  cudaStream_t compute_stream;
+  T* host_mem;
+  size_t count;
+  MPI_Comm comm;
 };
 
 }  // namespace ht
