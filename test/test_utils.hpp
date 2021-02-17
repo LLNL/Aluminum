@@ -109,6 +109,15 @@ struct CommWrapper {
 };
 
 /**
+ * Ensure all Aluminum operations on a communicator have completed.
+ *
+ * For backends that work with compute streams on other devices
+ * (e.g., GPUs), this ensures the operations finish.
+ */
+template <typename Backend>
+void complete_operations(typename Backend::comm_type&) {}
+
+/**
  * Helper to hang for debugging.
  *
  * If non-negative, hangs that rank; if negative, hangs all ranks.

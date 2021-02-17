@@ -61,3 +61,9 @@ template <>
 CommWrapper<Al::MPICUDABackend>::~CommWrapper() noexcept(false) {
   AL_FORCE_CHECK_CUDA_NOSYNC(cudaStreamDestroy(comm_->get_stream()));
 }
+
+template <>
+void complete_operations<Al::MPICUDABackend>(
+  typename Al::MPICUDABackend::comm_type& comm) {
+  AL_FORCE_CHECK_CUDA_NOSYNC(cudaStreamSynchronize(comm.get_stream()));
+}

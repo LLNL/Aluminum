@@ -81,6 +81,12 @@ CommWrapper<Al::NCCLBackend>::~CommWrapper() noexcept(false) {
   AL_FORCE_CHECK_CUDA_NOSYNC(cudaStreamDestroy(comm_->get_stream()));
 }
 
+template <>
+void complete_operations<Al::NCCLBackend>(
+  typename Al::NCCLBackend::comm_type& comm) {
+  AL_FORCE_CHECK_CUDA_NOSYNC(cudaStreamSynchronize(comm.get_stream()));
+}
+
 
 // Operator support.
 template <> struct IsOpSupported<AlOperation::allgather, Al::NCCLBackend> : std::true_type {};

@@ -62,6 +62,12 @@ CommWrapper<Al::HostTransferBackend>::~CommWrapper() noexcept(false) {
   AL_FORCE_CHECK_CUDA_NOSYNC(cudaStreamDestroy(comm_->get_stream()));
 }
 
+template <>
+void complete_operations<Al::HostTransferBackend>(
+  typename Al::HostTransferBackend::comm_type& comm) {
+  AL_FORCE_CHECK_CUDA_NOSYNC(cudaStreamSynchronize(comm.get_stream()));
+}
+
 // Operator support.
 template <> struct IsOpSupported<AlOperation::allgather, Al::HostTransferBackend> : std::true_type {};
 //template <> struct IsOpSupported<AlOperation::allgatherv, Al::HostTransferBackend> : std::true_type {};
