@@ -74,7 +74,7 @@ if (AL_HAS_ROCM)
 endif (AL_HAS_ROCM)
 
 target_compile_features(Al PUBLIC cxx_std_14)
-if (AL_HAS_CUDA)
+if (AL_HAS_CUDA AND NOT AL_HAS_ROCM)
   target_compile_features(Al PUBLIC cuda_std_14)
 endif ()
 
