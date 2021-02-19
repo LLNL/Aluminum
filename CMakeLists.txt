@@ -212,7 +212,12 @@ endforeach()
 set_property(TARGET MPI::MPI_CXX
   PROPERTY INTERFACE_LINK_LIBRARIES ${_MPI_LINK_LIBRARIES})
 
-find_package(HWLOC REQUIRED)
+if (ALUMINUM_ENABLE_ROCM)
+  set(AL_HWLOC_MINIMUM_VERSION "2.3.0")
+  find_package(HWLOC "${AL_HWLOC_MINIMUM_VERSION}" REQUIRED)
+else ()
+  find_package(HWLOC REQUIRED)
+endif ()
 
 if (ALUMINUM_ENABLE_CUDA)
   find_package(CUDA 9.0)
