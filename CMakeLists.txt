@@ -299,6 +299,8 @@ if (ALUMINUM_ENABLE_ROCM)
     # options above.
     set(AL_ROCM_PATH "/opt/rocm")
   endif ()
+  message(STATUS "Using AL_ROCM_PATH: ${AL_ROCM_PATH}")
+  
   # Provides hipify_*_files
   include(HipBuildSystem)
 
