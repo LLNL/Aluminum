@@ -335,7 +335,7 @@ if (ALUMINUM_ENABLE_ROCM)
   endif ()
 
   # Find CUB
-  set(CMAKE_PREFIX_PATH "/opt/rocm/hip" ${CMAKE_PREFIX_PATH})
+  set(CMAKE_PREFIX_PATH "${AL_ROCM_PATH}/hip" ${CMAKE_PREFIX_PATH})
   set(HIP_FOUND FALSE)
   find_package(HIP CONFIG REQUIRED)
   find_package(rocPRIM REQUIRED)
