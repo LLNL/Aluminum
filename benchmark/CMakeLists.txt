@@ -9,7 +9,7 @@ set_source_path(BENCHMARK_SRCS
   benchmark_ops.cpp)
 
 if (AL_HAS_ROCM)
-  hipify_source_files(AL_BENCHMARK_HEADERS ${BENCHMARK_HDRS})
+  hipify_header_files(AL_BENCHMARK_HEADERS ${BENCHMARK_HDRS})
   hipify_source_files(AL_BENCHMARK_SOURCES ${BENCHMARK_SRCS})
 else ()
   set(AL_BENCHMARK_SOURCES ${BENCHMARK_SRCS})
@@ -20,7 +20,7 @@ foreach(src ${AL_BENCHMARK_SOURCES})
   get_filename_component(_benchmark_exe_name
     "${_tmp_benchmark_exe_name}" NAME)
   if (AL_HAS_ROCM)
-    hip_add_executable(${_benchmark_exe_name} ${src})
+    hip_add_executable(${_benchmark_exe_name} ${src} ${AL_BENCHMARK_HEADERS})
     target_include_directories(${_benchmark_exe_name} PUBLIC
       $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>)
   else ()

@@ -282,14 +282,26 @@ if (ALUMINUM_ENABLE_CUDA)
 endif ()
 
 if (ALUMINUM_ENABLE_ROCM)
+
+  if (ROCM_PATH)
+    set(AL_ROCM_PATH "${ROCM_PATH}")
+  elseif (DEFINED ENV{ROCM_PATH})
+    set(AL_ROCM_PATH "$ENV{ROCM_PATH}")
+  else ()
+    # We could add a fallback here trying to find the base of some
+    # likely-to-exist executable like "hipconfig" or "hipcc" or even
+    # "rocm-smi" or something. Or the user can just use the ROCM_PATH
+    # options above.
+    set(AL_ROCM_PATH "/opt/rocm")
+  endif ()
   # Provides hipify_*_files
   include(HipBuildSystem)
 
   # Provides hip_add_executable
-  set(CMAKE_MODULE_PATH "/opt/rocm-3.8.0/hip/cmake" ${CMAKE_MODULE_PATH})
+  set(CMAKE_MODULE_PATH "${AL_ROCM_PATH}/hip/cmake" ${CMAKE_MODULE_PATH})
 
   # hip-runtime library
-  find_package(HIP REQUIRED)
+  find_package(HIP MODULE REQUIRED)
   set(AL_HAS_ROCM TRUE)
 
   # This is needed for some compatibility
@@ -327,10 +339,10 @@ if (ALUMINUM_ENABLE_ROCM)
   # (trb 11/02/2020): This is not ideal; when things stabilize, I'll
   # clean this up. Ideally we'll have a CMake config file for this.
   find_path(ROCM_SMI_INCLUDE_DIR rocm_smi/rocm_smi.h REQUIRED
-    HINTS /opt/rocm-3.8.0/rocm_smi/include)
+    HINTS ${AL_ROCM_PATH}/rocm_smi/include)
 
   find_library(ROCM_SMI_LIBRARY rocm_smi64 REQUIRED
-    HINTS /opt/rocm-3.8.0/rocm_smi/lib)
+    HINTS ${AL_ROCM_PATH}/rocm_smi/lib)
 
   # Just in case any of the previous commands turned this on.
   set(CMAKE_CXX_EXTENSIONS FALSE)
