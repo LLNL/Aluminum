@@ -1,5 +1,6 @@
 set_source_path(TEST_BASE_HDRS
   test_utils.hpp
+  test_utils_mpi.hpp
   op_dispatcher.hpp
   op_runner_impl.hpp
   hang_watchdog.hpp)

@@ -1,10 +1,9 @@
 # This file provides two functions (hipify_source_files and hipify_header_files)
 # for projects that would rather stay primarily in CUDA-land
 
-# hipify_files_internal (extension, new_filenames, ARGN)
+# hipify_files_internal (OUTPUT_VAR, ARGN)
 #
-# arguments: extension to give the target file, output list of processed
-#            filenames, files to process...
+# arguments: output list of processed filenames, files to process...
 # outputs: list of build-directory filenames, written to new_filenames
 #
 # Don't use this one! Use either hipify_source_files or hipify_header_files.
@@ -16,38 +15,44 @@
 
 find_program(HIPIFY_PERL hipify-perl)
 if (NOT HIPIFY_PERL)
-    message(FATAL_ERROR "hipify-perl was not found. Please make sure it's in $PATH")
+  message(FATAL_ERROR "hipify-perl was not found. "
+    "Please make sure it's in $PATH")
 else ()
-    message(STATUS "hipify-perl found at ${HIPIFY_PERL}")
+  message(STATUS "hipify-perl found at ${HIPIFY_PERL}")
 endif ()
 
-function (hipify_files_internal extension new_filenames)
-  set(${new_filenames} "")
+function (hipify_files_internal OUTPUT_VAR)
+  set(_new_filenames "")
 
   foreach (filename_in ${ARGN})
     string(REPLACE "${PROJECT_SOURCE_DIR}/" "" filename "${filename_in}")
     set(input "${PROJECT_SOURCE_DIR}/${filename}")
-    set(output "${CMAKE_BINARY_DIR}/${filename}${extension}")
+    get_filename_component(_tmp_extension "${filename}" EXT)
+    if (_tmp_extension STREQUAL ".hpp")
+      # Don't add extra ".hpp" for headers.
+      set(_tmp_extension)
+    endif ()
+    set(output "${CMAKE_BINARY_DIR}/${filename}${_tmp_extension}")
 
-    #message(DEBUG "Processing ${filename} into ${CMAKE_BINARY_DIR}/${filename}${extension}")
+    #message(DEBUG "***** Processing ${filename} into ${output}")
     add_custom_command(
       OUTPUT ${output}
       COMMAND ${HIPIFY_PERL} ${input} > ${output}
       DEPENDS ${input}
       VERBATIM)
 
-    list(APPEND ${new_filenames} ${output})
+    list(APPEND _new_filenames ${output})
   endforeach()
 
-  set(${new_filenames} ${${new_filenames}} PARENT_SCOPE)
+  set(${OUTPUT_VAR} ${_new_filenames} PARENT_SCOPE)
 endfunction()
 
-function(hipify_source_files new_filenames)
-  hipify_files_internal(".cpp" ${new_filenames} ${ARGN})
-  set(${new_filenames} ${${new_filenames}} PARENT_SCOPE)
+function(hipify_source_files OUTPUT_VAR)
+  hipify_files_internal(${OUTPUT_VAR} ${ARGN})
+  set(${OUTPUT_VAR} ${${OUTPUT_VAR}} PARENT_SCOPE)
 endfunction()
 
-function(hipify_header_files new_filenames)
-  hipify_files_internal("" ${new_filenames} ${ARGN})
-  set(${new_filenames} ${${new_filenames}} PARENT_SCOPE)
+function(hipify_header_files OUTPUT_VAR)
+  hipify_files_internal(${OUTPUT_VAR} ${ARGN})
+  set(${OUTPUT_VAR} ${${OUTPUT_VAR}} PARENT_SCOPE)
 endfunction()
