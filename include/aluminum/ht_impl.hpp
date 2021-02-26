@@ -86,14 +86,18 @@ void finalize();
 
 /** Represents a request for the host-transfer backend. */
 struct HostTransferRequest {
-  HostTransferRequest(cudaEvent_t op_event_, cudaStream_t orig_stream_) :
-    op_event(op_event_), orig_stream(orig_stream_) {}
+  HostTransferRequest(cudaEvent_t op_event_, cudaStream_t orig_stream_,
+                      cudaStream_t internal_stream_) :
+    op_event(op_event_), orig_stream(orig_stream_),
+    internal_stream(internal_stream_) {}
   // Note: Not thread safe!
   ~HostTransferRequest() { cuda::release_cuda_event(op_event); }
   /** Event pending on completion of the operation. */
   cudaEvent_t op_event;
   /** Original stream associated with the operation. */
   cudaStream_t orig_stream;
+  /** Internal stream the operation is running on. */
+  cudaStream_t internal_stream;
 };
 
 }  // namespace ht
@@ -799,7 +803,8 @@ class HostTransferBackend {
     cudaStream_t internal_stream, comm_type& comm, req_type& req) {
     cudaEvent_t event = internal::cuda::get_cuda_event();
     AL_CHECK_CUDA(cudaEventRecord(event, internal_stream));
-    req = std::make_shared<internal::ht::HostTransferRequest>(event, comm.get_stream());
+    req = std::make_shared<internal::ht::HostTransferRequest>(
+      event, comm.get_stream(), internal_stream);
   }
 
   /** Run a host-transfer allreduce. */
