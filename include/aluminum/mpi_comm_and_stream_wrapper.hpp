@@ -41,11 +41,11 @@ namespace internal {
  * The stream is assumed to be managed outside of the lifetime of the
  * communicator and will not be duplicated or deleted.
  */
-template <typename Stream, Stream default_stream>
+template <typename Stream>
 class MPICommAndStreamWrapper {
 public:
   /** Wrap (a duplicate of) comm_. */
-  MPICommAndStreamWrapper(MPI_Comm comm_, Stream stream_ = default_stream) :
+  MPICommAndStreamWrapper(MPI_Comm comm_, Stream stream_) :
     stream(stream_)
   {
     // Duplicate the communicator to avoid interference.

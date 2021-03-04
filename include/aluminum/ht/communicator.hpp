@@ -36,7 +36,7 @@ namespace internal {
 namespace ht {
 
 /** Communicator for host-transfer operations. */
-class HostTransferCommunicator: public MPICommAndStreamWrapper<cudaStream_t, nullptr> {
+class HostTransferCommunicator: public MPICommAndStreamWrapper<cudaStream_t> {
  public:
   /** Use MPI_COMM_WORLD and the default CUDA stream. */
   HostTransferCommunicator() : HostTransferCommunicator(MPI_COMM_WORLD, 0) {}

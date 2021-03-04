@@ -83,7 +83,7 @@ inline std::string algorithm_name(NCCLCollectiveAlgorithm algo) {
 class NCCLBackend;
 
 /** Communicator for NCCL operations. */
-class NCCLCommunicator : public internal::MPICommAndStreamWrapper<cudaStream_t, nullptr> {
+class NCCLCommunicator : public internal::MPICommAndStreamWrapper<cudaStream_t> {
   friend class NCCLBackend;
  public:
   /** Default constructor, uses MPI_COMM_WORLD and the default stream. */

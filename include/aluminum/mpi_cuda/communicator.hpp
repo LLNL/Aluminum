@@ -39,7 +39,7 @@ namespace mpi_cuda {
 class RMA;
 #endif
 
-class MPICUDACommunicator: public MPICommAndStreamWrapper<cudaStream_t, nullptr> {
+class MPICUDACommunicator: public MPICommAndStreamWrapper<cudaStream_t> {
  public:
   MPICUDACommunicator() : MPICUDACommunicator(MPI_COMM_WORLD, 0) {}
   MPICUDACommunicator(MPI_Comm comm_, cudaStream_t stream_)

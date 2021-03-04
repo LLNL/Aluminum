@@ -38,7 +38,7 @@ namespace mpi {
 int get_max_tag();
 
 /** Communicator for MPI-based operations. */
-class MPICommunicator : public MPICommAndStreamWrapper<int, 0> {
+class MPICommunicator : public MPICommAndStreamWrapper<int> {
  public:
   /** Default constructor; use MPI_COMM_WORLD. */
   MPICommunicator() : MPICommunicator(MPI_COMM_WORLD) {}
@@ -48,7 +48,7 @@ class MPICommunicator : public MPICommAndStreamWrapper<int, 0> {
    * The MPI backend currently ignores streams.
    */
   MPICommunicator(MPI_Comm comm_, int = 0) :
-    MPICommAndStreamWrapper<int, 0>(comm_, 0) {}
+    MPICommAndStreamWrapper<int>(comm_, 0) {}
   /** Cannot copy this. */
   MPICommunicator(const MPICommunicator& other) = delete;
   /** Default move constructor. */

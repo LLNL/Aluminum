@@ -48,7 +48,13 @@ NCCLCommunicator::~NCCLCommunicator() {
   int d;
   // Only destroy resources if the driver is still loaded.
   if (cudaGetDevice(&d) == cudaSuccess) {
-    AL_CHECK_NCCL(ncclCommDestroy(m_nccl_comm));
+    try {
+      AL_CHECK_NCCL(ncclCommDestroy(m_nccl_comm));
+    } catch (const al_exception& e) {
+      std::cerr << "Caught exception in NCCLCommunicator destructor: "
+                << e.what() << std::endl;
+      std::terminate();
+    }
   }
 }
 
