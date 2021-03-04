@@ -117,8 +117,7 @@ class HostTransferBackend {
     switch (algo) {
     case HostTransferAllreduceAlgorithm::automatic:
     case HostTransferAllreduceAlgorithm::host_transfer:
-      do_host_transfer_allreduce(sendbuf, recvbuf, count, op, comm,
-                                 comm.get_stream());
+      do_allreduce(sendbuf, recvbuf, count, op, comm, comm.get_stream());
       break;
     default:
       throw_al_exception("Invalid algorithm");
@@ -144,8 +143,7 @@ class HostTransferBackend {
     switch (algo) {
     case HostTransferAllreduceAlgorithm::automatic:
     case HostTransferAllreduceAlgorithm::host_transfer:
-      do_host_transfer_allreduce(sendbuf, recvbuf, count, op, comm,
-                                 internal_stream);
+      do_allreduce(sendbuf, recvbuf, count, op, comm, internal_stream);
       break;
     default:
       throw_al_exception("Invalid algorithm");
@@ -535,16 +533,11 @@ class HostTransferBackend {
 
   /** Run a host-transfer allreduce. */
   template <typename T>
-  static void do_host_transfer_allreduce(
+  static void do_allreduce(
     const T* sendbuf, T* recvbuf, size_t count, ReductionOperator op,
-    comm_type& comm, cudaStream_t internal_stream) {
-#if 0
-    if (!internal::cuda::stream_memory_operations_supported()) {
-      throw_al_exception("Host-transfer allreduce not supported without stream memory operations");
-    }
-#endif // 0
-    internal::ht::HostTransferState<T>* state = new internal::ht::HostTransferState<T>(
-      sendbuf, recvbuf, count, op, comm, internal_stream, internal::get_free_request());
+    comm_type& comm, cudaStream_t stream) {
+    internal::ht::AllreduceAlState<T>* state = new internal::ht::AllreduceAlState<T>(
+      sendbuf, recvbuf, count, op, comm, stream);
     internal::get_progress_engine()->enqueue(state);
   }
 
