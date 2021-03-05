@@ -38,6 +38,7 @@ template <> struct IsOpSupported<AlOperation::allgatherv, Al::MPIBackend> : std:
 template <> struct IsOpSupported<AlOperation::allreduce, Al::MPIBackend> : std::true_type {};
 template <> struct IsOpSupported<AlOperation::alltoall, Al::MPIBackend> : std::true_type {};
 template <> struct IsOpSupported<AlOperation::alltoallv, Al::MPIBackend> : std::true_type {};
+template <> struct IsOpSupported<AlOperation::barrier, Al::MPIBackend> : std::true_type {};
 template <> struct IsOpSupported<AlOperation::bcast, Al::MPIBackend> : std::true_type {};
 template <> struct IsOpSupported<AlOperation::gather, Al::MPIBackend> : std::true_type {};
 template <> struct IsOpSupported<AlOperation::gatherv, Al::MPIBackend> : std::true_type {};
@@ -89,6 +90,9 @@ template <> struct OpAlgoType<AlOperation::alltoall, Al::MPIBackend> {
 template <> struct OpAlgoType<AlOperation::alltoallv, Al::MPIBackend> {
   using type = Al::MPIBackend::alltoallv_algo_type;
 };
+template <> struct OpAlgoType<AlOperation::barrier, Al::MPIBackend> {
+  using type = Al::MPIBackend::barrier_algo_type;
+};
 template <> struct OpAlgoType<AlOperation::bcast, Al::MPIBackend> {
   using type = Al::MPIBackend::bcast_algo_type;
 };
@@ -139,6 +143,8 @@ struct AlgorithmOptions<Al::MPIBackend> {
     Al::MPIBackend::alltoall_algo_type::automatic;
   typename Al::MPIBackend::alltoallv_algo_type alltoallv_algo =
     Al::MPIBackend::alltoallv_algo_type::automatic;
+  typename Al::MPIBackend::barrier_algo_type barrier_algo =
+    Al::MPIBackend::barrier_algo_type::automatic;
   typename Al::MPIBackend::bcast_algo_type bcast_algo =
     Al::MPIBackend::bcast_algo_type::automatic;
   typename Al::MPIBackend::gather_algo_type gather_algo =

@@ -247,6 +247,7 @@ class NCCLBackend {
   friend void internal::nccl::finalize();
  public:
   using allreduce_algo_type = NCCLCollectiveAlgorithm;
+  using barrier_algo_type = NCCLCollectiveAlgorithm;
   using bcast_algo_type = NCCLCollectiveAlgorithm;
   using gather_algo_type = NCCLCollectiveAlgorithm;
   using gatherv_algo_type = NCCLCollectiveAlgorithm;
@@ -338,6 +339,18 @@ class NCCLBackend {
     sync_internal_stream_with_comm(internal_stream, comm);
     do_sendrecv(sendbuf, send_count, dest, recvbuf, recv_count, src,
                 comm, internal_stream);
+    setup_completion_event(internal_stream, comm, req);
+  }
+
+  static void Barrier(comm_type& comm, barrier_algo_type) {
+    do_barrier(comm, comm.get_stream());
+  }
+
+  static void NonblockingBarrier(comm_type& comm, req_type& req,
+                                 barrier_algo_type) {
+    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+    sync_internal_stream_with_comm(internal_stream, comm);
+    do_barrier(comm, internal_stream);
     setup_completion_event(internal_stream, comm, req);
   }
 
@@ -842,6 +855,18 @@ class NCCLBackend {
                              comm.m_nccl_comm, stream));
     }
     AL_CHECK_NCCL(ncclGroupEnd());
+  }
+
+  /** Do a NCCL barrier. */
+  static void do_barrier(comm_type& comm, cudaStream_t stream) {
+    // Implement the barrier as an allreduce on a single value.
+    using barrier_t = unsigned char;
+    barrier_t* barrier_buf = internal::get_gpu_memory<barrier_t>(1, stream);
+    AL_CHECK_NCCL(ncclAllReduce(
+                    (const void*) barrier_buf, (void*) barrier_buf, 1,
+                    internal::nccl::TypeMap<barrier_t>(), ncclSum,
+                    comm.m_nccl_comm, stream));
+    internal::release_gpu_memory(barrier_buf);
   }
 
   /** Do a NCCL broadcast. */

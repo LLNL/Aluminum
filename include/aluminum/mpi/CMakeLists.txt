@@ -5,6 +5,7 @@ set_source_path(THIS_DIR_HEADERS
   alltoall.hpp
   alltoallv.hpp
   base_state.hpp
+  barrier.hpp
   bcast.hpp
   communicator.hpp
   gather.hpp

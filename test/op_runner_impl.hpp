@@ -309,6 +309,51 @@ public:
 
 
 template <typename Backend, typename T>
+class OpRunner<AlOperation::barrier, Backend, T> :
+  public OpRunnerShim<AlOperation::barrier, Backend, T,
+                      OpRunner<AlOperation::barrier, Backend, T>> {
+public:
+  using ThisType = OpRunner<AlOperation::barrier, Backend, T>;
+  using OpRunnerShim<AlOperation::barrier, Backend, T, ThisType>::OpRunnerShim;
+
+  template <AlOperation Op2 = AlOperation::barrier,
+            std::enable_if_t<IsOpSupported<Op2, Backend>::value, bool> = true>
+  void run_impl(typename VectorType<T, Backend>::type& /*input*/,
+                typename VectorType<T, Backend>::type& /*output*/,
+                typename Backend::comm_type& comm) {
+    if (this->get_options().inplace) {
+      std::cerr << "No in-place for barrier" << std::endl;
+      std::abort();
+    }
+    typename Backend::req_type& req = this->get_options().req;
+    auto algo = this->get_options().algos.allgather_algo;
+    this->inplace_nb_dispatch(
+      [&]() { Al::Barrier<Backend>(comm, algo); },
+      [&]() {},
+      [&]() { Al::NonblockingBarrier<Backend>(comm, req, algo); },
+      [&]() {});
+  }
+
+  template <typename T2 = T,
+            std::enable_if_t<IsTypeSupportedByMPI<T2>::value, bool> = true>
+  void run_mpi_impl(std::vector<T>& /*input*/,
+                    std::vector<T>& /*output*/,
+                    typename Backend::comm_type& comm) {
+    MPI_Barrier(comm.get_comm());
+  }
+
+  size_t get_input_size_impl(size_t /*base_size*/,
+                             typename Backend::comm_type& /*comm*/) {
+    return 0;
+  }
+  size_t get_output_size_impl(size_t /*base_size*/,
+                              typename Backend::comm_type& /*comm*/) {
+    return 0;
+  }
+};
+
+
+template <typename Backend, typename T>
 class OpRunner<AlOperation::bcast, Backend, T> :
   public OpRunnerShim<AlOperation::bcast, Backend, T,
                       OpRunner<AlOperation::bcast, Backend, T>> {
