@@ -44,39 +44,6 @@
 namespace Al {
 
 /**
- * Abstract base class for all communicator objects.
- * Implementation note: Try to keep these lightweight.
- */
-class Communicator {
- public:
-  /** Basic empty constructor. */
-  Communicator() {}
-  /** Create a communicator based on an MPI communicator. */
-  Communicator(MPI_Comm) {}
-  /** Default copy constructor. */
-  Communicator(const Communicator& other) = default;
-  /** Default move constructor. */
-  Communicator(Communicator&& other) = default;
-  /** Default copy assignment operator. */
-  Communicator& operator=(const Communicator& other) noexcept = default;
-  /** Default move assignment operator. */
-  Communicator& operator=(Communicator&& other) = default;
-
-  /** Empty destructor. */
-  virtual ~Communicator() noexcept {}
-  /** Returns a copy of the concrete class. */
-  virtual Communicator* copy() const = 0;
-  /** Return the rank of the calling process in the communicator. */
-  virtual int rank() const = 0;
-  /** Return the number of processes in the communicator. */
-  virtual int size() const = 0;
-  /** Return the rank of this process on the node it is on. */
-  virtual int local_rank() const = 0;
-  /** Return the number of processes in the communicator on the same node. */
-  virtual int local_size() const = 0;
-};
-
-/**
  * Initialize Aluminum.
  * This must be called before any other calls to the library. It is safe to
  * call this multiple times.
