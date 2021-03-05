@@ -31,6 +31,7 @@
 
 #include <utility>
 #include <sstream>
+#include <functional>
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <cuda_fp16.h>
@@ -149,6 +150,16 @@ void release_cuda_event(cudaEvent_t event);
 cudaStream_t get_internal_stream();
 /** Get a specific internal stream. */
 cudaStream_t get_internal_stream(size_t id);
+/**
+ * Replace the internal stream pool with user-provided streams.
+ *
+ * stream_getter may be called an arbitrary number of times and should
+ * return the streams to use in the pool.
+ *
+ * This is meant to help interface with external applications that
+ * need Aluminum to use their streams for everything.
+ */
+void replace_internal_streams(std::function<cudaStream_t()> stream_getter);
 
 /** Return whether stream memory operations are supported. */
 bool stream_memory_operations_supported();

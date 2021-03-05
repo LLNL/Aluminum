@@ -147,14 +147,18 @@ template <> inline ncclDataType_t TypeMap<double>() { return ncclDouble; }
 
 /** Represents a request for the NCCL backend. */
 struct NCCLRequest {
-  NCCLRequest(cudaEvent_t op_event_, cudaStream_t orig_stream_) :
-    op_event(op_event_), orig_stream(orig_stream_) {}
+  NCCLRequest(cudaEvent_t op_event_, cudaStream_t orig_stream_,
+              cudaStream_t internal_stream_) :
+    op_event(op_event_), orig_stream(orig_stream_),
+    internal_stream(internal_stream_) {}
   // Note: Not thread safe!
   ~NCCLRequest() { cuda::release_cuda_event(op_event); }
   /** Event pending on completion of the operation. */
   cudaEvent_t op_event;
   /** Original stream associated with the operation. */
   cudaStream_t orig_stream;
+  /** Internal stream the operation is running on. */
+  cudaStream_t internal_stream;
 };
 
 /**
@@ -789,7 +793,8 @@ class NCCLBackend {
     cudaStream_t internal_stream, comm_type& comm, req_type& req) {
     cudaEvent_t event = internal::cuda::get_cuda_event();
     AL_CHECK_CUDA(cudaEventRecord(event, internal_stream));
-    req = std::make_shared<internal::nccl::NCCLRequest>(event, comm.get_stream());
+    req = std::make_shared<internal::nccl::NCCLRequest>(
+      event, comm.get_stream(), internal_stream);
   }
 
   // These are thin wrappers around the actual NCCL calls.

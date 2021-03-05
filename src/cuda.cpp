@@ -46,6 +46,8 @@ constexpr int num_internal_streams = 5;
 cudaStream_t internal_streams[num_internal_streams];
 // Whether stream memory operations are supported.
 bool stream_mem_ops_supported = false;
+// Whether we're using external streams (these are not freed).
+bool using_external_streams = false;
 }
 
 void init(int&, char**&) {
@@ -89,8 +91,10 @@ void finalize() {
   for (auto&& event : cuda_events) {
     AL_CHECK_CUDA(cudaEventDestroy(event));
   }
-  for (int i = 0; i < num_internal_streams; ++i) {
-    AL_CHECK_CUDA(cudaStreamDestroy(internal_streams[i]));
+  if (!using_external_streams) {
+    for (int i = 0; i < num_internal_streams; ++i) {
+      AL_CHECK_CUDA(cudaStreamDestroy(internal_streams[i]));
+    }
   }
 }
 
@@ -118,6 +122,19 @@ cudaStream_t get_internal_stream() {
 
 cudaStream_t get_internal_stream(size_t id) {
   return internal_streams[id];
+}
+
+void replace_internal_streams(std::function<cudaStream_t()> stream_getter) {
+  // Clean up our streams if needed.
+  if (!using_external_streams) {
+    for (int i = 0; i < num_internal_streams; ++i) {
+      AL_CHECK_CUDA(cudaStreamDestroy(internal_streams[i]));
+    }
+  }
+  for (int i = 0; i < num_internal_streams; ++i) {
+    internal_streams[i] = stream_getter();
+  }
+  using_external_streams = true;
 }
 
 bool stream_memory_operations_supported() {
