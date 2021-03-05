@@ -67,7 +67,7 @@ public:
   MPICommAndStreamWrapper& operator=(MPICommAndStreamWrapper&& other) = default;
 
   /** Destroy the underlying MPI_Comm. */
-  ~MPICommAndStreamWrapper() noexcept {
+  ~MPICommAndStreamWrapper() {
     int finalized;
     MPI_Finalized(&finalized);
     if (!finalized) {
