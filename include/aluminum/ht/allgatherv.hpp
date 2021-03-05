@@ -36,54 +36,57 @@ namespace internal {
 namespace ht {
 
 template <typename T>
-class ReduceAlState : public HostTransferCollectiveSignalNonRootEarlyState {
+class AllgathervAlState : public HostTransferCollectiveSignalAtEndState {
 public:
-  ReduceAlState(const T* sendbuf, T* recvbuf, size_t count_, ReductionOperator op_,
-                int root_, HostTransferCommunicator& comm_, cudaStream_t stream_) :
-    HostTransferCollectiveSignalNonRootEarlyState(comm_.rank() == root_, stream_),
-    host_mem(get_pinned_memory<T>(count_)),
-    count(count_),
-    root(root_),
-    op(mpi::ReductionOperator2MPI_Op(op_)),
+  AllgathervAlState(const T* sendbuf, T* recvbuf,
+                    std::vector<size_t> counts_, std::vector<size_t> displs_,
+                    HostTransferCommunicator& comm_, cudaStream_t stream_) :
+    HostTransferCollectiveSignalAtEndState(stream_),
+    host_mem(get_pinned_memory<T>(displs_.back()+counts_.back())),
+    counts(mpi::intify_size_t_vector(counts_)),
+    displs(mpi::intify_size_t_vector(displs_)),
     comm(comm_.get_comm()) {
     // Transfer data from device to host.
-    AL_CHECK_CUDA(cudaMemcpyAsync(host_mem, sendbuf, sizeof(T)*count,
-                                  cudaMemcpyDeviceToHost, stream_));
+    if (sendbuf == recvbuf) {
+      AL_CHECK_CUDA(cudaMemcpyAsync(host_mem + displs_[comm_.rank()],
+                                    sendbuf + displs_[comm_.rank()],
+                                    sizeof(T)*counts_[comm_.rank()],
+                                    cudaMemcpyDeviceToHost,
+                                    stream_));
+    } else {
+      AL_CHECK_CUDA(cudaMemcpyAsync(host_mem + displs_[comm_.rank()],
+                                    sendbuf, sizeof(T)*counts_[comm_.rank()],
+                                    cudaMemcpyDeviceToHost, stream_));
+    }
     start_event.record(stream_);
 
     // Have the device wait on the host.
     gpu_wait.wait(stream_);
 
-    if (is_root) {
-      // Transfer completed buffer back to device.
-      AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, host_mem, sizeof(T)*count,
-                                    cudaMemcpyHostToDevice, stream_));
-      end_event.record(stream_);
-    }
+    // Transfer completed buffer back to device.
+    AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, host_mem,
+                                  sizeof(T)*(displs_.back()+counts_.back()),
+                                  cudaMemcpyHostToDevice, stream_));
+    end_event.record(stream_);
   }
 
-  ~ReduceAlState() override {
+  ~AllgathervAlState() override {
     release_pinned_memory(host_mem);
   }
 
-  std::string get_name() const override { return "HTReduce"; }
+  std::string get_name() const override { return "HTAllgatherv"; }
 
 protected:
   void start_mpi_op() override {
-    if (is_root) {
-      MPI_Ireduce(MPI_IN_PLACE, host_mem, count, mpi::TypeMap<T>(),
-                  op, root, comm, get_mpi_req());
-    } else {
-      MPI_Ireduce(host_mem, host_mem, count, mpi::TypeMap<T>(),
-                  op, root, comm, get_mpi_req());
-    }
+    MPI_Iallgatherv(MPI_IN_PLACE, 0, mpi::TypeMap<T>(),
+                    host_mem, counts.data(), displs.data(), mpi::TypeMap<T>(),
+                    comm, get_mpi_req());
   }
 
 private:
   T* host_mem;
-  size_t count;
-  int root;
-  MPI_Op op;
+  std::vector<int> counts;
+  std::vector<int> displs;
   MPI_Comm comm;
 };
 

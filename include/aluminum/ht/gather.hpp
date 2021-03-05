@@ -29,126 +29,70 @@
 
 #include "aluminum/cuda.hpp"
 #include "aluminum/ht/communicator.hpp"
-#include "aluminum/progress.hpp"
+#include "aluminum/ht/base_state.hpp"
 
 namespace Al {
 namespace internal {
 namespace ht {
 
 template <typename T>
-class GatherAlState : public AlState {
+class GatherAlState : public HostTransferCollectiveSignalNonRootEarlyState {
 public:
-  GatherAlState(const T* sendbuf, T* recvbuf, size_t count, int root,
-                HostTransferCommunicator& comm, cudaStream_t stream) :
-    AlState(nullptr),
-    rank_(comm.rank()), root_(root), count_(count),
-    host_mem_(get_pinned_memory<T>(rank_ == root_ ? comm.size()*count_ : count_)),
-    comm_(comm.get_comm()),
-    compute_stream(comm.get_stream()) {
-
-    bool const i_am_root = rank_ == root_;
-    bool const inplace_operation = sendbuf == recvbuf;
-
-    // Transfer data from device to host and use an event to determine when it
-    // completes.
-    if (i_am_root)
+  GatherAlState(const T* sendbuf, T* recvbuf, size_t count_, int root_,
+                HostTransferCommunicator& comm_, cudaStream_t stream_) :
+    HostTransferCollectiveSignalNonRootEarlyState(comm_.rank() == root_, stream_),
+    host_mem(get_pinned_memory<T>(comm_.rank() == root_
+                                  ? comm_.size()*count_ : count_)),
+    count(count_),
+    root(root_),
+    comm(comm_.get_comm()) {
+    // Transfer data from device to host.
+    if (is_root) {
       AL_CHECK_CUDA(cudaMemcpyAsync(
-                      host_mem_+rank_*count_,
-                      inplace_operation ? sendbuf+rank_*count_ : sendbuf,
-                      sizeof(T)*count, cudaMemcpyDeviceToHost, stream));
-    else
-      AL_CHECK_CUDA(cudaMemcpyAsync(host_mem_, sendbuf, sizeof(T)*count_,
-                                    cudaMemcpyDeviceToHost, stream));
-    d2h_event_.record(stream);
-    gpuwait_.wait(stream);
+          host_mem + comm_.rank()*count,
+          (sendbuf == recvbuf) ? sendbuf + comm_.rank()*count : sendbuf,
+          sizeof(T)*count, cudaMemcpyDeviceToHost, stream_));
+    } else {
+      AL_CHECK_CUDA(cudaMemcpyAsync(host_mem, sendbuf, sizeof(T)*count,
+                                    cudaMemcpyDeviceToHost, stream_));
+    }
+    start_event.record(stream_);
 
-    if (i_am_root) {
+    // Have the device wait on the host.
+    gpu_wait.wait(stream_);
+
+    if (is_root) {
       // Transfer completed buffer back to device.
-      AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, host_mem_, sizeof(T)*count*comm.size(),
-                                    cudaMemcpyHostToDevice, stream));
-      h2d_event_.record(stream);
+      AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, host_mem, sizeof(T)*count*comm_.size(),
+                                    cudaMemcpyHostToDevice, stream_));
+      end_event.record(stream_);
     }
   }
 
   ~GatherAlState() override {
-    release_pinned_memory(host_mem_);
+    release_pinned_memory(host_mem);
   }
-
-  PEAction step() override {
-    if (!mem_xfer_done_) {
-      if (d2h_event_.query()) {
-        mem_xfer_done_ = true;
-        return PEAction::advance;
-      } else {
-        return PEAction::cont;
-      }
-    }
-    if (!gather_started_) {
-      if (root_ == rank_) {
-        MPI_Igather(MPI_IN_PLACE, count_, mpi::TypeMap<T>(),
-                    host_mem_, count_, mpi::TypeMap<T>(),
-                    root_, comm_, &req_);
-      } else {
-        MPI_Igather(host_mem_, count_, mpi::TypeMap<T>(),
-                    host_mem_, count_, mpi::TypeMap<T>(),
-                    root_, comm_, &req_);
-        gpuwait_.signal();
-      }
-      gather_started_ = true;
-    }
-
-    if (!gather_done_) {
-      // Wait for the gather to complete
-      int flag;
-      MPI_Test(&req_, &flag, MPI_STATUS_IGNORE);
-      if (flag) {
-        gather_done_ = true;
-        if (rank_ == root_)
-          gpuwait_.signal();
-        else
-          return PEAction::complete;
-      }
-      else {
-        return PEAction::cont;
-      }
-    }
-    else if (rank_ != root_) {
-      // Paranoia, in case step() is ever called again after returning
-      // 'true' for the first time.
-      return PEAction::complete;
-    }
-
-    // Wait for host-to-device memcopy; cleanup
-    if (h2d_event_.query()) {
-      return PEAction::complete;
-    }
-
-    return PEAction::cont;
-  }
-
-  bool needs_completion() const override { return false; }
-  void* get_compute_stream() const override { return compute_stream; }
 
   std::string get_name() const override { return "HTGather"; }
 
+protected:
+  void start_mpi_op() override {
+    if (is_root) {
+      MPI_Igather(MPI_IN_PLACE, count, mpi::TypeMap<T>(),
+                  host_mem, count, mpi::TypeMap<T>(),
+                  root, comm, get_mpi_req());
+    } else {
+      MPI_Igather(host_mem, count, mpi::TypeMap<T>(),
+                  host_mem, count, mpi::TypeMap<T>(),
+                  root, comm, get_mpi_req());
+    }
+  }
+
 private:
-  int rank_;
-  int root_;
-  size_t count_;
-  T* host_mem_;
-
-  cuda::GPUWait gpuwait_;
-
-  cuda::FastEvent d2h_event_, h2d_event_;
-
-  MPI_Comm comm_;
-  MPI_Request req_ = MPI_REQUEST_NULL;
-
-  bool mem_xfer_done_ = false;
-  bool gather_started_ = false;
-  bool gather_done_ = false;
-
-  cudaStream_t compute_stream;
+  T* host_mem;
+  size_t count;
+  int root;
+  MPI_Comm comm;
 };
 
 }  // namespace ht

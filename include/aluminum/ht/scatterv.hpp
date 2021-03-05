@@ -36,28 +36,37 @@ namespace internal {
 namespace ht {
 
 template <typename T>
-class ScatterAlState : public HostTransferCollectiveSignalRootEarlyState {
+class ScattervAlState : public HostTransferCollectiveSignalRootEarlyState {
 public:
-  ScatterAlState(const T* sendbuf, T* recvbuf, size_t count_, int root_,
-                HostTransferCommunicator& comm_, cudaStream_t stream_) :
+  ScattervAlState(const T* sendbuf, T* recvbuf,
+                  std::vector<size_t> counts_, std::vector<size_t> displs_,
+                  int root_,
+                  HostTransferCommunicator& comm_, cudaStream_t stream_) :
     HostTransferCollectiveSignalRootEarlyState(comm_.rank() == root_, stream_),
-    host_mem(get_pinned_memory<T>(comm_.rank() == root_
-                                  ? comm_.size()*count_ : count_)),
-    count(count_),
+    host_mem(get_pinned_memory<T>((comm_.rank() == root_) ?
+                                  (displs_.back() + counts_.back()) :
+                                  counts_[comm_.rank()])),
+    recv_count(counts_[comm_.rank()]),
+    counts(mpi::intify_size_t_vector(counts_)),
+    displs(mpi::intify_size_t_vector(displs_)),
     root(root_),
     comm(comm_.get_comm()) {
     if (is_root) {
       // Transfer the data from device to host.
-      AL_CHECK_CUDA(cudaMemcpyAsync(
-                      host_mem, sendbuf, sizeof(T)*count*comm_.size(),
-                      cudaMemcpyDeviceToHost, stream_));
+      for (size_t i = 0; i < counts_.size(); ++i) {
+        AL_CHECK_CUDA(cudaMemcpyAsync(
+                        host_mem + displs_[i], sendbuf + displs_[i],
+                        sizeof(T) * counts_[i],
+                        cudaMemcpyDeviceToHost, stream_));
+      }
       start_event.record(stream_);
       // Root only needs to copy its data to its final destination on the
       // device when it's not in place.
       if (sendbuf != recvbuf) {
         AL_CHECK_CUDA(cudaMemcpyAsync(
-                        recvbuf, sendbuf + comm_.rank()*count,
-                        count*sizeof(T), cudaMemcpyDeviceToDevice, stream_));
+                        recvbuf, sendbuf + displs_[comm_.rank()],
+                        sizeof(T) * counts_[comm_.rank()],
+                        cudaMemcpyDeviceToDevice, stream_));
       }
       // Have the device wait on the host.
       gpu_wait.wait(stream_);
@@ -67,34 +76,37 @@ public:
       // Have the device wait on the host.
       gpu_wait.wait(stream_);
       // Transfer completed buffer back to device.
-      AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, host_mem, sizeof(T)*count,
+      AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, host_mem,
+                                    sizeof(T)*counts_[comm_.rank()],
                                     cudaMemcpyHostToDevice, stream_));
       end_event.record(stream_);
     }
   }
 
-  ~ScatterAlState() override {
+  ~ScattervAlState() override {
     release_pinned_memory(host_mem);
   }
 
-  std::string get_name() const override { return "HTScatter"; }
+  std::string get_name() const override { return "HTScatterv"; }
 
 protected:
   void start_mpi_op() override {
     if (is_root) {
-      MPI_Iscatter(host_mem, count, mpi::TypeMap<T>(),
-                   MPI_IN_PLACE, count, mpi::TypeMap<T>(),
+      MPI_Iscatterv(host_mem, counts.data(), displs.data(), mpi::TypeMap<T>(),
+                   MPI_IN_PLACE, recv_count, mpi::TypeMap<T>(),
                    root, comm, get_mpi_req());
     } else {
-      MPI_Iscatter(host_mem, count, mpi::TypeMap<T>(),
-                   host_mem, count, mpi::TypeMap<T>(),
+      MPI_Iscatterv(host_mem, counts.data(), displs.data(), mpi::TypeMap<T>(),
+                   host_mem, recv_count, mpi::TypeMap<T>(),
                    root, comm, get_mpi_req());
     }
   }
 
 private:
   T* host_mem;
-  size_t count;
+  size_t recv_count;
+  std::vector<int> counts;
+  std::vector<int> displs;
   int root;
   MPI_Comm comm;
 };

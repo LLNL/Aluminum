@@ -36,53 +36,49 @@ namespace internal {
 namespace ht {
 
 template <typename T>
-class ReduceAlState : public HostTransferCollectiveSignalNonRootEarlyState {
+class ReduceScattervAlState : public HostTransferCollectiveSignalAtEndState {
 public:
-  ReduceAlState(const T* sendbuf, T* recvbuf, size_t count_, ReductionOperator op_,
-                int root_, HostTransferCommunicator& comm_, cudaStream_t stream_) :
-    HostTransferCollectiveSignalNonRootEarlyState(comm_.rank() == root_, stream_),
-    host_mem(get_pinned_memory<T>(count_)),
-    count(count_),
-    root(root_),
+  ReduceScattervAlState(const T* sendbuf, T* recvbuf,
+                        std::vector<size_t> counts_,
+                       ReductionOperator op_, HostTransferCommunicator& comm_,
+                       cudaStream_t stream_) :
+    HostTransferCollectiveSignalAtEndState(stream_),
+    total_size(std::accumulate(counts_.begin(), counts_.end(), 0)),
+    host_mem(get_pinned_memory<T>(total_size)),
+    counts(mpi::intify_size_t_vector(counts_)),
     op(mpi::ReductionOperator2MPI_Op(op_)),
     comm(comm_.get_comm()) {
     // Transfer data from device to host.
-    AL_CHECK_CUDA(cudaMemcpyAsync(host_mem, sendbuf, sizeof(T)*count,
+    AL_CHECK_CUDA(cudaMemcpyAsync(host_mem, sendbuf, sizeof(T)*total_size,
                                   cudaMemcpyDeviceToHost, stream_));
     start_event.record(stream_);
 
     // Have the device wait on the host.
     gpu_wait.wait(stream_);
 
-    if (is_root) {
-      // Transfer completed buffer back to device.
-      AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, host_mem, sizeof(T)*count,
-                                    cudaMemcpyHostToDevice, stream_));
-      end_event.record(stream_);
-    }
+    // Transfer completed buffer back to device.
+    AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, host_mem,
+                                  sizeof(T)*counts_[comm_.rank()],
+                                  cudaMemcpyHostToDevice, stream_));
+    end_event.record(stream_);
   }
 
-  ~ReduceAlState() override {
+  ~ReduceScattervAlState() override {
     release_pinned_memory(host_mem);
   }
 
-  std::string get_name() const override { return "HTReduce"; }
+  std::string get_name() const override { return "HTReduceScatterv"; }
 
 protected:
   void start_mpi_op() override {
-    if (is_root) {
-      MPI_Ireduce(MPI_IN_PLACE, host_mem, count, mpi::TypeMap<T>(),
-                  op, root, comm, get_mpi_req());
-    } else {
-      MPI_Ireduce(host_mem, host_mem, count, mpi::TypeMap<T>(),
-                  op, root, comm, get_mpi_req());
-    }
+    MPI_Ireduce_scatter(MPI_IN_PLACE, host_mem, counts.data(),
+                        mpi::TypeMap<T>(), op, comm, get_mpi_req());
   }
 
 private:
+  size_t total_size;
   T* host_mem;
-  size_t count;
-  int root;
+  std::vector<int> counts;
   MPI_Op op;
   MPI_Comm comm;
 };

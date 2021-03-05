@@ -28,101 +28,60 @@
 #pragma once
 
 #include "aluminum/cuda.hpp"
-#include "aluminum/progress.hpp"
 #include "aluminum/ht/communicator.hpp"
-#include <cassert>
+#include "aluminum/ht/base_state.hpp"
 
 namespace Al {
 namespace internal {
 namespace ht {
 
-/** Progress engine state for the host-transfer allreduce. */
 template <typename T>
-class AllreduceAlState : public AlState {
+class AllreduceAlState : public HostTransferCollectiveSignalAtEndState {
  public:
   AllreduceAlState(const T* sendbuf, T* recvbuf, size_t count_,
-                    ReductionOperator op_, HostTransferCommunicator& comm_,
-                    cudaStream_t stream) :
-    AlState(nullptr),
+                   ReductionOperator op_, HostTransferCommunicator& comm_,
+                   cudaStream_t stream_) :
+    HostTransferCollectiveSignalAtEndState(stream_),
     host_mem(get_pinned_memory<T>(count_)),
     count(count_),
     op(mpi::ReductionOperator2MPI_Op(op_)),
-    comm(comm_.get_comm()),
-    compute_stream(comm_.get_stream()) {
-
-    // Transfer data from device to host and use an event to determine when it
-    // completes. Handle in-place vs non-in-place.
+    comm(comm_.get_comm()) {
+    // Transfer data from device to host.
     if (sendbuf != recvbuf) {
       AL_CHECK_CUDA(cudaMemcpyAsync(host_mem, sendbuf, sizeof(T)*count,
-                                    cudaMemcpyDeviceToHost, stream));
+                                    cudaMemcpyDeviceToHost, stream_));
     } else {
       AL_CHECK_CUDA(cudaMemcpyAsync(host_mem, recvbuf, sizeof(T)*count,
-                                    cudaMemcpyDeviceToHost, stream));
+                                    cudaMemcpyDeviceToHost, stream_));
     }
-    d2h_event.record(stream);
+    start_event.record(stream_);
 
     // Have the device wait on the host.
-    gpu_wait.wait(stream);
+    gpu_wait.wait(stream_);
 
     // Transfer completed buffer back to device.
     AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, host_mem, sizeof(T)*count,
-                                  cudaMemcpyHostToDevice, stream));
-    h2d_event.record(stream);
+                                  cudaMemcpyHostToDevice, stream_));
+    end_event.record(stream_);
   }
 
   ~AllreduceAlState() {
     release_pinned_memory(host_mem);
   }
 
-  PEAction step() override {
-    if (!mem_xfer_done) {
-      if (d2h_event.query()) {
-        mem_xfer_done = true;
-        return PEAction::advance;
-      } else {
-        return PEAction::cont;
-      }
-    }
-    if (!ar_started) {
-      MPI_Iallreduce(MPI_IN_PLACE, host_mem, count, mpi::TypeMap<T>(),
-                     op, comm, &req);
-      ar_started = true;
-    }
-    if (!ar_done) {
-      // Wait for the allreduce to complete.
-      int flag;
-      MPI_Test(&req, &flag, MPI_STATUS_IGNORE);
-      if (flag) {
-        ar_done = true;
-        // Mark the sync as done to wake up the device.
-        gpu_wait.signal();
-      } else {
-        return PEAction::cont;
-      }
-    }
-    // Wait for the memcpy back to device to complete so we can clean up.
-    if (h2d_event.query()) {
-      return PEAction::complete;
-    }
-    return PEAction::cont;
-  }
-  bool needs_completion() const override { return false; }
-  void* get_compute_stream() const override { return compute_stream; }
-
   std::string get_name() const override { return "HTAllreduce"; }
+
+ protected:
+  void start_mpi_op() override {
+    MPI_Iallreduce(MPI_IN_PLACE, host_mem, count, mpi::TypeMap<T>(),
+                   op, comm, get_mpi_req());
+  }
 
  private:
   T* host_mem;
   size_t count;
-  cuda::FastEvent d2h_event, h2d_event;
-  cuda::GPUWait gpu_wait;
   MPI_Op op;
   MPI_Comm comm;
-  MPI_Request req = MPI_REQUEST_NULL;
-  bool mem_xfer_done = false;
-  bool ar_started = false;
-  bool ar_done = false;
-  cudaStream_t compute_stream;
 };
 
 } // namespace ht

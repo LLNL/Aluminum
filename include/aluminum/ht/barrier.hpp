@@ -35,55 +35,26 @@ namespace Al {
 namespace internal {
 namespace ht {
 
-template <typename T>
-class ReduceAlState : public HostTransferCollectiveSignalNonRootEarlyState {
+class BarrierAlState : public HostTransferCollectiveSignalAtEndState {
 public:
-  ReduceAlState(const T* sendbuf, T* recvbuf, size_t count_, ReductionOperator op_,
-                int root_, HostTransferCommunicator& comm_, cudaStream_t stream_) :
-    HostTransferCollectiveSignalNonRootEarlyState(comm_.rank() == root_, stream_),
-    host_mem(get_pinned_memory<T>(count_)),
-    count(count_),
-    root(root_),
-    op(mpi::ReductionOperator2MPI_Op(op_)),
+  BarrierAlState(HostTransferCommunicator& comm_, cudaStream_t stream_) :
+    HostTransferCollectiveSignalAtEndState(stream_),
     comm(comm_.get_comm()) {
-    // Transfer data from device to host.
-    AL_CHECK_CUDA(cudaMemcpyAsync(host_mem, sendbuf, sizeof(T)*count,
-                                  cudaMemcpyDeviceToHost, stream_));
+    // Just wait until we should start this.
     start_event.record(stream_);
 
     // Have the device wait on the host.
     gpu_wait.wait(stream_);
-
-    if (is_root) {
-      // Transfer completed buffer back to device.
-      AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, host_mem, sizeof(T)*count,
-                                    cudaMemcpyHostToDevice, stream_));
-      end_event.record(stream_);
-    }
   }
 
-  ~ReduceAlState() override {
-    release_pinned_memory(host_mem);
-  }
-
-  std::string get_name() const override { return "HTReduce"; }
+  std::string get_name() const override { return "HTBarrier"; }
 
 protected:
   void start_mpi_op() override {
-    if (is_root) {
-      MPI_Ireduce(MPI_IN_PLACE, host_mem, count, mpi::TypeMap<T>(),
-                  op, root, comm, get_mpi_req());
-    } else {
-      MPI_Ireduce(host_mem, host_mem, count, mpi::TypeMap<T>(),
-                  op, root, comm, get_mpi_req());
-    }
+    MPI_Ibarrier(comm, get_mpi_req());
   }
 
 private:
-  T* host_mem;
-  size_t count;
-  int root;
-  MPI_Op op;
   MPI_Comm comm;
 };
 

@@ -29,92 +29,54 @@
 
 #include "aluminum/cuda.hpp"
 #include "aluminum/ht/communicator.hpp"
-#include "aluminum/progress.hpp"
+#include "aluminum/ht/base_state.hpp"
 
 namespace Al {
 namespace internal {
 namespace ht {
 
 template <typename T>
-class ReduceScatterAlState : public AlState {
+class ReduceScatterAlState : public HostTransferCollectiveSignalAtEndState {
 public:
-  ReduceScatterAlState(const T* sendbuf, T* recvbuf, size_t count,
-                       ReductionOperator op, HostTransferCommunicator& comm,
-                       cudaStream_t stream) :
-    AlState(nullptr),
-    count_(count),
-    host_mem_(get_pinned_memory<T>(comm.size()*count_)),
-    op_(mpi::ReductionOperator2MPI_Op(op)),
-    comm_(comm.get_comm()),
-    compute_stream(comm.get_stream()) {
-
-    // Transfer data from device to host and use an event to determine when it
-    // completes.
-    AL_CHECK_CUDA(cudaMemcpyAsync(host_mem_, sendbuf, sizeof(T)*count*comm.size(),
-                                  cudaMemcpyDeviceToHost, stream));
-    d2h_event_.record(stream);
+  ReduceScatterAlState(const T* sendbuf, T* recvbuf, size_t count_,
+                       ReductionOperator op_, HostTransferCommunicator& comm_,
+                       cudaStream_t stream_) :
+    HostTransferCollectiveSignalAtEndState(stream_),
+    host_mem(get_pinned_memory<T>(comm_.size()*count_)),
+    count(count_),
+    op(mpi::ReductionOperator2MPI_Op(op_)),
+    comm(comm_.get_comm()) {
+    // Transfer data from device to host.
+    AL_CHECK_CUDA(cudaMemcpyAsync(host_mem, sendbuf, sizeof(T)*count*comm_.size(),
+                                  cudaMemcpyDeviceToHost, stream_));
+    start_event.record(stream_);
 
     // Have the device wait on the host.
-    gpuwait_.wait(stream);
+    gpu_wait.wait(stream_);
 
     // Transfer completed buffer back to device.
-    AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, host_mem_, sizeof(T)*count,
-                                  cudaMemcpyHostToDevice, stream));
-    h2d_event_.record(stream);
+    AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, host_mem, sizeof(T)*count,
+                                  cudaMemcpyHostToDevice, stream_));
+    end_event.record(stream_);
   }
 
   ~ReduceScatterAlState() override {
-    release_pinned_memory(host_mem_);
+    release_pinned_memory(host_mem);
   }
 
-  PEAction step() override {
-    if (!mem_xfer_done_) {
-      if (d2h_event_.query()) {
-        mem_xfer_done_ = true;
-        return PEAction::advance;
-      } else {
-        return PEAction::cont;
-      }
-    }
-    if (!rs_started_) {
-      MPI_Ireduce_scatter_block(MPI_IN_PLACE, host_mem_, count_,
-                                mpi::TypeMap<T>(), op_, comm_, &req_);
-      rs_started_ = true;
-    }
-    if (!rs_done_) {
-      // Wait for the RS to complete.
-      int flag;
-      MPI_Test(&req_, &flag, MPI_STATUS_IGNORE);
-      if (flag) {
-        rs_done_ = true;
-        gpuwait_.signal();
-      } else {
-        return PEAction::cont;
-      }
-    }
-    // Wait for host-to-device memcopy; cleanup
-    if (h2d_event_.query()) {
-      return PEAction::complete;
-    }
-    return PEAction::cont;
-  }
-
-  bool needs_completion() const override { return false; }
-  void* get_compute_stream() const override { return compute_stream; }
   std::string get_name() const override { return "HTReduceScatter"; }
 
+protected:
+  void start_mpi_op() override {
+    MPI_Ireduce_scatter_block(MPI_IN_PLACE, host_mem, count,
+                              mpi::TypeMap<T>(), op, comm, get_mpi_req());
+  }
+
 private:
-  size_t count_;
-  T* host_mem_;
-  cuda::GPUWait gpuwait_;
-  cuda::FastEvent d2h_event_, h2d_event_;
-  MPI_Op op_;
-  MPI_Comm comm_;
-  MPI_Request req_ = MPI_REQUEST_NULL;
-  bool mem_xfer_done_ = false;
-  bool rs_started_ = false;
-  bool rs_done_ = false;
-  cudaStream_t compute_stream;
+  T* host_mem;
+  size_t count;
+  MPI_Op op;
+  MPI_Comm comm;
 };
 
 }  // namespace ht

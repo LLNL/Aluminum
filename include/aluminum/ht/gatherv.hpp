@@ -36,65 +36,71 @@ namespace internal {
 namespace ht {
 
 template <typename T>
-class ScatterAlState : public HostTransferCollectiveSignalRootEarlyState {
+class GathervAlState : public HostTransferCollectiveSignalNonRootEarlyState {
 public:
-  ScatterAlState(const T* sendbuf, T* recvbuf, size_t count_, int root_,
-                HostTransferCommunicator& comm_, cudaStream_t stream_) :
-    HostTransferCollectiveSignalRootEarlyState(comm_.rank() == root_, stream_),
-    host_mem(get_pinned_memory<T>(comm_.rank() == root_
-                                  ? comm_.size()*count_ : count_)),
-    count(count_),
+  GathervAlState(const T* sendbuf, T* recvbuf,
+                 std::vector<size_t> counts_, std::vector<size_t> displs_,
+                 int root_,
+                 HostTransferCommunicator& comm_, cudaStream_t stream_) :
+    HostTransferCollectiveSignalNonRootEarlyState(comm_.rank() == root_, stream_),
+    host_mem(get_pinned_memory<T>((comm_.rank() == root_) ?
+                                  (displs_.back() + counts_.back()) :
+                                  counts_[comm_.rank()])),
+    send_count(counts_[comm_.rank()]),
+    counts(mpi::intify_size_t_vector(counts_)),
+    displs(mpi::intify_size_t_vector(displs_)),
     root(root_),
     comm(comm_.get_comm()) {
+    // Transfer data from device to host.
     if (is_root) {
-      // Transfer the data from device to host.
       AL_CHECK_CUDA(cudaMemcpyAsync(
-                      host_mem, sendbuf, sizeof(T)*count*comm_.size(),
+                      host_mem + displs_[comm_.rank()],
+                      (sendbuf == recvbuf) ? sendbuf + displs_[comm_.rank()] : sendbuf,
+                      sizeof(T) * counts_[comm_.rank()],
                       cudaMemcpyDeviceToHost, stream_));
-      start_event.record(stream_);
-      // Root only needs to copy its data to its final destination on the
-      // device when it's not in place.
-      if (sendbuf != recvbuf) {
-        AL_CHECK_CUDA(cudaMemcpyAsync(
-                        recvbuf, sendbuf + comm_.rank()*count,
-                        count*sizeof(T), cudaMemcpyDeviceToDevice, stream_));
-      }
-      // Have the device wait on the host.
-      gpu_wait.wait(stream_);
     } else {
-      // Need to ensure communication is not started early.
-      start_event.record(stream_);
-      // Have the device wait on the host.
-      gpu_wait.wait(stream_);
+      AL_CHECK_CUDA(cudaMemcpyAsync(host_mem, sendbuf,
+                                    sizeof(T) * counts_[comm_.rank()],
+                                    cudaMemcpyDeviceToHost, stream_));
+    }
+    start_event.record(stream_);
+
+    // Have the device wait on the host.
+    gpu_wait.wait(stream_);
+
+    if (is_root) {
       // Transfer completed buffer back to device.
-      AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, host_mem, sizeof(T)*count,
+      AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, host_mem,
+                                    sizeof(T) * (displs_.back() + counts_.back()),
                                     cudaMemcpyHostToDevice, stream_));
       end_event.record(stream_);
     }
   }
 
-  ~ScatterAlState() override {
+  ~GathervAlState() override {
     release_pinned_memory(host_mem);
   }
 
-  std::string get_name() const override { return "HTScatter"; }
+  std::string get_name() const override { return "HTGatherv"; }
 
 protected:
   void start_mpi_op() override {
     if (is_root) {
-      MPI_Iscatter(host_mem, count, mpi::TypeMap<T>(),
-                   MPI_IN_PLACE, count, mpi::TypeMap<T>(),
+      MPI_Igatherv(MPI_IN_PLACE, send_count, mpi::TypeMap<T>(),
+                   host_mem, counts.data(), displs.data(), mpi::TypeMap<T>(),
                    root, comm, get_mpi_req());
     } else {
-      MPI_Iscatter(host_mem, count, mpi::TypeMap<T>(),
-                   host_mem, count, mpi::TypeMap<T>(),
+      MPI_Igatherv(host_mem, send_count, mpi::TypeMap<T>(),
+                   host_mem, counts.data(), displs.data(), mpi::TypeMap<T>(),
                    root, comm, get_mpi_req());
     }
   }
 
 private:
   T* host_mem;
-  size_t count;
+  size_t send_count;
+  std::vector<int> counts;
+  std::vector<int> displs;
   int root;
   MPI_Comm comm;
 };

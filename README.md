@@ -117,6 +117,7 @@ The `MPI`, `NCCL`/`RCCL`, and `HostTransfer` backends support the following oper
   * Allreduce
   * Alltoall
   * Vector alltoall
+  * Barrier
   * Broadcast
   * Gather
   * Vector gather
@@ -129,8 +130,6 @@ The `MPI`, `NCCL`/`RCCL`, and `HostTransfer` backends support the following oper
   * Send
   * Recv
   * SendRecv
-
-Note, at the moment, the `HostTransfer` backend does not support vector collectives.
 
 Full API documentation is coming soon...
 
