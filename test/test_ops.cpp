@@ -250,6 +250,7 @@ void run_test(cxxopts::ParseResult& parsed_opts) {
         if (op_options.nonblocking) {
           Al::Wait<Backend>(op_options.req);
         }
+        complete_operations<Backend>(comm_wrapper.comm());
         watchdog.finish();
       }
 
