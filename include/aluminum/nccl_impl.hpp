@@ -1124,12 +1124,10 @@ class NCCLBackend {
     // Rank 0 is the root.
     size_t count = std::accumulate(counts.begin(), counts.end(), 0);
     std::vector<size_t> displs = excl_prefix_sum(counts);
-    // Need a temporary reduce buffer when we can't trash it.
-    T* tmp_redbuf = recvbuf;
+    // Need a temporary reduce buffer so we don't trash the entire thing.
+    T* tmp_redbuf = internal::get_gpu_memory<T>(count, stream);
     if (sendbuf == internal::IN_PLACE<T>()) {
       sendbuf = recvbuf;
-    } else {
-      tmp_redbuf = internal::get_gpu_memory<T>(count, stream);
     }
     do_reduce(sendbuf, tmp_redbuf, count, op, 0, comm, stream);
     do_scatterv(tmp_redbuf, recvbuf, counts, displs, 0, comm, stream);
