@@ -143,13 +143,7 @@ class MPIBackend {
                         const int tag = internal::mpi::default_tag) {
     internal::mpi::assert_count_fits_mpi(count);
     if (algo == MPIAllreduceAlgorithm::automatic) {
-      // TODO: Better algorithm selection/performance model.
-      // TODO: Make tuneable.
-      if (count <= 1<<9) {
-        algo = MPIAllreduceAlgorithm::mpi_recursive_doubling;
-      } else {
-        algo = MPIAllreduceAlgorithm::mpi_rabenseifner;
-      }
+      algo = MPIAllreduceAlgorithm::mpi_passthrough;
     }
     switch (algo) {
       case MPIAllreduceAlgorithm::mpi_passthrough:
@@ -172,7 +166,7 @@ class MPIBackend {
         throw_al_exception("Invalid algorithm for Allreduce");
     }
   }
-  
+
   template <typename T>
   static void Allreduce(T* recvbuf, size_t count,
                         ReductionOperator op, comm_type& comm,
@@ -189,13 +183,7 @@ class MPIBackend {
       allreduce_algo_type algo) {
     internal::mpi::assert_count_fits_mpi(count);
     if (algo == MPIAllreduceAlgorithm::automatic) {
-      // TODO: Better algorithm selection/performance model.
-      // TODO: Make tuneable.
-      if (count <= 1<<9) {
-        algo = MPIAllreduceAlgorithm::mpi_recursive_doubling;
-      } else {
-        algo = MPIAllreduceAlgorithm::mpi_rabenseifner;
-      }
+      algo = MPIAllreduceAlgorithm::mpi_passthrough;
     }
     switch (algo) {
       case MPIAllreduceAlgorithm::mpi_passthrough:
