@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.14)
+cmake_minimum_required(VERSION 3.17)
 # 3.9 is required for CUDA as a first-class language.
 #
 # 3.8 is required for cxx_std_11 compile feature. Otherwise we could
