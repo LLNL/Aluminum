@@ -96,9 +96,6 @@ option(ALUMINUM_ENABLE_NVPROF
 option(ALUMINUM_ENABLE_STREAM_MEM_OPS
   "Enable stream memory operations."
   OFF)
-option(ALUMINUM_HT_USE_PASSTHROUGH
-  "Host-transfer allreduces use MPI directly."
-  OFF)
 option(ALUMINUM_ENABLE_TRACE
   "Enable runtime tracing."
   OFF)
@@ -132,9 +129,6 @@ if (ALUMINUM_DEBUG_HANG_CHECK)
 endif ()
 if (ALUMINUM_ENABLE_STREAM_MEM_OPS)
   set(AL_USE_STREAM_MEM_OPS ON)
-endif ()
-if (ALUMINUM_HT_USE_PASSTHROUGH)
-  set(AL_HT_USE_PASSTHROUGH ON)
 endif ()
 if (ALUMINUM_ENABLE_TRACE)
   set(AL_TRACE ON)
