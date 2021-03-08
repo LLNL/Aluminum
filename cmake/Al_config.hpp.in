@@ -20,3 +20,5 @@
 #cmakedefine01 AL_USE_STREAM_MEM_OPS
 
 #cmakedefine AL_TRACE
+
+#cmakedefine AL_MPI_SERIALIZE

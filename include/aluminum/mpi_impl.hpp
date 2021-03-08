@@ -145,9 +145,17 @@ class MPIBackend {
     if (algo == MPIAllreduceAlgorithm::automatic) {
       algo = MPIAllreduceAlgorithm::mpi_passthrough;
     }
+#ifdef AL_MPI_SERIALIZE
+    if (algo != MPIAllreduceAlgorithm::mpi_passthrough) {
+      throw_al_exception(
+        "Only passthrough allreduce supported with AL_MPI_SERIALIZE");
+    }
+#endif
     switch (algo) {
       case MPIAllreduceAlgorithm::mpi_passthrough:
-        internal::mpi::passthrough_allreduce(sendbuf, recvbuf, count, op, comm);
+        handle_serialized(internal::mpi::passthrough_allreduce<T>,
+                          internal::mpi::nb_passthrough_allreduce<T>,
+                          sendbuf, recvbuf, count, op, comm);
         break;
       case MPIAllreduceAlgorithm::mpi_recursive_doubling:
         internal::mpi::recursive_doubling_allreduce(
@@ -219,7 +227,9 @@ class MPIBackend {
   template <typename T>
   static void Send(const T* sendbuf, size_t count, int dest, comm_type& comm) {
     internal::mpi::assert_count_fits_mpi(count);
-    internal::mpi::passthrough_send(sendbuf, count, dest, comm);
+    handle_serialized(internal::mpi::passthrough_send<T>,
+                      internal::mpi::passthrough_nb_send<T>,
+                      sendbuf, count, dest, comm);
   }
 
   template <typename T>
@@ -232,7 +242,9 @@ class MPIBackend {
   template <typename T>
   static void Recv(T* recvbuf, size_t count, int src, comm_type& comm) {
     internal::mpi::assert_count_fits_mpi(count);
-    internal::mpi::passthrough_recv(recvbuf, count, src, comm);
+    handle_serialized(internal::mpi::passthrough_recv<T>,
+                      internal::mpi::passthrough_nb_recv<T>,
+                      recvbuf, count, src, comm);
   }
 
   template <typename T>
@@ -247,8 +259,9 @@ class MPIBackend {
                        T* recvbuf, size_t recv_count, int src, comm_type& comm) {
     internal::mpi::assert_count_fits_mpi(send_count);
     internal::mpi::assert_count_fits_mpi(recv_count);
-    internal::mpi::passthrough_sendrecv(sendbuf, send_count, dest,
-                                        recvbuf, recv_count, src, comm);
+    handle_serialized(internal::mpi::passthrough_sendrecv<T>,
+                      internal::mpi::passthrough_nb_sendrecv<T>,
+                      sendbuf, send_count, dest, recvbuf, recv_count, src, comm);
   }
 
   template <typename T>
@@ -270,7 +283,9 @@ class MPIBackend {
     internal::mpi::assert_count_fits_mpi(count);
     switch (algo) {
     case MPICollectiveAlgorithm::automatic:
-      internal::mpi::passthrough_allgather(sendbuf, recvbuf, count, comm);
+      handle_serialized(internal::mpi::passthrough_allgather<T>,
+                        internal::mpi::passthrough_nb_allgather<T>,
+                        sendbuf, recvbuf, count, comm);
       break;
     default:
       throw_al_exception("Invalid algorithm");
@@ -317,8 +332,9 @@ class MPIBackend {
     }
     switch (algo) {
     case MPICollectiveAlgorithm::automatic:
-      internal::mpi::passthrough_allgatherv(
-        sendbuf, recvbuf, counts, displs, comm);
+      handle_serialized(internal::mpi::passthrough_allgatherv<T>,
+                        internal::mpi::passthrough_nb_allgatherv<T>,
+                        sendbuf, recvbuf, counts, displs, comm);
       break;
     default:
       throw_al_exception("Invalid algorithm");
@@ -368,7 +384,9 @@ class MPIBackend {
     internal::mpi::assert_count_fits_mpi(count);
     switch (algo) {
     case MPICollectiveAlgorithm::automatic:
-      internal::mpi::passthrough_alltoall(sendbuf, recvbuf, count, comm);
+      handle_serialized(internal::mpi::passthrough_alltoall<T>,
+                        internal::mpi::passthrough_nb_alltoall<T>,
+                        sendbuf, recvbuf, count, comm);
       break;
     default:
       throw_al_exception("Invalid algorithm");
@@ -418,10 +436,10 @@ class MPIBackend {
     }
     switch (algo) {
     case MPICollectiveAlgorithm::automatic:
-      internal::mpi::passthrough_alltoallv(
-        sendbuf, send_counts, send_displs,
-        recvbuf, recv_counts, recv_displs,
-        comm);
+      handle_serialized(internal::mpi::passthrough_alltoallv<T>,
+                        internal::mpi::passthrough_nb_alltoallv<T>,
+                        sendbuf, send_counts, send_displs,
+                        recvbuf, recv_counts, recv_displs, comm);
       break;
     default:
       throw_al_exception("Invalid algorithm");
@@ -470,7 +488,9 @@ class MPIBackend {
   static void Barrier(comm_type& comm, barrier_algo_type algo) {
     switch (algo) {
     case MPICollectiveAlgorithm::automatic:
-      internal::mpi::passthrough_barrier(comm);
+      handle_serialized(internal::mpi::passthrough_barrier,
+                        internal::mpi::passthrough_nb_barrier,
+                        comm);
       break;
     default:
       throw_al_exception("Invalid algorithm");
@@ -495,7 +515,9 @@ class MPIBackend {
     internal::mpi::assert_count_fits_mpi(count);
     switch (algo) {
     case MPICollectiveAlgorithm::automatic:
-      internal::mpi::passthrough_bcast(buf, count, root, comm);
+      handle_serialized(internal::mpi::passthrough_bcast<T>,
+                        internal::mpi::passthrough_nb_bcast<T>,
+                        buf, count, root, comm);
       break;
     default:
       throw_al_exception("Invalid algorithm");
@@ -526,7 +548,9 @@ class MPIBackend {
     internal::mpi::assert_count_fits_mpi(count);
     switch (algo) {
     case MPICollectiveAlgorithm::automatic:
-      internal::mpi::passthrough_gather(sendbuf, recvbuf, count, root, comm);
+      handle_serialized(internal::mpi::passthrough_gather<T>,
+                        internal::mpi::passthrough_nb_gather<T>,
+                        sendbuf, recvbuf, count, root, comm);
       break;
     default:
       throw_al_exception("Invalid algorithm");
@@ -573,8 +597,9 @@ class MPIBackend {
     }
     switch (algo) {
     case MPICollectiveAlgorithm::automatic:
-      internal::mpi::passthrough_gatherv(
-        sendbuf, recvbuf, counts, displs, root, comm);
+      handle_serialized(internal::mpi::passthrough_gatherv<T>,
+                        internal::mpi::passthrough_nb_gatherv<T>,
+                        sendbuf, recvbuf, counts, displs, root, comm);
       break;
     default:
       throw_al_exception("Invalid algorithm");
@@ -624,7 +649,9 @@ class MPIBackend {
     internal::mpi::assert_count_fits_mpi(count);
     switch (algo) {
     case MPICollectiveAlgorithm::automatic:
-      internal::mpi::passthrough_reduce(sendbuf, recvbuf, count, op, root, comm);
+      handle_serialized(internal::mpi::passthrough_reduce<T>,
+                        internal::mpi::passthrough_nb_reduce<T>,
+                        sendbuf, recvbuf, count, op, root, comm);
       break;
     default:
       throw_al_exception("Invalid algorithm");
@@ -669,8 +696,9 @@ class MPIBackend {
     internal::mpi::assert_count_fits_mpi(count);
     switch (algo) {
     case MPICollectiveAlgorithm::automatic:
-      internal::mpi::passthrough_reduce_scatter(sendbuf, recvbuf, count, op,
-                                                comm);
+      handle_serialized(internal::mpi::passthrough_reduce_scatter<T>,
+                        internal::mpi::passthrough_nb_reduce_scatter<T>,
+                        sendbuf, recvbuf, count, op, comm);
       break;
     default:
       throw_al_exception("Invalid algorithm");
@@ -718,8 +746,9 @@ class MPIBackend {
     }
     switch (algo) {
     case MPICollectiveAlgorithm::automatic:
-      internal::mpi::passthrough_reduce_scatterv(
-        sendbuf, recvbuf, counts, op, comm);
+      handle_serialized(internal::mpi::passthrough_reduce_scatterv<T>,
+                        internal::mpi::passthrough_nb_reduce_scatterv<T>,
+                        sendbuf, recvbuf, counts, op, comm);
       break;
     default:
       throw_al_exception("Invalid algorithm");
@@ -768,7 +797,9 @@ class MPIBackend {
     internal::mpi::assert_count_fits_mpi(count);
     switch (algo) {
     case MPICollectiveAlgorithm::automatic:
-      internal::mpi::passthrough_scatter(sendbuf, recvbuf, count, root, comm);
+      handle_serialized(internal::mpi::passthrough_scatter<T>,
+                        internal::mpi::passthrough_nb_scatter<T>,
+                        sendbuf, recvbuf, count, root, comm);
       break;
     default:
       throw_al_exception("Invalid algorithm");
@@ -815,8 +846,9 @@ class MPIBackend {
     }
     switch (algo) {
     case MPICollectiveAlgorithm::automatic:
-      internal::mpi::passthrough_scatterv(
-        sendbuf, recvbuf, counts, displs, root, comm);
+      handle_serialized(internal::mpi::passthrough_scatterv<T>,
+                        internal::mpi::passthrough_nb_scatterv<T>,
+                        sendbuf, recvbuf, counts, displs, root, comm);
       break;
     default:
       throw_al_exception("Invalid algorithm");
@@ -859,6 +891,28 @@ class MPIBackend {
   }
 
   static std::string Name() { return "MPIBackend"; }
+
+private:
+  /**
+   * Handle AL_MPI_SERIALIZE support by dispatching a call to either
+   * blocking_func (when not serialized) or nonblocking_func followed
+   * immediately by a wait (when serialized). Arguments are passed
+   * directly to the function.
+   */
+  template <typename BlockingFunc, typename NonblockingFunc, typename... Args>
+  static void handle_serialized(BlockingFunc blocking_func,
+                                NonblockingFunc nonblocking_func,
+                                Args&&... args) {
+#ifdef AL_MPI_SERIALIZE
+    req_type req;
+    nonblocking_func(std::forward<Args>(args)..., req);
+    Al::Wait<MPIBackend>(req);
+    (void) blocking_func;
+#else
+    blocking_func(std::forward<Args>(args)...);
+    (void) nonblocking_func;
+#endif
+  }
 };
 
 template <>
