@@ -100,6 +100,10 @@ option(ALUMINUM_ENABLE_TRACE
   "Enable runtime tracing."
   OFF)
 
+option(ALUMINUM_MPI_SERIALIZE
+  "Serialize MPI operations."
+  OFF)
+
 option(ALUMINUM_ENABLE_TESTS
   "Build tests."
   OFF)
@@ -132,6 +136,9 @@ if (ALUMINUM_ENABLE_STREAM_MEM_OPS)
 endif ()
 if (ALUMINUM_ENABLE_TRACE)
   set(AL_TRACE ON)
+endif ()
+if (ALUMINUM_MPI_SERIALIZE)
+  set(AL_MPI_SERIALIZE ON)
 endif ()
 if (ALUMINUM_ENABLE_TESTS)
   set(AL_ENABLE_TESTS ON)

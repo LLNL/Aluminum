@@ -40,20 +40,26 @@ int max_tag = 0;
 
 void init(int& argc, char**& argv) {
   int flag;
+#ifdef AL_MPI_SERIALIZE
+  int required = MPI_THREAD_SERIALIZED;
+#else
+  int required = MPI_THREAD_MULTIPLE;
+#endif
   MPI_Initialized(&flag);
   if (!flag) {
     int provided;
-    MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
-    if (provided != MPI_THREAD_MULTIPLE) {
-      throw_al_exception("MPI_THREAD_MULTIPLE not provided");
+    MPI_Init_thread(&argc, &argv, required, &provided);
+    if (provided < required) {
+      throw_al_exception("Insufficient MPI thread support");
     }
     initialized_mpi = true;
   } else {
-    // Ensure that we have THREAD_MULTIPLE.
+    // Ensure that we have sufficient threading support in MPI.
     int provided;
     MPI_Query_thread(&provided);
-    if (provided != MPI_THREAD_MULTIPLE) {
-      throw_al_exception("MPI already initialized without MPI_THREAD_MULTIPLE");
+    if (provided < required) {
+      throw_al_exception(
+        "MPI already initialized with insufficient thread support");
     }
   }
   // Get the upper bound for tags; this is always set in MPI_COMM_WORLD.
