@@ -26,7 +26,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include <cuda_runtime.h>
-#include "aluminum/helper_kernels.hpp"
+#include "aluminum/cuda/helper_kernels.hpp"
 
 namespace Al {
 namespace internal {

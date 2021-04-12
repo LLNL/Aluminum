@@ -37,7 +37,7 @@
 
 #include "Al.hpp"
 #include "aluminum/internal.hpp"
-#include "aluminum/cuda.hpp"
+#include "aluminum/cuda/cuda.hpp"
 #include "aluminum/mpi_comm_and_stream_wrapper.hpp"
 
 #define AL_FORCE_CHECK_NCCL(nccl_call)                                \

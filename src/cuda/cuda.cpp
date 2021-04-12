@@ -28,9 +28,9 @@
 #include <vector>
 #include <mutex>
 #include "Al.hpp"
-#include "aluminum/cuda.hpp"
+#include "aluminum/cuda/cuda.hpp"
 #include "aluminum/mempool.hpp"
-#include "aluminum/helper_kernels.hpp"
+#include "aluminum/cuda/helper_kernels.hpp"
 
 namespace Al {
 namespace internal {

@@ -36,7 +36,7 @@
 #include "aluminum/internal.hpp"
 #include "aluminum/progress.hpp"
 #ifdef AL_HAS_CUDA
-#include "aluminum/cuda.hpp"
+#include "aluminum/cuda/cuda.hpp"
 #endif
 #include "aluminum/trace.hpp"
 

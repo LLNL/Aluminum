@@ -28,7 +28,7 @@
 #pragma once
 
 #include "aluminum/mpi_cuda/communicator.hpp"
-#include "aluminum/cuda.hpp"
+#include "aluminum/cuda/cuda.hpp"
 #include <map>
 
 namespace Al {

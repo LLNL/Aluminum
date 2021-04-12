@@ -27,7 +27,7 @@ set_source_path(THIS_DIR_NCCL_HEADERS
 add_subdirectory(mpi)
 
 if (AL_HAS_CUDA)
-  list(APPEND THIS_DIR_HEADERS "${THIS_DIR_CUDA_HEADERS}")
+  add_subdirectory(cuda)
 endif ()
 
 if (AL_HAS_MPI_CUDA)
