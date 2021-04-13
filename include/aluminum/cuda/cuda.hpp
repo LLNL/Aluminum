@@ -164,58 +164,6 @@ void replace_internal_streams(std::function<cudaStream_t()> stream_getter);
 /** Return whether stream memory operations are supported. */
 bool stream_memory_operations_supported();
 
-/**
- * An optimized version of CUDA events.
- * This essentially uses full/empty bit semantics to implement synchronization.
- * A memory location is polled on by the host and written to by the device
- * using the stream memory write operation.
- * This falls back to the usual CUDA events when stream memory operations are
- * not available.
- * @note This is currently always falling back on CUDA events to work around a
- * hang, the underlying cause of which has not been diagnosed.
- */
-class FastEvent {
- public:
-  /**
-   * Allocate the event.
-   */
-  FastEvent();
-  ~FastEvent();
-  /** Record the event into stream. */
-  void record(cudaStream_t stream);
-  /** Return true if the event has completed. */
-  bool query();
- private:
-  int32_t* sync_event __attribute__((aligned(64)));
-  CUdeviceptr sync_event_dev_ptr;
-  cudaEvent_t plain_event;
-};
-
-/**
- * Have a GPU stream block until signalled.
- * This essentially uses full/empty bit semantics to implement synchronization.
- * The GPU will wait on a memory location until the host writes to it using the
- * stream memory wait operation.
- *
- * If stream memory operations are not available, this will use a
- * spinning wait kernel. This can cause problems. It has a tendency to
- * lead to deadlock, especially in "debug" mode. Also, if kernel
- * timeout is enabled, this is likely to error out.
- */
-class GPUWait {
- public:
-  GPUWait();
-  ~GPUWait();
-  /** Enqueue a wait onto stream. */
-  void wait(cudaStream_t stream);
-  /** Signal the stream to continue. */
-  void signal();
- private:
-  int32_t* wait_sync __attribute__((aligned(64)));
-  int32_t* wait_sync_dev_ptr_no_stream_mem_ops __attribute__((aligned(64)));
-  CUdeviceptr wait_sync_dev_ptr;
-};
-
 }  // namespace cuda
 }  // namespace internal
 }  // namespace Al

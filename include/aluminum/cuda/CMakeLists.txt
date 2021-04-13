@@ -1,5 +1,7 @@
 set_source_path(THIS_DIR_CUDA_HEADERS
   cuda.hpp
+  gpu_status_flag.hpp
+  gpu_wait.hpp
   helper_kernels.hpp
   )
 
