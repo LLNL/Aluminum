@@ -31,7 +31,7 @@
 #include <sstream>
 
 #include <Al_config.hpp>
-#include "aluminum/utils.hpp"
+#include "aluminum/utils/utils.hpp"
 
 namespace Al {
 namespace internal {
