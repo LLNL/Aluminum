@@ -30,17 +30,18 @@
 #include "Al.hpp"
 #include "aluminum/cuda/cuda.hpp"
 #include "aluminum/cuda/sync_memory.hpp"
+#include "aluminum/cuda/events.hpp"
 #include "aluminum/mempool.hpp"
 
 namespace Al {
 namespace internal {
 namespace cuda {
 
+// Define resource pools.
+Al::internal::LockedResourcePool<int32_t*, CacheLinePinnedMemoryAllocator> sync_pool;
+Al::internal::LockedResourcePool<cudaEvent_t, CUDAEventAllocator> event_pool;
+
 namespace {
-// Stack of CUDA events for reuse.
-std::vector<cudaEvent_t> cuda_events;
-// Lock to protect the CUDA events.
-std::mutex cuda_events_lock;
 // Internal CUDA streams.
 constexpr int num_internal_streams = 5;
 cudaStream_t internal_streams[num_internal_streams];
@@ -90,9 +91,7 @@ void init(int&, char**&) {
 
 void finalize() {
   sync_pool.clear();
-  for (auto&& event : cuda_events) {
-    AL_CHECK_CUDA(cudaEventDestroy(event));
-  }
+  event_pool.clear();
   if (!using_external_streams) {
     for (int i = 0; i < num_internal_streams; ++i) {
       AL_CHECK_CUDA(cudaStreamDestroy(internal_streams[i]));
@@ -101,20 +100,11 @@ void finalize() {
 }
 
 cudaEvent_t get_cuda_event() {
-  std::lock_guard<std::mutex> lock(cuda_events_lock);
-  cudaEvent_t event;
-  if (cuda_events.empty()) {
-    AL_CHECK_CUDA(cudaEventCreateWithFlags(&event, cudaEventDisableTiming));
-  } else {
-    event = cuda_events.back();
-    cuda_events.pop_back();
-  }
-  return event;
+  return event_pool.get();
 }
 
 void release_cuda_event(cudaEvent_t event) {
-  std::lock_guard<std::mutex> lock(cuda_events_lock);
-  cuda_events.push_back(event);
+  event_pool.release(event);
 }
 
 cudaStream_t get_internal_stream() {
