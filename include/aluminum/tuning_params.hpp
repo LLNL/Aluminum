@@ -54,3 +54,6 @@
  * On x86 this is usually 64. On POWER this is 128. On A64FX this is 256.
  */
 #define AL_CACHE_LINE_SIZE 64
+
+/** Number of CUDA streams in the default stream pool. */
+#define AL_CUDA_STREAM_POOL_SIZE 5

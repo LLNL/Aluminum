@@ -2,6 +2,7 @@ set_source_path(THIS_DIR_CUDA_CXX_SOURCES
   cuda.cpp
   gpu_status_flag.cpp
   gpu_wait.cpp
+  streams.cpp
   )
 set_source_path(THIS_DIR_CUDA_SOURCES
   helper_kernels.cu

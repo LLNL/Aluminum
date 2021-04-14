@@ -31,6 +31,7 @@
 #include "aluminum/cuda/cuda.hpp"
 #include "aluminum/cuda/sync_memory.hpp"
 #include "aluminum/cuda/events.hpp"
+#include "aluminum/cuda/streams.hpp"
 #include "aluminum/mempool.hpp"
 
 namespace Al {
@@ -42,31 +43,13 @@ Al::internal::LockedResourcePool<int32_t*, CacheLinePinnedMemoryAllocator> sync_
 Al::internal::LockedResourcePool<cudaEvent_t, CUDAEventAllocator> event_pool;
 
 namespace {
-// Internal CUDA streams.
-constexpr int num_internal_streams = 5;
-cudaStream_t internal_streams[num_internal_streams];
 // Whether stream memory operations are supported.
 bool stream_mem_ops_supported = false;
-// Whether we're using external streams (these are not freed).
-bool using_external_streams = false;
 }
 
 void init(int&, char**&) {
   // Initialize internal streams.
-  for (int i = 0; i < num_internal_streams; ++i) {
-    // Set highest priority if instructed
-    if (std::getenv("AL_USE_PRIORITY_STREAM")) {
-      int least_priority, greatest_priority;
-      AL_CHECK_CUDA(cudaDeviceGetStreamPriorityRange(
-          &least_priority, &greatest_priority));
-      AL_CHECK_CUDA(cudaStreamCreateWithPriority(
-          &internal_streams[i], cudaStreamDefault, greatest_priority));
-    } else {
-      AL_CHECK_CUDA(cudaStreamCreate(&internal_streams[i]));
-    }
-    profiling::name_stream(internal_streams[i],
-                           "al_internal_" + std::to_string(i));
-  }
+  stream_pool.allocate(AL_CUDA_STREAM_POOL_SIZE);
 #ifndef AL_HAS_ROCM
   // Check whether stream memory operations are supported.
   CUdevice dev;
@@ -85,33 +68,7 @@ void init(int&, char**&) {
 void finalize() {
   sync_pool.clear();
   event_pool.clear();
-  if (!using_external_streams) {
-    for (int i = 0; i < num_internal_streams; ++i) {
-      AL_CHECK_CUDA(cudaStreamDestroy(internal_streams[i]));
-    }
-  }
-}
-
-cudaStream_t get_internal_stream() {
-  static size_t cur_stream = 0;
-  return internal_streams[cur_stream++ % num_internal_streams];
-}
-
-cudaStream_t get_internal_stream(size_t id) {
-  return internal_streams[id];
-}
-
-void replace_internal_streams(std::function<cudaStream_t()> stream_getter) {
-  // Clean up our streams if needed.
-  if (!using_external_streams) {
-    for (int i = 0; i < num_internal_streams; ++i) {
-      AL_CHECK_CUDA(cudaStreamDestroy(internal_streams[i]));
-    }
-  }
-  for (int i = 0; i < num_internal_streams; ++i) {
-    internal_streams[i] = stream_getter();
-  }
-  using_external_streams = true;
+  stream_pool.clear();
 }
 
 bool stream_memory_operations_supported() {

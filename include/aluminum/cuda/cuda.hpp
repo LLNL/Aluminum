@@ -32,9 +32,11 @@
 #include <utility>
 #include <sstream>
 #include <functional>
+#include <string>
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <cuda_fp16.h>
+#include "aluminum/base.hpp"
 
 /**
  * Things we use that hip doesn't support:
@@ -137,24 +139,6 @@ namespace cuda {
 void init(int& argc, char**& argv);
 /** Finalize CUDA. */
 void finalize();
-
-/**
- * Return an internal stream to run operations on.
- * This may select among multiple internal streams.
- */
-cudaStream_t get_internal_stream();
-/** Get a specific internal stream. */
-cudaStream_t get_internal_stream(size_t id);
-/**
- * Replace the internal stream pool with user-provided streams.
- *
- * stream_getter may be called an arbitrary number of times and should
- * return the streams to use in the pool.
- *
- * This is meant to help interface with external applications that
- * need Aluminum to use their streams for everything.
- */
-void replace_internal_streams(std::function<cudaStream_t()> stream_getter);
 
 /** Return whether stream memory operations are supported. */
 bool stream_memory_operations_supported();

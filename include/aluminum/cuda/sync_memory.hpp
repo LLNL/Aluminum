@@ -29,7 +29,6 @@
 
 #include <cstdint>
 #include <cstdlib>
-#include "Al.hpp"
 #include "aluminum/utils/locked_resource_pool.hpp"
 #include "aluminum/cuda/cuda.hpp"
 #include "aluminum/tuning_params.hpp"
