@@ -25,51 +25,41 @@
 // permissions and limitations under the license.
 ////////////////////////////////////////////////////////////////////////////////
 
+#pragma once
+
+#include <cstdint>
+#include <cstdlib>
 #include "Al.hpp"
-#include "aluminum/cuda/gpu_wait.hpp"
-#include "aluminum/cuda/helper_kernels.hpp"
-#include "aluminum/cuda/sync_memory.hpp"
+#include "aluminum/utils/locked_resource_pool.hpp"
+#include "aluminum/cuda/cuda.hpp"
+#include "aluminum/tuning_params.hpp"
 
 namespace Al {
 namespace internal {
 namespace cuda {
 
-GPUWait::GPUWait()
-  : wait_sync(sync_pool.get())
-{
-  // An atomic here may be overkill.
-  // Can't use std::atomic because we need the actual address.
-  __atomic_store_n(wait_sync, 0, __ATOMIC_SEQ_CST);
+// TODO: May want to allocate larger chunks and partition.
 
-  if (stream_memory_operations_supported()) {
-    AL_CHECK_CUDA_DRV(
-        cuMemHostGetDevicePointer(&wait_sync_dev_ptr, wait_sync, 0));
-  } else {
-    AL_CHECK_CUDA(cudaHostGetDevicePointer(
-        reinterpret_cast<void **>(&wait_sync_dev_ptr_no_stream_mem_ops),
-        wait_sync, 0));
+/**
+ * Allocate CUDA pinned memory such that there is one allocation per
+ * cache line.
+ */
+struct CacheLinePinnedMemoryAllocator {
+  int32_t* allocate() {
+    int32_t* mem = (int32_t*) std::aligned_alloc(
+      AL_CACHE_LINE_SIZE, sizeof(int32_t));
+    AL_CHECK_CUDA(cudaHostRegister(mem, sizeof(int32_t), cudaHostRegisterDefault));
+    return mem;
   }
-}
 
-GPUWait::~GPUWait() {
-  sync_pool.release(wait_sync);
-}
-
-void GPUWait::wait(cudaStream_t stream) {
-  if (stream_memory_operations_supported()) {
-#ifdef AL_HAS_ROCM
-    launch_wait_kernel(stream, 1, static_cast<int32_t *>(wait_sync_dev_ptr));
-#else
-    launch_wait_kernel(stream, 1, wait_sync_dev_ptr);
-#endif
-  } else {
-    launch_wait_kernel(stream, 1, wait_sync_dev_ptr_no_stream_mem_ops);
+  void deallocate(int32_t* mem) {
+    AL_CHECK_CUDA(cudaHostUnregister(mem));
+    std::free(mem);
   }
-}
+};
 
-void GPUWait::signal() {
-  __atomic_store_n(wait_sync, 1, __ATOMIC_SEQ_CST);
-}
+/** Resource pool for synchronization memory. */
+extern Al::internal::LockedResourcePool<int32_t*, CacheLinePinnedMemoryAllocator> sync_pool;
 
 }  // namespace cuda
 }  // namespace internal

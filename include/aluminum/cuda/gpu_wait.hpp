@@ -56,8 +56,10 @@ class GPUWait {
   void signal();
  private:
   int32_t* wait_sync __attribute__((aligned(64)));
-  int32_t* wait_sync_dev_ptr_no_stream_mem_ops __attribute__((aligned(64)));
-  CUdeviceptr wait_sync_dev_ptr;
+  union {
+    int32_t *wait_sync_dev_ptr_no_stream_mem_ops __attribute__((aligned(64)));
+    CUdeviceptr wait_sync_dev_ptr;
+  };
 };
 
 }  // namespace cuda

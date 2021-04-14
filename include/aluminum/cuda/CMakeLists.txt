@@ -3,6 +3,7 @@ set_source_path(THIS_DIR_CUDA_HEADERS
   gpu_status_flag.hpp
   gpu_wait.hpp
   helper_kernels.hpp
+  sync_memory.hpp
   )
 
 if (AL_HAS_CUDA)

@@ -1,4 +1,5 @@
 set_source_path(THIS_DIR_HEADERS
+  locked_resource_pool.hpp
   utils.hpp
   )
 

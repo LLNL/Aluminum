@@ -27,7 +27,7 @@
 
 #include "Al.hpp"
 #include "aluminum/cuda/gpu_status_flag.hpp"
-#include "aluminum/mempool.hpp"
+#include "aluminum/cuda/sync_memory.hpp"
 
 namespace Al {
 namespace internal {
@@ -35,11 +35,12 @@ namespace cuda {
 
 GPUStatusFlag::GPUStatusFlag() {
   if (stream_memory_operations_supported()) {
-    sync_event = get_pinned_memory<int32_t>(1);
+    stream_mem.sync_event = sync_pool.get();
     // Initialize to completed to match CUDA event semantics.
-    __atomic_store_n(sync_event, 1, __ATOMIC_SEQ_CST);
+    __atomic_store_n(stream_mem.sync_event, 1, __ATOMIC_SEQ_CST);
     AL_CHECK_CUDA_DRV(cuMemHostGetDevicePointer(
-                        &sync_event_dev_ptr, sync_event, 0));
+                        &stream_mem.sync_event_dev_ptr,
+                        stream_mem.sync_event, 0));
   } else {
     plain_event = get_cuda_event();
   }
@@ -47,7 +48,7 @@ GPUStatusFlag::GPUStatusFlag() {
 
 GPUStatusFlag::~GPUStatusFlag() {
   if (stream_memory_operations_supported()) {
-    release_pinned_memory(sync_event);
+    sync_pool.release(stream_mem.sync_event);
   } else {
     release_cuda_event(plain_event);
   }
@@ -58,9 +59,9 @@ void GPUStatusFlag::record(cudaStream_t stream) {
     // We cannot use std::atomic because we need the actual address of
     // the memory.
 #ifndef AL_HAS_ROCM
-    __atomic_store_n(sync_event, 0, __ATOMIC_SEQ_CST);
+    __atomic_store_n(stream_mem.sync_event, 0, __ATOMIC_SEQ_CST);
     AL_CHECK_CUDA_DRV(cuStreamWriteValue32(
-                        stream, sync_event_dev_ptr, 1,
+                        stream, stream_mem.sync_event_dev_ptr, 1,
                         CU_STREAM_WRITE_VALUE_DEFAULT));
 #else
     throw_al_exception("A serious error has occurred; should not reach this.");
@@ -72,7 +73,7 @@ void GPUStatusFlag::record(cudaStream_t stream) {
 
 bool GPUStatusFlag::query() {
   if (stream_memory_operations_supported()) {
-    return __atomic_load_n(sync_event, __ATOMIC_SEQ_CST);
+    return __atomic_load_n(stream_mem.sync_event, __ATOMIC_SEQ_CST);
   } else {
     cudaError_t r = cudaEventQuery(plain_event);
     if (r == cudaSuccess) {

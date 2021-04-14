@@ -57,9 +57,14 @@ class GPUStatusFlag {
   /** Return true if the event has completed. */
   bool query();
  private:
-  int32_t* sync_event __attribute__((aligned(64)));
-  CUdeviceptr sync_event_dev_ptr;
-  cudaEvent_t plain_event;
+  struct stream_mem_t {
+    int32_t* sync_event __attribute__((aligned(64)));
+    CUdeviceptr sync_event_dev_ptr;
+  };
+  union {
+    stream_mem_t stream_mem;
+    cudaEvent_t plain_event;
+  };
 };
 
 }  // namespace cuda

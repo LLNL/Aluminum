@@ -66,7 +66,7 @@ if (AL_HAS_ROCM)
   target_link_libraries(Al PUBLIC ${ROCM_SMI_LIBRARY})
 endif (AL_HAS_ROCM)
 
-target_compile_features(Al PUBLIC cxx_std_14)
+target_compile_features(Al PUBLIC cxx_std_17)
 if (AL_HAS_CUDA AND NOT AL_HAS_ROCM)
   target_compile_features(Al PUBLIC cuda_std_14)
 endif ()

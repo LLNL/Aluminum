@@ -29,6 +29,7 @@
 #include <mutex>
 #include "Al.hpp"
 #include "aluminum/cuda/cuda.hpp"
+#include "aluminum/cuda/sync_memory.hpp"
 #include "aluminum/mempool.hpp"
 
 namespace Al {
@@ -77,6 +78,7 @@ void init(int&, char**&) {
   stream_mem_ops_supported = false;
 #endif
   // Preallocate memory for synchronization operations.
+  sync_pool.preallocate(AL_SYNC_MEM_PREALLOC);
   std::vector<int32_t*> prealloc_mem;
   for (int i = 0; i < AL_SYNC_MEM_PREALLOC; ++i) {
     prealloc_mem.push_back(get_pinned_memory<int32_t>(1));
@@ -87,6 +89,7 @@ void init(int&, char**&) {
 }
 
 void finalize() {
+  sync_pool.clear();
   for (auto&& event : cuda_events) {
     AL_CHECK_CUDA(cudaEventDestroy(event));
   }

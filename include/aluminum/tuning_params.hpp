@@ -47,3 +47,10 @@
 
 /** Amount of sync object memory to preallocate in the pool. */
 #define AL_SYNC_MEM_PREALLOC 1024
+
+/**
+ * Cache line size.
+ *
+ * On x86 this is usually 64. On POWER this is 128. On A64FX this is 256.
+ */
+#define AL_CACHE_LINE_SIZE 64
