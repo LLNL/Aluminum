@@ -80,13 +80,6 @@ void init(int&, char**&) {
 #endif
   // Preallocate memory for synchronization operations.
   sync_pool.preallocate(AL_SYNC_MEM_PREALLOC);
-  std::vector<int32_t*> prealloc_mem;
-  for (int i = 0; i < AL_SYNC_MEM_PREALLOC; ++i) {
-    prealloc_mem.push_back(get_pinned_memory<int32_t>(1));
-  }
-  for (int i = 0; i < AL_SYNC_MEM_PREALLOC; ++i) {
-    release_pinned_memory(prealloc_mem[i]);
-  }
 }
 
 void finalize() {
@@ -97,14 +90,6 @@ void finalize() {
       AL_CHECK_CUDA(cudaStreamDestroy(internal_streams[i]));
     }
   }
-}
-
-cudaEvent_t get_cuda_event() {
-  return event_pool.get();
-}
-
-void release_cuda_event(cudaEvent_t event) {
-  event_pool.release(event);
 }
 
 cudaStream_t get_internal_stream() {

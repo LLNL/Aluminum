@@ -28,6 +28,7 @@
 #pragma once
 
 #include "Al.hpp"
+#include "aluminum/cuda/events.hpp"
 #include "aluminum/ht/communicator.hpp"
 #include "aluminum/ht/allgather.hpp"
 #include "aluminum/ht/allgatherv.hpp"
@@ -90,8 +91,7 @@ struct HostTransferRequest {
                       cudaStream_t internal_stream_) :
     op_event(op_event_), orig_stream(orig_stream_),
     internal_stream(internal_stream_) {}
-  // Note: Not thread safe!
-  ~HostTransferRequest() { cuda::release_cuda_event(op_event); }
+  ~HostTransferRequest() { cuda::event_pool.release(op_event); }
   /** Event pending on completion of the operation. */
   cudaEvent_t op_event;
   /** Original stream associated with the operation. */
@@ -801,7 +801,7 @@ class HostTransferBackend {
    */
   static void setup_completion_event(
     cudaStream_t internal_stream, comm_type& comm, req_type& req) {
-    cudaEvent_t event = internal::cuda::get_cuda_event();
+    cudaEvent_t event = internal::cuda::event_pool.get();
     AL_CHECK_CUDA(cudaEventRecord(event, internal_stream));
     req = std::make_shared<internal::ht::HostTransferRequest>(
       event, comm.get_stream(), internal_stream);

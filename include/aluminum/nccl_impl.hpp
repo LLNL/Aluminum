@@ -38,6 +38,7 @@
 #include "Al.hpp"
 #include "aluminum/internal.hpp"
 #include "aluminum/cuda/cuda.hpp"
+#include "aluminum/cuda/events.hpp"
 #include "aluminum/mpi_comm_and_stream_wrapper.hpp"
 
 #define AL_FORCE_CHECK_NCCL(nccl_call)                                \
@@ -151,8 +152,7 @@ struct NCCLRequest {
               cudaStream_t internal_stream_) :
     op_event(op_event_), orig_stream(orig_stream_),
     internal_stream(internal_stream_) {}
-  // Note: Not thread safe!
-  ~NCCLRequest() { cuda::release_cuda_event(op_event); }
+  ~NCCLRequest() { cuda::event_pool.release(op_event); }
   /** Event pending on completion of the operation. */
   cudaEvent_t op_event;
   /** Original stream associated with the operation. */
@@ -791,7 +791,7 @@ class NCCLBackend {
    */
   static void setup_completion_event(
     cudaStream_t internal_stream, comm_type& comm, req_type& req) {
-    cudaEvent_t event = internal::cuda::get_cuda_event();
+    cudaEvent_t event = internal::cuda::event_pool.get();
     AL_CHECK_CUDA(cudaEventRecord(event, internal_stream));
     req = std::make_shared<internal::nccl::NCCLRequest>(
       event, comm.get_stream(), internal_stream);

@@ -138,11 +138,6 @@ void init(int& argc, char**& argv);
 /** Finalize CUDA. */
 void finalize();
 
-/** Return a currently unused CUDA event. */
-cudaEvent_t get_cuda_event();
-/** Release a finished CUDA event. */
-void release_cuda_event(cudaEvent_t event);
-
 /**
  * Return an internal stream to run operations on.
  * This may select among multiple internal streams.

@@ -28,6 +28,7 @@
 #include "Al.hpp"
 #include "aluminum/cuda/gpu_status_flag.hpp"
 #include "aluminum/cuda/sync_memory.hpp"
+#include "aluminum/cuda/events.hpp"
 
 namespace Al {
 namespace internal {
@@ -42,7 +43,7 @@ GPUStatusFlag::GPUStatusFlag() {
                         &stream_mem.sync_event_dev_ptr,
                         stream_mem.sync_event, 0));
   } else {
-    plain_event = get_cuda_event();
+    plain_event = event_pool.get();
   }
 }
 
@@ -50,7 +51,7 @@ GPUStatusFlag::~GPUStatusFlag() {
   if (stream_memory_operations_supported()) {
     sync_pool.release(stream_mem.sync_event);
   } else {
-    release_cuda_event(plain_event);
+    event_pool.release(plain_event);
   }
 }
 
