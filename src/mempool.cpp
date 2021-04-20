@@ -25,57 +25,12 @@
 // permissions and limitations under the license.
 ////////////////////////////////////////////////////////////////////////////////
 
-#include <vector>
-#include <mutex>
-#include "Al.hpp"
-#include "aluminum/cuda/cuda.hpp"
-#include "aluminum/cuda/sync_memory.hpp"
-#include "aluminum/cuda/events.hpp"
-#include "aluminum/cuda/streams.hpp"
-#include "aluminum/cuda/cuda_mempool.hpp"
 #include "aluminum/mempool.hpp"
 
 namespace Al {
 namespace internal {
-namespace cuda {
 
-// Define resource pools.
-Al::internal::LockedResourcePool<int32_t*, CacheLinePinnedMemoryAllocator> sync_pool;
-Al::internal::LockedResourcePool<cudaEvent_t, CUDAEventAllocator> event_pool;
+MemoryPool mempool;
 
-namespace {
-// Whether stream memory operations are supported.
-bool stream_mem_ops_supported = false;
-}
-
-void init(int&, char**&) {
-  // Initialize internal streams.
-  stream_pool.allocate(AL_CUDA_STREAM_POOL_SIZE);
-#ifndef AL_HAS_ROCM
-  // Check whether stream memory operations are supported.
-  CUdevice dev;
-  AL_CHECK_CUDA_DRV(cuCtxGetDevice(&dev));
-  int attr;
-  AL_CHECK_CUDA_DRV(cuDeviceGetAttribute(
-                      &attr, CU_DEVICE_ATTRIBUTE_CAN_USE_STREAM_MEM_OPS, dev));
-  stream_mem_ops_supported = attr;
-#else
-  stream_mem_ops_supported = false;
-#endif
-  // Preallocate memory for synchronization operations.
-  sync_pool.preallocate(AL_SYNC_MEM_PREALLOC);
-}
-
-void finalize() {
-  sync_pool.clear();
-  event_pool.clear();
-  stream_pool.clear();
-}
-
-bool stream_memory_operations_supported() {
-  return stream_mem_ops_supported;
-}
-
-}  // namespace cuda
 }  // namespace internal
 }  // namespace Al

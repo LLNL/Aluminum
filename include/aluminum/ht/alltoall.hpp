@@ -41,7 +41,7 @@ public:
   AlltoallAlState(const T* sendbuf, T* recvbuf, size_t count_,
                   HostTransferCommunicator& comm_, cudaStream_t stream_) :
     HostTransferCollectiveSignalAtEndState(stream_),
-    host_mem(get_pinned_memory<T>(comm_.size()*count_)),
+    host_mem(mempool.allocate<MemoryType::CUDA_PINNED_HOST, T>(comm_.size()*count_)),
     count(count_),
     comm(comm_.get_comm()) {
     // Transfer data from device to host.
@@ -59,7 +59,7 @@ public:
   }
 
   ~AlltoallAlState() override {
-    release_pinned_memory(host_mem);
+    mempool.release<MemoryType::CUDA_PINNED_HOST>(host_mem);
   }
 
   std::string get_name() const override { return "HTAlltoall"; }

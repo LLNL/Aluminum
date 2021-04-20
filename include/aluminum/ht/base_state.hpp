@@ -29,6 +29,7 @@
 
 #include "aluminum/progress.hpp"
 #include "aluminum/cuda/cuda.hpp"
+#include "aluminum/cuda/cuda_mempool.hpp"
 #include "aluminum/cuda/gpu_status_flag.hpp"
 #include "aluminum/cuda/gpu_wait.hpp"
 

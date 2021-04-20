@@ -37,6 +37,7 @@
 
 #include "Al.hpp"
 #include "aluminum/internal.hpp"
+#include "aluminum/mempool.hpp"
 #include "aluminum/cuda/cuda.hpp"
 #include "aluminum/cuda/events.hpp"
 #include "aluminum/cuda/streams.hpp"
@@ -867,12 +868,13 @@ class NCCLBackend {
   static void do_barrier(comm_type& comm, cudaStream_t stream) {
     // Implement the barrier as an allreduce on a single value.
     using barrier_t = unsigned char;
-    barrier_t* barrier_buf = internal::get_gpu_memory<barrier_t>(1, stream);
+    barrier_t* barrier_buf =
+      internal::mempool.allocate<internal::MemoryType::CUDA, barrier_t>(1, stream);
     AL_CHECK_NCCL(ncclAllReduce(
                     (const void*) barrier_buf, (void*) barrier_buf, 1,
                     internal::nccl::TypeMap<barrier_t>(), ncclSum,
                     comm.m_nccl_comm, stream));
-    internal::release_gpu_memory(barrier_buf);
+    internal::mempool.release<internal::MemoryType::CUDA>(barrier_buf);
   }
 
   /** Do a NCCL broadcast. */
@@ -1025,11 +1027,10 @@ class NCCLBackend {
     if (sendbuf == internal::IN_PLACE<T>()) {
       sendbuf = recvbuf;
     }
-    // Need to use a temporary buffer because we read and write to this.
-    // TODO: Optimize this.
     T* tmp_sendbuf = const_cast<T*>(sendbuf);
     if (sendbuf == recvbuf) {
-      tmp_sendbuf = internal::get_gpu_memory<T>(count*comm.size(), stream);
+      tmp_sendbuf = internal::mempool.allocate<internal::MemoryType::CUDA, T>(
+        count*comm.size(), stream);
       AL_CHECK_CUDA(cudaMemcpyAsync(tmp_sendbuf, sendbuf,
                                     count*sizeof(T)*comm.size(),
                                     cudaMemcpyDeviceToDevice, stream));
@@ -1045,8 +1046,7 @@ class NCCLBackend {
                                comm.m_nccl_comm, stream));
       });
     if (tmp_sendbuf != sendbuf) {
-      internal::release_gpu_memory(tmp_sendbuf);
-      //AL_CHECK_CUDA(cudaFree(tmp_sendbuf));
+      internal::mempool.release<internal::MemoryType::CUDA>(tmp_sendbuf);
     }
   }
 
@@ -1067,7 +1067,8 @@ class NCCLBackend {
       size_t sendbuf_len = std::accumulate(send_counts.begin(),
                                            send_counts.end(), 0);
       std::vector<size_t> contig_displs = excl_prefix_sum(send_counts);
-      tmp_sendbuf = internal::get_gpu_memory<T>(sendbuf_len, stream);
+      tmp_sendbuf = internal::mempool.allocate<internal::MemoryType::CUDA, T>(
+        sendbuf_len, stream);
       // TODO: Optimize for the case where everything is contiguous.
       for (size_t i = 0; i < send_counts.size(); ++i) {
         AL_CHECK_CUDA(cudaMemcpyAsync((void*) (tmp_sendbuf + contig_displs[i]),
@@ -1093,7 +1094,7 @@ class NCCLBackend {
         }
       });
     if (tmp_sendbuf != sendbuf) {
-      internal::release_gpu_memory(tmp_sendbuf);
+      internal::mempool.release<internal::MemoryType::CUDA>(tmp_sendbuf);
     }
   }
 
@@ -1126,14 +1127,15 @@ class NCCLBackend {
     size_t count = std::accumulate(counts.begin(), counts.end(), 0);
     std::vector<size_t> displs = excl_prefix_sum(counts);
     // Need a temporary reduce buffer so we don't trash the entire thing.
-    T* tmp_redbuf = internal::get_gpu_memory<T>(count, stream);
+    T* tmp_redbuf = internal::mempool.allocate<internal::MemoryType::CUDA, T>(
+      count, stream);
     if (sendbuf == internal::IN_PLACE<T>()) {
       sendbuf = recvbuf;
     }
     do_reduce(sendbuf, tmp_redbuf, count, op, 0, comm, stream);
     do_scatterv(tmp_redbuf, recvbuf, counts, displs, 0, comm, stream);
     if (tmp_redbuf != recvbuf) {
-      internal::release_gpu_memory(tmp_redbuf);
+      internal::mempool.release<internal::MemoryType::CUDA>(tmp_redbuf);
     }
   }
 

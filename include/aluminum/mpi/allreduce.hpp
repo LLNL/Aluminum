@@ -53,7 +53,7 @@ class MPIAlState : public AlState {
   }
   ~MPIAlState() override {
     if (recv_to != nullptr) {
-      release_memory(recv_to);
+      mempool.release<MemoryType::HOST>(recv_to);
     }
   }
   /**
@@ -221,7 +221,7 @@ void recursive_doubling_allreduce(const T* sendbuf, T* recvbuf, size_t count,
   // TODO: Shared memory optimization.
   MPI_Datatype type = TypeMap<T>();
   unsigned int mask = 1;
-  T* recv_to = get_memory<T>(count);
+  T* recv_to = mempool.allocate<MemoryType::HOST, T>(count);
   auto reduction_op = ReductionMap<T>(op);
   // Check if we are in a non-power-of-2 case.
   // First find the nearest power-of-2 <= nprocs.
@@ -268,7 +268,7 @@ void recursive_doubling_allreduce(const T* sendbuf, T* recvbuf, size_t count,
       MPI_Send(recvbuf, count, type, orig_rank - 1, tag, mpi_comm);
     }
   }
-  release_memory(recv_to);
+  mempool.release<MemoryType::HOST>(recv_to);
 }
 
 template <typename T>
@@ -281,7 +281,7 @@ class MPIRecursiveDoublingAlState : public MPIAlState<T> {
   bool setup() override {
     bool r = MPIAlState<T>::setup();
     if (!r) {
-      this->recv_to = get_memory<T>(this->count);
+      this->recv_to = mempool.allocate<MemoryType::HOST, T>(this->count);
       // Check if we're in a non-power-of-2 case.
       while (pow2 <= this->nprocs) pow2 <<= 1;
       pow2 >>= 1;
@@ -447,7 +447,7 @@ void ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
   for (size_t i = 0; i < num_rings; ++i) {
     recv_to[i].resize(bidir_cnt);
     for (size_t j = 0; j < bidir_cnt; ++j) {
-      recv_to[i][j] = get_memory<T>(slice_lengths[0][0][0]);
+      recv_to[i][j] = mempool.allocate<MemoryType::HOST, T>(slice_lengths[0][0][0]);
     }
   }
   // Compute sources (left) and destinations (right) for the rings.
@@ -590,7 +590,7 @@ void ring_allreduce(const T* sendbuf, T* recvbuf, size_t count,
   // Release temporary receive buffers.
   for (size_t i = 0; i < num_rings; ++i) {
     for (size_t j = 0; j < bidir_cnt; ++j) {
-      release_memory(recv_to[i][j]);
+      mempool.release<MemoryType::HOST>(recv_to[i][j]);
     }
   }
 }
@@ -616,7 +616,7 @@ class MPIRingAlState : public MPIAlState<T> {
       slice_ends.resize(this->nprocs);
       std::partial_sum(slice_lengths.begin(), slice_lengths.end(),
                        slice_ends.begin());
-      this->recv_to = get_memory<T>(slice_lengths[0]);
+      this->recv_to = mempool.allocate<MemoryType::HOST, T>(slice_lengths[0]);
       src = (this->rank - 1 + this->nprocs) % this->nprocs;
       dst = (this->rank + 1) % this->nprocs;
       ag_send_idx = (this->rank + 1) % this->nprocs;
@@ -760,7 +760,7 @@ void rabenseifner_allreduce(const T* sendbuf, T* recvbuf, size_t count,
       MPI_Send(recvbuf, count, type, rank + 1, tag, mpi_comm);
       rank = -1;  // Don't participate.
     } else {
-      recv_to = get_memory<T>(count);
+      recv_to = mempool.allocate<MemoryType::HOST, T>(count);
       MPI_Recv(recv_to, count, type, rank - 1, tag, mpi_comm, MPI_STATUS_IGNORE);
       reduction_op(recv_to, recvbuf, count);
       rank /= 2;
@@ -782,7 +782,7 @@ void rabenseifner_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                      slice_ends.begin());
     // Allocate temporary buffer if needed.
     if (recv_to == nullptr) {
-      recv_to = get_memory<T>(slice_ends[pow2 / 2]);
+      recv_to = mempool.allocate<MemoryType::HOST, T>(slice_ends[pow2 / 2]);
     }
     // Do a recursive-halving reduce-scatter.
     unsigned int partner_mask = pow2 >> 1;
@@ -875,7 +875,7 @@ void rabenseifner_allreduce(const T* sendbuf, T* recvbuf, size_t count,
       MPI_Send(recvbuf, count, type, orig_rank - 1, tag, mpi_comm);
     }
   }
-  release_memory(recv_to);
+  mempool.release<MemoryType::HOST>(recv_to);
 }
 
 template <typename T>
@@ -902,7 +902,7 @@ class MPIRabenseifnerAlState : public MPIAlState<T> {
           adjusted_rank = -1;  // Don't participate.
         } else {
           // Need to receive entire buffer.
-          this->recv_to = get_memory<T>(this->count);
+          this->recv_to = mempool.allocate<MemoryType::HOST, T>(this->count);
           MPI_Irecv(this->recv_to, this->count, this->type, this->rank - 1,
                     this->tag, this->comm, &(this->send_recv_reqs[0]));
           adjusted_rank /= 2;
@@ -925,7 +925,7 @@ class MPIRabenseifnerAlState : public MPIAlState<T> {
                          slice_ends.begin());
         // Receive at most half the data.
         if (this->recv_to == nullptr) {
-          this->recv_to = get_memory<T>(slice_ends[pow2 / 2]);
+          this->recv_to = mempool.allocate<MemoryType::HOST, T>(slice_ends[pow2 / 2]);
         }
         partner_mask = pow2 >> 1;
         last_idx = pow2;

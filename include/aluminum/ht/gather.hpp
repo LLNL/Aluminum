@@ -41,7 +41,7 @@ public:
   GatherAlState(const T* sendbuf, T* recvbuf, size_t count_, int root_,
                 HostTransferCommunicator& comm_, cudaStream_t stream_) :
     HostTransferCollectiveSignalNonRootEarlyState(comm_.rank() == root_, stream_),
-    host_mem(get_pinned_memory<T>(comm_.rank() == root_
+    host_mem(mempool.allocate<MemoryType::CUDA_PINNED_HOST, T>(comm_.rank() == root_
                                   ? comm_.size()*count_ : count_)),
     count(count_),
     root(root_),
@@ -70,7 +70,7 @@ public:
   }
 
   ~GatherAlState() override {
-    release_pinned_memory(host_mem);
+    mempool.release<MemoryType::CUDA_PINNED_HOST>(host_mem);
   }
 
   std::string get_name() const override { return "HTGather"; }
