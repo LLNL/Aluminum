@@ -45,98 +45,10 @@
 #include "aluminum/base.hpp"
 #include "aluminum/tuning_params.hpp"
 #include "aluminum/mpi/communicator.hpp"
-#include "aluminum/profiling.hpp"
+#include "aluminum/state.hpp"
 
 namespace Al {
 namespace internal {
-
-/**
- * Request handle for non-blocking operations.
- * The atomic flag is used to check for completion.
- */
-using AlRequest = std::shared_ptr<std::atomic<bool>>;
-/** Return a free request for use. */
-AlRequest get_free_request();
-/** Special marker for null requests. */
-static constexpr std::nullptr_t NULL_REQUEST = nullptr;
-/** Special marker for the default compute stream. */
-static constexpr std::nullptr_t DEFAULT_STREAM = nullptr;
-/** Run queue types for the progress engine. */
-enum class RunType {
-  /** Only a limited number of ops will be run at a time. */
-  bounded,
-  /** There cannot be a limit on how many ops of this type will run. */
-  unbounded
-};
-
-/** Actions a state can ask the progress engine to do. */
-enum class PEAction {
-  /** Do nothing (i.e. keep running as it is now). */
-  cont,
-  /** Advance the state to the next pipeline stage. */
-  advance,
-  /** Operation is complete. */
-  complete
-};
-
-/**
- * Represents the state and algorithm for an asynchronous operation.
- * A non-blocking operation should create one of these and enqueue it for
- * execution by the progress thread. Specific implementations can override
- * as needed.
- *
- * An algorithm should be broken up into steps which execute some small,
- * discrete operation. Steps from different operations may be interleaved.
- * Note that the memory pool is not thread-safe, so memory from it should be
- * pre-allocated before enqueueing.
- *
- * The steps are run through a simple pipeline. The algorithm can request it
- * advance to the next stage by returning PEAction::advance. Operations enqueud
- * on the same compute stream will only be advanced in the order they were
- * enqueued. If a state asks to advance but it is not at the head of its
- * pipeline stage, step will not be called again until it has successfully
- * advanced.
- */
-class AlState {
-  friend class ProgressEngine;
- public:
-  /** Create with an associated request. */
-  AlState(AlRequest req_) : req(req_) {}
-  virtual ~AlState();
-  /**
-   * Perform initial setup of the algorithm.
-   * This is called by the progress engine when the operation begins execution.
-   */
-  virtual void start();
-  /**
-   * Run one step of the algorithm.
-   * Return the action the algorithm wishes the progress engine to take.
-   */
-  virtual PEAction step() = 0;
-  /** Return the associated request. */
-  AlRequest& get_req() { return req; }
-  /** True if this is meant to be waited on by the user. */
-  virtual bool needs_completion() const { return true; }
-  /** Return the compute stream associated with this operation. */
-  virtual void* get_compute_stream() const { return DEFAULT_STREAM; }
-  /** Return the run queue type this operation should use. */
-  virtual RunType get_run_type() const { return RunType::bounded; }
-  /** True if this is meant to block operations until completion. */
-  virtual bool blocks() const { return false; }
-  /** Return a name identifying the state (for debugging/info purposes). */
-  virtual std::string get_name() const { return "AlState"; }
-  /** Return a string description of the state (for debugging/info purposes). */
-  virtual std::string get_desc() const { return ""; }
- private:
-  AlRequest req;
-#ifdef AL_DEBUG_HANG_CHECK
-  bool hang_reported = false;
-  double start_time = std::numeric_limits<double>::max();
-#endif
-  profiling::ProfileRange prof_range;
-  /** Whether execution of this operation is paused on pipeline advancement. */
-  bool paused_for_advance = false;
-};
 
 /**
  * Lock-free single-producer, single-consumer queue.

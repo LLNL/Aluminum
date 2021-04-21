@@ -168,19 +168,6 @@ int get_hwloc_offset(
 
 }  // anonymous namespace
 
-
-AlState::~AlState() {
-  profiling::prof_end(prof_range);
-}
-
-void AlState::start() {
-  prof_range = profiling::prof_start(get_name());
-}
-
-AlRequest get_free_request() {
-  return std::make_shared<std::atomic<bool>>(false);
-}
-
 ProgressEngine::ProgressEngine() {
   stop_flag = false;
   started_flag = false;
