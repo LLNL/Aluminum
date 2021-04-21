@@ -42,21 +42,13 @@
 #include <ostream>
 #include <array>
 
-namespace Al {
-
-// Forward declaration.
-class Communicator;
-
-}  // namespace Al
-
+#include "aluminum/base.hpp"
+#include "aluminum/tuning_params.hpp"
 #include "aluminum/mpi/communicator.hpp"
+#include "aluminum/profiling.hpp"
 
 namespace Al {
 namespace internal {
-// Forward declaration.
-namespace profiling {
-struct ProfileRange;
-}
 
 /**
  * Request handle for non-blocking operations.

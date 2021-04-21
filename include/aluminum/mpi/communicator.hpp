@@ -28,7 +28,6 @@
 #pragma once
 
 #include <mpi.h>
-#include "Al.hpp"
 #include "aluminum/mpi_comm_and_stream_wrapper.hpp"
 
 namespace Al {

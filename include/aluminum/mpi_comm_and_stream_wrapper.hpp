@@ -28,7 +28,6 @@
 #pragma once
 
 #include <mpi.h>
-#include "Al.hpp"
 
 namespace Al {
 namespace internal {
