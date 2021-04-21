@@ -233,61 +233,6 @@ struct InputQueue {
 };
 
 /**
- * An fixed-length ordered array that allows arbitrary elements to be removed.
- * This is meant to be used for small N.
- */
-template <size_t N>
-struct OrderedArray {
-  OrderedArray() {
-    std::fill_n(l, N, nullptr);
-  }
-  ~OrderedArray() {}
-  /** Whether the array is currently full. */
-  bool full() const { return cur_size == N; }
-  /**
-   * Add an element to the end of the array.
-   * This assumes the array is not full.
-   */
-  void push(AlState* v) {
-    l[cur_size] = v;
-    ++cur_size;
-  }
-  /**
-   * Delete an entry.
-   * This assumes idx exists.
-   */
-  void del(size_t idx) {
-    // Just copy the elements over.
-    for (size_t i = idx; i < cur_size - 1; ++i) {
-      l[i] = l[i+1];
-    }
-    --cur_size;
-  }
-  /**
-   * Fill "holes" created by marking elements null.
-   */
-  void compact() {
-    size_t free_slot = 0;
-    for (size_t i = 0; i < cur_size; ++i) {
-      if (l[i] != nullptr) {
-        // l[i] has something, see if we can move it into the free slot.
-        if (free_slot < i) {
-          l[free_slot] = l[i];
-        }
-        // Advance the free slot. If we copied something over, everything after
-        // should be shifted too.
-        ++free_slot;
-      }
-    }
-    cur_size = free_slot;
-  }
-  /** Underlying data store. */
-  AlState* l[N];
-  /** Number of elements currently present. */
-  size_t cur_size = 0;
-};
-
-/**
  * Encapsulates the asynchronous progress engine.
  * Note this is intended to be used from only one thread (in addition to the
  * progress thread) and is not optimized (or tested) for other cases.
