@@ -44,10 +44,12 @@ namespace cuda {
  * cache line.
  */
 struct CacheLinePinnedMemoryAllocator {
-  int32_t* allocate() {
-    int32_t* mem = (int32_t*) std::aligned_alloc(
-      AL_CACHE_LINE_SIZE, sizeof(int32_t));
-    AL_CHECK_CUDA(cudaHostRegister(mem, sizeof(int32_t), cudaHostRegisterDefault));
+  int32_t *allocate() {
+    // Overallocate to avoid interference.
+    int32_t *mem = (int32_t *)std::aligned_alloc(
+        AL_DESTRUCTIVE_INTERFERENCE_SIZE, AL_DESTRUCTIVE_INTERFERENCE_SIZE);
+    AL_CHECK_CUDA(cudaHostRegister(mem, AL_DESTRUCTIVE_INTERFERENCE_SIZE,
+                                   cudaHostRegisterDefault));
     return mem;
   }
 

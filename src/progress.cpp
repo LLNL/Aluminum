@@ -261,7 +261,7 @@ std::ostream& ProgressEngine::dump_state(std::ostream& ss) {
       }
     }
   }
-  const size_t req_queue_size = num_input_streams.load();
+  /*const size_t req_queue_size = num_input_streams.load();
   ss << "Request queues (" << req_queue_size << "):\n";
   for (size_t i = 0; i < req_queue_size; ++i) {
     ss << i << ": blocked=" << request_queues[i].blocked;
@@ -272,7 +272,7 @@ std::ostream& ProgressEngine::dump_state(std::ostream& ss) {
       ss << "\t" << j << ": " << request_queues[i].q.data[j]->get_name()
          << " " << request_queues[i].q.data[j]->get_desc() << "\n";
     }
-  }
+    }*/
   return ss;
 }
 

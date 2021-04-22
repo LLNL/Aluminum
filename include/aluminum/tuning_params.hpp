@@ -49,11 +49,20 @@
 #define AL_SYNC_MEM_PREALLOC 1024
 
 /**
- * Cache line size.
+ * Cache line size in bytes.
  *
  * On x86 this is usually 64. On POWER this is 128. On A64FX this is 256.
  */
 #define AL_CACHE_LINE_SIZE 64
+
+/**
+ * Minimum size in bytes to avoid destructive interference.
+ *
+ * This is generally AL_CACHE_LINE_SIZE, except on x86, where it should
+ * be twice the cache line size, because Intel processors can fetch
+ * two adjacent cache lines (see Intel Optimization Manual, 3.7.3).
+ */
+#define AL_DESTRUCTIVE_INTERFERENCE_SIZE 128
 
 /** Number of CUDA streams in the default stream pool. */
 #define AL_CUDA_STREAM_POOL_SIZE 5

@@ -2,6 +2,7 @@ set_source_path(THIS_DIR_HEADERS
   caching_allocator.hpp
   locked_resource_pool.hpp
   meta.hpp
+  spsc_queue.hpp
   utils.hpp
   )
 

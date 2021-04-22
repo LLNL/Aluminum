@@ -46,98 +46,16 @@
 #include "aluminum/tuning_params.hpp"
 #include "aluminum/mpi/communicator.hpp"
 #include "aluminum/state.hpp"
+#include "aluminum/utils/spsc_queue.hpp"
 
 namespace Al {
 namespace internal {
-
-/**
- * Lock-free single-producer, single-consumer queue.
- * This is Lamport's classic SPSC queue, with memory order optimizations
- * (see Le, et al. "Correct and Efficient Bounded FIFO Queues").
- */
-class SPSCQueue {
-  friend class ProgressEngine;
- public:
-  /**
-   * Initialize the queue.
-   * size_ must be a power of 2.
-   */
-  SPSCQueue(size_t size_) :
-    front(0), back(0), size(size_) {
-    data = new AlState*[size];
-    std::fill_n(data, size, nullptr);
-  }
-  ~SPSCQueue() {
-    delete[] data;
-  }
-  /**
-   * Add v to the queue.
-   * This will throw an exception if the queue is full.
-   * @todo We can elide the capacity check to save an atomic load.
-   * @todo If we elide the capacity check, this can be reformulated to use
-   * just a single fetch-and-add.
-   */
-  void push(AlState* v) {
-    size_t b = back.load(std::memory_order_relaxed);
-    size_t f = front.load(std::memory_order_acquire);
-    size_t bmod = (b+1) & (size-1);
-    if (bmod == f) {
-      throw_al_exception("Queue full");
-    }
-    data[b] = v;
-    back.store(bmod, std::memory_order_release);
-  }
-  /**
-   * Remove an element from the queue.
-   * If the queue is empty, this returns nullptr.
-   */
-  AlState* pop() {
-    size_t f = front.load(std::memory_order_relaxed);
-    size_t b = back.load(std::memory_order_acquire);
-    if (b == f) {
-      return nullptr;
-    }
-    AlState* v = data[f];
-    front.store((f+1) & (size-1), std::memory_order_release);
-    return v;
-  }
-  /**
-   * Discard the element at the front of the queue.
-   * This always advances the front, even if nothing is present. The user must
-   * ensure that something was actually there (via peek).
-   */
-  void pop_always() {
-    size_t f = front.load(std::memory_order_relaxed);
-    front.store((f+1) & (size-1), std::memory_order_release);
-  }
-  /**
-   * Return the element at the front of the queue without removing it.
-   * If the queue is empty, this returns nullptr.
-   */
-  AlState* peek() {
-    size_t f = front.load(std::memory_order_relaxed);
-    size_t b = back.load(std::memory_order_acquire);
-    if (b == f) {
-      return nullptr;
-    }
-    return data[f];
-  }
- private:
-  /** Index for the current front of the queue. */
-  std::atomic<size_t> front;
-  /** Index for the current back of the queue. */
-  std::atomic<size_t> back;
-  /** Number of elements the queue can store. */
-  const size_t size;
-  /** Buffer for data in the queue. */
-  AlState** data;
-};
 
 /** Input request queue. */
 struct InputQueue {
   InputQueue() : q(1<<13) {}
   /** Input queue. */
-  SPSCQueue q;
+  SPSCQueue<AlState*> q;
   /** Whether a blocking operation is being executed. */
   bool blocked = false;
   /** Associated compute stream. */
