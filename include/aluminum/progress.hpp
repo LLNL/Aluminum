@@ -47,20 +47,10 @@
 #include "aluminum/mpi/communicator.hpp"
 #include "aluminum/state.hpp"
 #include "aluminum/utils/spsc_queue.hpp"
+#include "aluminum/utils/mpsc_queue.hpp"
 
 namespace Al {
 namespace internal {
-
-/** Input request queue. */
-struct InputQueue {
-  InputQueue() : q(1<<13) {}
-  /** Input queue. */
-  SPSCQueue<AlState*> q;
-  /** Whether a blocking operation is being executed. */
-  bool blocked = false;
-  /** Associated compute stream. */
-  void* compute_stream = DEFAULT_STREAM;
-};
 
 /**
  * Encapsulates the asynchronous progress engine.
@@ -97,6 +87,21 @@ class ProgressEngine {
    */
   std::ostream& dump_state(std::ostream& ss);
  private:
+  /** Input request queue. */
+  struct InputQueue {
+    InputQueue() : q(AL_PE_INPUT_QUEUE_SIZE) {}
+    /** Input queue. */
+#ifdef AL_THREAD_MULTIPLE
+    MPSCQueue<AlState*> q;
+#else
+    SPSCQueue<AlState*> q;
+#endif
+    /** Whether a blocking operation is being executed. */
+    bool blocked = false;
+    /** Associated compute stream. */
+    void* compute_stream = DEFAULT_STREAM;
+  };
+
   /** The actual thread of execution. */
   std::thread thread;
   /** Atomic flag indicating the progress engine should stop; true to stop. */
@@ -109,20 +114,30 @@ class ProgressEngine {
   std::atomic<bool> started_flag;
   /**
    * Per-stream request queues.
+   *
    * Each queue contains requests that have been enqueued to the progress
    * engine but that it has not yet begun to process.
+   * There should be only one queue per stream.
    * Queues can be "added" to this by incrementing cur_streams. The calling
-   * thread sets up the queue, then increments cur_streams. (Note that this is
-   * only safe with one user thread.)
+   * thread sets up the queue, then increments cur_streams. The
+   * add_queue_mutex mutex is used to synchronize this operation. It
+   * should be rare.
    */
   InputQueue request_queues[AL_PE_NUM_STREAMS];
+#ifdef AL_THREAD_MULTIPLE
+  /** Synchronize adding a new queue. */
+  std::mutex add_queue_mutex;
+#endif
   /** Current number of streams. */
   std::atomic<size_t> num_input_streams;
-  /**
-   * Compute streams that currently have InputQueues.
-   * Only the user thread accesses this.
-   */
-  std::unordered_map<void*, InputQueue*> stream_to_queue;
+#ifdef AL_PE_STREAM_QUEUE_CACHE
+  /** Per-thread mapping from streams to queues (cached to avoid lookup). */
+#ifdef AL_THREAD_MULTIPLE
+  static thread_local std::unordered_map<void*, InputQueue*> stream_to_queue;
+#else
+  static std::unordered_map<void*, InputQueue*> stream_to_queue;
+#endif
+#endif
   /**
    * Per-stream pipelined run queues.
    * This should be accessed only by the progress engine.

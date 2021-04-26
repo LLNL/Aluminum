@@ -32,15 +32,31 @@
  */
 #pragma once
 
-/**
- * Number of concurrent operations the progress engine will perform.
- * This must be a positive number.
- */
+/** Number of concurrent operations the progress engine will perform. */
 #define AL_PE_NUM_CONCURRENT_OPS 4
 /** Max number of streams the progress engine supports. */
 #define AL_PE_NUM_STREAMS 64
 /** Max number of pipeline stages the progress engine supports. */
 #define AL_PE_NUM_PIPELINE_STAGES 2
+/** Max number of entries in each stream's input queue. */
+#define AL_PE_INPUT_QUEUE_SIZE 8192
+/**
+ * Whether to have a default stream entry for the progress engine
+ * added automatically.
+ *
+ * This makes sense when using MPI, but not so when using the
+ * host-transfer backend, which does not use the default stream.
+ */
+// #define AL_PE_ADD_DEFAULT_STREAM 1
+/**
+ * Whether to use a thread-local cache to map streams to input queues
+ * for the progress engine.
+ *
+ * If you expect to have only a small number of streams, using a cache
+ * is unlikely to help, since searching it will take as long as
+ * searching the actual list.
+ */
+// #define AL_PE_STREAM_QUEUE_CACHE 1
 
 /** Whether to protect memory pools with locks. */
 #define AL_LOCK_MEMPOOL 1
