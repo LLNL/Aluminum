@@ -30,7 +30,7 @@
 #include <Al_config.hpp>
 
 #include <atomic>
-#include <algorithm>
+#include <memory>
 #include <type_traits>
 #include "aluminum/base.hpp"
 #include "aluminum/tuning_params.hpp"
@@ -39,55 +39,66 @@
 namespace Al {
 namespace internal {
 
-/**
- * Bounded, lock-free, single-producer, single-consumer queue.
- *
- * This is Lamport's classic SPSC queue with memory order optimizations.
- * See Le, et al. "Correct and Efficient Bounded FIFO Queues".
- */
+/** Bounded, lock-free multiple-producer, single-consumer queue. */
 template <typename T>
-class SPSCQueue {
+class MPSCQueue {
 public:
   /** Initialize queue with fixed size (must be a power of 2). */
-  explicit SPSCQueue(size_t size_) : size(size_), front(0), back(0) {
+  explicit MPSCQueue(size_t size_) : size(size_), index(1) {
     static_assert(std::is_pointer<T>::value, "T must be a pointer type");
 #ifdef AL_DEBUG
     if (!is_pow2(size)) {
       throw_al_exception("SPSCQueue size must be a power of 2");
     }
 #endif
-    data = new T[size];
-    std::fill_n(data, size, nullptr);
+    data = new queue_entry[size + 1];
+    head = &data[0];
+    head->next = nullptr;
+    tail = head;
   }
 
-  ~SPSCQueue() {
+  ~MPSCQueue() {
     delete[] data;
   }
 
   /** Add v to the queue. */
   void push(T& v) {
-    size_t b = back.load(std::memory_order_relaxed);
-    size_t bmod = (b+1) & (size-1);
-#ifdef AL_DEBUG
-    size_t f = front.load(std::memory_order_acquire);
-    if (bmod == f) {
-      throw_al_exception("Queue full");
+    size_t i = index.fetch_add(1);
+    queue_entry* entry = &data[i & (size - 1)];
+    entry->value = v;
+    entry->next = nullptr;
+    queue_entry* old_tail;
+    queue_entry* old_next;
+    while (true) {
+      old_tail = tail;
+      old_next = tail->next;
+      if (old_tail == tail) {
+        if (old_next != nullptr) {
+          // We didn't read the actual tail, help it get updated.
+          __atomic_compare_exchange_n(&tail, &old_tail, old_next, true,
+                                      __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+        } else {
+          // Attempt to add our entry as the node after the current tail.
+          if (__atomic_compare_exchange_n(&tail->next, &old_next, entry, true,
+                                          __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
+            // Update the tail.
+            __atomic_compare_exchange_n(&tail, &old_tail, entry, true,
+                                        __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+            break;
+          }
+        }
+      }
     }
-#endif
-    data[b] = v;
-    back.store(bmod, std::memory_order_release);
   }
 
   /** Return the next element in the queue; nullptr if empty. */
   T pop() {
-    size_t f = front.load(std::memory_order_relaxed);
-    size_t b = back.load(std::memory_order_acquire);
-    if (b == f) {
+    if (head->next == nullptr) {
       return nullptr;
     }
-    T* v = data[f];
-    front.store((f+1) & (size-1), std::memory_order_release);
-    return v;
+    T value = head->next->value;
+    head = head->next;
+    return value;
   }
 
   /**
@@ -96,38 +107,39 @@ public:
    * It is an error to call this if no element is present.
    */
   void pop_always() {
-    size_t f = front.load(std::memory_order_relaxed);
 #ifdef AL_DEBUG
-    size_t b = back.load(std::memory_order_acquire);
-    if (b == f) {
+    if (head->next == nullptr) {
       throw_al_exception("Tried to pop_always when empty");
     }
 #endif
-    front.store((f+1) & (size-1), std::memory_order_release);
+    head = head->next;
   }
 
   /** Return the next element in the queue; nullptr if empty. */
   T peek() {
-    size_t f = front.load(std::memory_order_relaxed);
-    size_t b = back.load(std::memory_order_acquire);
-    if (b == f) {
-      return nullptr;
-    }
-    return data[f];
+    return (head->next == nullptr) ? nullptr : head->next->value;
   }
 
 private:
+  /** Stores each entry in the queue, and the next entry in the order. */
+  struct queue_entry {
+    T value;
+    queue_entry* next;
+  };
+
   /** Number of elements the queue can store. */
   const size_t size;
-  /** Buffer for data in the queue. */
-  T* data;
-  /** Index for the current front of the queue. */
-  alignas(AL_DESTRUCTIVE_INTERFERENCE_SIZE) std::atomic<size_t> front;
-  /** Index for the current back of the queue. */
-  alignas(AL_DESTRUCTIVE_INTERFERENCE_SIZE) std::atomic<size_t> back;
+  /** Buffer for entries in the queue. */
+  queue_entry* data;
+  /** Current index in data. */
+  alignas(AL_DESTRUCTIVE_INTERFERENCE_SIZE) std::atomic<size_t> index;
+  /** Pointer to the current head of the queue. */
+  alignas(AL_DESTRUCTIVE_INTERFERENCE_SIZE) queue_entry* head;
+  /** Pointer to the current tail of the queue. */
+  alignas(AL_DESTRUCTIVE_INTERFERENCE_SIZE) queue_entry* tail;
 
-  // Prevent allocations on the cache line back is in.
-  char padding[AL_DESTRUCTIVE_INTERFERENCE_SIZE - sizeof(std::atomic<size_t>)];
+  // Prevent allocations on the cache line tail is in.
+  char padding[AL_DESTRUCTIVE_INTERFERENCE_SIZE - sizeof(queue_entry*)];
 };
 
 }  // namespace internal
