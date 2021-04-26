@@ -58,9 +58,6 @@
  */
 // #define AL_PE_STREAM_QUEUE_CACHE 1
 
-/** Whether to protect memory pools with locks. */
-#define AL_LOCK_MEMPOOL 1
-
 /** Amount of sync object memory to preallocate in the pool. */
 #define AL_SYNC_MEM_PREALLOC 1024
 
