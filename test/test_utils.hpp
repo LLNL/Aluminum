@@ -61,7 +61,7 @@ struct VectorType {
   using type = std::vector<T>;
 
   /** Generate a vector of random data of size count. */
-  static type gen_data(size_t count) {
+  static type gen_data(size_t count, int = 0) {
     static bool rng_seeded = false;
     static std::minstd_rand rng_gen;
     if (!rng_seeded) {
@@ -100,8 +100,9 @@ struct CommWrapper {
   std::unique_ptr<typename Backend::comm_type> comm_;
   CommWrapper(MPI_Comm mpi_comm) :
     comm_(std::make_unique<typename Backend::comm_type>(mpi_comm)) {}
-  // Not noexcept because CUDA specializations might throw.
-  ~CommWrapper() noexcept(false) {};
+  CommWrapper(CommWrapper<Backend>&& other) = default;
+  CommWrapper<Backend>& operator=(CommWrapper<Backend>&& other) = default;
+  ~CommWrapper() {};
   typename Backend::comm_type& comm() { return *comm_; }
   const typename Backend::comm_type& comm() const { return *comm_; }
   int rank() const { return comm_->rank(); }

@@ -36,6 +36,8 @@ parser.add_argument('--blocking', default=None, action='store_true',
                     help='Run only blocking algorithms')
 parser.add_argument('--nonblocking', default=None, action='store_true',
                     help='Run only nonblocking algorithms')
+parser.add_argument('--threads', type=int, default=None,
+                    help='Number of threads to test with')
 
 
 # Supported datatypes for backends.
@@ -137,6 +139,8 @@ def run_test(args, num_procs, backend, operator, datatype, inplace,
                 '--max-size', '2048',
                 # Don't wait too long.
                 '--hang-timeout', '5']
+    if args.threads is not None:
+        test_cmd += ['--threads', str(args.threads)]
     test_desc = f'procs:{num_procs} {backend} {operator} {datatype}'
     if inplace:
         test_cmd += ['--inplace']
