@@ -75,7 +75,7 @@ class CUDAVector {
 
   void clear() {
     if (m_count > 0) {
-      AL_FORCE_CHECK_CUDA_NOSYNC(cudaFree(m_ptr));
+      Al::internal::mempool.release<Al::internal::MemoryType::CUDA>(m_ptr);
       m_ptr = nullptr;
       m_count = 0;
     }
@@ -84,17 +84,8 @@ class CUDAVector {
   void allocate() {
     assert(m_ptr == nullptr);
     if (m_count > 0) {
-      cudaError_t e = cudaMalloc(&m_ptr, get_bytes());
-      if (e != cudaSuccess) {
-        size_t free_mem, total_mem;
-        cudaMemGetInfo(&free_mem, &total_mem);
-        std::cerr << "Error allocating "
-                  << get_bytes() << " bytes of memory: "
-                  << cudaGetErrorString(e)
-                  << ", free: " << free_mem << "\n";
-        cudaDeviceReset();
-        std::abort();
-      }
+      m_ptr = Al::internal::mempool.allocate<Al::internal::MemoryType::CUDA, T>(
+        m_count, m_stream);
     }
   }
 
