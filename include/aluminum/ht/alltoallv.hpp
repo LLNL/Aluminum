@@ -49,8 +49,8 @@ public:
     inplace(sendbuf == recvbuf),
     host_sendbuf(inplace ?
                  nullptr :
-                 get_pinned_memory<T>(send_displs_.back() + send_counts_.back())),
-    host_recvbuf(get_pinned_memory<T>(recv_displs_.back() + recv_counts_.back())),
+                 mempool.allocate<MemoryType::CUDA_PINNED_HOST, T>(send_displs_.back() + send_counts_.back())),
+    host_recvbuf(mempool.allocate<MemoryType::CUDA_PINNED_HOST, T>(recv_displs_.back() + recv_counts_.back())),
     send_counts(mpi::intify_size_t_vector(send_counts_)),
     send_displs(mpi::intify_size_t_vector(send_displs_)),
     recv_counts(mpi::intify_size_t_vector(recv_counts_)),
@@ -93,9 +93,9 @@ public:
 
   ~AlltoallvAlState() override {
     if (host_sendbuf) {
-      release_pinned_memory(host_sendbuf);
+      mempool.release<MemoryType::CUDA_PINNED_HOST>(host_sendbuf);
     }
-    release_pinned_memory(host_recvbuf);
+    mempool.release<MemoryType::CUDA_PINNED_HOST>(host_recvbuf);
   }
 
   std::string get_name() const override { return "HTAlltoallv"; }

@@ -46,13 +46,13 @@ class SendAlState : public AlState {
               HostTransferCommunicator& comm_, cudaStream_t stream) :
     AlState(nullptr), count(count_), dest(dest_), comm(comm_.get_comm()),
     compute_stream(comm_.get_stream()) {
-    mem = get_pinned_memory<T>(count);
+    mem = mempool.allocate<MemoryType::CUDA_PINNED_HOST, T>(count);
     AL_CHECK_CUDA(cudaMemcpyAsync(mem, sendbuf, sizeof(T)*count,
                                   cudaMemcpyDeviceToHost, stream));
     sync_event.record(stream);
   }
   ~SendAlState() override {
-    release_pinned_memory(mem);
+    mempool.release<MemoryType::CUDA_PINNED_HOST>(mem);
   }
 #ifdef AL_HAS_PROF
   void start() override {
@@ -116,14 +116,14 @@ class RecvAlState : public AlState {
               HostTransferCommunicator& comm_, cudaStream_t stream) :
     AlState(nullptr), count(count_), src(src_), comm(comm_.get_comm()),
     compute_stream(comm_.get_stream()) {
-    mem = get_pinned_memory<T>(count);
+    mem = mempool.allocate<MemoryType::CUDA_PINNED_HOST, T>(count);
     wait_sync.wait(stream);
     AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, mem, sizeof(T)*count,
                                   cudaMemcpyHostToDevice, stream));
     sync_event.record(stream);
   }
   ~RecvAlState() override {
-    release_pinned_memory(mem);
+    mempool.release<MemoryType::CUDA_PINNED_HOST>(mem);
   }
   void start() override {
     AlState::start();

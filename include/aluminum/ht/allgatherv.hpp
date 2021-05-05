@@ -42,7 +42,7 @@ public:
                     std::vector<size_t> counts_, std::vector<size_t> displs_,
                     HostTransferCommunicator& comm_, cudaStream_t stream_) :
     HostTransferCollectiveSignalAtEndState(stream_),
-    host_mem(get_pinned_memory<T>(displs_.back()+counts_.back())),
+    host_mem(mempool.allocate<MemoryType::CUDA_PINNED_HOST, T>(displs_.back()+counts_.back())),
     counts(mpi::intify_size_t_vector(counts_)),
     displs(mpi::intify_size_t_vector(displs_)),
     comm(comm_.get_comm()) {
@@ -71,7 +71,7 @@ public:
   }
 
   ~AllgathervAlState() override {
-    release_pinned_memory(host_mem);
+    mempool.release<MemoryType::CUDA_PINNED_HOST>(host_mem);
   }
 
   std::string get_name() const override { return "HTAllgatherv"; }

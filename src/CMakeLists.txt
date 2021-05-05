@@ -1,5 +1,6 @@
 set_source_path(THIS_DIR_CXX_SOURCES
   Al.cpp
+  mempool.cpp
   mpi_impl.cpp
   profiling.cpp
   progress.cpp

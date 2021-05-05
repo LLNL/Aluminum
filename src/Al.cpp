@@ -34,6 +34,7 @@
 #include <fstream>
 #include "Al.hpp"
 #include "aluminum/internal.hpp"
+#include "aluminum/mempool.hpp"
 #include "aluminum/progress.hpp"
 #ifdef AL_HAS_CUDA
 #include "aluminum/cuda/cuda.hpp"
@@ -163,6 +164,8 @@ void Finalize() {
   progress_engine->stop();
   delete progress_engine;
   progress_engine = nullptr;
+  // Clear host memory pool.
+  internal::mempool.clear();
   is_initialized = false;
   internal::mpi::finalize();
   internal::trace::write_trace_to_file();
