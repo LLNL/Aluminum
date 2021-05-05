@@ -25,35 +25,48 @@
 // permissions and limitations under the license.
 ////////////////////////////////////////////////////////////////////////////////
 
-/**
- * These are used to tune various algorithmic choices.
- * You should probably choose them based on benchmarks for your particular
- * configuration.
- */
 #pragma once
 
-/**
- * Number of concurrent operations the progress engine will perform.
- * This must be a positive number.
- */
-#define AL_PE_NUM_CONCURRENT_OPS 4
-/** Max number of streams the progress engine supports. */
-#define AL_PE_NUM_STREAMS 64
-/** Max number of pipeline stages the progress engine supports. */
-#define AL_PE_NUM_PIPELINE_STAGES 2
+#include <Al_config.hpp>
 
-/** Whether to protect memory pools with locks. */
-#define AL_LOCK_MEMPOOL 1
+#include "aluminum/cuda/cuda.hpp"
 
-/** Amount of sync object memory to preallocate in the pool. */
-#define AL_SYNC_MEM_PREALLOC 1024
+namespace Al {
+namespace internal {
+namespace cuda {
 
 /**
- * Cache line size.
- *
- * On x86 this is usually 64. On POWER this is 128. On A64FX this is 256.
+ * An optimized version of CUDA events that only supports polling from the host.
+ * This essentially uses full/empty bit semantics to implement synchronization.
+ * A memory location is polled on by the host and written to by the device
+ * using the stream memory write operation.
+ * This falls back to the usual CUDA events when stream memory operations are
+ * not available.
+ * @note This is currently always falling back on CUDA events to work around a
+ * hang, the underlying cause of which has not been diagnosed.
  */
-#define AL_CACHE_LINE_SIZE 64
+class GPUStatusFlag {
+ public:
+  /**
+   * Allocate the event.
+   */
+  GPUStatusFlag();
+  ~GPUStatusFlag();
+  /** Record the event into stream. */
+  void record(cudaStream_t stream);
+  /** Return true if the event has completed. */
+  bool query();
+ private:
+  struct stream_mem_t {
+    int32_t* sync_event __attribute__((aligned(64)));
+    CUdeviceptr sync_event_dev_ptr;
+  };
+  union {
+    stream_mem_t stream_mem;
+    cudaEvent_t plain_event;
+  };
+};
 
-/** Number of CUDA streams in the default stream pool. */
-#define AL_CUDA_STREAM_POOL_SIZE 5
+}  // namespace cuda
+}  // namespace internal
+}  // namespace Al

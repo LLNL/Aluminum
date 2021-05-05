@@ -3,7 +3,7 @@
 #include <iostream>
 #include <cuda.h>
 #include "Al.hpp"
-#include "aluminum/helper_kernels.hpp"
+#include "aluminum/cuda/helper_kernels.hpp"
 #include "benchmark_utils.hpp"
 #include "wait.hpp"
 

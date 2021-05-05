@@ -8,7 +8,6 @@ set_source_path(THIS_DIR_HEADERS
   profiling.hpp
   trace.hpp
   tuning_params.hpp
-  utils.hpp
   )
 set_source_path(THIS_DIR_CUDA_HEADERS
   cuda.hpp
@@ -24,10 +23,12 @@ set_source_path(THIS_DIR_NCCL_HEADERS
   nccl_impl.hpp
   )
 
+add_subdirectory(utils)
+
 add_subdirectory(mpi)
 
 if (AL_HAS_CUDA)
-  list(APPEND THIS_DIR_HEADERS "${THIS_DIR_CUDA_HEADERS}")
+  add_subdirectory(cuda)
 endif ()
 
 if (AL_HAS_MPI_CUDA)

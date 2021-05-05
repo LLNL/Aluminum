@@ -25,35 +25,33 @@
 // permissions and limitations under the license.
 ////////////////////////////////////////////////////////////////////////////////
 
-/**
- * These are used to tune various algorithmic choices.
- * You should probably choose them based on benchmarks for your particular
- * configuration.
- */
-#pragma once
+#include <cuda_runtime.h>
+#include "aluminum/cuda/helper_kernels.hpp"
 
-/**
- * Number of concurrent operations the progress engine will perform.
- * This must be a positive number.
- */
-#define AL_PE_NUM_CONCURRENT_OPS 4
-/** Max number of streams the progress engine supports. */
-#define AL_PE_NUM_STREAMS 64
-/** Max number of pipeline stages the progress engine supports. */
-#define AL_PE_NUM_PIPELINE_STAGES 2
+namespace Al {
+namespace internal {
+namespace cuda {
 
-/** Whether to protect memory pools with locks. */
-#define AL_LOCK_MEMPOOL 1
+__global__ void spin_wait_kernel(int32_t wait_value, volatile int32_t* wait_mem) {
+  for (;;)
+  {
+    __threadfence_system();
+    int32_t value = *wait_mem;
+    if (value == wait_value) break;
+  }
+}
 
-/** Amount of sync object memory to preallocate in the pool. */
-#define AL_SYNC_MEM_PREALLOC 1024
+void launch_wait_kernel(cudaStream_t stream, int32_t wait_value, volatile int32_t* wait_mem) {
+  spin_wait_kernel<<<1,1,0,stream>>>(wait_value, wait_mem);
+}
 
-/**
- * Cache line size.
- *
- * On x86 this is usually 64. On POWER this is 128. On A64FX this is 256.
- */
-#define AL_CACHE_LINE_SIZE 64
+#if defined AL_HAS_CUDA && !defined AL_HAS_ROCM
+void launch_wait_kernel(cudaStream_t stream, int32_t wait_value, CUdeviceptr wait_mem) {
+  AL_CHECK_CUDA_DRV(cuStreamWaitValue32(
+                      stream, wait_mem, wait_value, CU_STREAM_WAIT_VALUE_EQ));
+}
+#endif // defined AL_HAS_CUDA && !defined AL_HAS_ROCM
 
-/** Number of CUDA streams in the default stream pool. */
-#define AL_CUDA_STREAM_POOL_SIZE 5
+} // namespace cuda
+} // namespace internal
+} // namespace Al

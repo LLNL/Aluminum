@@ -5,12 +5,6 @@ set_source_path(THIS_DIR_CXX_SOURCES
   progress.cpp
   trace.cpp
   )
-set_source_path(THIS_DIR_CUDA_CXX_SOURCES
-  cuda.cpp
-  )
-set_source_path(THIS_DIR_CUDA_SOURCES
-  helper_kernels.cu
-  )
 set_source_path(THIS_DIR_MPI_CUDA_CXX_SOURCES
   mpi_cuda_impl.cpp
   )
@@ -22,7 +16,7 @@ set_source_path(THIS_DIR_NCCL_CXX_SOURCES
   )
 
 if (AL_HAS_CUDA)
-  list(APPEND THIS_DIR_CXX_SOURCES "${THIS_DIR_CUDA_CXX_SOURCES}")
+  add_subdirectory(cuda)
 endif ()
 
 if (AL_HAS_MPI_CUDA)
@@ -72,7 +66,7 @@ if (AL_HAS_ROCM)
   target_link_libraries(Al PUBLIC ${ROCM_SMI_LIBRARY})
 endif (AL_HAS_ROCM)
 
-target_compile_features(Al PUBLIC cxx_std_14)
+target_compile_features(Al PUBLIC cxx_std_17)
 if (AL_HAS_CUDA AND NOT AL_HAS_ROCM)
   target_compile_features(Al PUBLIC cuda_std_14)
 endif ()

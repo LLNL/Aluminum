@@ -29,6 +29,7 @@
 
 #include "Al.hpp"
 #include "aluminum/mpi_cuda/communicator.hpp"
+#include "aluminum/cuda/events.hpp"
 #ifdef AL_HAS_MPI_CUDA_RMA
 #include "aluminum/mpi_cuda/rma.hpp"
 #endif
@@ -43,12 +44,12 @@ void init(int& argc, char**& argv);
 /** Finalize MPI-CUDA backend. */
 void finalize();
 
+// TODO: Not used.
 /** Represents a request for the MPI-CUDA backend. */
 struct MPICUDARequest {
   MPICUDARequest(cudaEvent_t op_event_, cudaStream_t orig_stream_) :
     op_event(op_event_), orig_stream(orig_stream_) {}
-  // Note: Not thread safe!
-  ~MPICUDARequest() { cuda::release_cuda_event(op_event); }
+  ~MPICUDARequest() { cuda::event_pool.release(op_event); }
   /** Event pending on completion of the operation. */
   cudaEvent_t op_event;
   /** Original stream associated with the operation. */

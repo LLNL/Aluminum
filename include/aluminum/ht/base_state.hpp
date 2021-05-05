@@ -28,7 +28,9 @@
 #pragma once
 
 #include "aluminum/progress.hpp"
-#include "aluminum/cuda.hpp"
+#include "aluminum/cuda/cuda.hpp"
+#include "aluminum/cuda/gpu_status_flag.hpp"
+#include "aluminum/cuda/gpu_wait.hpp"
 
 namespace Al {
 namespace internal {
@@ -58,11 +60,11 @@ protected:
   // These are protected to simplify child implementations.
 
   /** Event that when complete indicates communication can begin. */
-  cuda::FastEvent start_event;
+  cuda::GPUStatusFlag start_event;
   /** Whether start_event has completed. */
   bool start_done = false;
   /** Event that when complete indicates all device operations are done. */
-  cuda::FastEvent end_event;
+  cuda::GPUStatusFlag end_event;
   /** Whether the MPI operation has been started. */
   bool mpi_started = false;
   /** Whether the MPI operation has completed. */

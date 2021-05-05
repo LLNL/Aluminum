@@ -27,7 +27,9 @@
 
 #pragma once
 
-#include "aluminum/cuda.hpp"
+#include "aluminum/cuda/cuda.hpp"
+#include "aluminum/cuda/gpu_status_flag.hpp"
+#include "aluminum/cuda/gpu_wait.hpp"
 #include "aluminum/ht/communicator.hpp"
 
 namespace Al {
@@ -98,7 +100,7 @@ class SendAlState : public AlState {
   int dest;
   MPI_Comm comm;
   MPI_Request req = MPI_REQUEST_NULL;
-  cuda::FastEvent sync_event;
+  cuda::GPUStatusFlag sync_event;
   bool mem_transfer_done = false;
   bool send_started = false;
   cudaStream_t compute_stream;
@@ -168,7 +170,7 @@ class RecvAlState : public AlState {
   int src;
   MPI_Comm comm;
   MPI_Request req = MPI_REQUEST_NULL;
-  cuda::FastEvent sync_event;
+  cuda::GPUStatusFlag sync_event;
   cuda::GPUWait wait_sync;
   bool recv_done = false;
   cudaStream_t compute_stream;

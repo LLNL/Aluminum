@@ -25,35 +25,43 @@
 // permissions and limitations under the license.
 ////////////////////////////////////////////////////////////////////////////////
 
-/**
- * These are used to tune various algorithmic choices.
- * You should probably choose them based on benchmarks for your particular
- * configuration.
- */
 #pragma once
 
-/**
- * Number of concurrent operations the progress engine will perform.
- * This must be a positive number.
- */
-#define AL_PE_NUM_CONCURRENT_OPS 4
-/** Max number of streams the progress engine supports. */
-#define AL_PE_NUM_STREAMS 64
-/** Max number of pipeline stages the progress engine supports. */
-#define AL_PE_NUM_PIPELINE_STAGES 2
+#include <Al_config.hpp>
 
-/** Whether to protect memory pools with locks. */
-#define AL_LOCK_MEMPOOL 1
+#include "aluminum/cuda/cuda.hpp"
 
-/** Amount of sync object memory to preallocate in the pool. */
-#define AL_SYNC_MEM_PREALLOC 1024
+namespace Al {
+namespace internal {
+namespace cuda {
 
 /**
- * Cache line size.
+ * Have a GPU stream block until signalled.
+ * This essentially uses full/empty bit semantics to implement synchronization.
+ * The GPU will wait on a memory location until the host writes to it using the
+ * stream memory wait operation.
  *
- * On x86 this is usually 64. On POWER this is 128. On A64FX this is 256.
+ * If stream memory operations are not available, this will use a
+ * spinning wait kernel. This can cause problems. It has a tendency to
+ * lead to deadlock, especially in "debug" mode. Also, if kernel
+ * timeout is enabled, this is likely to error out.
  */
-#define AL_CACHE_LINE_SIZE 64
+class GPUWait {
+ public:
+  GPUWait();
+  ~GPUWait();
+  /** Enqueue a wait onto stream. */
+  void wait(cudaStream_t stream);
+  /** Signal the stream to continue. */
+  void signal();
+ private:
+  int32_t* wait_sync __attribute__((aligned(64)));
+  union {
+    int32_t *wait_sync_dev_ptr_no_stream_mem_ops __attribute__((aligned(64)));
+    CUdeviceptr wait_sync_dev_ptr;
+  };
+};
 
-/** Number of CUDA streams in the default stream pool. */
-#define AL_CUDA_STREAM_POOL_SIZE 5
+}  // namespace cuda
+}  // namespace internal
+}  // namespace Al

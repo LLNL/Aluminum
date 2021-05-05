@@ -37,7 +37,9 @@
 
 #include "Al.hpp"
 #include "aluminum/internal.hpp"
-#include "aluminum/cuda.hpp"
+#include "aluminum/cuda/cuda.hpp"
+#include "aluminum/cuda/events.hpp"
+#include "aluminum/cuda/streams.hpp"
 #include "aluminum/mpi_comm_and_stream_wrapper.hpp"
 
 #define AL_FORCE_CHECK_NCCL(nccl_call)                                \
@@ -151,8 +153,7 @@ struct NCCLRequest {
               cudaStream_t internal_stream_) :
     op_event(op_event_), orig_stream(orig_stream_),
     internal_stream(internal_stream_) {}
-  // Note: Not thread safe!
-  ~NCCLRequest() { cuda::release_cuda_event(op_event); }
+  ~NCCLRequest() { cuda::event_pool.release(op_event); }
   /** Event pending on completion of the operation. */
   cudaEvent_t op_event;
   /** Original stream associated with the operation. */
@@ -286,7 +287,7 @@ class NCCLBackend {
   static void NonblockingAllreduce(const T* sendbuf, T* recvbuf, size_t count,
                                    ReductionOperator op, comm_type& comm,
                                    req_type& req, allreduce_algo_type) {
-    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+    cudaStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     do_allreduce(sendbuf, recvbuf, count, op, comm, internal_stream);
     setup_completion_event(internal_stream, comm, req);
@@ -308,7 +309,7 @@ class NCCLBackend {
   template <typename T>
   static void NonblockingSend(const T* sendbuf, size_t count, int dest,
                               comm_type& comm, req_type& req) {
-    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+    cudaStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     do_send(sendbuf, count, dest, comm, internal_stream);
     setup_completion_event(internal_stream, comm, req);
@@ -322,7 +323,7 @@ class NCCLBackend {
   template <typename T>
   static void NonblockingRecv(T* recvbuf, size_t count, int src,
                               comm_type& comm, req_type& req) {
-      cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+      cudaStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
       sync_internal_stream_with_comm(internal_stream, comm);
       do_recv(recvbuf, count, src, comm, internal_stream);
       setup_completion_event(internal_stream, comm, req);
@@ -339,7 +340,7 @@ class NCCLBackend {
   static void NonblockingSendRecv(const T* sendbuf, size_t send_count, int dest,
                                   T* recvbuf, size_t recv_count, int src,
                                   comm_type& comm, req_type& req) {
-    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+    cudaStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     do_sendrecv(sendbuf, send_count, dest, recvbuf, recv_count, src,
                 comm, internal_stream);
@@ -352,7 +353,7 @@ class NCCLBackend {
 
   static void NonblockingBarrier(comm_type& comm, req_type& req,
                                  barrier_algo_type) {
-    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+    cudaStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     do_barrier(comm, internal_stream);
     setup_completion_event(internal_stream, comm, req);
@@ -367,7 +368,7 @@ class NCCLBackend {
   template <typename T>
   static void NonblockingBcast(T* buf, size_t count, int root,
                                comm_type& comm, req_type& req, bcast_algo_type) {
-    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+    cudaStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     do_broadcast(buf, count, root, comm, internal_stream);
     setup_completion_event(internal_stream, comm, req);
@@ -389,7 +390,7 @@ class NCCLBackend {
   static void NonblockingGather(const T* sendbuf, T* recvbuf, size_t count,
                                 int root, comm_type& comm, req_type& req,
                                 gather_algo_type) {
-    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+    cudaStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     do_gather(sendbuf, recvbuf, count, root, comm, internal_stream);
     setup_completion_event(internal_stream, comm, req);
@@ -424,7 +425,7 @@ class NCCLBackend {
                                  std::vector<size_t> displs,
                                  int root, comm_type& comm, req_type& req,
                                  gatherv_algo_type) {
-    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+    cudaStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     do_gatherv(sendbuf, recvbuf, counts, displs, root, comm, internal_stream);
     setup_completion_event(internal_stream, comm, req);
@@ -457,7 +458,7 @@ class NCCLBackend {
   static void NonblockingReduce(const T* sendbuf, T* recvbuf, size_t count,
                                 ReductionOperator op, int root, comm_type& comm,
                                 req_type& req, reduce_algo_type) {
-    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+    cudaStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     do_reduce(sendbuf, recvbuf, count, op, root, comm, internal_stream);
     setup_completion_event(internal_stream, comm, req);
@@ -487,7 +488,7 @@ class NCCLBackend {
   static void NonblockingAllgather(const T* sendbuf, T* recvbuf,
                                    size_t send_count, comm_type& comm,
                                    req_type& req, allgather_algo_type) {
-    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+    cudaStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     do_allgather(sendbuf, recvbuf, send_count, comm, internal_stream);
     setup_completion_event(internal_stream, comm, req);
@@ -523,7 +524,7 @@ class NCCLBackend {
                                     std::vector<size_t> displs,
                                     comm_type& comm, req_type& req,
                                     allgatherv_algo_type) {
-    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+    cudaStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     do_allgatherv(sendbuf, recvbuf, counts, displs, comm, internal_stream);
     setup_completion_event(internal_stream, comm, req);
@@ -555,7 +556,7 @@ class NCCLBackend {
   static void NonblockingAlltoall(const T* sendbuf, T* recvbuf, size_t count,
                                   comm_type& comm, req_type& req,
                                   alltoall_algo_type) {
-    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+    cudaStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     do_alltoall(sendbuf, recvbuf, count, comm, internal_stream);
     setup_completion_event(internal_stream, comm, req);
@@ -600,7 +601,7 @@ class NCCLBackend {
                                    std::vector<size_t> recv_displs,
                                    comm_type& comm, req_type& req,
                                    alltoallv_algo_type) {
-    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+    cudaStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     do_alltoallv(sendbuf, send_counts, send_displs,
                  recvbuf, recv_counts, recv_displs,
@@ -640,7 +641,7 @@ class NCCLBackend {
                                         size_t count,
                                         ReductionOperator op, comm_type& comm,
                                         req_type& req, reduce_scatter_algo_type) {
-    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+    cudaStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     do_reduce_scatter(sendbuf, recvbuf, count, op, comm, internal_stream);
     setup_completion_event(internal_stream, comm, req);
@@ -678,7 +679,7 @@ class NCCLBackend {
                                          comm_type& comm,
                                          req_type& req,
                                          reduce_scatterv_algo_type) {
-    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+    cudaStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     do_reduce_scatterv(sendbuf, recvbuf, counts, op, comm,
                        internal_stream);
@@ -712,7 +713,7 @@ class NCCLBackend {
   static void NonblockingScatter(const T* sendbuf, T* recvbuf, size_t count,
                                  int root, comm_type& comm, req_type& req,
                                  scatter_algo_type) {
-    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+    cudaStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     do_scatter(sendbuf, recvbuf, count, root, comm, internal_stream);
     setup_completion_event(internal_stream, comm, req);
@@ -750,7 +751,7 @@ class NCCLBackend {
                                   std::vector<size_t> displs,
                                   int root, comm_type& comm, req_type& req,
                                   scatterv_algo_type) {
-    cudaStream_t internal_stream = internal::cuda::get_internal_stream();
+    cudaStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     do_scatterv(sendbuf, recvbuf, counts, displs, root, comm,
                 internal_stream);
@@ -791,7 +792,7 @@ class NCCLBackend {
    */
   static void setup_completion_event(
     cudaStream_t internal_stream, comm_type& comm, req_type& req) {
-    cudaEvent_t event = internal::cuda::get_cuda_event();
+    cudaEvent_t event = internal::cuda::event_pool.get();
     AL_CHECK_CUDA(cudaEventRecord(event, internal_stream));
     req = std::make_shared<internal::nccl::NCCLRequest>(
       event, comm.get_stream(), internal_stream);

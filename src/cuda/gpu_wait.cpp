@@ -25,35 +25,52 @@
 // permissions and limitations under the license.
 ////////////////////////////////////////////////////////////////////////////////
 
-/**
- * These are used to tune various algorithmic choices.
- * You should probably choose them based on benchmarks for your particular
- * configuration.
- */
-#pragma once
+#include "Al.hpp"
+#include "aluminum/cuda/gpu_wait.hpp"
+#include "aluminum/cuda/helper_kernels.hpp"
+#include "aluminum/cuda/sync_memory.hpp"
 
-/**
- * Number of concurrent operations the progress engine will perform.
- * This must be a positive number.
- */
-#define AL_PE_NUM_CONCURRENT_OPS 4
-/** Max number of streams the progress engine supports. */
-#define AL_PE_NUM_STREAMS 64
-/** Max number of pipeline stages the progress engine supports. */
-#define AL_PE_NUM_PIPELINE_STAGES 2
+namespace Al {
+namespace internal {
+namespace cuda {
 
-/** Whether to protect memory pools with locks. */
-#define AL_LOCK_MEMPOOL 1
+GPUWait::GPUWait()
+  : wait_sync(sync_pool.get())
+{
+  // An atomic here may be overkill.
+  // Can't use std::atomic because we need the actual address.
+  __atomic_store_n(wait_sync, 0, __ATOMIC_SEQ_CST);
 
-/** Amount of sync object memory to preallocate in the pool. */
-#define AL_SYNC_MEM_PREALLOC 1024
+  if (stream_memory_operations_supported()) {
+    AL_CHECK_CUDA_DRV(
+        cuMemHostGetDevicePointer(&wait_sync_dev_ptr, wait_sync, 0));
+  } else {
+    AL_CHECK_CUDA(cudaHostGetDevicePointer(
+        reinterpret_cast<void **>(&wait_sync_dev_ptr_no_stream_mem_ops),
+        wait_sync, 0));
+  }
+}
 
-/**
- * Cache line size.
- *
- * On x86 this is usually 64. On POWER this is 128. On A64FX this is 256.
- */
-#define AL_CACHE_LINE_SIZE 64
+GPUWait::~GPUWait() {
+  sync_pool.release(wait_sync);
+}
 
-/** Number of CUDA streams in the default stream pool. */
-#define AL_CUDA_STREAM_POOL_SIZE 5
+void GPUWait::wait(cudaStream_t stream) {
+  if (stream_memory_operations_supported()) {
+#ifdef AL_HAS_ROCM
+    launch_wait_kernel(stream, 1, static_cast<int32_t *>(wait_sync_dev_ptr));
+#else
+    launch_wait_kernel(stream, 1, wait_sync_dev_ptr);
+#endif
+  } else {
+    launch_wait_kernel(stream, 1, wait_sync_dev_ptr_no_stream_mem_ops);
+  }
+}
+
+void GPUWait::signal() {
+  __atomic_store_n(wait_sync, 1, __ATOMIC_SEQ_CST);
+}
+
+}  // namespace cuda
+}  // namespace internal
+}  // namespace Al

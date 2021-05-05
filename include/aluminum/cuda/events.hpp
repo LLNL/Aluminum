@@ -27,21 +27,34 @@
 
 #pragma once
 
-#include "aluminum/base.hpp"
-#include "aluminum/cuda.hpp"
+#include "aluminum/utils/locked_resource_pool.hpp"
+#include "aluminum/cuda/cuda.hpp"
 
 namespace Al {
 namespace internal {
 namespace cuda {
 
-void launch_wait_kernel(cudaStream_t stream, int32_t wait_value,
-                        volatile int32_t* wait_mem);
+// TODO: May want to allocate larger chunks and partition.
 
-#if defined AL_HAS_CUDA && !defined AL_HAS_ROCM
-void launch_wait_kernel(cudaStream_t stream, int32_t wait_value,
-                        CUdeviceptr wait_mem);
-#endif // defined AL_HAS_CUDA && !defined AL_HAS_ROCM
+/**
+ * Allocate CUDA pinned memory such that there is one allocation per
+ * cache line.
+ */
+struct CUDAEventAllocator {
+  cudaEvent_t allocate() {
+    cudaEvent_t event;
+    AL_CHECK_CUDA(cudaEventCreateWithFlags(&event, cudaEventDisableTiming));
+    return event;
+  }
 
-} // namespace cuda
-} // namespace internal
-} // namespace Al
+  void deallocate(cudaEvent_t event) {
+    AL_CHECK_CUDA(cudaEventDestroy(event));
+  }
+};
+
+/** Resource pool for synchronization memory. */
+extern Al::internal::LockedResourcePool<cudaEvent_t, CUDAEventAllocator> event_pool;
+
+}  // namespace cuda
+}  // namespace internal
+}  // namespace Al

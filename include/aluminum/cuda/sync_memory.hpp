@@ -25,35 +25,41 @@
 // permissions and limitations under the license.
 ////////////////////////////////////////////////////////////////////////////////
 
-/**
- * These are used to tune various algorithmic choices.
- * You should probably choose them based on benchmarks for your particular
- * configuration.
- */
 #pragma once
 
-/**
- * Number of concurrent operations the progress engine will perform.
- * This must be a positive number.
- */
-#define AL_PE_NUM_CONCURRENT_OPS 4
-/** Max number of streams the progress engine supports. */
-#define AL_PE_NUM_STREAMS 64
-/** Max number of pipeline stages the progress engine supports. */
-#define AL_PE_NUM_PIPELINE_STAGES 2
+#include <cstdint>
+#include <cstdlib>
+#include "aluminum/utils/locked_resource_pool.hpp"
+#include "aluminum/cuda/cuda.hpp"
+#include "aluminum/tuning_params.hpp"
 
-/** Whether to protect memory pools with locks. */
-#define AL_LOCK_MEMPOOL 1
+namespace Al {
+namespace internal {
+namespace cuda {
 
-/** Amount of sync object memory to preallocate in the pool. */
-#define AL_SYNC_MEM_PREALLOC 1024
+// TODO: May want to allocate larger chunks and partition.
 
 /**
- * Cache line size.
- *
- * On x86 this is usually 64. On POWER this is 128. On A64FX this is 256.
+ * Allocate CUDA pinned memory such that there is one allocation per
+ * cache line.
  */
-#define AL_CACHE_LINE_SIZE 64
+struct CacheLinePinnedMemoryAllocator {
+  int32_t* allocate() {
+    int32_t* mem = (int32_t*) std::aligned_alloc(
+      AL_CACHE_LINE_SIZE, sizeof(int32_t));
+    AL_CHECK_CUDA(cudaHostRegister(mem, sizeof(int32_t), cudaHostRegisterDefault));
+    return mem;
+  }
 
-/** Number of CUDA streams in the default stream pool. */
-#define AL_CUDA_STREAM_POOL_SIZE 5
+  void deallocate(int32_t* mem) {
+    AL_CHECK_CUDA(cudaHostUnregister(mem));
+    std::free(mem);
+  }
+};
+
+/** Resource pool for synchronization memory. */
+extern Al::internal::LockedResourcePool<int32_t*, CacheLinePinnedMemoryAllocator> sync_pool;
+
+}  // namespace cuda
+}  // namespace internal
+}  // namespace Al
