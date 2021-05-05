@@ -79,24 +79,24 @@ void StreamPool::clear() {
   high_priority_idx = 0;
 }
 
-cudaStream_t StreamPool::get_stream(bool high_priority) {
-  if (high_priority) {
+cudaStream_t StreamPool::get_stream() {
 #ifdef AL_DEBUG
-    if (high_priority_streams.empty()) {
-      throw_al_exception("No high priority streams in pool");
-    }
-#endif
-    uint32_t idx = (high_priority_idx++) % high_priority_streams.size();
-    return high_priority_streams[idx];
-  } else {
-#ifdef AL_DEBUG
-    if (default_streams.empty()) {
-      throw_al_exception("No default priority streams in pool");
-    }
-#endif
-    uint32_t idx = (default_idx++) % default_streams.size();
-    return default_streams[idx];
+  if (default_streams.empty()) {
+    throw_al_exception("No default priority streams in pool");
   }
+#endif
+  uint32_t idx = (default_idx++) % default_streams.size();
+  return default_streams[idx];
+}
+
+cudaStream_t StreamPool::get_high_priority_stream() {
+#ifdef AL_DEBUG
+  if (high_priority_streams.empty()) {
+    throw_al_exception("No high priority streams in pool");
+  }
+#endif
+  uint32_t idx = (high_priority_idx++) % high_priority_streams.size();
+  return high_priority_streams[idx];
 }
 
 void StreamPool::replace_streams(std::function<cudaStream_t(bool)> stream_getter) {

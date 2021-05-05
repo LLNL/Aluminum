@@ -55,8 +55,16 @@ public:
   /** Delete all streams in the pool. */
   void clear();
 
-  /** Return a CUDA stream. */
-  cudaStream_t get_stream(bool high_priority = false);
+  /** Return a default-priority CUDA stream. */
+  cudaStream_t get_stream();
+
+  /**
+   * Return a high-priority CUDA stream.
+   *
+   * If high-priority streams are not supported, returns a default-priority
+   * stream.
+   */
+  cudaStream_t get_high_priority_stream();
 
   /**
    * Replace all streams in the pool with streams from an external source.
