@@ -45,6 +45,7 @@ public:
 
     // Have the device wait on the host.
     gpu_wait.wait(stream_);
+    end_event.record(stream_);
   }
 
   std::string get_name() const override { return "HTBarrier"; }
