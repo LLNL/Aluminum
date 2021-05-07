@@ -1,4 +1,4 @@
-set_source_path(THIS_DIR_CUDA_HEADERS
+set_source_path(THIS_DIR_HEADERS
   cuda.hpp
   cuda_mempool.hpp
   events.hpp
@@ -9,8 +9,4 @@ set_source_path(THIS_DIR_CUDA_HEADERS
   sync_memory.hpp
   )
 
-if (AL_HAS_CUDA)
-  list(APPEND THIS_DIR_HEADERS "${THIS_DIR_CUDA_HEADERS}")
-endif ()
-
-set(ALUMINUM_HEADERS "${HEADERS}" "${THIS_DIR_HEADERS}" PARENT_SCOPE)
+set(HEADERS "${HEADERS}" "${THIS_DIR_HEADERS}" PARENT_SCOPE)
