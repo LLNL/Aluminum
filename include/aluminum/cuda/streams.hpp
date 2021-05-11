@@ -79,9 +79,9 @@ public:
 
 private:
   std::vector<cudaStream_t> default_streams;
-  std::atomic<uint32_t> default_idx = 0;
+  std::atomic<uint32_t> default_idx{0};
   std::vector<cudaStream_t> high_priority_streams;
-  std::atomic<uint32_t> high_priority_idx = 0;
+  std::atomic<uint32_t> high_priority_idx{0};
   /** Whether streams were replaced; we do not free these streams. */
   bool external_streams = false;
 };
