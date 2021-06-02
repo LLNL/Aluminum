@@ -67,6 +67,7 @@ class CUDAVector {
     using std::swap;
     swap(x.m_count, y.m_count);
     swap(x.m_ptr, y.m_ptr);
+    swap(x.m_stream, y.m_stream);
   }
 
   size_t size() const {
@@ -140,6 +141,9 @@ class CUDAVector {
 
   void sync_memcpy(void* dst, const void* src, size_t count,
                    cudaMemcpyKind kind) const {
+    if (count == 0) {
+      return;
+    }
     AL_FORCE_CHECK_CUDA_NOSYNC(
       cudaMemcpyAsync(dst, src, count, kind, m_stream));
     AL_FORCE_CHECK_CUDA_NOSYNC(cudaStreamSynchronize(m_stream));
