@@ -144,7 +144,7 @@ struct TestData {
   {}
 
   void check(size_t size, bool inplace, bool dump_on_error,
-             CommWrapper<Backend>& comm_wrapper) {
+             size_t max_dump_size, CommWrapper<Backend>& comm_wrapper) {
     bool err = false;
     if (!inplace && !check_vector(mpi_input, input)) {
       std::cerr << comm_wrapper.rank() << ": input does not match for size "
@@ -160,7 +160,7 @@ struct TestData {
     MPI_Allreduce(MPI_IN_PLACE, &err, 1, MPI_BYTE, MPI_LOR,
                   comm_wrapper.comm().get_comm());
     if (err) {
-      if (dump_on_error) {
+      if (dump_on_error && (max_dump_size == 0 || size <= max_dump_size)) {
         if (inplace) {
           dump_data<Backend>(orig_input, output, orig_mpi_input, mpi_output,
                              comm_wrapper.comm());
@@ -359,7 +359,9 @@ void run_test(cxxopts::ParseResult& parsed_opts) {
           watchdog.finish();
         }
         data[i].check(size, op_options.inplace,
-                      parsed_opts.count("dump-on-error"), comm_wrappers[i]);
+                      parsed_opts.count("dump-on-error"),
+                      parsed_opts["max-dump-size"].as<size_t>(),
+                      comm_wrappers[i]);
       }
       MPI_Barrier(MPI_COMM_WORLD);
     }
@@ -401,6 +403,7 @@ int main(int argc, char** argv) {
     ("datatype", "Message datatype", cxxopts::value<std::string>()->default_value("float"))
     ("threads", "Number of threads", cxxopts::value<int>()->default_value("-1"))
     ("dump-on-error", "Dump vectors on error")
+    ("max-dump-size", "Max size of a vector to dump", cxxopts::value<size_t>()->default_value("0"))
     ("hang-rank", "Hang a specific or all ranks at startup", cxxopts::value<int>()->default_value("-1"))
     ("hang-timeout", "How long to wait for an operation to complete", cxxopts::value<size_t>()->default_value("60"))
     ("no-abort-on-hang", "Do not abort if a hang is detected")
