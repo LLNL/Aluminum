@@ -209,8 +209,6 @@ void run_test_instance(AlOperation op, OpOptions<Backend> op_options,
       Al::Wait<Backend>(op_options.req);
     }
   }
-
-  MPI_Barrier(comm_wrapper.comm().get_comm());
 }
 
 template <typename Backend, typename T,
@@ -349,6 +347,7 @@ void run_test(cxxopts::ParseResult& parsed_opts) {
       }
       for (int i = 0; i < num; ++i) {
         complete_operations<Backend>(comm_wrappers[i].comm());
+        MPI_Barrier(comm_wrapper.comm().get_comm());
       }
       watchdog.finish();
       // Run MPI baseline and check.
