@@ -32,6 +32,7 @@
 #include <array>
 #include <vector>
 #include <mutex>
+#include <unordered_map>
 #include "aluminum/base.hpp"
 #include "aluminum/utils/meta.hpp"
 
