@@ -43,12 +43,16 @@ namespace internal {
 template <typename T>
 class MPSCQueue {
 public:
-  /** Initialize queue with fixed size (must be a power of 2). */
+  /**
+   * Initialize queue with fixed size (must be a power of 2).
+   *
+   * The queue will hold at most size - 1 elements.
+   */
   explicit MPSCQueue(size_t size_) : size(size_), index(1) {
     static_assert(std::is_pointer<T>::value, "T must be a pointer type");
 #ifdef AL_DEBUG
     if (!is_pow2(size)) {
-      throw_al_exception("SPSCQueue size must be a power of 2");
+      throw_al_exception("MPSCQueue size must be a power of 2");
     }
 #endif
     data = new queue_entry[size + 1];
