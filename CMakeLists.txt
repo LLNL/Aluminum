@@ -96,6 +96,9 @@ option(ALUMINUM_ENABLE_NVPROF
 option(ALUMINUM_ENABLE_STREAM_MEM_OPS
   "Enable stream memory operations."
   OFF)
+option(ALUMINUM_ENABLE_THREAD_MULTIPLE
+  "Allow multiple threads to call Aluminum concurrently."
+  OFF)
 option(ALUMINUM_ENABLE_TRACE
   "Enable runtime tracing."
   OFF)
@@ -133,6 +136,9 @@ if (ALUMINUM_DEBUG_HANG_CHECK)
 endif ()
 if (ALUMINUM_ENABLE_STREAM_MEM_OPS)
   set(AL_USE_STREAM_MEM_OPS ON)
+endif ()
+if (ALUMINUM_ENABLE_THREAD_MULTIPLE)
+  set(AL_THREAD_MULTIPLE ON)
 endif ()
 if (ALUMINUM_ENABLE_TRACE)
   set(AL_TRACE ON)

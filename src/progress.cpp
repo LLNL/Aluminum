@@ -168,26 +168,22 @@ int get_hwloc_offset(
 
 }  // anonymous namespace
 
-
-AlState::~AlState() {
-  profiling::prof_end(prof_range);
-}
-
-void AlState::start() {
-  prof_range = profiling::prof_start(get_name());
-}
-
-AlRequest get_free_request() {
-  return std::make_shared<std::atomic<bool>>(false);
-}
+#ifdef AL_PE_STREAM_QUEUE_CACHE
+#ifdef AL_THREAD_MULTIPLE
+thread_local std::unordered_map<void*, ProgressEngine::InputQueue*> ProgressEngine::stream_to_queue;
+#else
+std::unordered_map<void*, ProgressEngine::InputQueue*> ProgressEngine::stream_to_queue;
+#endif
+#endif
 
 ProgressEngine::ProgressEngine() {
   stop_flag = false;
   started_flag = false;
   world_comm = new mpi::MPICommunicator(MPI_COMM_WORLD);
+#ifdef AL_PE_ADD_DEFAULT_STREAM
   // Initialze with the default stream.
   num_input_streams = 1;
-  stream_to_queue[DEFAULT_STREAM] = &request_queues[0];
+#endif
 }
 
 ProgressEngine::~ProgressEngine() {
@@ -217,20 +213,59 @@ void ProgressEngine::stop() {
 }
 
 void ProgressEngine::enqueue(AlState* state) {
-  // Find the correct input queue for the stream, creating it if needed.
-  auto iter = stream_to_queue.find(state->get_compute_stream());
-  if (iter != stream_to_queue.end()) {
+#ifdef AL_PE_STREAM_QUEUE_CACHE
+  // Check the thread-local queue cache.
+  auto iter = ProgressEngine::stream_to_queue.find(state->get_compute_stream());
+  if (iter != ProgressEngine::stream_to_queue.end()) {
     iter->second->q.push(state);
-  } else {
-    size_t cur_stream = num_input_streams.load();
-    if (cur_stream == AL_PE_NUM_STREAMS) {
-      throw_al_exception("Using more streams than supported!");
-    }
-    request_queues[cur_stream].compute_stream = state->get_compute_stream();
-    stream_to_queue[state->get_compute_stream()] = &request_queues[cur_stream];
-    request_queues[cur_stream].q.push(state);
-    ++num_input_streams;
+    return;
   }
+  const size_t local_num_input_streams = num_input_streams.load();
+#else
+  // Linear search to find the queue.
+  const size_t local_num_input_streams = num_input_streams.load();
+  for (size_t i = 0; i < local_num_input_streams; ++i) {
+    if (request_queues[i].compute_stream == state->get_compute_stream()) {
+      // Appropriate queue found, we can just enqueue.
+      request_queues[i].q.push(state);
+      return;
+    }
+  }
+#endif
+  // Queue was not found, so we need to create it.
+#ifdef AL_THREAD_MULTIPLE
+  add_queue_mutex.lock();
+  // Check if some other thread added the queue.
+  const size_t locked_local_num_input_streams = num_input_streams.load();
+  for (size_t i = local_num_input_streams;
+       i < locked_local_num_input_streams;
+       ++i) {
+    if (request_queues[i].compute_stream == state->get_compute_stream()) {
+      // Queue was added.
+      add_queue_mutex.unlock();
+      request_queues[i].q.push(state);
+#ifdef AL_PE_STREAM_QUEUE_CACHE
+      // Update cache.
+      ProgressEngine::stream_to_queue[state->get_compute_stream()] = &request_queues[i];
+#endif
+      return;
+    }
+  }
+#else
+  // When there is only one thread, if the queue was not found earlier,
+  // we always have to create it.
+  const size_t locked_local_num_input_streams = local_num_input_streams;
+#endif
+  // Add the new queue.
+  request_queues[locked_local_num_input_streams].compute_stream = state->get_compute_stream();
+  ++num_input_streams;  // Make new queue visible.
+#ifdef AL_THREAD_MULTIPLE
+  add_queue_mutex.unlock();
+#endif
+  request_queues[locked_local_num_input_streams].q.push(state);
+#ifdef AL_PE_STREAM_QUEUE_CACHE
+  ProgressEngine::stream_to_queue[state->get_compute_stream()] = &request_queues[locked_local_num_input_streams];
+#endif
 }
 
 bool ProgressEngine::is_complete(AlRequest& req) {
@@ -274,7 +309,7 @@ std::ostream& ProgressEngine::dump_state(std::ostream& ss) {
       }
     }
   }
-  const size_t req_queue_size = num_input_streams.load();
+  /*const size_t req_queue_size = num_input_streams.load();
   ss << "Request queues (" << req_queue_size << "):\n";
   for (size_t i = 0; i < req_queue_size; ++i) {
     ss << i << ": blocked=" << request_queues[i].blocked;
@@ -285,7 +320,7 @@ std::ostream& ProgressEngine::dump_state(std::ostream& ss) {
       ss << "\t" << j << ": " << request_queues[i].q.data[j]->get_name()
          << " " << request_queues[i].q.data[j]->get_desc() << "\n";
     }
-  }
+    }*/
   return ss;
 }
 

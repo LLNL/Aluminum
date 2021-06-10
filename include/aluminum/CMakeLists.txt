@@ -6,6 +6,7 @@ set_source_path(THIS_DIR_HEADERS
   mpi_comm_and_stream_wrapper.hpp
   mpi_impl.hpp
   profiling.hpp
+  state.hpp
   trace.hpp
   tuning_params.hpp
   )
