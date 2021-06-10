@@ -44,6 +44,12 @@ NCCLCommunicator::NCCLCommunicator(MPI_Comm comm_, cudaStream_t stream_) :
   AL_CHECK_NCCL(ncclCommInitRank(&m_nccl_comm, size(), nccl_id, rank()));
 }
 
+NCCLCommunicator::NCCLCommunicator(int rank_, int size_, ncclUniqueId nccl_id_, cudaStream_t stream_) :
+  MPICommAndStreamWrapper(rank_, size_, stream_) {
+  // This uses the current CUDA device.
+  AL_CHECK_NCCL(ncclCommInitRank(&m_nccl_comm, size_, nccl_id_, rank_));
+}
+
 NCCLCommunicator::~NCCLCommunicator() {
   int d;
   // Only destroy resources if the driver is still loaded.

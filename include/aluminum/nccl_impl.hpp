@@ -93,6 +93,8 @@ class NCCLCommunicator : public internal::MPICommAndStreamWrapper<cudaStream_t> 
    NCCLCommunicator() : NCCLCommunicator(MPI_COMM_WORLD, 0) {}
   /** Use a particular MPI communicator and stream. */
   NCCLCommunicator(MPI_Comm comm_, cudaStream_t stream_ = 0);
+  /** disable mpi. */
+  NCCLCommunicator(int rank_, int size_, ncclUniqueId nccl_id_, cudaStream_t stream_ = 0);
   /** Cannot copy this. */
   NCCLCommunicator(const NCCLCommunicator& other) = delete;
   /** Default move constructor. */

@@ -56,6 +56,10 @@ public:
     MPI_Comm_rank(local_comm, &rank_in_local_comm);
     MPI_Comm_size(local_comm, &size_of_local_comm);
   }
+  /** disable mpi */
+  MPICommAndStreamWrapper(int rank_, int size_, Stream stream_) :
+      stream(stream_), rank_in_comm(rank_), size_of_comm(size_), mpi_disabled(true) {
+  }
   /** Cannot copy this. */
   MPICommAndStreamWrapper(const MPICommAndStreamWrapper& other) = delete;
   /** Default move constructor. */
@@ -67,11 +71,13 @@ public:
 
   /** Destroy the underlying MPI_Comm. */
   ~MPICommAndStreamWrapper() {
-    int finalized;
-    MPI_Finalized(&finalized);
-    if (!finalized) {
-      MPI_Comm_free(&comm);
-      MPI_Comm_free(&local_comm);
+    if (!mpi_disabled) {
+      int finalized;
+      MPI_Finalized(&finalized);
+      if (!finalized) {
+        MPI_Comm_free(&comm);
+        MPI_Comm_free(&local_comm);
+      }
     }
   }
 
@@ -113,6 +119,8 @@ private:
   int rank_in_local_comm;
   /** Size of the local communicator. */
   int size_of_local_comm;
+  /** disable mpi. */
+  bool mpi_disabled = false;
 };
 
 } // namespace internal
