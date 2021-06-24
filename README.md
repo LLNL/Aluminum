@@ -50,7 +50,7 @@ For all builds:
 * A compiler with at least C++14 support
 * MPI (at least MPI 3.0)
 * HWLOC (any recent version should work)
-* CMake 3.14 or later
+* CMake 3.17 or later
 
 For GPU backends (`NCCL` and `HostTransfer`):
 * CUDA (at least 9.0, for Nvidia GPUs) or HIP/ROCm (at least 3.6, for AMD GPUs)
