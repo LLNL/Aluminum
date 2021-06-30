@@ -38,9 +38,9 @@ template <typename T>
 struct VectorType<T, Al::MPICUDABackend> {
   using type = CUDAVector<T>;
 
-  static type gen_data(size_t count) {
+  static type gen_data(size_t count, cudaStream_t stream = 0) {
     auto&& host_data = VectorType<T, Al::MPIBackend>::gen_data(count);
-    CUDAVector<T> data(host_data);
+    CUDAVector<T> data(host_data, stream);
     return data;
   }
 
@@ -58,8 +58,17 @@ CommWrapper<Al::MPICUDABackend>::CommWrapper(MPI_Comm mpi_comm) {
     mpi_comm, stream);
 }
 template <>
-CommWrapper<Al::MPICUDABackend>::~CommWrapper() noexcept(false) {
-  AL_FORCE_CHECK_CUDA_NOSYNC(cudaStreamDestroy(comm_->get_stream()));
+CommWrapper<Al::MPICUDABackend>::~CommWrapper() {
+  if (comm_) {
+    try {
+      AL_FORCE_CHECK_CUDA_NOSYNC(cudaStreamDestroy(comm_->get_stream()));
+    } catch (const Al::al_exception &e) {
+      std::cerr
+          << "Caught exception in CommWrapper<MPICUDABackend> destructor: "
+          << e.what() << std::endl;
+      std::terminate();
+    }
+  }
 }
 
 template <>

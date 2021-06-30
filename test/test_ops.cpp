@@ -28,6 +28,7 @@
 #include "Al.hpp"
 #include <iostream>
 #include <sstream>
+#include <thread>
 #include <cxxopts.hpp>
 #include "test_utils.hpp"
 #include "hang_watchdog.hpp"
@@ -130,6 +131,86 @@ void dump_data(typename VectorType<T, Backend>::type& input,
   print_vectors_from_root<Backend>(mpi_output, comm, "MPI output:\n");
 }
 
+template <typename Backend, typename T>
+struct TestData {
+  TestData(size_t in_size, size_t out_size,
+           CommWrapper<Backend>& comm_wrapper) :
+    input(VectorType<T, Backend>::gen_data(in_size, comm_wrapper.comm().get_stream())),
+    output(VectorType<T, Backend>::gen_data(out_size, comm_wrapper.comm().get_stream())),
+    orig_input(input),
+    mpi_input(VectorType<T, Backend>::copy_to_host(input)),
+    mpi_output(VectorType<T, Backend>::copy_to_host(output)),
+    orig_mpi_input(mpi_output)
+  {}
+
+  void check(size_t size, bool inplace, bool dump_on_error,
+             size_t max_dump_size, CommWrapper<Backend>& comm_wrapper) {
+    bool err = false;
+    if (!inplace && !check_vector(mpi_input, input)) {
+      std::cerr << comm_wrapper.rank() << ": input does not match for size "
+                << size << std::endl;
+      err = true;
+    }
+    if (!check_vector(mpi_output, output)) {
+      std::cerr << comm_wrapper.rank() << ": output does not match for size "
+                << size << std::endl;
+      err = true;
+    }
+    // Check if any process reported an error.
+    MPI_Allreduce(MPI_IN_PLACE, &err, 1, MPI_BYTE, MPI_LOR,
+                  comm_wrapper.comm().get_comm());
+    if (err) {
+      if (dump_on_error && (max_dump_size == 0 || size <= max_dump_size)) {
+        if (inplace) {
+          dump_data<Backend>(orig_input, output, orig_mpi_input, mpi_output,
+                             comm_wrapper.comm());
+        } else {
+          dump_data<Backend>(input, output, mpi_input, mpi_output,
+                             comm_wrapper.comm());
+        }
+      }
+      std::abort();
+    }
+  }
+
+  typename VectorType<T, Backend>::type input;
+  typename VectorType<T, Backend>::type output;
+  // For errors when in-place.
+  typename VectorType<T, Backend>::type orig_input;
+  std::vector<T> mpi_input;
+  std::vector<T> mpi_output;
+  std::vector<T> orig_mpi_input;
+};
+
+template <typename Backend, typename T,
+          std::enable_if_t<IsTypeSupported<Backend, T>::value, bool> = true>
+void run_test_instance(AlOperation op, OpOptions<Backend> op_options,
+                       CommWrapper<Backend>& comm_wrapper,
+                       bool participates_in_pt2pt,
+                       int thread_id,
+                       int device_id,
+                       TestData<Backend, T>& data) {
+  // Set CUDA device if needed.
+#ifdef AL_HAS_CUDA
+  if (thread_id >= 0) {
+    AL_CHECK_CUDA(cudaSetDevice(device_id));
+  }
+#else
+  (void) thread_id;
+  (void) device_id;
+#endif
+  OpDispatcher<Backend, T> op_runner(op, op_options);
+
+  MPI_Barrier(comm_wrapper.comm().get_comm());
+
+  if (!is_pt2pt_op(op) || participates_in_pt2pt) {
+    op_runner.run(data.input, data.output, comm_wrapper.comm());
+    if (op_options.nonblocking) {
+      Al::Wait<Backend>(op_options.req);
+    }
+  }
+}
+
 template <typename Backend, typename T,
           std::enable_if_t<IsTypeSupported<Backend, T>::value, bool> = true>
 void run_test(cxxopts::ParseResult& parsed_opts) {
@@ -167,9 +248,21 @@ void run_test(cxxopts::ParseResult& parsed_opts) {
 
   auto sizes = get_sizes_from_opts(parsed_opts);
 
-  CommWrapper<Backend> comm_wrapper(MPI_COMM_WORLD);
-  HangWatchdog watchdog(parsed_opts["hang-timeout"].as<size_t>(),
-                        parsed_opts.count("no-abort-on-hang") ? false : true);
+  // One communicator per thread, ensuring we always have one.
+  int num_threads = parsed_opts["threads"].as<int>();
+  std::vector<CommWrapper<Backend>> comm_wrappers;
+  for (int i = 0; i < std::max(num_threads, 1); ++i) {
+    comm_wrappers.emplace_back(MPI_COMM_WORLD);
+  }
+  CommWrapper<Backend>& comm_wrapper = comm_wrappers[0];
+
+  // Save the device ID for threads.
+#ifdef AL_HAS_CUDA
+  int device_id;
+  AL_CHECK_CUDA(cudaGetDevice(&device_id));
+#else
+  int device_id = -1;
+#endif
 
   bool participates_in_pt2pt = true;
   if (is_pt2pt_op(op)) {
@@ -178,19 +271,19 @@ void run_test(cxxopts::ParseResult& parsed_opts) {
       std::abort();
     }
     // If there is an odd number of ranks, the last one sits out.
-    if (!((comm_wrapper.comm().size() % 2 != 0) &&
-          (comm_wrapper.comm().rank() == comm_wrapper.comm().size() - 1))) {
+    if (!((comm_wrapper.size() % 2 != 0) &&
+          (comm_wrapper.rank() == comm_wrapper.size() - 1))) {
       // Even ranks send to rank + 1, odd ranks receive from rank - 1.
       // If this is not sendrecv, we need to adjust the op.
-      if (comm_wrapper.comm().rank() % 2 == 0) {
-        op_options.src = comm_wrapper.comm().rank() + 1;
-        op_options.dst = comm_wrapper.comm().rank() + 1;
+      if (comm_wrapper.rank() % 2 == 0) {
+        op_options.src = comm_wrapper.rank() + 1;
+        op_options.dst = comm_wrapper.rank() + 1;
         if (op != AlOperation::sendrecv) {
           op = AlOperation::send;
         }
       } else {
-        op_options.src = comm_wrapper.comm().rank() - 1;
-        op_options.dst = comm_wrapper.comm().rank() - 1;
+        op_options.src = comm_wrapper.rank() - 1;
+        op_options.dst = comm_wrapper.rank() - 1;
         if (op != AlOperation::sendrecv) {
           op = AlOperation::recv;
         }
@@ -199,6 +292,10 @@ void run_test(cxxopts::ParseResult& parsed_opts) {
       participates_in_pt2pt = false;
     }
   }
+  // One hang watchdog for all threads.
+  HangWatchdog watchdog(parsed_opts["hang-timeout"].as<size_t>(),
+                        parsed_opts.count("no-abort-on-hang") ? false : true);
+  const int num = std::max(1, num_threads);
   for (const auto &size : sizes) {
     // Set up counts and displacements for vector operations.
     // TODO: Generalize to support more complex counts/displacements.
@@ -213,6 +310,7 @@ void run_test(cxxopts::ParseResult& parsed_opts) {
       if (op_supports_algos(op)) {
         op_options.algos = algo_opt;
       }
+      std::vector<TestData<Backend, T>> data;
       OpDispatcher<Backend, T> op_runner(op, op_options);
       // The size is the amount each processor sends to another processor.
       // (Roughly equivalent to the sendcount parameter in MPI.)
@@ -220,76 +318,52 @@ void run_test(cxxopts::ParseResult& parsed_opts) {
       // Get output buffer size.
       size_t out_size = op_runner.get_output_size(size, comm_wrapper.comm());
       // Ensure sizes are reasonable for MPI.
-      if (!Al::internal::mpi::check_count_fits_mpi(size)
+      if (!Al::internal::mpi::check_count_fits_mpi(in_size)
           || !Al::internal::mpi::check_count_fits_mpi(out_size)) {
-        std::cout << "Input size " << size << " or output size " << out_size
-                  << " too large for MPI, skipping this and future sizes"
-                  << std::endl;
-        break;
+        std::cout << "Input size " << in_size << " or output size " << out_size
+                  << " too large for MPI, skipping." << std::endl;
+        continue;
       }
-
-      typename VectorType<T, Backend>::type input =
-        VectorType<T, Backend>::gen_data(in_size);
-      typename VectorType<T, Backend>::type output =
-        VectorType<T, Backend>::gen_data(out_size);
-      std::vector<T> mpi_input = VectorType<T, Backend>::copy_to_host(input);
-      std::vector<T> mpi_output = VectorType<T, Backend>::copy_to_host(output);
-      // Save originals when in-place if we might print an error.
-      typename VectorType<T, Backend>::type orig_input;
-      std::vector<T> orig_mpi_input;
-      if (op_options.inplace && parsed_opts.count("dump-on-error")) {
-        orig_input = output;
-        orig_mpi_input = mpi_output;
+      for (int i = 0; i < num; ++i) {
+        data.emplace_back(in_size, out_size, comm_wrappers[i]);
       }
-
-      MPI_Barrier(MPI_COMM_WORLD);
-
-      if (!is_pt2pt_op(op) || participates_in_pt2pt) {
-        watchdog.start(std::string("Al size=") + std::to_string(size));
-        op_runner.run(input, output, comm_wrapper.comm());
-        if (op_options.nonblocking) {
-          Al::Wait<Backend>(op_options.req);
+      watchdog.start(std::string("Al size=") + std::to_string(size));
+      if (num_threads > 0) {
+        std::vector<std::thread> threads;
+        for (int i = 0; i < num_threads; ++i) {
+          threads.emplace_back(
+              std::thread(&run_test_instance<Backend, T>,
+                          op, op_options, std::ref(comm_wrappers[i]),
+                          participates_in_pt2pt, i, device_id,
+                          std::ref(data[i])));
         }
-        complete_operations<Backend>(comm_wrapper.comm());
-        watchdog.finish();
-      }
-
-      MPI_Barrier(MPI_COMM_WORLD);
-
-      if (!is_pt2pt_op(op) || participates_in_pt2pt) {
-        watchdog.start(std::string("MPI size=") + std::to_string(size));
-        op_runner.run_mpi(mpi_input, mpi_output, comm_wrapper.comm());
-        watchdog.finish();
-      }
-
-      MPI_Barrier(MPI_COMM_WORLD);
-
-      bool err = false;
-      if (!op_options.inplace && !check_vector(mpi_input, input)) {
-        std::cerr << comm_wrapper.comm().rank() << ": input does not match for size "
-                  << size << std::endl;
-        err = true;
-      }
-      if (!check_vector(mpi_output, output)) {
-        std::cerr << comm_wrapper.comm().rank() << ": output does not match for size "
-                  << size << std::endl;
-        err = true;
-      }
-      // Check if any process reported an error.
-      MPI_Allreduce(MPI_IN_PLACE, &err, 1, MPI_BYTE, MPI_LOR,
-                    comm_wrapper.comm().get_comm());
-      if (err) {
-        if (parsed_opts.count("dump-on-error")) {
-          if (op_options.inplace) {
-            dump_data<Backend>(orig_input, output, orig_mpi_input, mpi_output,
-                               comm_wrapper.comm());
-          } else {
-            dump_data<Backend>(input, output, mpi_input, mpi_output,
-                               comm_wrapper.comm());
-          }
+        for (int i = 0; i < num_threads; ++i) {
+          threads[i].join();
         }
-        std::abort();
+      } else {
+        run_test_instance<Backend, T>(op, op_options,
+                                      comm_wrapper, participates_in_pt2pt, -1,
+                                      device_id, data[0]);
       }
+      for (int i = 0; i < num; ++i) {
+        complete_operations<Backend>(comm_wrappers[i].comm());
+        MPI_Barrier(comm_wrapper.comm().get_comm());
+      }
+      watchdog.finish();
+      // Run MPI baseline and check.
+      for (int i = 0; i < num; ++i) {
+        if (!is_pt2pt_op(op) || participates_in_pt2pt) {
+          watchdog.start(std::string("MPI size=") + std::to_string(size));
+          op_runner.run_mpi(data[i].mpi_input, data[i].mpi_output,
+                            comm_wrappers[i].comm());
+          watchdog.finish();
+        }
+        data[i].check(size, op_options.inplace,
+                      parsed_opts.count("dump-on-error"),
+                      parsed_opts["max-dump-size"].as<size_t>(),
+                      comm_wrappers[i]);
+      }
+      MPI_Barrier(MPI_COMM_WORLD);
     }
   }
 }
@@ -327,7 +401,9 @@ int main(int argc, char** argv) {
     ("min-size", "Minimum size of message to test", cxxopts::value<size_t>()->default_value("1"))
     ("max-size", "Maximum size of message to test", cxxopts::value<size_t>()->default_value("4194304"))
     ("datatype", "Message datatype", cxxopts::value<std::string>()->default_value("float"))
+    ("threads", "Number of threads", cxxopts::value<int>()->default_value("-1"))
     ("dump-on-error", "Dump vectors on error")
+    ("max-dump-size", "Max size of a vector to dump", cxxopts::value<size_t>()->default_value("0"))
     ("hang-rank", "Hang a specific or all ranks at startup", cxxopts::value<int>()->default_value("-1"))
     ("hang-timeout", "How long to wait for an operation to complete", cxxopts::value<size_t>()->default_value("60"))
     ("no-abort-on-hang", "Do not abort if a hang is detected")
@@ -359,6 +435,14 @@ int main(int argc, char** argv) {
     test_fini_aluminum();
     return EXIT_FAILURE;
   }
+
+  // Warn about this.
+#ifndef AL_THREAD_MULTIPLE
+  if (parsed_opts["threads"].as<int>() > 0) {
+    std::cerr << "Warning: Using multiple threads without AL_THREAD_MULTIPLE"
+              << std::endl;
+  }
+#endif
 
   dispatch_to_backend(parsed_opts, test_dispatcher());
 

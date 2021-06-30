@@ -38,21 +38,21 @@ class CUDAVector {
  public:
   CUDAVector() : m_count(0), m_ptr(nullptr) {}
 
-  CUDAVector(size_t count) : m_count(count), m_ptr(nullptr) {
+  CUDAVector(size_t count, cudaStream_t stream = 0) : m_count(count), m_ptr(nullptr),
+                                                      m_stream(stream) {
     allocate();
   }
 
-  CUDAVector(const std::vector<T> &host_vector) :
-      m_count(host_vector.size()), m_ptr(nullptr) {
+  CUDAVector(const std::vector<T> &host_vector, cudaStream_t stream = 0) :
+    m_count(host_vector.size()), m_ptr(nullptr), m_stream(stream) {
     allocate();
-    AL_FORCE_CHECK_CUDA(
-      cudaMemcpy(m_ptr, host_vector.data(), get_bytes(), cudaMemcpyDefault));
+    sync_memcpy(m_ptr, host_vector.data(), get_bytes(), cudaMemcpyDefault);
   }
 
-  CUDAVector(const CUDAVector &v) : m_count(v.m_count), m_ptr(nullptr) {
+  CUDAVector(const CUDAVector &v) : m_count(v.m_count), m_ptr(nullptr),
+                                    m_stream(v.m_stream) {
     allocate();
-    AL_FORCE_CHECK_CUDA(
-      cudaMemcpy(m_ptr, v.data(), get_bytes(), cudaMemcpyDefault));
+    sync_memcpy(m_ptr, v.data(), get_bytes(), cudaMemcpyDefault);
   }
 
   CUDAVector(CUDAVector &&v) : CUDAVector() {
@@ -67,6 +67,7 @@ class CUDAVector {
     using std::swap;
     swap(x.m_count, y.m_count);
     swap(x.m_ptr, y.m_ptr);
+    swap(x.m_stream, y.m_stream);
   }
 
   size_t size() const {
@@ -75,7 +76,7 @@ class CUDAVector {
 
   void clear() {
     if (m_count > 0) {
-      AL_FORCE_CHECK_CUDA(cudaFree(m_ptr));
+      Al::internal::mempool.release<Al::internal::MemoryType::CUDA>(m_ptr);
       m_ptr = nullptr;
       m_count = 0;
     }
@@ -84,17 +85,8 @@ class CUDAVector {
   void allocate() {
     assert(m_ptr == nullptr);
     if (m_count > 0) {
-      cudaError_t e = cudaMalloc(&m_ptr, get_bytes());
-      if (e != cudaSuccess) {
-        size_t free_mem, total_mem;
-        cudaMemGetInfo(&free_mem, &total_mem);
-        std::cerr << "Error allocating "
-                  << get_bytes() << " bytes of memory: "
-                  << cudaGetErrorString(e)
-                  << ", free: " << free_mem << "\n";
-        cudaDeviceReset();
-        std::abort();
-      }
+      m_ptr = Al::internal::mempool.allocate<Al::internal::MemoryType::CUDA, T>(
+        m_count, m_stream);
     }
   }
 
@@ -104,14 +96,12 @@ class CUDAVector {
       m_count = v.m_count;
       allocate();
     }
-    AL_FORCE_CHECK_CUDA(
-      cudaMemcpy(m_ptr, v.m_ptr, get_bytes(), cudaMemcpyDefault));
+    sync_memcpy(m_ptr, v.m_ptr, get_bytes(), cudaMemcpyDefault);
     return *this;
   }
 
   CUDAVector& move(const CUDAVector<T> &v) {
-    AL_FORCE_CHECK_CUDA(
-      cudaMemcpy(m_ptr, v.m_ptr, v.get_bytes(), cudaMemcpyDefault));
+    sync_memcpy(m_ptr, v.m_ptr, v.get_bytes(), cudaMemcpyDefault);
     return *this;
   }
 
@@ -125,19 +115,16 @@ class CUDAVector {
 
   std::vector<T> copyout() const {
     std::vector<T> hv(size());
-    AL_FORCE_CHECK_CUDA(
-      cudaMemcpy(hv.data(), m_ptr, get_bytes(), cudaMemcpyDeviceToHost));
+    sync_memcpy(hv.data(), m_ptr, get_bytes(), cudaMemcpyDeviceToHost);
     return hv;
   }
 
   void copyout(std::vector<T>& hv) const {
-    AL_FORCE_CHECK_CUDA(
-      cudaMemcpy(hv.data(), m_ptr, get_bytes(), cudaMemcpyDeviceToHost));
+    sync_memcpy(hv.data(), m_ptr, get_bytes(), cudaMemcpyDeviceToHost);
   }
 
   void copyin(const T *hp) {
-    AL_FORCE_CHECK_CUDA(
-      cudaMemcpy(m_ptr, hp, get_bytes(), cudaMemcpyHostToDevice));
+    sync_memcpy(m_ptr, hp, get_bytes(), cudaMemcpyHostToDevice);
   }
 
   void copyin(const std::vector<T> &hv) {
@@ -152,9 +139,20 @@ class CUDAVector {
     return m_count * sizeof(T);
   }
 
+  void sync_memcpy(void* dst, const void* src, size_t count,
+                   cudaMemcpyKind kind) const {
+    if (count == 0) {
+      return;
+    }
+    AL_FORCE_CHECK_CUDA_NOSYNC(
+      cudaMemcpyAsync(dst, src, count, kind, m_stream));
+    AL_FORCE_CHECK_CUDA_NOSYNC(cudaStreamSynchronize(m_stream));
+  }
+
  private:
   size_t m_count;
   T *m_ptr;
+  cudaStream_t m_stream;
 };
 
 /** Compare two vectors with a given tolerance. */
