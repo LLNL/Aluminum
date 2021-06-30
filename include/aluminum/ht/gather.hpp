@@ -65,8 +65,8 @@ public:
       // Transfer completed buffer back to device.
       AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, host_mem, sizeof(T)*count*comm_.size(),
                                     cudaMemcpyHostToDevice, stream_));
-      end_event.record(stream_);
     }
+    end_event.record(stream_);
   }
 
   ~GatherAlState() override {

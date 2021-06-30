@@ -148,8 +148,6 @@ class HostTransferCollectiveSignalRootEarlyState : public HostTransferCollective
         mpi_done = true;
         if (!is_root) {
           gpu_wait.signal();
-        } else {
-          return PEAction::complete;
         }
       } else {
         return PEAction::cont;
@@ -196,8 +194,6 @@ class HostTransferCollectiveSignalNonRootEarlyState : public HostTransferCollect
         mpi_done = true;
         if (is_root) {
           gpu_wait.signal();
-        } else {
-          return PEAction::complete;
         }
       } else {
         return PEAction::cont;

@@ -73,8 +73,8 @@ public:
       AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, host_mem,
                                     sizeof(T) * (displs_.back() + counts_.back()),
                                     cudaMemcpyHostToDevice, stream_));
-      end_event.record(stream_);
     }
+    end_event.record(stream_);
   }
 
   ~GathervAlState() override {

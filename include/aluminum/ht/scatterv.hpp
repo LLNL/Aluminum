@@ -79,8 +79,8 @@ public:
       AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, host_mem,
                                     sizeof(T)*counts_[comm_.rank()],
                                     cudaMemcpyHostToDevice, stream_));
-      end_event.record(stream_);
     }
+    end_event.record(stream_);
   }
 
   ~ScattervAlState() override {
