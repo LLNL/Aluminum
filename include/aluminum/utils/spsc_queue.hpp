@@ -49,7 +49,11 @@ template <typename T>
 class SPSCQueue {
 public:
   /** Initialize queue with fixed size (must be a power of 2). */
-  explicit SPSCQueue(size_t size_) : size(size_), front(0), back(0) {
+  explicit SPSCQueue(size_t size_)
+#ifndef AL_DEBUG
+    noexcept
+#endif
+    : size(size_), front(0), back(0) {
     static_assert(std::is_pointer<T>::value, "T must be a pointer type");
 #ifdef AL_DEBUG
     if (!is_pow2(size)) {
@@ -65,7 +69,11 @@ public:
   }
 
   /** Add v to the queue. */
-  void push(T& v) {
+  void push(T& v)
+#ifndef AL_DEBUG
+    noexcept
+#endif
+  {
     size_t b = back.load(std::memory_order_relaxed);
     size_t bmod = (b+1) & (size-1);
 #ifdef AL_DEBUG
@@ -79,7 +87,7 @@ public:
   }
 
   /** Return the next element in the queue; nullptr if empty. */
-  T pop() {
+  T pop() noexcept {
     size_t f = front.load(std::memory_order_relaxed);
     size_t b = back.load(std::memory_order_acquire);
     if (b == f) {
@@ -95,7 +103,11 @@ public:
    *
    * It is an error to call this if no element is present.
    */
-  void pop_always() {
+  void pop_always()
+#ifndef AL_DEBUG
+    noexcept
+#endif
+  {
     size_t f = front.load(std::memory_order_relaxed);
 #ifdef AL_DEBUG
     size_t b = back.load(std::memory_order_acquire);
@@ -107,7 +119,7 @@ public:
   }
 
   /** Return the next element in the queue; nullptr if empty. */
-  T peek() {
+  T peek() noexcept {
     size_t f = front.load(std::memory_order_relaxed);
     size_t b = back.load(std::memory_order_acquire);
     if (b == f) {

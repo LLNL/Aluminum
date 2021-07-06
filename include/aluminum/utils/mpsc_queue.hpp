@@ -48,7 +48,11 @@ public:
    *
    * The queue will hold at most size - 1 elements.
    */
-  explicit MPSCQueue(size_t size_) : size(size_), index(1) {
+  explicit MPSCQueue(size_t size_)
+#ifndef AL_DEBUG
+    noexcept
+#endif
+    : size(size_), index(1) {
     static_assert(std::is_pointer<T>::value, "T must be a pointer type");
 #ifdef AL_DEBUG
     if (!is_pow2(size)) {
@@ -66,7 +70,11 @@ public:
   }
 
   /** Add v to the queue. */
-  void push(T& v) {
+  void push(T& v)
+#ifndef AL_DEBUG
+    noexcept
+#endif
+  {
     size_t i = index.fetch_add(1);
     queue_entry* entry = &data[i & (size - 1)];
     entry->value = v;
@@ -96,7 +104,7 @@ public:
   }
 
   /** Return the next element in the queue; nullptr if empty. */
-  T pop() {
+  T pop() noexcept {
     if (head->next == nullptr) {
       return nullptr;
     }
@@ -110,7 +118,11 @@ public:
    *
    * It is an error to call this if no element is present.
    */
-  void pop_always() {
+  void pop_always()
+#ifndef AL_DEBUG
+    noexcept
+#endif
+  {
 #ifdef AL_DEBUG
     if (head->next == nullptr) {
       throw_al_exception("Tried to pop_always when empty");
@@ -120,7 +132,7 @@ public:
   }
 
   /** Return the next element in the queue; nullptr if empty. */
-  T peek() {
+  T peek() noexcept {
     return (head->next == nullptr) ? nullptr : head->next->value;
   }
 
