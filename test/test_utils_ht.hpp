@@ -49,26 +49,33 @@ struct VectorType<T, Al::HostTransferBackend> {
   }
 };
 
+// Specialize to use the Aluminum stream pool, and size it appropriately.
+template <>
+struct StreamManager<Al::HostTransferBackend> {
+  using StreamType = cudaStream_t;
+
+  static void init(size_t num_streams) {
+    get_stream_pool().allocate(num_streams);
+  }
+  static void finalize() {
+    get_stream_pool().clear();
+  }
+  static StreamType get_stream() {
+    return get_stream_pool().get_stream();
+  }
+
+private:
+  static Al::internal::cuda::StreamPool& get_stream_pool() {
+   static Al::internal::cuda::StreamPool streams;
+   return streams;
+  }
+};
+
 // Specialize to create a CUDA stream with the communicator.
 template <>
 CommWrapper<Al::HostTransferBackend>::CommWrapper(MPI_Comm mpi_comm) {
-  cudaStream_t stream;
-  AL_FORCE_CHECK_CUDA_NOSYNC(cudaStreamCreate(&stream));
   comm_ = std::make_unique<typename Al::HostTransferBackend::comm_type>(
-    mpi_comm, stream);
-}
-template <>
-CommWrapper<Al::HostTransferBackend>::~CommWrapper() {
-  if (comm_) {
-    try {
-      AL_FORCE_CHECK_CUDA_NOSYNC(cudaStreamDestroy(comm_->get_stream()));
-    } catch (const Al::al_exception &e) {
-      std::cerr
-          << "Caught exception in CommWrapper<HostTransferBackend> destructor: "
-          << e.what() << std::endl;
-      std::terminate();
-    }
-  }
+    mpi_comm, StreamManager<Al::HostTransferBackend>::get_stream());
 }
 
 template <>

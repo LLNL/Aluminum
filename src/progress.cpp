@@ -256,6 +256,13 @@ void ProgressEngine::enqueue(AlState* state) {
   // we always have to create it.
   const size_t locked_local_num_input_streams = local_num_input_streams;
 #endif
+#ifdef AL_DEBUG
+  // Ensure we do not try to use too many queues.
+  if (locked_local_num_input_streams >= AL_PE_NUM_STREAMS) {
+    throw_al_exception(
+      "Trying to create more progress engine streams than supported");
+  }
+#endif
   // Add the new queue.
   request_queues[locked_local_num_input_streams].compute_stream = state->get_compute_stream();
   ++num_input_streams;  // Make new queue visible.

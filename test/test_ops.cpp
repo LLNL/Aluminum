@@ -137,22 +137,27 @@ struct TestData {
            CommWrapper<Backend>& comm_wrapper) :
     input(VectorType<T, Backend>::gen_data(in_size, comm_wrapper.comm().get_stream())),
     output(VectorType<T, Backend>::gen_data(out_size, comm_wrapper.comm().get_stream())),
-    orig_input(input),
+    orig_input(output),
     mpi_input(VectorType<T, Backend>::copy_to_host(input)),
     mpi_output(VectorType<T, Backend>::copy_to_host(output)),
     orig_mpi_input(mpi_output)
   {}
 
-  void check(size_t size, bool inplace, bool dump_on_error,
-             size_t max_dump_size, CommWrapper<Backend>& comm_wrapper) {
+  void check(size_t size, bool inplace, bool dump_on_error, bool hang_on_error,
+             size_t max_dump_size, CommWrapper<Backend>& comm_wrapper,
+             int thread_id) {
     bool err = false;
     if (!inplace && !check_vector(mpi_input, input)) {
-      std::cerr << comm_wrapper.rank() << ": input does not match for size "
+      std::cerr << comm_wrapper.rank()
+                << " (thread " << thread_id << ")"
+                << ": input does not match for size "
                 << size << std::endl;
       err = true;
     }
     if (!check_vector(mpi_output, output)) {
-      std::cerr << comm_wrapper.rank() << ": output does not match for size "
+      std::cerr << comm_wrapper.rank()
+                << " (thread " << thread_id << ")"
+                << ": output does not match for size "
                 << size << std::endl;
       err = true;
     }
@@ -168,6 +173,9 @@ struct TestData {
           dump_data<Backend>(input, output, mpi_input, mpi_output,
                              comm_wrapper.comm());
         }
+      }
+      if (hang_on_error) {
+        hang_for_debugging(-1);  // Hang all ranks always.
       }
       std::abort();
     }
@@ -360,8 +368,9 @@ void run_test(cxxopts::ParseResult& parsed_opts) {
         }
         data[i].check(size, op_options.inplace,
                       parsed_opts.count("dump-on-error"),
+                      parsed_opts.count("hang-on-error"),
                       parsed_opts["max-dump-size"].as<size_t>(),
-                      comm_wrappers[i]);
+                      comm_wrappers[i], i);
       }
       MPI_Barrier(MPI_COMM_WORLD);
     }
@@ -381,7 +390,15 @@ void run_test(cxxopts::ParseResult& parsed_opts) {
 struct test_dispatcher {
   template <typename Backend, typename T>
   void operator()(cxxopts::ParseResult& parsed_opts) {
-    run_test<Backend, T>(parsed_opts);
+    // Initialize the stream manager if necessary.
+    // Initialized here so we do it exactly once.
+    // Ensure there is one stream for every thread.
+    StreamManager<Backend>::init(
+      std::max(parsed_opts["threads"].as<int>(), 1));
+    for (size_t i = 0; i < parsed_opts["trials"].as<size_t>(); ++i) {
+      run_test<Backend, T>(parsed_opts);
+    }
+    StreamManager<Backend>::finalize();
   }
 };
 
@@ -407,6 +424,8 @@ int main(int argc, char** argv) {
     ("hang-rank", "Hang a specific or all ranks at startup", cxxopts::value<int>()->default_value("-1"))
     ("hang-timeout", "How long to wait for an operation to complete", cxxopts::value<size_t>()->default_value("60"))
     ("no-abort-on-hang", "Do not abort if a hang is detected")
+    ("hang-on-error", "Hang when an error is detected")
+    ("trials", "Number of times to run the test", cxxopts::value<size_t>()->default_value("1"))
     ("help", "Print help");
   auto parsed_opts = options.parse(argc, argv);
 

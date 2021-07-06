@@ -49,26 +49,26 @@ struct VectorType<T, Al::MPICUDABackend> {
   }
 };
 
+// Specialize to use the Aluminum stream pool, and size it appropriately.
+template <>
+struct StreamManager<Al::MPICUDABackend> {
+  using StreamType = cudaStream_t;
+
+  static void init(size_t num_streams) {
+    Al::internal::cuda::stream_pool.clear();
+    Al::internal::cuda::stream_pool.allocate(num_streams);
+  }
+  static void finalize() {}
+  static StreamType get_stream() {
+    return Al::internal::cuda::stream_pool.get_stream();
+  }
+};
+
 // Specialize to create a CUDA stream with the communicator.
 template <>
 CommWrapper<Al::MPICUDABackend>::CommWrapper(MPI_Comm mpi_comm) {
-  cudaStream_t stream;
-  AL_FORCE_CHECK_CUDA_NOSYNC(cudaStreamCreate(&stream));
   comm_ = std::make_unique<typename Al::MPICUDABackend::comm_type>(
-    mpi_comm, stream);
-}
-template <>
-CommWrapper<Al::MPICUDABackend>::~CommWrapper() {
-  if (comm_) {
-    try {
-      AL_FORCE_CHECK_CUDA_NOSYNC(cudaStreamDestroy(comm_->get_stream()));
-    } catch (const Al::al_exception &e) {
-      std::cerr
-          << "Caught exception in CommWrapper<MPICUDABackend> destructor: "
-          << e.what() << std::endl;
-      std::terminate();
-    }
-  }
+    mpi_comm, StreamManager<Al::MPICUDABackend>::get_stream());
 }
 
 template <>

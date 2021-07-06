@@ -46,7 +46,7 @@ namespace cuda {
 class StreamPool {
 public:
   /** Create pool with num_streams default and high priority streams. */
-  StreamPool(size_t num_streams);
+  StreamPool(size_t num_streams = 0);
   ~StreamPool();
 
   /** Explicitly allocate streams. */
