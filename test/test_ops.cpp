@@ -390,9 +390,15 @@ void run_test(cxxopts::ParseResult& parsed_opts) {
 struct test_dispatcher {
   template <typename Backend, typename T>
   void operator()(cxxopts::ParseResult& parsed_opts) {
+    // Initialize the stream manager if necessary.
+    // Initialized here so we do it exactly once.
+    // Ensure there is one stream for every thread.
+    StreamManager<Backend>::init(
+      std::max(parsed_opts["threads"].as<int>(), 1));
     for (size_t i = 0; i < parsed_opts["trials"].as<size_t>(); ++i) {
       run_test<Backend, T>(parsed_opts);
     }
+    StreamManager<Backend>::finalize();
   }
 };
 

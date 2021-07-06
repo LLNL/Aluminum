@@ -94,6 +94,24 @@ typename VectorType<T, Backend>::type get_vector(size_t count) {
   return typename VectorType<T, Backend>::type(count);
 }
 
+/**
+ * Manager for streams for a backend.
+ *
+ * Default implementation for backends that do not have real streams.
+ */
+template <typename Backend>
+struct StreamManager {
+  /** Type of the underlying stream. */
+  using StreamType = int;
+
+  /** Initialize the stream manager to support this many streams. */
+  static void init(size_t /*num_streams*/) {}
+  /** Clean up the stream manager. */
+  static void finalize() {}
+  /** Return a new stream. */
+  static StreamType get_stream() { return 0; };
+};
+
 /** RAII manager for a communicator. */
 template <typename Backend>
 struct CommWrapper {
