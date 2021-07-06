@@ -52,7 +52,11 @@ public:
 #ifndef AL_DEBUG
     noexcept
 #endif
-    : size(size_), index(1) {
+    : size(size_), index(1)
+#ifdef AL_DEBUG
+    , cur_size(0)
+#endif
+  {
     static_assert(std::is_pointer<T>::value, "T must be a pointer type");
 #ifdef AL_DEBUG
     if (!is_pow2(size)) {
@@ -82,6 +86,11 @@ public:
     queue_entry* old_tail;
     queue_entry* old_next;
     while (true) {
+#ifdef AL_DEBUG
+      if (cur_size.load() + 1 >= size - 1) {
+        throw_al_exception("Queue full");
+      }
+#endif
       old_tail = tail;
       old_next = tail->next;
       if (old_tail == tail) {
@@ -96,6 +105,9 @@ public:
             // Update the tail.
             __atomic_compare_exchange_n(&tail, &old_tail, entry, true,
                                         __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+#ifdef AL_DEBUG
+            ++cur_size;
+#endif
             break;
           }
         }
@@ -110,6 +122,9 @@ public:
     }
     T value = head->next->value;
     head = head->next;
+#ifdef AL_DEBUG
+    --cur_size;
+#endif
     return value;
   }
 
@@ -129,6 +144,9 @@ public:
     }
 #endif
     head = head->next;
+#ifdef AL_DEBUG
+    --cur_size;
+#endif
   }
 
   /** Return the next element in the queue; nullptr if empty. */
@@ -149,6 +167,10 @@ private:
   queue_entry* data;
   /** Current index in data. */
   alignas(AL_DESTRUCTIVE_INTERFERENCE_SIZE) std::atomic<size_t> index;
+#ifdef AL_DEBUG
+  /** Used for best-effort debugging to detect queue overflows. */
+  alignas(AL_DESTRUCTIVE_INTERFERENCE_SIZE) std::atomic<size_t> cur_size;
+#endif
   /** Pointer to the current head of the queue. */
   alignas(AL_DESTRUCTIVE_INTERFERENCE_SIZE) queue_entry* head;
   /** Pointer to the current tail of the queue. */
