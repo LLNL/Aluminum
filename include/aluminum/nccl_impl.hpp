@@ -134,6 +134,8 @@ inline ncclRedOp_t ReductionOperator2ncclRedOp(ReductionOperator op) {
     return ncclMin;
   case ReductionOperator::max:
     return ncclMax;
+  case ReductionOperator::avg:
+    return ncclAvg;
   default:
     throw_al_exception("Reduction operator not supported");
   }
