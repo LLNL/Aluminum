@@ -118,9 +118,11 @@ private:
         std::unique_lock<std::mutex> lock(watchdog_mutex);
         if (!cv.wait_for(lock, std::chrono::seconds(timeout),
                          [&] { return event_finished; })) {
-          std::cerr << "Aborting after hang in " << event_desc << std::endl;
           if (do_abort) {
+            std::cerr << "Aborting after hang in " << event_desc << std::endl;
             std::abort();
+          } else {
+            std::cerr << "Hang detected in " << event_desc << std::endl;
           }
         }
         event_started = false;
