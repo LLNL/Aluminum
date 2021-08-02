@@ -182,6 +182,8 @@ endif ()
 # Dependencies
 
 find_package(MPI 3.0 REQUIRED COMPONENTS CXX)
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
 
 # Fix the imported target
 
