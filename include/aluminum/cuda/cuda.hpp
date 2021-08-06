@@ -99,8 +99,9 @@ inline hipError_t cuGetErrorString(hipError_t /* error */, const char** pStr)
     CUresult status_CHECK_CUDA_DRV = (cuda_call);               \
     if (status_CHECK_CUDA_DRV != CUDA_SUCCESS) {                \
       const char* err_msg_CHECK_CUDA_DRV;                       \
-      cuGetErrorString(status_CHECK_CUDA_DRV,                   \
-                       &err_msg_CHECK_CUDA_DRV);                \
+      AL_IGNORE_NODISCARD(                                      \
+        cuGetErrorString(status_CHECK_CUDA_DRV,                 \
+                         &err_msg_CHECK_CUDA_DRV));             \
       throw_al_exception(std::string("CUDA driver error: ")     \
                          + err_msg_CHECK_CUDA_DRV);             \
     }                                                           \
@@ -112,8 +113,9 @@ inline hipError_t cuGetErrorString(hipError_t /* error */, const char** pStr)
     CUresult status_CHECK_CUDA_DRV = (cuda_call);               \
     if (status_CHECK_CUDA_DRV != CUDA_SUCCESS) {                \
       const char* err_msg_CHECK_CUDA_DRV;                       \
-      cuGetErrorString(status_CHECK_CUDA_DRV,                   \
-                       &err_msg_CHECK_CUDA_DRV);                \
+      AL_IGNORE_NODISCARD(                                      \
+        cuGetErrorString(status_CHECK_CUDA_DRV,                 \
+                         &err_msg_CHECK_CUDA_DRV));             \
       throw_al_exception(std::string("CUDA driver error: ")     \
                          + err_msg_CHECK_CUDA_DRV);             \
     }                                                           \
