@@ -57,7 +57,8 @@ target_include_directories(Al PUBLIC
   $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 target_link_libraries(Al PUBLIC
-  MPI::MPI_CXX HWLOC::hwloc
+  HWLOC::hwloc
+  MPI::MPI_CXX
   $<TARGET_NAME_IF_EXISTS:roc::rccl>
   $<TARGET_NAME_IF_EXISTS:hip::rocprim_hip>
   $<TARGET_NAME_IF_EXISTS:hip::hipcub>)

@@ -39,6 +39,9 @@
 # endif
 #endif /* HOST_NAME_MAX */
 
+/** Intentionally ignore results of [[nodiscard]] functions. */
+#define AL_IGNORE_NODISCARD(fcall) static_cast<void>((fcall))
+
 namespace Al {
 
 /**

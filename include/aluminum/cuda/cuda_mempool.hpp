@@ -76,7 +76,7 @@ public:
     AL_CHECK_CUDA(cub_pool.DeviceFree(ptr));
   }
 
-  void clear() { cub_pool.FreeAllCached(); }
+  void clear() { AL_IGNORE_NODISCARD(cub_pool.FreeAllCached()); }
 
 private:
   cub::CachingDeviceAllocator cub_pool;
