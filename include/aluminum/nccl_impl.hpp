@@ -110,6 +110,11 @@ class NCCLCommunicator : public internal::MPICommAndStreamWrapper<cudaStream_t> 
     return NCCLCommunicator(get_comm(), stream);
   }
 
+  /** gracefully abort uncompleted nccl operations */
+  void abort() {
+      AL_CHECK_NCCL(ncclCommAbort(m_nccl_comm));
+  }
+
  private:
   /** Raw NCCL communicator. */
   ncclComm_t m_nccl_comm;
