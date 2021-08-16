@@ -297,6 +297,14 @@ endif ()
 
 if (ALUMINUM_ENABLE_ROCM)
 
+  list(APPEND AL_HIP_HIPCC_FLAGS "-std=c++17")
+  if (CMAKE_POSITION_INDEPENDENT_CODE)
+    list(APPEND AL_HIP_HIPCC_FLAGS "-fPIC")
+  endif ()
+  set(HIP_HIPCC_FLAGS "${AL_HIP_HIPCC_FLAGS};${HIP_HIPCC_FLAGS}"
+    CACHE STRING "Semi-colon delimited list of flags to pass to hipcc"
+    FORCE) # <- because these are definitely the flags we want.
+
   if (ROCM_PATH)
     set(AL_ROCM_PATH "${ROCM_PATH}")
   elseif (DEFINED ENV{ROCM_PATH})
@@ -309,7 +317,7 @@ if (ALUMINUM_ENABLE_ROCM)
     set(AL_ROCM_PATH "/opt/rocm")
   endif ()
   message(STATUS "Using AL_ROCM_PATH: ${AL_ROCM_PATH}")
-  
+
   # Provides hipify_*_files
   include(HipBuildSystem)
 
