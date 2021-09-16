@@ -63,6 +63,7 @@ void run_benchmark(cxxopts::ParseResult& parsed_opts) {
 
   auto sizes = get_sizes_from_opts(parsed_opts);
 
+  StreamManager<Backend>::init(1UL);
   CommWrapper<Backend> comm_wrapper(MPI_COMM_WORLD);
   OpProfile<Op, Backend, T> profile(comm_wrapper.comm(), op_options);
   Timer<Backend> timer;
