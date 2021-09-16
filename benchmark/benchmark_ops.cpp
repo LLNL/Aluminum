@@ -164,6 +164,8 @@ void run_benchmark(cxxopts::ParseResult& parsed_opts) {
   if (!parsed_opts.count("no-print-table")) {
     profile.print_results();
   }
+
+  StreamManager<Backend>::finalize();
 }
 
 template <AlOperation Op, typename Backend, typename T,
