@@ -45,7 +45,7 @@ if (AL_HAS_ROCM)
   # files. This should circumvent that issue.
   add_custom_target(HipifiedHeaders
     DEPENDS ${ALUMINUM_HIP_HEADERS})
-  hip_add_library(Al "${ALUMINUM_HIP_SOURCES}" "${ALUMINUM_HIP_HEADERS}")
+  hip_add_library(Al "${ALUMINUM_HIP_SOURCES}")
   add_dependencies(Al HipifiedHeaders)
   target_include_directories(Al PUBLIC
     $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include>)
