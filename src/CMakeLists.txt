@@ -40,7 +40,13 @@ set(ALUMINUM_CUDA_SOURCES "${CUDA_SOURCES}" "${THIS_DIR_CUDA_SOURCES}")
 if (AL_HAS_ROCM)
   hipify_source_files(ALUMINUM_HIP_SOURCES ${ALUMINUM_CXX_SOURCES} ${ALUMINUM_CUDA_SOURCES})
   hipify_header_files(ALUMINUM_HIP_HEADERS ${ALUMINUM_HEADERS})
-  hip_add_library(Al "${ALUMINUM_HIP_SOURCES}" "${ALUMINUM_HIP_HEADERS}")
+  # Some generators seem to miss the memo about having to pre-generate
+  # all the headers before attempting to compile the source
+  # files. This should circumvent that issue.
+  add_custom_target(HipifiedHeaders
+    DEPENDS ${ALUMINUM_HIP_HEADERS})
+  hip_add_library(Al "${ALUMINUM_HIP_SOURCES}")
+  add_dependencies(Al HipifiedHeaders)
   target_include_directories(Al PUBLIC
     $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include>)
 else ()
