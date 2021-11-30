@@ -183,6 +183,8 @@ ProgressEngine::ProgressEngine() {
 #ifdef AL_PE_ADD_DEFAULT_STREAM
   // Initialze with the default stream.
   num_input_streams = 1;
+#else
+  num_input_streams = 0;
 #endif
 }
 
