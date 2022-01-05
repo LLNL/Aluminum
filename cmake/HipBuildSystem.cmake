@@ -13,12 +13,16 @@
 # and writes the output to the same place as the initial file, but in the build
 # directory.
 
+find_program(HIPIFY_PERL hipify-perl
+  HINTS ENV ROCM_PATH
+  PATH_SUFFIXES bin hip/bin
+  NO_DEFAULT_PATH)
 find_program(HIPIFY_PERL hipify-perl)
 if (NOT HIPIFY_PERL)
   message(FATAL_ERROR "hipify-perl was not found. "
     "Please make sure it's in $PATH")
 else ()
-  message(STATUS "hipify-perl found at ${HIPIFY_PERL}")
+  message(STATUS "hipify-perl found: ${HIPIFY_PERL}")
 endif ()
 
 function (hipify_files_internal OUTPUT_VAR)
@@ -31,6 +35,11 @@ function (hipify_files_internal OUTPUT_VAR)
     if (_tmp_extension STREQUAL ".hpp")
       # Don't add extra ".hpp" for headers.
       set(_tmp_extension)
+    elseif (_tmp_extension STREQUAL ".cu")
+      # According to
+      # <cmake_prefix>/share/cmake/Modules/CMakeHIPCompiler.cmake.in,
+      # the correct extension for HIP language files is "hip".
+      set(_tmp_extension ".hip")
     endif ()
     set(output "${CMAKE_BINARY_DIR}/${filename}${_tmp_extension}")
 
