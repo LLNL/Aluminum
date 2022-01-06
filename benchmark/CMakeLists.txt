@@ -20,7 +20,7 @@ foreach(src ${AL_BENCHMARK_SOURCES})
   get_filename_component(_benchmark_exe_name
     "${_tmp_benchmark_exe_name}" NAME)
   if (AL_HAS_ROCM)
-    hip_add_executable(${_benchmark_exe_name} ${src} ${AL_BENCHMARK_HEADERS})
+    add_executable(${_benchmark_exe_name} ${src} ${AL_BENCHMARK_HEADERS})
     target_include_directories(${_benchmark_exe_name} PUBLIC
       $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>)
   else ()
@@ -76,7 +76,7 @@ foreach(src ${AL_SPECIAL_BENCHMARK_SOURCES})
   get_filename_component(_benchmark_exe_name
     "${_tmp_benchmark_exe_name}" NAME)
   if (AL_HAS_ROCM)
-    hip_add_executable(${_benchmark_exe_name} ${src} ${AL_WAIT_SOURCES})
+    add_executable(${_benchmark_exe_name} ${src} ${AL_WAIT_SOURCES})
     target_include_directories(${_benchmark_exe_name} PUBLIC
       $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>)
     add_dependencies(${_benchmark_exe_name} gen_wait_source_files)
