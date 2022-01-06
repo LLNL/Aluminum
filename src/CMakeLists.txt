@@ -58,16 +58,11 @@ else ()
     "${ALUMINUM_CXX_SOURCES}"
     "${ALUMINUM_CUDA_SOURCES}"
     "${ALUMINUM_HEADERS}")
-  target_link_libraries(Al PUBLIC
-    $<$<BOOL:${AL_HAS_CUDA}>:CUDA::cudart>
-    $<$<BOOL:${AL_HAS_CUDA}>:CUDA::cuda_driver>
-    $<$<BOOL:${AL_HAS_NVPROF}>:CUDA::nvToolsExt>
-    $<$<BOOL:${AL_HAS_NCCL}>:cuda::nccl>
-    $<$<BOOL:${AL_HAS_EXTERNAL_CUB}>:cuda::CUB>)
   target_include_directories(Al PUBLIC
     $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>)
 endif ()
 
+target_compile_features(Al PUBLIC cxx_std_17)
 target_include_directories(Al PUBLIC
   $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
@@ -84,12 +79,15 @@ if (AL_HAS_ROCM)
     hip::hipcub
     roc::rocprim
     ${ROCM_SMI_LIBRARY})
-endif (AL_HAS_ROCM)
-
-target_compile_features(Al PUBLIC cxx_std_17)
-if (AL_HAS_CUDA AND NOT AL_HAS_ROCM)
+elseif (AL_HAS_CUDA)
+  target_link_libraries(Al PUBLIC
+    CUDA::cudart
+    CUDA::cuda_driver
+    $<$<BOOL:${AL_HAS_NVPROF}>:CUDA::nvToolsExt>
+    $<$<BOOL:${AL_HAS_NCCL}>:cuda::nccl>
+    $<$<BOOL:${AL_HAS_EXTERNAL_CUB}>:cuda::CUB>)
   target_compile_features(Al PUBLIC cuda_std_14)
-endif ()
+endif (AL_HAS_ROCM)
 
 # Header installation. For HIP, install the generated files. For
 # NOGPU/CUDA, install the real files.
