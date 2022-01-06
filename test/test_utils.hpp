@@ -36,6 +36,39 @@
 #include <cstdlib>
 #include <cxxopts.hpp>
 
+// This is the path of least resistance for coping with a convoluted
+// HIP/hipCUB/rocPRIM/etc issue. It's easier for now to just do this
+// than to push for the proper fixes.
+
+#if defined(AL_HAS_ROCM) && defined(AL_HAS_NCCL)
+
+inline std::ostream& operator<<(std::ostream& os, __half const& x) {
+  return os << static_cast<float>(x);
+}
+
+inline bool operator<(__half const& lhs, __half const& rhs) {
+  return static_cast<float>(lhs) < static_cast<float>(rhs);
+}
+inline bool operator<=(__half const& lhs, __half const& rhs) {
+  return static_cast<float>(lhs) <= static_cast<float>(rhs);
+}
+inline bool operator>(__half const& lhs, __half const& rhs) {
+  return static_cast<float>(lhs) > static_cast<float>(rhs);
+}
+inline bool operator>=(__half const& lhs, __half const& rhs) {
+  return static_cast<float>(lhs) >= static_cast<float>(rhs);
+}
+inline bool operator==(__half const& lhs, __half const& rhs) {
+  return static_cast<float>(lhs) == static_cast<float>(rhs);
+}
+inline bool operator!=(__half const& lhs, __half const& rhs) {
+  return static_cast<float>(lhs) != static_cast<float>(rhs);
+}
+inline __half operator-(__half const& lhs, __half const& rhs) {
+  return static_cast<float>(lhs) - static_cast<float>(rhs);
+}
+
+#endif // defined(AL_HAS_ROCM) && defined(AL_HAS_NCCL)
 
 /** Helper for generating random data. */
 template <typename T, typename Generator,
