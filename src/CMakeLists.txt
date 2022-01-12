@@ -62,6 +62,10 @@ else ()
     $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>)
 endif ()
 
+set_target_properties(Al
+  PROPERTIES
+  VERSION ${ALUMINUM_VERSION})
+
 target_compile_features(Al PUBLIC cxx_std_17)
 target_include_directories(Al PUBLIC
   $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
