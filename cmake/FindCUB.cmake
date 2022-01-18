@@ -21,7 +21,7 @@ be created.
 
 find_path(CUB_INCLUDE_PATH cub/cub.cuh
   HINTS ${CUB_DIR} $ENV{CUB_DIR}
-  ${CUDA_TOOLKIT_ROOT_DIR} ${CUDA_SDK_ROOT_DIR}
+  ${CUDAToolkit_INCLUDE_DIRS}
   PATH_SUFFIXES include
   NO_DEFAULT_PATH
   DOC "The CUB header directory."

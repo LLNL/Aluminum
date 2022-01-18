@@ -18,40 +18,40 @@ find_package(MPI 3.0 REQUIRED COMPONENTS CXX)
 find_dependency(HWLOC)
 
 if (AL_HAS_ROCM)
-  find_package(HIP REQUIRED)
+  # The API for Aluminum does not require that HIP language support
+  # be enabled; it only requires the host/device libraries be found.
+  find_dependency(hip)
+  find_dependency(hipcub)
+
+  set(AL_ROCM_PATH "@AL_ROCM_PATH@")
+
   if (AL_HAS_NCCL)
-    find_package(rccl REQUIRED)
+    find_dependency(rccl)
   endif (AL_HAS_NCCL)
 elseif (AL_HAS_CUDA)
-  find_package(CUDA REQUIRED)
 
-  if (NOT TARGET cuda::cuda)
-    add_library(cuda::cuda INTERFACE IMPORTED)
-  endif ()
-
-  set_property(TARGET cuda::cuda
-    PROPERTY INTERFACE_LINK_LIBRARIES ${CUDA_LIBRARIES})
-
-  set_property(TARGET cuda::cuda
-    PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${CUDA_INCLUDE_DIRS})
+  # The API for Aluminum does not require that CUDA language support
+  # be enabled; it only requires the CUDAToolkit.
+  find_dependency(CUDAToolkit)
 
   if (AL_HAS_NCCL)
-    find_package(NCCL 2.0.0 QUIET)
-    if (NOT NCCL_FOUND)
-      if (NOT NCCL_DIR)
-        set(NCCL_DIR "@NCCL_DIR@")
-      endif()
-      if (NOT NCCL_DIR AND NOT NCCL_LIBRARY AND NOT NCCL_INCLUDE_PATH)
-        set(NCCL_LIBRARY "@NCCL_LIBRARY@" CACHE FILEPATH
-          "The NCCL library" FORCE)
-        set(NCCL_INCLUDE_PATH "@NCCL_INCLUDE_PATH@" CACHE PATH
-          "The NCCL header include directory" FORCE)
-      endif ()
-      find_package(NCCL 2.0.0 REQUIRED)
-    endif (NOT NCCL_FOUND)
+    find_dependency(NCCL)
+  endif (AL_HAS_NCCL)
 
-    set_property(TARGET cuda::cuda APPEND
-      PROPERTY INTERFACE_LINK_LIBRARIES cuda::nccl)
+  set(AL_HAS_NVPROF @AL_HAS_NVPROF@)
+  if (AL_HAS_NVPROF)
+    set(AL_HAS_EXTERNAL_NVTX @AL_HAS_EXTERNAL_NVTX@)
+    if (AL_HAS_EXTERNAL_NVTX)
+      find_dependency(NVTX)
+    endif ()
+  endif ()
+
+  # Because of their templated nature, the CUB-based memory allocator
+  # is public. Therefore, this dependency is public and must be met
+  # downstream.
+  set(AL_HAS_EXTERNAL_CUB @AL_HAS_EXTERNAL_CUB@)
+  if (AL_HAS_EXTERNAL_CUB)
+    find_dependency(CUB)
   endif ()
 endif (AL_HAS_ROCM)
 
@@ -69,7 +69,7 @@ foreach (_DIR ${_TMP_LIBRARY_DIRS})
   list(APPEND ALUMINUM_LIBRARY_DIRS "${_LIBRARY_DIR}")
 endforeach (_DIR ${_TMP_LIBRARY_DIRS})
 
-if (NOT TARGET AL::aluminum)
+if (NOT TARGET AL::Al)
   include(${CMAKE_CURRENT_LIST_DIR}/AluminumTargets.cmake)
 endif ()
 

@@ -1,18 +1,13 @@
-cmake_minimum_required(VERSION 3.17)
-# 3.9 is required for CUDA as a first-class language.
-#
-# 3.8 is required for cxx_std_11 compile feature. Otherwise we could
-# set the CMAKE_CXX_STANDARD flag, but the compile features are a more
-# elegant solution.
+cmake_minimum_required(VERSION 3.21)
+# 3.21 fixes an important bug related to FindCUDAToolkit and the
+# NVIDIA HPC SDK (Perlmutter, e.g.)
 
-#
 # Version setup
-#
-
 set(ALUMINUM_VERSION_MAJOR 1)
 set(ALUMINUM_VERSION_MINOR 0)
 set(ALUMINUM_VERSION_PATCH 0)
-set(ALUMINUM_VERSION "${ALUMINUM_VERSION_MAJOR}.${ALUMINUM_VERSION_MINOR}.${ALUMINUM_VERSION_PATCH}")
+set(ALUMINUM_VERSION
+  "${ALUMINUM_VERSION_MAJOR}.${ALUMINUM_VERSION_MINOR}.${ALUMINUM_VERSION_PATCH}")
 
 if (NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release CACHE STRING "Configuration type" FORCE)
@@ -229,73 +224,67 @@ else ()
 endif ()
 
 if (ALUMINUM_ENABLE_CUDA)
-  find_package(CUDA 9.0)
-  if (CUDA_FOUND)
-    enable_language(CUDA)
-    set(AL_HAS_CUDA TRUE)
+  enable_language(CUDA)
+  find_package(CUDAToolkit 10.0 REQUIRED)
 
-    if (ALUMINUM_ENABLE_MPI_CUDA)
-      set(AL_HAS_CUDA TRUE)
-      set(AL_HAS_MPI_CUDA TRUE)
-      if (ALUMINUM_ENABLE_MPI_CUDA_RMA)
-        set(AL_HAS_MPI_CUDA_RMA TRUE)
-      endif ()
+  # If the previous find_package fails, we won't get here.
+  set(AL_HAS_CUDA TRUE)
+
+  if (ALUMINUM_ENABLE_MPI_CUDA)
+    set(AL_HAS_MPI_CUDA TRUE)
+    if (ALUMINUM_ENABLE_MPI_CUDA_RMA)
+      set(AL_HAS_MPI_CUDA_RMA TRUE)
     endif ()
-
-    if (ALUMINUM_ENABLE_HOST_TRANSFER)
-      set(AL_HAS_CUDA TRUE)
-      set(AL_HAS_HOST_TRANSFER TRUE)
-    endif ()
-
-    # Add the cuda imported target
-    if (NOT TARGET cuda::cuda)
-      add_library(cuda::cuda INTERFACE IMPORTED)
-    endif ()
-
-    set_property(TARGET cuda::cuda
-      PROPERTY INTERFACE_LINK_LIBRARIES ${CUDA_LIBRARIES})
-
-    set_property(TARGET cuda::cuda
-      PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${CUDA_INCLUDE_DIRS})
-
-    if (ALUMINUM_ENABLE_NCCL)
-      find_package(NCCL 2.7.0 REQUIRED)
-
-      set(AL_HAS_NCCL TRUE)
-      set_property(TARGET cuda::cuda APPEND
-        PROPERTY INTERFACE_LINK_LIBRARIES cuda::nccl)
-    endif ()
-
-    if (ALUMINUM_ENABLE_NVPROF)
-      find_package(NVTX REQUIRED)
-      set(AL_HAS_NVPROF ON)
-    endif ()
-
-    find_package(CUB REQUIRED)
-    set_property(TARGET cuda::cuda APPEND
-        PROPERTY INTERFACE_LINK_LIBRARIES cuda::CUB)
-  else ()
-    message(WARNING "CUDA support requested but not found. Disabling.")
-    set(ALUMINUM_ENABLE_CUDA OFF)
-    set(ALUMINUM_ENABLE_MPI_CUDA OFF)
-    set(ALUMINUM_ENABLE_HOST_TRANSFER OFF)
-    set(ALUMINUM_ENABLE_NCCL OFF)
-    set(ALUMINUM_ENABLE_NVPROF OFF)
-    set(AL_HAS_CUDA FALSE)
-    set(AL_HAS_MPI_CUDA FALSE)
-    set(AL_HAS_HOST_TRANSFER FALSE)
-    set(AL_HAS_NCCL FALSE)
-    set(AL_HAS_NVPROF OFF)
   endif ()
 
-  # Check that a backend is found
+  if (ALUMINUM_ENABLE_HOST_TRANSFER)
+    set(AL_HAS_HOST_TRANSFER TRUE)
+  endif ()
+
+  # From the CUDAToolkit module, we use the following IMPORTED targets:
+  #   - CUDA::cudart
+  #   - CUDA::cuda_driver
+  #   - CUDA::nvToolsExt
+
+  if (ALUMINUM_ENABLE_NCCL)
+    find_package(NCCL 2.7.0 REQUIRED)
+    set(AL_HAS_NCCL TRUE)
+  endif ()
+
+  if (ALUMINUM_ENABLE_NVPROF)
+    if (NOT TARGET CUDA::nvToolsExt)
+      find_package(NVTX REQUIRED)
+      set(AL_HAS_EXTERNAL_NVTX TRUE)
+    endif ()
+    set(AL_HAS_NVPROF ON)
+  endif ()
+
+  # CUDA 11 ships CUB with its usual runtime headers.
+  if (CUDAToolkit_VERSION_MAJOR LESS 11)
+    find_package(CUB REQUIRED)
+    set(AL_HAS_EXTERNAL_CUB TRUE)
+  endif ()
+
+    # Check that a backend is found
   if (NOT AL_HAS_NCCL AND NOT AL_HAS_MPI_CUDA AND NOT AL_HAS_HOST_TRANSFER)
+    message(FATAL_ERROR "CUDA support has been requested and detected. "
+      "However, no backend was enabled.")
     set(ALUMINUM_ENABLE_CUDA FALSE)
     set(AL_HAS_CUDA FALSE)
   endif ()
-endif ()
+
+endif (ALUMINUM_ENABLE_CUDA)
 
 if (ALUMINUM_ENABLE_ROCM)
+  # NOTE: This MUST come first. Even before the HIP language is
+  # enabled. If it is not, then the header guard in
+  # AMDDeviceLibsConfig.cmake will block future calls from finding the
+  # correct AMD_DEVICE_LIBS_PREFIX, which will cause the command line
+  # to have an invalid argument.
+  find_package(hip CONFIG REQUIRED)
+
+  # Now that that's handled, we can enable HIP as a language.
+  enable_language(HIP)
 
   list(APPEND AL_HIP_HIPCC_FLAGS "-std=c++17")
   if (CMAKE_POSITION_INDEPENDENT_CODE)
@@ -322,10 +311,6 @@ if (ALUMINUM_ENABLE_ROCM)
   include(HipBuildSystem)
 
   # Provides hip_add_executable
-  set(CMAKE_MODULE_PATH "${AL_ROCM_PATH}/hip/cmake" ${CMAKE_MODULE_PATH})
-
-  # hip-runtime library
-  find_package(HIP MODULE REQUIRED)
   set(AL_HAS_ROCM TRUE)
 
   # This is needed for some compatibility
@@ -345,7 +330,7 @@ if (ALUMINUM_ENABLE_ROCM)
 
   if (ALUMINUM_ENABLE_NCCL)
     find_package(rccl CONFIG QUIET
-      HINTS ${RCCL_DIR} $ENV{RCCL_DIR}
+      HINTS ${RCCL_DIR} $ENV{RCCL_DIR} ${AL_ROCM_PATH}
       PATH_SUFFIXES lib64/cmake/rccl lib/cmake/rccl
       NO_DEFAULT_PATH)
     find_package(rccl CONFIG REQUIRED)
@@ -354,40 +339,35 @@ if (ALUMINUM_ENABLE_ROCM)
   endif ()
 
   # Find CUB
-  set(CMAKE_PREFIX_PATH "${AL_ROCM_PATH}/hip" ${CMAKE_PREFIX_PATH})
-  set(HIP_FOUND FALSE)
-  find_package(HIP CONFIG REQUIRED)
-  find_package(rocPRIM REQUIRED)
-  find_package(hipCUB REQUIRED)
+  find_package(hipcub CONFIG REQUIRED)
 
-  # (trb 11/02/2020): This is not ideal; when things stabilize, I'll
-  # clean this up. Ideally we'll have a CMake config file for this.
+  # (trb 01/03/2022): This is needed for HWLOC stuff to work correctly.
   find_path(ROCM_SMI_INCLUDE_DIR rocm_smi/rocm_smi.h REQUIRED
     HINTS ${AL_ROCM_PATH}/rocm_smi/include)
-
   find_library(ROCM_SMI_LIBRARY rocm_smi64 REQUIRED
     HINTS ${AL_ROCM_PATH}/rocm_smi/lib)
 
-  # Just in case any of the previous commands turned this on.
-  set(CMAKE_CXX_EXTENSIONS FALSE)
-
-  # For some reason, hipified files can be relatively specified, but regular
-  # files must be given a full path. This appears to be the easiest way for both
-  # ROCm and non-ROCm builds to both work and install.
+  # For some reason, hipified files can be relatively specified, but
+  # regular files must be given a full path. This appears to be the
+  # easiest way for both ROCm and non-ROCm builds to both work and
+  # install.
   set(SOURCE_PREFIX "")
 else ()
   set(SOURCE_PREFIX "${CMAKE_CURRENT_LIST_DIR}/")
 endif ()
 
 # Pull the Git submodules.
-# Adapted from: https://cliutils.gitlab.io/modern-cmake/chapters/projects/submodule.html
+# Adapted from:
+# https://cliutils.gitlab.io/modern-cmake/chapters/projects/submodule.html
 find_package(Git QUIET)
 if (GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
   execute_process(COMMAND ${GIT_EXECUTABLE} submodule update --init --recursive
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     RESULT_VARIABLE GIT_SUBMOD_RESULT)
   if (NOT GIT_SUBMOD_RESULT EQUAL "0")
-    message(FATAL_ERROR "git submodule update --init failed with ${GIT_SUBMOD_RESULT}, please checkout submodules")
+    message(FATAL_ERROR
+      "git submodule update --init failed with ${GIT_SUBMOD_RESULT}. "
+      "Please checkout submodules")
   endif ()
 endif ()
 
@@ -448,7 +428,7 @@ write_basic_package_version_file(
   "${CMAKE_BINARY_DIR}/AluminumConfigVersion.cmake" VERSION
   ${ALUMINUM_VERSION} COMPATIBILITY SameMinorVersion )
 
-set(INCLUDE_INSTALL_DIRS ${CMAKE_SOURCE_DIR}/src)
+set(INCLUDE_INSTALL_DIRS ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/src)
 set(LIB_INSTALL_DIR src)
 set(CMAKE_INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR})
 set(CMAKE_MODULE_LOCATION "${CMAKE_SOURCE_DIR}/cmake")

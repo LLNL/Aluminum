@@ -38,46 +38,60 @@ set(ALUMINUM_CXX_SOURCES "${CXX_SOURCES}" "${THIS_DIR_CXX_SOURCES}")
 set(ALUMINUM_CUDA_SOURCES "${CUDA_SOURCES}" "${THIS_DIR_CUDA_SOURCES}")
 
 if (AL_HAS_ROCM)
-  hipify_source_files(ALUMINUM_HIP_SOURCES ${ALUMINUM_CXX_SOURCES} ${ALUMINUM_CUDA_SOURCES})
-  hipify_header_files(ALUMINUM_HIP_HEADERS ${ALUMINUM_HEADERS})
+  hipify_source_files(ALUMINUM_HIP_SOURCES
+    ${ALUMINUM_CXX_SOURCES}
+    ${ALUMINUM_CUDA_SOURCES})
+  hipify_header_files(ALUMINUM_HIP_HEADERS
+    ${ALUMINUM_HEADERS})
   # Some generators seem to miss the memo about having to pre-generate
   # all the headers before attempting to compile the source
   # files. This should circumvent that issue.
   add_custom_target(HipifiedHeaders
     DEPENDS ${ALUMINUM_HIP_HEADERS})
-  hip_add_library(Al "${ALUMINUM_HIP_SOURCES}")
+
+  add_library(Al "${ALUMINUM_HIP_SOURCES}")
   add_dependencies(Al HipifiedHeaders)
   target_include_directories(Al PUBLIC
     $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include>)
 else ()
   add_library(Al
-    "${ALUMINUM_CXX_SOURCES}" "${ALUMINUM_CUDA_SOURCES}" "${ALUMINUM_HEADERS}")
-  target_link_libraries(Al PUBLIC
-    $<$<BOOL:${AL_HAS_CUDA}>:cuda::cuda>
-    $<$<BOOL:${AL_HAS_NVPROF}>:cuda::nvtx>)
+    "${ALUMINUM_CXX_SOURCES}"
+    "${ALUMINUM_CUDA_SOURCES}"
+    "${ALUMINUM_HEADERS}")
   target_include_directories(Al PUBLIC
     $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>)
 endif ()
 
+set_target_properties(Al
+  PROPERTIES
+  VERSION ${ALUMINUM_VERSION})
+
+target_compile_features(Al PUBLIC cxx_std_17)
 target_include_directories(Al PUBLIC
   $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 target_link_libraries(Al PUBLIC
   HWLOC::hwloc
-  MPI::MPI_CXX
-  $<TARGET_NAME_IF_EXISTS:roc::rccl>
-  $<TARGET_NAME_IF_EXISTS:hip::rocprim_hip>
-  $<TARGET_NAME_IF_EXISTS:hip::hipcub>)
+  MPI::MPI_CXX)
+
 if (AL_HAS_ROCM)
   target_include_directories(Al PRIVATE
     $<BUILD_INTERFACE:${ROCM_SMI_INCLUDE_DIR}>)
-  target_link_libraries(Al PUBLIC ${ROCM_SMI_LIBRARY})
-endif (AL_HAS_ROCM)
-
-target_compile_features(Al PUBLIC cxx_std_17)
-if (AL_HAS_CUDA AND NOT AL_HAS_ROCM)
+  target_link_libraries(Al PUBLIC
+    hip::host
+    roc::rccl
+    hip::hipcub
+    roc::rocprim
+    ${ROCM_SMI_LIBRARY})
+elseif (AL_HAS_CUDA)
+  target_link_libraries(Al PUBLIC
+    CUDA::cudart
+    CUDA::cuda_driver
+    $<$<BOOL:${AL_HAS_NVPROF}>:CUDA::nvToolsExt>
+    $<$<BOOL:${AL_HAS_NCCL}>:cuda::nccl>
+    $<$<BOOL:${AL_HAS_EXTERNAL_CUB}>:cuda::CUB>)
   target_compile_features(Al PUBLIC cuda_std_14)
-endif ()
+endif (AL_HAS_ROCM)
 
 # Header installation. For HIP, install the generated files. For
 # NOGPU/CUDA, install the real files.

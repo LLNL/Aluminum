@@ -36,6 +36,94 @@
 #include <cstdlib>
 #include <cxxopts.hpp>
 
+// This is the path of least resistance for coping with a convoluted
+// FP16/HIP/hipCUB/rocPRIM/RCCL/etc issue. It's easier for now to just
+// do this than to push for the proper fixes.
+//
+// The primary issue is that these operators are declared __device__
+// when compiling as a "HIP" language file (i.e., when "-x hip" is
+// passed to the compiler). Therefore, the proper overload cannot be
+// resolved by the compiler. We just add these simple definitions and
+// we're good to go from a compiler perspective (I don't know what
+// performance cost this incurs, but we have historically suggested
+// NOT using FP16 on the host side (or using a different library to
+// support that)).
+//
+// So, at this point, you might be thinking "but this is not device
+// code? Why is it being compiled as HIP code?", and you'd be right to
+// be thinking that. Indeed, it is not device code, and for its part,
+// nothing in this code requires HIP device support. Except that it
+// #includes hipCUB stuff. For better or worse, AMD has hard-coded
+// "hip::device" into their usage requirements for rocPRIM (via
+// roc::rocprim_hip), which is a usage requirement for hipCUB. So we
+// actually compile all of Aluminum as HIP code.
+//
+// This unveils another interesting discrepancy. When CMake introduced
+// first-class language support for HIP, a new set of IMPORTED targets
+// was introduced: hip-lang::host and hip-lang::device. Naturally,
+// these largely seem to mirror hip::host and hip::device (imported
+// via find_package(hip CONFIG)) except that the hip-lang IMPORTED
+// targets seem to take more care to use Generator Expressions to
+// isolate the flags they add to the detected compilation language for
+// the source file in question. If we were to use hip-lang::device
+// instead of hip::device, the only real benefit is that the compile
+// line looks slightly saner (e.g., "-x hip" is not on it, nor are any
+// of the GPU-related flags); the resulting error messages look worse,
+// however.
+//
+// As it happens, hipCUB/rocPRIM headers rely on these
+// "hip::device"-related command-line options being present as they
+// seem to use some compiler-specific extensions (e.g.,
+// "__align__(b)", where "b" is an int) that are not enabled unless
+// using "-x hip".
+//
+// Also related: It is required the "-D__HIP_PLATFORM_HCC__=1" be on
+// the command line; "-D__HIP_PLATFORM_AMD__=1" is NOT sufficient for
+// hipCUB. If that define is not on the command line, hipCUB will have
+// essentially no symbols, and the compiler will not know about
+// "hipcub::CachingDeviceAllocator".
+//
+// Rather than crawling through this rat's nest of CMake/compiler CLI
+// garbage, it seems like a better use of our time to just add these
+// and move on...
+//
+// I should also note that this is not a problem for CUDA CUB. Its
+// memory allocator file is completely host-side and does not have the
+// same usage requirements imposed upon it, whether by CMake or by
+// C++/CUDA. Ideally, HIP will adopt the same stream-aware memory
+// allocator interface introduced in CUDA 11, and we can move to that
+// universally (since we don't actually use the CUB features of
+// CUB...).
+
+#if defined(AL_HAS_ROCM) && defined(AL_HAS_NCCL)
+
+inline std::ostream& operator<<(std::ostream& os, __half const& x) {
+  return os << static_cast<float>(x);
+}
+
+inline bool operator<(__half const& lhs, __half const& rhs) {
+  return static_cast<float>(lhs) < static_cast<float>(rhs);
+}
+inline bool operator<=(__half const& lhs, __half const& rhs) {
+  return static_cast<float>(lhs) <= static_cast<float>(rhs);
+}
+inline bool operator>(__half const& lhs, __half const& rhs) {
+  return static_cast<float>(lhs) > static_cast<float>(rhs);
+}
+inline bool operator>=(__half const& lhs, __half const& rhs) {
+  return static_cast<float>(lhs) >= static_cast<float>(rhs);
+}
+inline bool operator==(__half const& lhs, __half const& rhs) {
+  return static_cast<float>(lhs) == static_cast<float>(rhs);
+}
+inline bool operator!=(__half const& lhs, __half const& rhs) {
+  return static_cast<float>(lhs) != static_cast<float>(rhs);
+}
+inline __half operator-(__half const& lhs, __half const& rhs) {
+  return static_cast<float>(lhs) - static_cast<float>(rhs);
+}
+
+#endif // defined(AL_HAS_ROCM) && defined(AL_HAS_NCCL)
 
 /** Helper for generating random data. */
 template <typename T, typename Generator,
