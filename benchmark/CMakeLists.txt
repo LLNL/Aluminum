@@ -6,7 +6,8 @@ set_source_path(BENCHMARK_HDRS
   wait.hpp)
 
 set_source_path(BENCHMARK_SRCS
-  benchmark_ops.cpp)
+  benchmark_ops.cpp
+  bandwidth.cpp)
 
 if (AL_HAS_ROCM)
   hipify_header_files(AL_BENCHMARK_HEADERS ${BENCHMARK_HDRS})

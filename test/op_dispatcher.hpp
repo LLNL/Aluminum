@@ -779,6 +779,8 @@ public:
 
   const OpOptions<Backend> &get_options() const { return options; }
 
+  AlOperation get_op() const { return op; }
+
   /**
    * Return the needed input buffer size for an input of the given size.
    *
