@@ -1065,7 +1065,7 @@ class NCCLBackend {
       // For simplicity, we will ensure it is contiguous.
       // TODO: Optimize this.
       size_t sendbuf_len = std::accumulate(send_counts.begin(),
-                                           send_counts.end(), 0);
+                                           send_counts.end(), size_t{0});
       std::vector<size_t> contig_displs = excl_prefix_sum(send_counts);
       tmp_sendbuf = internal::mempool.allocate<internal::MemoryType::CUDA, T>(
         sendbuf_len, stream);
@@ -1124,7 +1124,7 @@ class NCCLBackend {
                                  cudaStream_t stream) {
     // This is implemented as a reduce followed by a scatterv.
     // Rank 0 is the root.
-    size_t count = std::accumulate(counts.begin(), counts.end(), 0);
+    size_t count = std::accumulate(counts.begin(), counts.end(), size_t{0});
     std::vector<size_t> displs = excl_prefix_sum(counts);
     // Need a temporary reduce buffer so we don't trash the entire thing.
     T* tmp_redbuf = internal::mempool.allocate<internal::MemoryType::CUDA, T>(
