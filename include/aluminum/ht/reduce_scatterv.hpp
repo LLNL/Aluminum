@@ -43,7 +43,7 @@ public:
                        ReductionOperator op_, HostTransferCommunicator& comm_,
                        cudaStream_t stream_) :
     HostTransferCollectiveSignalAtEndState(stream_),
-    total_size(std::accumulate(counts_.begin(), counts_.end(), 0)),
+    total_size(std::accumulate(counts_.begin(), counts_.end(), size_t{0})),
     host_mem(mempool.allocate<MemoryType::CUDA_PINNED_HOST, T>(total_size)),
     counts(mpi::intify_size_t_vector(counts_)),
     op(mpi::ReductionOperator2MPI_Op(op_)),

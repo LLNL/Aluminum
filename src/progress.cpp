@@ -110,7 +110,7 @@ std::vector<hwloc_bitmap_t> local_exchange_hwloc_bitmaps(
 
   // Collect all the bitmaps.
   size_t total_len = std::accumulate(bitmap_lens.begin(),
-                                     bitmap_lens.end(), 0);
+                                     bitmap_lens.end(), size_t{0});
   std::vector<unsigned long> gathered_bitmaps = std::vector<unsigned long>(total_len);
   // Compute displacements (TODO: Should generalize excl_prefix_sum).
   std::vector<int> displs = std::vector<int>(bitmap_lens.size(), 0);
