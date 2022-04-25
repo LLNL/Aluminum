@@ -25,21 +25,25 @@
 // permissions and limitations under the license.
 ////////////////////////////////////////////////////////////////////////////////
 
+#include "Al.hpp"
+
 #include <signal.h>
 #include <execinfo.h>
 #include <unistd.h>
 #include <limits.h>
+#include <stdlib.h>
+
 #include <string>
 #include <sstream>
 #include <fstream>
-#include "Al.hpp"
-#include "aluminum/internal.hpp"
+
+#include <Al_config.hpp>
 #include "aluminum/mempool.hpp"
 #include "aluminum/progress.hpp"
+#include "aluminum/trace.hpp"
 #ifdef AL_HAS_CUDA
 #include "aluminum/cuda/cuda.hpp"
 #endif
-#include "aluminum/trace.hpp"
 
 namespace Al {
 

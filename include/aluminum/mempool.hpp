@@ -27,9 +27,10 @@
 
 #pragma once
 
-#include <Al_config.hpp>
-
 #include <cstdlib>
+
+#include <Al_config.hpp>
+#include "aluminum/base.hpp"
 #include "aluminum/utils/caching_allocator.hpp"
 #ifdef AL_HAS_CUDA
 #include "aluminum/cuda/cuda_mempool.hpp"

@@ -25,16 +25,35 @@
 // permissions and limitations under the license.
 ////////////////////////////////////////////////////////////////////////////////
 
-#include <hwloc.h>
-#include <cstdlib>
-#include <vector>
-#include "Al.hpp"
 #include "aluminum/progress.hpp"
+
+#include <iostream>
+#include <numeric>
+#include <string>
+
+#include <hwloc.h>
+#include <mpi.h>
+
+#include <Al_config.hpp>
+#include "aluminum/base.hpp"
+#include "aluminum/tuning_params.hpp"
+#include "aluminum/state.hpp"
+#include "aluminum/mpi/communicator.hpp"
+#include "aluminum/profiling.hpp"
+#ifdef AL_HAS_CUDA
+#include "aluminum/cuda/cuda.hpp"
+#endif
+#ifdef AL_TRACE
 #include "aluminum/trace.hpp"
+#endif
+
 #if defined AL_HAS_ROCM
 #include <hwloc/rsmi.h>
 #elif defined AL_HAS_CUDA
 #include <hwloc/cudart.h>
+#endif
+#ifdef AL_HAS_CUDA
+#include <cuda_runtime.h>
 #endif
 
 namespace Al {

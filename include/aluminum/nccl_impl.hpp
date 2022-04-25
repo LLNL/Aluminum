@@ -35,8 +35,20 @@
 #include <nccl.h>
 #endif // defined(AL_HAS_ROCM)
 
-#include "Al.hpp"
+#include <cstddef>
+#include <functional>
+#include <numeric>
+#include <string>
+#include <vector>
+
+#include <mpi.h>
+
+#include <cuda_runtime.h>
+
+#include "aluminum/base.hpp"
 #include "aluminum/internal.hpp"
+#include "aluminum/utils/utils.hpp"
+#include "aluminum/utils/caching_allocator.hpp"
 #include "aluminum/mempool.hpp"
 #include "aluminum/cuda/cuda.hpp"
 #include "aluminum/cuda/events.hpp"
@@ -1172,6 +1184,8 @@ class NCCLBackend {
 
 };
 
+// Forward declare:
+template <typename Backend> bool Test(typename Backend::req_type&);
 template <>
 inline bool Test<NCCLBackend>(typename NCCLBackend::req_type& req) {
   if (req == NCCLBackend::null_req) {
@@ -1185,6 +1199,8 @@ inline bool Test<NCCLBackend>(typename NCCLBackend::req_type& req) {
   return r;
 }
 
+// Forward declare:
+template <typename Backend> void Wait(typename Backend::req_type&);
 template <>
 inline void Wait<NCCLBackend>(typename NCCLBackend::req_type& req) {
   if (req == NCCLBackend::null_req) {

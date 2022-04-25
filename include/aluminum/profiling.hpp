@@ -34,11 +34,8 @@
 
 #ifdef AL_HAS_NVPROF
 #include <nvToolsExt.h>
-#include <nvToolsExtCuda.h>
-#include <nvToolsExtCudaRt.h>
 #endif
 #ifdef AL_HAS_CUDA
-#include <cuda.h>
 #include <cuda_runtime.h>
 #endif
 

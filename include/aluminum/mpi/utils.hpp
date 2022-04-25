@@ -27,7 +27,13 @@
 
 #pragma once
 
+#include <functional>
+#include <vector>
+
 #include <mpi.h>
+
+#include "aluminum/base.hpp"
+#include "aluminum/internal.hpp"
 
 namespace Al {
 namespace internal {

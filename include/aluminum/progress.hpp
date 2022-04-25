@@ -29,28 +29,32 @@
 
 #pragma once
 
-#include <limits>
-#include <functional>
-#include <list>
-#include <unordered_map>
-#include <thread>
-#include <atomic>
-#include <mutex>
-#include <condition_variable>
-#include <queue>
-#include <algorithm>
-#include <ostream>
 #include <array>
+#include <atomic>
+#include <condition_variable>
+#include <cstddef>
+#include <mutex>
+#include <ostream>
+#include <thread>
+#include <unordered_map>
+#include <vector>
 
-#include "aluminum/base.hpp"
+#include <Al_config.hpp>
 #include "aluminum/tuning_params.hpp"
-#include "aluminum/mpi/communicator.hpp"
 #include "aluminum/state.hpp"
-#include "aluminum/utils/spsc_queue.hpp"
+#ifdef AL_THREAD_MULTIPLE
 #include "aluminum/utils/mpsc_queue.hpp"
+#else
+#include "aluminum/utils/spsc_queue.hpp"
+#endif
 
 namespace Al {
 namespace internal {
+
+// Forward declaration:
+namespace mpi {
+class MPICommunicator;
+}
 
 /**
  * Encapsulates the asynchronous progress engine.

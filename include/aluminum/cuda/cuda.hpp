@@ -27,15 +27,14 @@
 
 #pragma once
 
-#include <Al_config.hpp>
-
-#include <utility>
 #include <sstream>
-#include <functional>
 #include <string>
+
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <cuda_fp16.h>
+
+#include <Al_config.hpp>
 #include "aluminum/base.hpp"
 
 /**

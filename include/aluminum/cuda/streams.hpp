@@ -28,9 +28,12 @@
 #pragma once
 
 #include <atomic>
+#include <cstddef>
+#include <cstdint>
 #include <vector>
 #include <functional>
-#include "aluminum/cuda/cuda.hpp"
+
+#include <cuda_runtime.h>
 
 namespace Al {
 namespace internal {
