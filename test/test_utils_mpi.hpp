@@ -118,18 +118,6 @@ template <> struct OpAlgoType<AlOperation::scatterv, Al::MPIBackend> {
   using type = Al::MPIBackend::scatterv_algo_type;
 };
 
-// Supported algorithms.
-template <>
-std::vector<std::pair<std::string, typename OpAlgoType<AlOperation::allreduce, Al::MPIBackend>::type>> get_supported_algos<AlOperation::allreduce, Al::MPIBackend>() {
-  using algo_type = Al::MPIBackend::allreduce_algo_type;
-  return {{"automatic", algo_type::automatic},
-          {"passthrough", algo_type::mpi_passthrough},
-          {"recursive_doubling", algo_type::mpi_recursive_doubling},
-          {"ring", algo_type::mpi_ring},
-          {"rabenseifner", algo_type::mpi_rabenseifner},
-          {"biring", algo_type::mpi_biring}};
-}
-
 // Algorithms.
 template <>
 struct AlgorithmOptions<Al::MPIBackend> {
