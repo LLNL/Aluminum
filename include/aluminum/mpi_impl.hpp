@@ -209,7 +209,6 @@ class MPIBackend {
   static void Allgather(
     const T* sendbuf, T* recvbuf, size_t count,
     comm_type& comm, allgather_algo_type algo) {
-    if (count == 0) return;
     internal::mpi::assert_count_fits_mpi(count);
     switch (algo) {
     case MPICollectiveAlgorithm::automatic:
@@ -232,7 +231,6 @@ class MPIBackend {
   static void NonblockingAllgather(
     const T* sendbuf, T* recvbuf, size_t count,
     comm_type& comm, req_type& req, allgather_algo_type algo) {
-    if (count == 0) return;
     internal::mpi::assert_count_fits_mpi(count);
     switch (algo) {
     case MPICollectiveAlgorithm::automatic:
@@ -310,7 +308,6 @@ class MPIBackend {
   static void Alltoall(
     const T* sendbuf, T* recvbuf, size_t count,
     comm_type& comm, alltoall_algo_type algo) {
-    if (count == 0) return;
     internal::mpi::assert_count_fits_mpi(count);
     switch (algo) {
     case MPICollectiveAlgorithm::automatic:
@@ -333,7 +330,6 @@ class MPIBackend {
   static void NonblockingAlltoall(
     const T* sendbuf, T* recvbuf, size_t count,
     comm_type& comm, req_type& req, alltoall_algo_type algo) {
-    if (count == 0) return;
     internal::mpi::assert_count_fits_mpi(count);
     switch (algo) {
     case MPICollectiveAlgorithm::automatic:
@@ -441,7 +437,6 @@ class MPIBackend {
   template <typename T>
   static void Bcast(T* buf, size_t count, int root, comm_type& comm,
                     bcast_algo_type algo) {
-    if (count == 0) return;
     internal::mpi::assert_count_fits_mpi(count);
     switch (algo) {
     case MPICollectiveAlgorithm::automatic:
@@ -458,7 +453,6 @@ class MPIBackend {
   static void NonblockingBcast(
     T* buf, size_t count, int root,
     comm_type& comm, req_type& req, bcast_algo_type algo) {
-    if (count == 0) return;
     internal::mpi::assert_count_fits_mpi(count);
     switch (algo) {
     case MPICollectiveAlgorithm::automatic:
@@ -474,7 +468,6 @@ class MPIBackend {
   static void Gather(
     const T* sendbuf, T* recvbuf, size_t count, int root,
     comm_type& comm, gather_algo_type algo) {
-    if (count == 0) return;
     internal::mpi::assert_count_fits_mpi(count);
     switch (algo) {
     case MPICollectiveAlgorithm::automatic:
@@ -497,7 +490,6 @@ class MPIBackend {
   static void NonblockingGather(
     const T* sendbuf, T* recvbuf, size_t count, int root,
     comm_type& comm, req_type& req, gather_algo_type algo) {
-    if (count == 0) return;
     internal::mpi::assert_count_fits_mpi(count);
     switch (algo) {
     case MPICollectiveAlgorithm::automatic:
@@ -575,7 +567,6 @@ class MPIBackend {
   static void Reduce(
     const T* sendbuf, T* recvbuf, size_t count, ReductionOperator op, int root,
     comm_type& comm, reduce_algo_type algo) {
-    if (count == 0) return;
     internal::mpi::assert_count_fits_mpi(count);
     switch (algo) {
     case MPICollectiveAlgorithm::automatic:
@@ -599,7 +590,6 @@ class MPIBackend {
   static void NonblockingReduce(
     const T* sendbuf, T* recvbuf, size_t count, ReductionOperator op, int root,
     comm_type& comm, req_type& req, reduce_algo_type algo) {
-    if (count == 0) return;
     internal::mpi::assert_count_fits_mpi(count);
     switch (algo) {
     case MPICollectiveAlgorithm::automatic:
@@ -622,7 +612,6 @@ class MPIBackend {
   static void Reduce_scatter(
     const T* sendbuf, T* recvbuf, size_t count, ReductionOperator op,
     comm_type& comm, reduce_scatter_algo_type algo) {
-    if (count == 0) return;
     internal::mpi::assert_count_fits_mpi(count);
     switch (algo) {
     case MPICollectiveAlgorithm::automatic:
@@ -646,7 +635,6 @@ class MPIBackend {
   static void NonblockingReduce_scatter(
     const T* sendbuf, T* recvbuf, size_t count, ReductionOperator op,
     comm_type& comm, req_type& req, reduce_scatter_algo_type algo) {
-    if (count == 0) return;
     internal::mpi::assert_count_fits_mpi(count);
     switch (algo) {
     case MPICollectiveAlgorithm::automatic:
@@ -723,7 +711,6 @@ class MPIBackend {
   static void Scatter(
     const T* sendbuf, T* recvbuf, size_t count, int root,
     comm_type& comm, scatter_algo_type algo) {
-    if (count == 0) return;
     internal::mpi::assert_count_fits_mpi(count);
     switch (algo) {
     case MPICollectiveAlgorithm::automatic:
@@ -746,7 +733,6 @@ class MPIBackend {
   static void NonblockingScatter(
     const T* sendbuf, T* recvbuf, size_t count, int root,
     comm_type& comm, req_type& req, scatter_algo_type algo) {
-    if (count == 0) return;
     internal::mpi::assert_count_fits_mpi(count);
     switch (algo) {
     case MPICollectiveAlgorithm::automatic:
