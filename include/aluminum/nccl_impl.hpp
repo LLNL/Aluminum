@@ -805,9 +805,6 @@ class NCCLBackend {
   static void do_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                            ReductionOperator op, comm_type& comm,
                            cudaStream_t stream) {
-    if (count == 0) {
-      return;
-    }
     if (sendbuf == internal::IN_PLACE<T>()) {
       sendbuf = recvbuf;
     }
@@ -821,9 +818,6 @@ class NCCLBackend {
   template <typename T>
   static void do_send(const T* sendbuf, size_t count, int dest, comm_type& comm,
                       cudaStream_t stream) {
-    if (count == 0) {
-      return;
-    }
     AL_CHECK_NCCL(ncclSend((const void*) sendbuf, count,
                            internal::nccl::TypeMap<T>(), dest,
                            comm.m_nccl_comm, stream));
@@ -833,9 +827,6 @@ class NCCLBackend {
   template <typename T>
   static void do_recv(T* recvbuf, size_t count, int src, comm_type& comm,
                       cudaStream_t stream) {
-    if (count == 0) {
-      return;
-    }
     AL_CHECK_NCCL(ncclRecv((void*) recvbuf, count,
                            internal::nccl::TypeMap<T>(), src,
                            comm.m_nccl_comm, stream));
@@ -846,21 +837,13 @@ class NCCLBackend {
   static void do_sendrecv(const T* sendbuf, size_t send_count, int dest,
                           T* recvbuf, size_t recv_count, int src,
                           comm_type& comm, cudaStream_t stream) {
-    if (send_count == 0 && recv_count == 0) {
-      return;
-    }
     AL_CHECK_NCCL(ncclGroupStart());
-    // Work around some sort of potential bug.
-    if (send_count != 0) {
-      AL_CHECK_NCCL(ncclSend((const void*) sendbuf, send_count,
-                             internal::nccl::TypeMap<T>(), dest,
-                             comm.m_nccl_comm, stream));
-    }
-    if (recv_count != 0) {
-      AL_CHECK_NCCL(ncclRecv((void*) recvbuf, recv_count,
-                             internal::nccl::TypeMap<T>(), src,
-                             comm.m_nccl_comm, stream));
-    }
+    AL_CHECK_NCCL(ncclSend((const void*) sendbuf, send_count,
+                           internal::nccl::TypeMap<T>(), dest,
+                           comm.m_nccl_comm, stream));
+    AL_CHECK_NCCL(ncclRecv((void*) recvbuf, recv_count,
+                           internal::nccl::TypeMap<T>(), src,
+                           comm.m_nccl_comm, stream));
     AL_CHECK_NCCL(ncclGroupEnd());
   }
 
@@ -881,9 +864,6 @@ class NCCLBackend {
   template <typename T>
   static void do_broadcast(T* buf, size_t count, int root, comm_type& comm,
                            cudaStream_t stream) {
-    if (count == 0) {
-      return;
-    }
     AL_CHECK_NCCL(ncclBroadcast((const void*) buf, (void*) buf, count,
                                 internal::nccl::TypeMap<T>(), root,
                                 comm.m_nccl_comm, stream));
@@ -893,9 +873,6 @@ class NCCLBackend {
   template <typename T>
   static void do_gather(const T* sendbuf, T* recvbuf, size_t count, int root,
                         comm_type& comm, cudaStream_t stream) {
-    if (count == 0) {
-      return;
-    }
     if (sendbuf == internal::IN_PLACE<T>()) {
       if (comm.rank() == root) {
         sendbuf = recvbuf + comm.rank() * count;
@@ -968,9 +945,6 @@ class NCCLBackend {
   static void do_reduce(const T* sendbuf, T* recvbuf, size_t count,
                         ReductionOperator op, int root, comm_type& comm,
                         cudaStream_t stream) {
-    if (count == 0) {
-      return;
-    }
     if (sendbuf == internal::IN_PLACE<T>()) {
       sendbuf = recvbuf;
     }
@@ -984,9 +958,6 @@ class NCCLBackend {
   template <typename T>
   static void do_allgather(const T* sendbuf, T* recvbuf, size_t send_count,
                            comm_type& comm, cudaStream_t stream) {
-    if (send_count == 0) {
-      return;
-    }
     if (sendbuf == internal::IN_PLACE<T>()) {
       sendbuf = recvbuf + comm.rank()*send_count;
     }
@@ -1021,9 +992,6 @@ class NCCLBackend {
   template <typename T>
   static void do_alltoall(const T* sendbuf, T* recvbuf, size_t count,
                           comm_type& comm, cudaStream_t stream) {
-    if (count == 0) {
-      return;
-    }
     if (sendbuf == internal::IN_PLACE<T>()) {
       sendbuf = recvbuf;
     }
@@ -1103,9 +1071,6 @@ class NCCLBackend {
   static void do_reduce_scatter(const T* sendbuf, T* recvbuf,
                                 size_t recv_count, ReductionOperator op,
                                 comm_type& comm, cudaStream_t stream) {
-    if (recv_count == 0) {
-      return;
-    }
     if (sendbuf == internal::IN_PLACE<T>()) {
       sendbuf = recvbuf;
     }
@@ -1143,9 +1108,6 @@ class NCCLBackend {
   template <typename T>
   static void do_scatter(const T* sendbuf, T* recvbuf, size_t count, int root,
                          comm_type& comm, cudaStream_t stream) {
-    if (count == 0) {
-      return;
-    }
     if (sendbuf == internal::IN_PLACE<T>() && comm.rank() == root) {
       sendbuf = recvbuf;
       recvbuf = recvbuf + comm.rank()*count;

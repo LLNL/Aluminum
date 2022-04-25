@@ -130,7 +130,6 @@ class HostTransferBackend {
   static void Allreduce(const T* sendbuf, T* recvbuf, size_t count,
                         ReductionOperator op, comm_type& comm,
                         allreduce_algo_type algo) {
-    if (count == 0) return;
     switch (algo) {
     case HostTransferAllreduceAlgorithm::automatic:
     case HostTransferAllreduceAlgorithm::host_transfer:
@@ -154,7 +153,6 @@ class HostTransferBackend {
       comm_type& comm,
       req_type& req,
       allreduce_algo_type algo) {
-    if (count == 0) return;
     cudaStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     switch (algo) {
@@ -228,7 +226,6 @@ class HostTransferBackend {
   static void Allgather(
     const T* sendbuf, T* recvbuf, size_t count,
     comm_type& comm, allgather_algo_type algo) {
-    if (count == 0) return;
     switch (algo) {
     case HostTransferCollectiveAlgorithm::automatic:
       do_allgather(sendbuf, recvbuf, count, comm, comm.get_stream());
@@ -248,7 +245,6 @@ class HostTransferBackend {
   static void NonblockingAllgather(
     const T* sendbuf, T* recvbuf, size_t count,
     comm_type& comm, req_type& req, allgather_algo_type algo) {
-    if (count == 0) return;
     cudaStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     switch (algo) {
@@ -319,7 +315,6 @@ class HostTransferBackend {
   static void Alltoall(
     const T* sendbuf, T* recvbuf, size_t count,
     comm_type& comm, alltoall_algo_type algo) {
-    if (count == 0) return;
     switch (algo) {
     case HostTransferCollectiveAlgorithm::automatic:
       do_alltoall(sendbuf, recvbuf, count, comm, comm.get_stream());
@@ -339,7 +334,6 @@ class HostTransferBackend {
   static void NonblockingAlltoall(
     const T* sendbuf, T* recvbuf, size_t count,
     comm_type& comm, req_type& req, alltoall_algo_type algo) {
-    if (count == 0) return;
     cudaStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     switch (algo) {
@@ -441,7 +435,6 @@ class HostTransferBackend {
   template <typename T>
   static void Bcast(T* buf, size_t count, int root, comm_type& comm,
                     bcast_algo_type algo) {
-    if (count == 0) return;
     switch (algo) {
     case HostTransferCollectiveAlgorithm::automatic:
       do_bcast(buf, count, root, comm, comm.get_stream());
@@ -455,7 +448,6 @@ class HostTransferBackend {
   static void NonblockingBcast(
     T* buf, size_t count, int root,
     comm_type& comm, req_type& req, bcast_algo_type algo) {
-    if (count == 0) return;
     cudaStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     switch (algo) {
@@ -472,7 +464,6 @@ class HostTransferBackend {
   static void Gather(
     const T* sendbuf, T* recvbuf, size_t count, int root,
     comm_type& comm, gather_algo_type algo) {
-    if (count == 0) return;
     switch (algo) {
     case HostTransferCollectiveAlgorithm::automatic:
       do_gather(sendbuf, recvbuf, count, root, comm, comm.get_stream());
@@ -492,7 +483,6 @@ class HostTransferBackend {
   static void NonblockingGather(
     const T* sendbuf, T* recvbuf, size_t count, int root,
     comm_type& comm, req_type& req, gather_algo_type algo) {
-    if (count == 0) return;
     cudaStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     switch (algo) {
@@ -561,7 +551,6 @@ class HostTransferBackend {
   static void Reduce(
     const T* sendbuf, T* recvbuf, size_t count, ReductionOperator op, int root,
     comm_type& comm, reduce_algo_type algo) {
-    if (count == 0) return;
     switch (algo) {
     case HostTransferCollectiveAlgorithm::automatic:
       do_reduce(sendbuf, recvbuf, count, op, root, comm, comm.get_stream());
@@ -582,7 +571,6 @@ class HostTransferBackend {
   static void NonblockingReduce(
     const T* sendbuf, T* recvbuf, size_t count, ReductionOperator op, int root,
     comm_type& comm, req_type& req, reduce_algo_type algo) {
-    if (count == 0) return;
     cudaStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     switch (algo) {
@@ -606,7 +594,6 @@ class HostTransferBackend {
   static void Reduce_scatter(
     const T* sendbuf, T* recvbuf, size_t count, ReductionOperator op,
     comm_type& comm, reduce_scatter_algo_type algo) {
-    if (count == 0) return;
     switch (algo) {
     case HostTransferCollectiveAlgorithm::automatic:
       do_reduce_scatter(sendbuf, recvbuf, count, op, comm, comm.get_stream());
@@ -627,7 +614,6 @@ class HostTransferBackend {
   static void NonblockingReduce_scatter(
     const T* sendbuf, T* recvbuf, size_t count, ReductionOperator op,
     comm_type& comm, req_type& req, reduce_scatter_algo_type algo) {
-    if (count == 0) return;
     cudaStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     switch (algo) {
@@ -694,7 +680,6 @@ class HostTransferBackend {
   static void Scatter(
     const T* sendbuf, T* recvbuf, size_t count, int root,
     comm_type& comm, scatter_algo_type algo) {
-    if (count == 0) return;
     switch (algo) {
     case HostTransferCollectiveAlgorithm::automatic:
       do_scatter(sendbuf, recvbuf, count, root, comm, comm.get_stream());
@@ -714,7 +699,6 @@ class HostTransferBackend {
   static void NonblockingScatter(
     const T* sendbuf, T* recvbuf, size_t count, int root,
     comm_type& comm, req_type& req, scatter_algo_type algo) {
-    if (count == 0) return;
     cudaStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     switch (algo) {
