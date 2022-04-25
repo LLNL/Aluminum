@@ -68,43 +68,10 @@ constexpr int default_tag = 0;
 }  // namespace mpi
 }  // namespace internal
 
-/**
- * Supported allreduce algorithms.
- * This is used for requesting a particular algorithm. Use automatic to let the
- * library select for you.
- */
-enum class MPIAllreduceAlgorithm {
-  automatic,
-  mpi_passthrough,
-  mpi_recursive_doubling,
-  mpi_ring,
-  mpi_rabenseifner,
-  mpi_biring
-};
-/** Supported algorithms for other collectives. */
+/** Supported algorithms for collectives. */
 enum class MPICollectiveAlgorithm {
   automatic
 };
-
-/** Return a textual name for an MPI allreduce algorithm. */
-inline std::string algorithm_name(MPIAllreduceAlgorithm algo) {
-  switch (algo) {
-  case MPIAllreduceAlgorithm::automatic:
-    return "automatic";
-  case MPIAllreduceAlgorithm::mpi_passthrough:
-    return "passthrough";
-  case MPIAllreduceAlgorithm::mpi_recursive_doubling:
-    return "recursive_doubling";
-  case MPIAllreduceAlgorithm::mpi_ring:
-    return "ring";
-  case MPIAllreduceAlgorithm::mpi_rabenseifner:
-    return "rabenseifner";
-  case MPIAllreduceAlgorithm::mpi_biring:
-    return "biring";
-  default:
-    return "unknown";
-  }
-}
 
 /** Return a textual name for a collective algorithm. */
 inline std::string algorithm_name(MPICollectiveAlgorithm algo) {
@@ -118,7 +85,7 @@ inline std::string algorithm_name(MPICollectiveAlgorithm algo) {
 
 class MPIBackend {
  public:
-  using allreduce_algo_type = MPIAllreduceAlgorithm;
+  using allreduce_algo_type = MPICollectiveAlgorithm;
   using allgather_algo_type = MPICollectiveAlgorithm;
   using allgatherv_algo_type = MPICollectiveAlgorithm;
   using alltoall_algo_type = MPICollectiveAlgorithm;
@@ -139,39 +106,16 @@ class MPIBackend {
   template <typename T>
   static void Allreduce(const T* sendbuf, T* recvbuf, size_t count,
                         ReductionOperator op, comm_type& comm,
-                        allreduce_algo_type algo,
-                        const int tag = internal::mpi::default_tag) {
+                        allreduce_algo_type algo) {
     internal::mpi::assert_count_fits_mpi(count);
-    if (algo == MPIAllreduceAlgorithm::automatic) {
-      algo = MPIAllreduceAlgorithm::mpi_passthrough;
-    }
-#ifdef AL_MPI_SERIALIZE
-    if (algo != MPIAllreduceAlgorithm::mpi_passthrough) {
-      throw_al_exception(
-        "Only passthrough allreduce supported with AL_MPI_SERIALIZE");
-    }
-#endif
     switch (algo) {
-      case MPIAllreduceAlgorithm::mpi_passthrough:
+      case MPICollectiveAlgorithm::automatic:
         handle_serialized(internal::mpi::passthrough_allreduce<T>,
-                          internal::mpi::nb_passthrough_allreduce<T>,
+                          internal::mpi::passthrough_nb_allreduce<T>,
                           sendbuf, recvbuf, count, op, comm);
         break;
-      case MPIAllreduceAlgorithm::mpi_recursive_doubling:
-        internal::mpi::recursive_doubling_allreduce(
-          sendbuf, recvbuf, count, op, comm, tag);
-        break;
-      case MPIAllreduceAlgorithm::mpi_ring:
-        internal::mpi::ring_allreduce(sendbuf, recvbuf, count, op, comm, false, 1, tag);
-        break;
-      case MPIAllreduceAlgorithm::mpi_rabenseifner:
-        internal::mpi::rabenseifner_allreduce(sendbuf, recvbuf, count, op, comm, tag);
-        break;
-      case MPIAllreduceAlgorithm::mpi_biring:
-        internal::mpi::ring_allreduce(sendbuf, recvbuf, count, op, comm, true, 1, tag);
-        break;
       default:
-        throw_al_exception("Invalid algorithm for Allreduce");
+        throw_al_exception("Invalid algorithm");
     }
   }
 
@@ -190,27 +134,13 @@ class MPIBackend {
       req_type& req,
       allreduce_algo_type algo) {
     internal::mpi::assert_count_fits_mpi(count);
-    if (algo == MPIAllreduceAlgorithm::automatic) {
-      algo = MPIAllreduceAlgorithm::mpi_passthrough;
-    }
     switch (algo) {
-      case MPIAllreduceAlgorithm::mpi_passthrough:
-        internal::mpi::nb_passthrough_allreduce(sendbuf, recvbuf, count, op, comm,
+    case MPICollectiveAlgorithm::automatic:
+        internal::mpi::passthrough_nb_allreduce(sendbuf, recvbuf, count, op, comm,
                                                 req);
         break;
-      case MPIAllreduceAlgorithm::mpi_recursive_doubling:
-        internal::mpi::nb_recursive_doubling_allreduce(
-            sendbuf, recvbuf, count, op, comm, req);
-        break;
-      case MPIAllreduceAlgorithm::mpi_ring:
-        internal::mpi::nb_ring_allreduce(sendbuf, recvbuf, count, op, comm, req);
-        break;
-      case MPIAllreduceAlgorithm::mpi_rabenseifner:
-        internal::mpi::nb_rabenseifner_allreduce(sendbuf, recvbuf, count, op, comm,
-                                                 req);
-        break;
       default:
-        throw_al_exception("Invalid algorithm for NonblockingAllreduce");
+        throw_al_exception("Invalid algorithm");
     }
   }
 
