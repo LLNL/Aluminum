@@ -2,7 +2,7 @@
 
 **Aluminum** provides a generic interface to high-performance communication libraries for both CPU and GPU platforms and GPU-friendly semantics.
 
-If you use Aluminum, please cite our paper:
+If you use Aluminum, please cite [our paper](https://ieeexplore.ieee.org/document/8638639):
 ```
 @inproceedings{dryden2018aluminum,
   title={Aluminum: An Asynchronous, {GPU}-Aware Communication Library Optimized for Large-Scale Training of Deep Neural Networks on {HPC} Systems},
@@ -40,6 +40,16 @@ These semantics are comparable to those provided by NCCL.
 Aluminum provides support for non-blocking GPU communication operations in its `NCCL` and `HostTransfer` backends.
 Much like non-blocking MPI operations can be initiated by a thread, progress in the background, and be waited on for completion later, a CUDA stream can do the same thing.
 Aluminum will manage the necessary synchronization and progress, and the communication will be performed on an internal CUDA stream.
+
+### Thread Safety
+
+Aluminum provides different levels of thread safety, depending on user requirements.
+This must be chosen at compile time.
+All builds of Aluminum are safe to use in the presence of external threads, but Aluminum offers different guarantes when multiple threads attempt to use Aluminum concurrently.
+* A standard build of Aluminum supports only a single thread calling an Aluminum API at a given time. However, Aluminum APIs may be called by multiple different threads, so long as access is synchronized by the caller. (This is equivalent to `MPI_THREAD_SERIALIZED`.)
+* Aluminum may be built with `-D ALUMINUM_ENABLE_THREAD_MULTIPLE=YES` to enable support for multiple threads to call Aluminum APIs concurrently. Aluminum will provide the appropriate synchronization, but the caller is required to ensure that no cyclic dependencies, deadlocks, races, or the like are introduced. (This is equivalent to `MPI_THREAD_MULTIPLE`.)
+
+There is one exception: Concurrent construction of communicators is not guaranteed to be safe.
 
 ## Getting started
 
