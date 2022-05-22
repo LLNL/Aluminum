@@ -70,10 +70,41 @@ constexpr int default_tag = 0;
 }  // namespace mpi
 }  // namespace internal
 
+/**
+ * Supported allreduce algorithms.
+ * This is used for requesting a particular algorithm. Use automatic to let the
+ * library select for you.
+ *
+ * Note: These are kept for backwards compatibility and are all
+ * equivalent to an automatic algorithm that passes through to MPI.
+ */
+enum class MPIAllreduceAlgorithm {
+  automatic,
+  mpi_passthrough,
+  mpi_recursive_doubling,
+  mpi_ring,
+  mpi_rabenseifner,
+  mpi_biring
+};
 /** Supported algorithms for collectives. */
 enum class MPICollectiveAlgorithm {
   automatic
 };
+
+/** Return a textual name for an MPI allreduce algorithm. */
+inline std::string algorithm_name(MPIAllreduceAlgorithm algo) {
+  switch (algo) {
+  case MPIAllreduceAlgorithm::automatic:
+  case MPIAllreduceAlgorithm::mpi_passthrough:
+  case MPIAllreduceAlgorithm::mpi_recursive_doubling:
+  case MPIAllreduceAlgorithm::mpi_ring:
+  case MPIAllreduceAlgorithm::mpi_rabenseifner:
+  case MPIAllreduceAlgorithm::mpi_biring:
+    return "automatic";
+  default:
+    return "unknown";
+  }
+}
 
 /** Return a textual name for a collective algorithm. */
 inline std::string algorithm_name(MPICollectiveAlgorithm algo) {
@@ -87,7 +118,7 @@ inline std::string algorithm_name(MPICollectiveAlgorithm algo) {
 
 class MPIBackend {
  public:
-  using allreduce_algo_type = MPICollectiveAlgorithm;
+  using allreduce_algo_type = MPIAllreduceAlgorithm;
   using allgather_algo_type = MPICollectiveAlgorithm;
   using allgatherv_algo_type = MPICollectiveAlgorithm;
   using alltoall_algo_type = MPICollectiveAlgorithm;
@@ -111,7 +142,12 @@ class MPIBackend {
                         allreduce_algo_type algo) {
     internal::mpi::assert_count_fits_mpi(count);
     switch (algo) {
-      case MPICollectiveAlgorithm::automatic:
+      case MPIAllreduceAlgorithm::automatic:
+      case MPIAllreduceAlgorithm::mpi_passthrough:
+      case MPIAllreduceAlgorithm::mpi_recursive_doubling:
+      case MPIAllreduceAlgorithm::mpi_ring:
+      case MPIAllreduceAlgorithm::mpi_rabenseifner:
+      case MPIAllreduceAlgorithm::mpi_biring:
         handle_serialized(internal::mpi::passthrough_allreduce<T>,
                           internal::mpi::passthrough_nb_allreduce<T>,
                           sendbuf, recvbuf, count, op, comm);
@@ -137,7 +173,12 @@ class MPIBackend {
       allreduce_algo_type algo) {
     internal::mpi::assert_count_fits_mpi(count);
     switch (algo) {
-    case MPICollectiveAlgorithm::automatic:
+      case MPIAllreduceAlgorithm::automatic:
+      case MPIAllreduceAlgorithm::mpi_passthrough:
+      case MPIAllreduceAlgorithm::mpi_recursive_doubling:
+      case MPIAllreduceAlgorithm::mpi_ring:
+      case MPIAllreduceAlgorithm::mpi_rabenseifner:
+      case MPIAllreduceAlgorithm::mpi_biring:
         internal::mpi::passthrough_nb_allreduce(sendbuf, recvbuf, count, op, comm,
                                                 req);
         break;
