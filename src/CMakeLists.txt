@@ -75,6 +75,47 @@ target_link_libraries(Al PUBLIC
   MPI::MPI_CXX)
 
 if (AL_HAS_ROCM)
+  set(HIP_CLANG_ROOT "${AL_ROCM_PATH}/llvm")
+
+  ##############################
+  # FIXME: This bit is to fix errors in the HIP CMake config
+  # file. Hopefully this can be removed in a future version of ROCm.
+  file(GLOB HIP_CLANG_INCLUDE_SEARCH_PATHS
+    "${HIP_CLANG_ROOT}/lib/clang/*/include")
+  find_path(HIP_CLANG_INCLUDE_PATH stddef.h
+    HINTS "${HIP_CLANG_INCLUDE_SEARCH_PATHS}"
+    NO_DEFAULT_PATH)
+
+  file(GLOB HIP_CLANGRT_LIB_SEARCH_PATHS
+    "${HIP_CLANG_ROOT}/lib/clang/*/lib/*")
+  find_library(ACTUAL_CLANGRT_BUILTINS clangrt-builtins
+    NAMES
+    clang_rt.builtins
+    clang_rt.builtins-x86_64
+    PATHS
+    "${HIP_CLANGRT_LIB_SEARCH_PATHS}")
+
+  get_target_property(_HIP_HOST_LIBS hip::host INTERFACE_LINK_LIBRARIES)
+  get_target_property(_HIP_DEVICE_LIBS hip::device INTERFACE_LINK_LIBRARIES)
+
+  string(REPLACE
+    "CLANGRT_BUILTINS-NOTFOUND"
+    "${ACTUAL_CLANGRT_BUILTINS}"
+    _NEW_HIP_HOST_LIBS
+    "${_HIP_HOST_LIBS}")
+  string(REPLACE
+    "CLANGRT_BUILTINS-NOTFOUND"
+    "${ACTUAL_CLANGRT_BUILTINS}"
+    _NEW_HIP_DEVICE_LIBS
+    "${_HIP_DEVICE_LIBS}")
+
+  set_property(TARGET hip::host
+    PROPERTY INTERFACE_LINK_LIBRARIES ${_NEW_HIP_HOST_LIBS})
+  set_property(TARGET hip::device
+    PROPERTY INTERFACE_LINK_LIBRARIES ${_NEW_HIP_DEVICE_LIBS})
+  # END FIXME BLOCK
+  ##############################
+
   target_include_directories(Al PRIVATE
     $<BUILD_INTERFACE:${ROCM_SMI_INCLUDE_DIR}>)
   target_link_libraries(Al PUBLIC
@@ -82,7 +123,8 @@ if (AL_HAS_ROCM)
     roc::rccl
     hip::hipcub
     roc::rocprim
-    ${ROCM_SMI_LIBRARY})
+    ${ROCM_SMI_LIBRARY}
+    Threads::Threads)
 elseif (AL_HAS_CUDA)
   target_link_libraries(Al PUBLIC
     CUDA::cudart
