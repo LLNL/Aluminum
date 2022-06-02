@@ -48,6 +48,7 @@
 #endif
 
 #if defined AL_HAS_ROCM
+#include <rocm_smi/rocm_smi.h>
 #include <hwloc/rsmi.h>
 #elif defined AL_HAS_CUDA
 #include <hwloc/cudart.h>
@@ -363,10 +364,14 @@ void ProgressEngine::bind() {
   hwloc_cpuset_t cpuset = hwloc_bitmap_alloc();
 #ifdef AL_HAS_ROCM
   {
+    // We need RSMI to be initialized for the hwloc_rsmi call.
+    // We only use it here, so initialize it and shut it down.
+    rsmi_init(0);
     int device;
     // The macro will be hipified.
     AL_CHECK_CUDA(hipGetDevice(&device));
     hwloc_rsmi_get_device_cpuset(topo, device, cpuset);
+    rsmi_shut_down();
   }
 #elif defined AL_HAS_CUDA
   {
