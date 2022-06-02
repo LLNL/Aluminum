@@ -25,15 +25,16 @@
 // permissions and limitations under the license.
 ////////////////////////////////////////////////////////////////////////////////
 
-#include <vector>
-#include <mutex>
-#include "Al.hpp"
 #include "aluminum/cuda/cuda.hpp"
+
+#include <cstdint>
+#include <vector>
+
 #include "aluminum/cuda/sync_memory.hpp"
 #include "aluminum/cuda/events.hpp"
 #include "aluminum/cuda/streams.hpp"
-#include "aluminum/cuda/cuda_mempool.hpp"
-#include "aluminum/mempool.hpp"
+#include "aluminum/utils/locked_resource_pool.hpp"
+#include "aluminum/tuning_params.hpp"
 
 namespace Al {
 namespace internal {

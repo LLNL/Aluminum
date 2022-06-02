@@ -26,6 +26,12 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "aluminum/cuda/streams.hpp"
+
+#include <string>
+
+#include <Al_config.hpp>
+#include "aluminum/base.hpp"
+#include "aluminum/cuda/cuda.hpp"
 #include "aluminum/profiling.hpp"
 
 namespace Al {

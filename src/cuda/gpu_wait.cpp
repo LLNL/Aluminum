@@ -25,8 +25,9 @@
 // permissions and limitations under the license.
 ////////////////////////////////////////////////////////////////////////////////
 
-#include "Al.hpp"
 #include "aluminum/cuda/gpu_wait.hpp"
+
+#include "aluminum/cuda/cuda.hpp"
 #include "aluminum/cuda/helper_kernels.hpp"
 #include "aluminum/cuda/sync_memory.hpp"
 

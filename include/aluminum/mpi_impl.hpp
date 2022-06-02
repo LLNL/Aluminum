@@ -27,13 +27,15 @@
 
 #pragma once
 
-#include <algorithm>
+#include <cstddef>
+#include <string>
+#include <utility>
 #include <vector>
-#include <numeric>
 
+#include "aluminum/base.hpp"
 #include "aluminum/internal.hpp"
 #include "aluminum/progress.hpp"
-#include "aluminum/mempool.hpp"
+#include "aluminum/state.hpp"
 
 #include "aluminum/mpi/communicator.hpp"
 #include "aluminum/mpi/utils.hpp"
@@ -831,12 +833,16 @@ private:
   }
 };
 
+// Forward declare:
+template <typename Backend> bool Test(typename Backend::req_type&);
 template <>
 inline bool Test<MPIBackend>(typename MPIBackend::req_type& req) {
   internal::ProgressEngine* pe = internal::get_progress_engine();
   return pe->is_complete(req);
 }
 
+// Forward declare:
+template <typename Backend> void Wait(typename Backend::req_type&);
 template <>
 inline void Wait<MPIBackend>(typename MPIBackend::req_type& req) {
   internal::ProgressEngine* pe = internal::get_progress_engine();

@@ -27,9 +27,19 @@
 
 #pragma once
 
-#include "Al.hpp"
+#include <cstddef>
+#include <string>
+#include <vector>
+
+#include <cuda_runtime.h>
+
+#include "aluminum/base.hpp"
+#include "aluminum/cuda/cuda.hpp"
 #include "aluminum/cuda/events.hpp"
 #include "aluminum/cuda/streams.hpp"
+#include "aluminum/progress.hpp"
+
+// IWYU pragma: begin_exports
 #include "aluminum/ht/communicator.hpp"
 #include "aluminum/ht/allgather.hpp"
 #include "aluminum/ht/allgatherv.hpp"
@@ -46,6 +56,7 @@
 #include "aluminum/ht/scatter.hpp"
 #include "aluminum/ht/scatterv.hpp"
 #include "aluminum/ht/pt2pt.hpp"
+// IWYU pragma: end_exports
 
 namespace Al {
 
@@ -968,6 +979,8 @@ class HostTransferBackend {
   }
 };
 
+// Forward declare:
+template <typename Backend> bool Test(typename Backend::req_type&);
 template <>
 inline bool Test<HostTransferBackend>(typename HostTransferBackend::req_type& req) {
   if (req == HostTransferBackend::null_req) {
@@ -981,6 +994,8 @@ inline bool Test<HostTransferBackend>(typename HostTransferBackend::req_type& re
   return r;
 }
 
+// Forward declare:
+template <typename Backend> void Wait(typename Backend::req_type&);
 template <>
 inline void Wait<HostTransferBackend>(typename HostTransferBackend::req_type& req) {
   if (req == HostTransferBackend::null_req) {

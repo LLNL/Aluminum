@@ -25,12 +25,15 @@
 // permissions and limitations under the license.
 ////////////////////////////////////////////////////////////////////////////////
 
+#include "aluminum/trace.hpp"
+
 #include <unistd.h>
 #include <limits.h>
-#include <iostream>
-#include <vector>
+
 #include <fstream>
-#include "Al.hpp"
+#include <vector>
+
+#include "aluminum/state.hpp"
 
 namespace Al {
 namespace internal {

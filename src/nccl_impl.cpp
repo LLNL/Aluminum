@@ -27,6 +27,9 @@
 
 #include "aluminum/nccl_impl.hpp"
 
+#include <exception>
+#include <iostream>
+
 namespace Al {
 
 // Initialize this.

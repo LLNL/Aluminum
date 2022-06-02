@@ -25,7 +25,10 @@
 // permissions and limitations under the license.
 ////////////////////////////////////////////////////////////////////////////////
 
-#include "Al.hpp"
+#include "aluminum/mpi_impl.hpp"
+#include <mpi.h>
+#include "aluminum/base.hpp"
+#include "aluminum/mpi/communicator.hpp"
 
 namespace Al {
 namespace internal {

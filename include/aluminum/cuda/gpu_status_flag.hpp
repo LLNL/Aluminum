@@ -27,9 +27,10 @@
 
 #pragma once
 
-#include <Al_config.hpp>
+#include <cstdint>
 
-#include "aluminum/cuda/cuda.hpp"
+#include <cuda.h>
+#include <cuda_runtime.h>
 
 namespace Al {
 namespace internal {

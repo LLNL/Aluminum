@@ -27,6 +27,13 @@
 
 #include "aluminum/profiling.hpp"
 
+#include <Al_config.hpp>
+
+#ifdef AL_HAS_NVPROF
+#include <nvToolsExtCuda.h>
+#include <nvToolsExtCudaRt.h>
+#endif
+
 namespace Al {
 namespace internal {
 namespace profiling {
