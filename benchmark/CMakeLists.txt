@@ -38,6 +38,11 @@ foreach(src ${AL_BENCHMARK_SOURCES})
   if (AL_HAS_CUDA AND NOT AL_HAS_ROCM)
     target_link_libraries(${_benchmark_exe_name} PUBLIC cuda)
   endif ()
+
+  # FIXME: Hopefully this can be removed in a future version of ROCm.
+  if (AL_HAS_ROCM AND AL_BUILD_TYPE_UPPER MATCHES "DEBUG")
+    target_compile_options(${_benchmark_exe_name} PRIVATE "-O0")
+  endif ()
 endforeach()
 
 # Do it all again for "special" benchmarks...
@@ -92,5 +97,10 @@ foreach(src ${AL_SPECIAL_BENCHMARK_SOURCES})
 
   if (AL_HAS_CUDA AND NOT AL_HAS_ROCM)
     target_link_libraries(${_benchmark_exe_name} PRIVATE cuda)
+  endif ()
+
+  # FIXME: Hopefully this can be removed in a future version of ROCm.
+  if (AL_HAS_ROCM AND AL_BUILD_TYPE_UPPER MATCHES "DEBUG")
+    target_compile_options(${_benchmark_exe_name} PRIVATE "-O0")
   endif ()
 endforeach ()

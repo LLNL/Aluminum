@@ -65,6 +65,11 @@ if (AL_ENABLE_TESTS)
       target_link_libraries(${_test_exe_name} PUBLIC cuda)
     endif()
     target_link_libraries(${_test_exe_name} PRIVATE Threads::Threads)
+
+    # FIXME: Hopefully this can be removed in a future version of ROCm.
+    if (AL_HAS_ROCM AND AL_BUILD_TYPE_UPPER MATCHES "DEBUG")
+      target_compile_options(${_test_exe_name} PRIVATE "-O0")
+    endif ()
   endforeach()
 
   # FIXME: Should any of these tests be enabled with ROCm?
@@ -89,5 +94,11 @@ if (AL_ENABLE_TESTS)
     target_link_libraries(test_rma_halo_exchange.exe PRIVATE Al)
     target_link_libraries(test_rma_halo_exchange.exe PUBLIC cuda)
     target_link_libraries(${_test_exe_name} PRIVATE Threads::Threads)
+  endif ()
+
+  if (AL_HAS_ROCM AND AL_BUILD_TYPE_UPPER MATCHES "DEBUG")
+    set_source_files_properties(
+      ${AL_TEST_SOURCES}
+      COMPILE_OPTIONS "-O0")
   endif ()
 endif ()
