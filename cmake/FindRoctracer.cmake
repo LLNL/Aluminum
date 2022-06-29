@@ -47,7 +47,9 @@ foreach (comp IN LISTS Roctracer_FIND_COMPONENTS)
   if (${comp}_LIBRARY AND ${comp}_INCLUDE_PATH)
     set(Roctracer_${comp}_FOUND TRUE)
 
-    add_library(roctracer::${comp}_api INTERFACE IMPORTED)
+    if (NOT TARGET roctracer::${comp}_api)
+      add_library(roctracer::${comp}_api INTERFACE IMPORTED)
+    endif ()
     target_link_libraries(roctracer::${comp}_api INTERFACE
       "${${comp}_LIBRARY}")
     target_include_directories(roctracer::${comp}_api INTERFACE
@@ -66,7 +68,9 @@ include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(Roctracer HANDLE_COMPONENTS)
 
 if (Roctracer_FOUND)
-  add_library(roctracer::roctracer INTERFACE IMPORTED)
+  if (NOT TARGET roctracer::roctracer)
+    add_library(roctracer::roctracer INTERFACE IMPORTED)
+  endif ()
   foreach (lib IN LISTS _imported_libraries)
     target_link_libraries(roctracer::roctracer INTERFACE ${lib})
   endforeach ()
