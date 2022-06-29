@@ -59,28 +59,34 @@ void name_stream(cudaStream_t stream, std::string name) {
 #endif
 
 void mark(std::string desc) {
+  (void) desc;
 #ifdef AL_HAS_NVPROF
   nvtxMarkA(desc.c_str());
-#else
-  (void) desc;
+#endif
+#ifdef AL_HAS_ROCTRACER
+  roctxMark(desc.c_str());
 #endif
 }
 
 ProfileRange prof_start(std::string name) {
+  (void) name;
   ProfileRange range;
 #ifdef AL_HAS_NVPROF
   range.nvtx_range = nvtxRangeStartA(name.c_str());
-#else
-  (void) name;
+#endif
+#ifdef AL_HAS_ROCTRACER
+  range.roctx_range = roctxRangeStart(name.c_str());
 #endif
   return range;
 }
 
 void prof_end(ProfileRange range) {
+  (void) range;
 #ifdef AL_HAS_NVPROF
   nvtxRangeEnd(range.nvtx_range);
-#else
-  (void) range;
+#endif
+#ifdef AL_HAS_ROCTRACER
+  roctxRangeStop(range.roctx_range);
 #endif
 }
 

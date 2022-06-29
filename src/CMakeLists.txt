@@ -124,6 +124,7 @@ if (AL_HAS_ROCM)
     hip::hipcub
     roc::rocprim
     ${ROCM_SMI_LIBRARY}
+    ${Roctracer_LIBRARIES}
     Threads::Threads)
 elseif (AL_HAS_CUDA)
   target_link_libraries(Al PUBLIC
