@@ -15,6 +15,7 @@
 
 #cmakedefine AL_HAS_PROF
 #cmakedefine AL_HAS_NVPROF
+#cmakedefine AL_HAS_ROCTRACER
 
 /** Whether to use stream memory operations (if supported). */
 #cmakedefine01 AL_USE_STREAM_MEM_OPS

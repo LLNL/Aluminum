@@ -88,6 +88,9 @@ option(ALUMINUM_DEBUG_HANG_CHECK
 option(ALUMINUM_ENABLE_NVPROF
   "Enable profiling via nvprof/NVTX."
   OFF)
+option(ALUMINUM_ENABLE_ROCTRACER
+  "Enable profiling via rocprof/roctx."
+  OFF)
 option(ALUMINUM_ENABLE_STREAM_MEM_OPS
   "Enable stream memory operations."
   OFF)
@@ -346,6 +349,11 @@ if (ALUMINUM_ENABLE_ROCM)
     HINTS ${AL_ROCM_PATH}/rocm_smi/include)
   find_library(ROCM_SMI_LIBRARY rocm_smi64 REQUIRED
     HINTS ${AL_ROCM_PATH}/rocm_smi/lib)
+
+  if (ALUMINUM_ENABLE_ROCTRACER)
+    find_package(Roctracer MODULE COMPONENTS roctx)
+    set(AL_HAS_ROCTRACER ${Roctracer_FOUND})
+  endif ()
 
   # For some reason, hipified files can be relatively specified, but
   # regular files must be given a full path. This appears to be the

@@ -35,6 +35,9 @@
 #ifdef AL_HAS_NVPROF
 #include <nvToolsExt.h>
 #endif
+#ifdef AL_HAS_ROCTRACER
+#include <roctx.h>
+#endif
 #ifdef AL_HAS_CUDA
 #include <cuda_runtime.h>
 #endif
@@ -57,6 +60,9 @@ void mark(std::string desc);
 struct ProfileRange {
 #ifdef AL_HAS_NVPROF
   nvtxRangeId_t nvtx_range;
+#endif
+#ifdef AL_HAS_ROCTRACER
+  roctx_range_id_t roctx_range;
 #endif
 };
 
