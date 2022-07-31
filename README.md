@@ -1,4 +1,5 @@
-# Aluminum
+![Al](al.svg) Aluminum
+======================
 
 **Aluminum** provides a generic interface to high-performance communication libraries for both CPU and GPU platforms and GPU-friendly semantics.
 
