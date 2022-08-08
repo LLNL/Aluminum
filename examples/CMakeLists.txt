@@ -14,6 +14,7 @@ find_package(Aluminum 1.0.0 REQUIRED)
 
 set(SOURCES
   hello_world.cpp
+  allreduce.cpp
 )
 
 foreach (src ${SOURCES})
