@@ -156,6 +156,12 @@ struct VectorType {
   }
 };
 
+/** Return an uninitialized vector of size count. */
+template <typename T, typename Backend>
+typename VectorType<T, Backend>::type get_vector(size_t count) {
+  return typename VectorType<T, Backend>::type(count);
+}
+
 #ifdef AL_HAS_CUDA
 
 // Note: This is adapted from the same class in the Aluminum test utils

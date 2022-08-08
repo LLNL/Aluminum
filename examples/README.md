@@ -6,6 +6,7 @@ These are simple examples of how to use Aluminum.
 Current examples:
 * `hello_world`: Initialize Aluminum and have each process print its rank.
 * `allreduce`: Allreduce a buffer of data and print it afterward.
+* `pingpong`: Ranks alternate sending and receiving data.
 
 ## Building
 
