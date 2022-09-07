@@ -1,0 +1,40 @@
+cff-version: 1.2.0
+title: "Aluminum Communication Library"
+message: "If you use Aluminum, please cite it as"
+authors:
+  - family-names: Dryden
+    given-names: Nikoli
+  - family-names: Maruyama
+    given-names: Naoya
+  - family-names: Moon
+    given-names: Tim
+  - family-names: Benson
+    given-names: Tom
+  - family-names: Yoo
+    given-names: Andy
+  - family-names: Van Essen
+    given-names: Brian
+  - family-names: McNeish
+    given-names: Corey
+  - family-names: Snir
+    given-names: Marc
+preferred-citation:
+  title: "Aluminum: An Asynchronous, GPU-Aware Communication Library Optimized for Large-Scale Training of Deep Neural Networks on HPC Systems"
+  year: "2018"
+  type: conference-paper
+  collection-title: "Proceedings of the Workshop on Machine Learning in HPC Environments"
+  authors:
+    - family-names: Dryden
+      given-names: Nikoli
+    - family-names: Maruyama
+      given-names: Naoya
+    - family-names: Moon
+      given-names: Tim
+    - family-names: Benson
+      given-names: Tom
+    - family-names: Yoo
+      given-names: Andy
+    - family-names: Snir
+      given-names: Marc
+    - family-names: Van Essen
+      given-names: Brian
