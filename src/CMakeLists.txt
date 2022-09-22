@@ -116,12 +116,17 @@ if (AL_HAS_ROCM)
   # END FIXME BLOCK
   ##############################
 
+  if (AL_HAS_NCCL)
+    set(AL_NCCL_LIBRARY roc::rccl)
+  else ()
+    set(AL_NCCL_LIBRARY)
+  endif ()
   target_include_directories(Al PRIVATE
     $<BUILD_INTERFACE:${ROCM_SMI_INCLUDE_DIR}>)
   target_link_libraries(Al PUBLIC
     hip::host
-    roc::rccl
     hip::hipcub
+    ${AL_NCCL_LIBRARY}
     roc::rocprim
     ${ROCM_SMI_LIBRARY}
     ${Roctracer_LIBRARIES}

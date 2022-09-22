@@ -31,6 +31,8 @@
 #include "aluminum/ht/communicator.hpp"
 #include "aluminum/ht/base_state.hpp"
 
+#include <numeric> // std::accumulate
+
 namespace Al {
 namespace internal {
 namespace ht {
