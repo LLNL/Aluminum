@@ -37,6 +37,7 @@
 #include "aluminum/cuda/cuda.hpp"
 #include "aluminum/cuda/events.hpp"
 #include "aluminum/cuda/streams.hpp"
+#include "aluminum/mempool.hpp"
 #include "aluminum/progress.hpp"
 
 // IWYU pragma: begin_exports
