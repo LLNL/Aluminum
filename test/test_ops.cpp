@@ -162,7 +162,8 @@ struct TestData {
       err = true;
     }
     // Check if any process reported an error.
-    MPI_Allreduce(MPI_IN_PLACE, &err, 1, MPI_CXX_BOOL, MPI_LOR,
+    // TODO: Switch MPI_C_BOOL for MPI_CXX_BOOL when MPICH better supports it.
+    MPI_Allreduce(MPI_IN_PLACE, &err, 1, MPI_C_BOOL, MPI_LOR,
                   comm_wrapper.comm().get_comm());
     if (err) {
       if (dump_on_error && (max_dump_size == 0 || size <= max_dump_size)) {
