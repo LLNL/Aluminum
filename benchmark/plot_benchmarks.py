@@ -243,7 +243,7 @@ def plot_best_heatmap(df, out_dir, name):
     df_best.Size = df_best.Size.map(size_indices)
     # Build the matrix for the heatmap.
     # Not sure of a better way than iterating.
-    best = np.zeros((len(sizes), len(comm_sizes)), dtype=np.int)
+    best = np.zeros((len(sizes), len(comm_sizes)), dtype=np.int32)
     for r in df_best.iterrows():
         r = r[1]
         best[int(r.Size), int(r.CommSize)] = r.Impl

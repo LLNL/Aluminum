@@ -336,6 +336,9 @@ inline int get_local_rank() {
     env = std::getenv("SLURM_LOCALID");
   }
   if (!env) {
+    env = std::getenv("FLUX_TASK_LOCAL_ID");
+  }
+  if (!env) {
     std::cerr << "Cannot determine local rank" << std::endl;
     std::abort();
   }
@@ -350,6 +353,19 @@ inline int get_local_size() {
   }
   if (!env) {
     env = std::getenv("SLURM_NTASKS_PER_NODE");
+  }
+  // Flux doesn't have an environment variable for this directly, so we
+  // assume an even distribution.
+  if (!env) {
+    char* flux_size = std::getenv("FLUX_JOB_SIZE");
+    if (flux_size) {
+      char* flux_nnodes = std::getenv("FLUX_JOB_NNODES");
+      if (flux_nnodes) {
+        int size = std::atoi(flux_size);
+        int nnodes = std::atoi(flux_nnodes);
+        return (size + nnodes - 1) / nnodes;
+      }
+    }
   }
   if (!env) {
     std::cerr << "Cannot determine local size" << std::endl;

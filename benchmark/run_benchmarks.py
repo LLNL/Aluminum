@@ -17,7 +17,7 @@ parser.add_argument('--procs-per-node', type=int, default=4,
 parser.add_argument('--min-procs', type=int,
                     help='Minimum number of processes to use')
 parser.add_argument('--launcher', type=str, default='jsrun',
-                    choices=['jsrun', 'srun'],
+                    choices=['jsrun', 'srun', 'flux'],
                     help='Which parallel launcher to use')
 parser.add_argument('--benchmark-ops', type=str, default='./benchmark_ops.exe',
                     help='Path to benchmark_ops binary')
@@ -61,9 +61,7 @@ OpDesc = namedtuple('OpDesc',
                     defaults=['both', False, 1, _default_algo_map])
 coll_ops = [OpDesc('allgather'),
             OpDesc('allreduce',
-                   algorithms={'mpi': ['automatic', 'passthrough',
-                                       'recursive_doubling', 'ring',
-                                       'rabenseifner'],  # Excluding biring.
+                   algorithms={'mpi': ['automatic'],  # Excluding biring.
                                'nccl': ['automatic'],
                                'ht': ['automatic']}),
             OpDesc('alltoall'),
@@ -126,15 +124,26 @@ def get_srun_launcher(num_procs, args):
     """Return the base launch command using srun."""
     ppn, num_nodes = get_ppn_and_nodes(num_procs, args.procs_per_node)
     return ['srun',
+            f'-n {num_nodes * nodes}',
             f'--nodes={num_nodes}',
             f'--ntasks-per-node={ppn}',
-            '--mpibind=off',
-            '--nvidia_compute_mode=default']
+            '--mpibind=off']
+            #'--nvidia_compute_mode=default']
+
+
+def get_flux_launcher(num_procs, args):
+    """Return the base launch command using flux."""
+    ppn, num_nodes = get_ppn_and_nodes(num_procs, args.procs_per_node)
+    return ['flux', 'mini', 'run',
+            f'--nodes={num_nodes}',
+            f'--tasks-per-node={ppn}',
+            '-o', 'mpibind=off']
 
 
 launcher_funcs = {
     'jsrun': get_jsrun_launcher,
-    'srun': get_srun_launcher
+    'srun': get_srun_launcher,
+    'flux': get_flux_launcher
 }
 
 def run_benchmark(args, num_procs, backend, operator, datatype, algorithm,
