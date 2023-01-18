@@ -52,17 +52,18 @@ bool stream_mem_ops_supported = false;
 void init(int&, char**&) {
   // Initialize internal streams.
   stream_pool.allocate(AL_CUDA_STREAM_POOL_SIZE);
-#ifndef AL_HAS_ROCM
   // Check whether stream memory operations are supported.
   CUdevice dev;
   AL_CHECK_CUDA_DRV(cuCtxGetDevice(&dev));
   int attr;
+#ifdef AL_HAS_ROCM
+  AL_CHECK_CUDA_DRV(hipDeviceGetAttribute(
+                      &attr, hipDeviceAttributeCanUseStreamWaitValue, dev));
+#else
   AL_CHECK_CUDA_DRV(cuDeviceGetAttribute(
                       &attr, CU_DEVICE_ATTRIBUTE_CAN_USE_STREAM_MEM_OPS, dev));
-  stream_mem_ops_supported = attr;
-#else
-  stream_mem_ops_supported = false;
 #endif
+  stream_mem_ops_supported = attr;
   // Preallocate memory for synchronization operations.
   sync_pool.preallocate(AL_SYNC_MEM_PREALLOC);
 }

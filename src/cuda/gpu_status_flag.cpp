@@ -60,13 +60,15 @@ void GPUStatusFlag::record(cudaStream_t stream) {
   if (stream_memory_operations_supported()) {
     // We cannot use std::atomic because we need the actual address of
     // the memory.
-#ifndef AL_HAS_ROCM
     __atomic_store_n(stream_mem.sync_event, 0, __ATOMIC_SEQ_CST);
+#ifdef AL_HAS_ROCM
+    AL_CHECK_CUDA_DRV(hipStreamWriteValue32(
+                        stream, stream_mem.sync_event_dev_ptr, 1,
+                        0));
+#else
     AL_CHECK_CUDA_DRV(cuStreamWriteValue32(
                         stream, stream_mem.sync_event_dev_ptr, 1,
                         CU_STREAM_WRITE_VALUE_DEFAULT));
-#else
-    throw_al_exception("A serious error has occurred; should not reach this.");
 #endif
   } else {
     AL_CHECK_CUDA(cudaEventRecord(plain_event, stream));
