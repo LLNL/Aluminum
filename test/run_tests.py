@@ -15,7 +15,7 @@ parser.add_argument('--procs-per-node', type=int, default=4,
 parser.add_argument('--min-procs', type=int,
                     help='Minimum number of processes to use')
 parser.add_argument('--launcher', type=str, default='jsrun',
-                    choices=['jsrun', 'srun'],
+                    choices=['jsrun', 'srun', 'flux'],
                     help='Which parallel launcher to use')
 parser.add_argument('--test-ops', type=str, default='./test_ops.exe',
                     help='Path to test_ops binary')
@@ -43,7 +43,7 @@ parser.add_argument('--threads', type=int, default=None,
 # Supported datatypes for backends.
 mpi_datatypes = ['char', 'schar', 'uchar', 'short', 'ushort', 'int', 'uint',
                  'long', 'ulong', 'longlong', 'ulonglong',
-                 'float', 'double', 'longdouble']
+                 'float', 'double',]# 'longdouble']
 nccl_datatypes = ['char', 'uchar', 'int', 'uint', 'longlong', 'ulonglong',
                   'half', 'float', 'double']
 # Standard sets of operations.
@@ -113,15 +113,26 @@ def get_srun_launcher(num_procs, args):
     """Return the base launch command using srun."""
     ppn, num_nodes = get_ppn_and_nodes(num_procs, args.procs_per_node)
     return ['srun',
+            f'-n {num_nodes * ppn}',
             f'--nodes={num_nodes}',
             f'--ntasks-per-node={ppn}',
-            '--mpibind=off',
-            '--nvidia_compute_mode=default']
+            '--mpibind=off']
+            #'--nvidia_compute_mode=default']
+
+
+def get_flux_launcher(num_procs, args):
+    """Return the base launch command using flux."""
+    ppn, num_nodes = get_ppn_and_nodes(num_procs, args.procs_per_node)
+    return ['flux', 'mini', 'run',
+            f'--nodes={num_nodes}',
+            f'--tasks-per-node={ppn}',
+            '-o', 'mpibind=off']
 
 
 launcher_funcs = {
     'jsrun': get_jsrun_launcher,
-    'srun': get_srun_launcher
+    'srun': get_srun_launcher,
+    'flux': get_flux_launcher
 }
 
 
