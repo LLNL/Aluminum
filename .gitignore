@@ -34,3 +34,14 @@
 # Emacs stuff
 *~
 \#*\#
+
+# Python stuff
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Dev stuff
+build*/
+compile_commands.json
+.ccls-root
+.ccls-cache
