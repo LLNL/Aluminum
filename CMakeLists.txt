@@ -170,7 +170,7 @@ endif ()
 # Set -Og for debug builds when supported.
 check_cxx_compiler_flag("-Og" CXX_COMPILER_HAS_OG)
 if (CXX_COMPILER_HAS_OG)
-  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Og")
+  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Og -gdwarf-4")
 endif ()
 
 if (NOT DEFINED BUILD_SHARED_LIBS)
