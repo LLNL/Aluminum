@@ -9,6 +9,38 @@ set(ALUMINUM_VERSION_PATCH 0)
 set(ALUMINUM_VERSION
   "${ALUMINUM_VERSION_MAJOR}.${ALUMINUM_VERSION_MINOR}.${ALUMINUM_VERSION_PATCH}")
 
+# Gather Git information if available.
+find_program(__GIT_EXECUTABLE git)
+mark_as_advanced(__GIT_EXECUTABLE)
+if (__GIT_EXECUTABLE)
+  execute_process(
+    COMMAND ${__GIT_EXECUTABLE} rev-parse --is-inside-source-tree
+    WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+    OUTPUT_VARIABLE __BUILDING_FROM_GIT_SOURCES
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+  if (__BUILDING_FROM_GIT_SOURCES)
+    execute_process(
+      COMMAND ${__GIT_EXECUTABLE} rev-parse --show-toplevel
+      WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+      OUTPUT_VARIABLE __GIT_TOPLEVEL_DIR
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
+    execute_process(
+      COMMAND ${__GIT_EXECUTABLE} rev-parse --git-dir
+      WORKING_DIRECTORY "${__GIT_TOPLEVEL_DIR}"
+      OUTPUT_VARIABLE __GIT_GIT_DIR
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
+    execute_process(
+      COMMAND ${__GIT_EXECUTABLE} --git-dir "${__GIT_GIT_DIR}" describe
+      --abbrev=7 --always --dirty --tags
+      WORKING_DIRECTORY "${__GIT_TOPLEVEL_DIR}"
+      OUTPUT_VARIABLE __GIT_DESCRIBE_VERSION
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+    set(ALUMINUM_GIT_VERSION "${__GIT_DESCRIBE_VERSION}")
+  endif ()
+endif ()
+
 if (NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release CACHE STRING "Configuration type" FORCE)
 endif ()
@@ -413,6 +445,7 @@ list(APPEND ALUMINUM_HEADERS "${CMAKE_SOURCE_DIR}/include/Al.hpp")
 
 # Add the library targets
 add_subdirectory(src)
+add_subdirectory(util)
 
 # Testing
 include(CTest)
