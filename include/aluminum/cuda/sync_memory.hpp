@@ -27,11 +27,11 @@
 
 #pragma once
 
-#include <cstdint>
-#include <cstdlib>
 #include "aluminum/utils/locked_resource_pool.hpp"
 #include "aluminum/cuda/cuda.hpp"
 #include "aluminum/tuning_params.hpp"
+#include <cstdint>
+#include <cstdlib>
 
 namespace Al {
 namespace internal {
@@ -48,13 +48,13 @@ struct CacheLinePinnedMemoryAllocator {
     // Overallocate to avoid interference.
     int32_t *mem = (int32_t *)std::aligned_alloc(
         AL_DESTRUCTIVE_INTERFERENCE_SIZE, AL_DESTRUCTIVE_INTERFERENCE_SIZE);
-    AL_CHECK_CUDA(cudaHostRegister(mem, AL_DESTRUCTIVE_INTERFERENCE_SIZE,
-                                   cudaHostRegisterDefault));
+    AL_CHECK_CUDA(AL_GPU_RT(HostRegister)(mem, AL_DESTRUCTIVE_INTERFERENCE_SIZE,
+                                   AL_GPU_RT(HostRegisterDefault)));
     return mem;
   }
 
   void deallocate(int32_t* mem) {
-    AL_CHECK_CUDA(cudaHostUnregister(mem));
+    AL_CHECK_CUDA(AL_GPU_RT(HostUnregister)(mem));
     std::free(mem);
   }
 };

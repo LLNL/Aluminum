@@ -48,7 +48,7 @@ void name_thread(std::thread::native_handle_type handle, std::string name) {
 }
 
 #ifdef AL_HAS_CUDA
-void name_stream(cudaStream_t stream, std::string name) {
+void name_stream(AL_GPU_RT(Stream_t) stream, std::string name) {
 #ifdef AL_HAS_NVPROF
   nvtxNameCudaStreamA(stream, name.c_str());
 #else

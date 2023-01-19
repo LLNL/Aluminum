@@ -56,17 +56,17 @@ void StreamPool::allocate(size_t num_streams) {
     throw_al_exception("Cannot reallocate existing streams");
   }
   int least_priority, greatest_priority;
-  AL_CHECK_CUDA(cudaDeviceGetStreamPriorityRange(
+  AL_CHECK_CUDA(AL_GPU_RT(DeviceGetStreamPriorityRange)(
                   &least_priority, &greatest_priority));
   default_streams.resize(num_streams);
   high_priority_streams.resize(num_streams);
   for (size_t i = 0; i < num_streams; ++i) {
-    AL_CHECK_CUDA(cudaStreamCreate(&default_streams[i]));
+    AL_CHECK_CUDA(AL_GPU_RT(StreamCreate)(&default_streams[i]));
     // TODO: Support stream pool names to better differentiate.
     profiling::name_stream(default_streams[i],
                            "al_internal_" + std::to_string(i));
-    AL_CHECK_CUDA(cudaStreamCreateWithPriority(
-          &high_priority_streams[i], cudaStreamDefault, greatest_priority));
+    AL_CHECK_CUDA(AL_GPU_RT(StreamCreateWithPriority)(
+          &high_priority_streams[i], AL_GPU_RT(StreamDefault), greatest_priority));
     profiling::name_stream(high_priority_streams[i],
                            "al_internal_high_" + std::to_string(i));
   }
@@ -75,8 +75,8 @@ void StreamPool::allocate(size_t num_streams) {
 void StreamPool::clear() {
   if (!external_streams) {
     for (size_t i = 0; i < default_streams.size(); ++i) {
-      AL_CHECK_CUDA(cudaStreamDestroy(default_streams[i]));
-      AL_CHECK_CUDA(cudaStreamDestroy(high_priority_streams[i]));
+      AL_CHECK_CUDA(AL_GPU_RT(StreamDestroy)(default_streams[i]));
+      AL_CHECK_CUDA(AL_GPU_RT(StreamDestroy)(high_priority_streams[i]));
     }
   }
   default_streams.clear();
@@ -85,7 +85,7 @@ void StreamPool::clear() {
   high_priority_idx = 0;
 }
 
-cudaStream_t StreamPool::get_stream() {
+AL_GPU_RT(Stream_t) StreamPool::get_stream() {
 #ifdef AL_DEBUG
   if (default_streams.empty()) {
     throw_al_exception("No default priority streams in pool");
@@ -95,7 +95,7 @@ cudaStream_t StreamPool::get_stream() {
   return default_streams[idx];
 }
 
-cudaStream_t StreamPool::get_high_priority_stream() {
+AL_GPU_RT(Stream_t) StreamPool::get_high_priority_stream() {
 #ifdef AL_DEBUG
   if (high_priority_streams.empty()) {
     throw_al_exception("No high priority streams in pool");
@@ -105,7 +105,7 @@ cudaStream_t StreamPool::get_high_priority_stream() {
   return high_priority_streams[idx];
 }
 
-void StreamPool::replace_streams(std::function<cudaStream_t(bool)> stream_getter) {
+void StreamPool::replace_streams(std::function<AL_GPU_RT(Stream_t)(bool)> stream_getter) {
   size_t num_streams = default_streams.size();
   // Clean up our streams if needed.
   clear();

@@ -27,10 +27,16 @@
 
 #pragma once
 
+#include <Al_config.hpp>
+
 #include <cstdint>
 
+#if defined AL_HAS_ROCM
+#include <hip/hip_runtime.h>
+#elif defined AL_HAS_CUDA
 #include <cuda.h>
 #include <cuda_runtime.h>
+#endif
 
 namespace Al {
 namespace internal {
@@ -54,17 +60,21 @@ class GPUStatusFlag {
   GPUStatusFlag();
   ~GPUStatusFlag();
   /** Record the event into stream. */
-  void record(cudaStream_t stream);
+  void record(AL_GPU_RT(Stream_t) stream);
   /** Return true if the event has completed. */
   bool query();
  private:
   struct stream_mem_t {
     int32_t* sync_event __attribute__((aligned(64)));
+#if defined AL_HAS_ROCM
+    hipDeviceptr_t sync_event_dev_ptr;
+#elif defined AL_HAS_CUDA
     CUdeviceptr sync_event_dev_ptr;
+#endif
   };
   union {
     stream_mem_t stream_mem;
-    cudaEvent_t plain_event;
+    AL_GPU_RT(Event_t) plain_event;
   };
 };
 

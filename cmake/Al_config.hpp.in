@@ -12,6 +12,21 @@
 #cmakedefine AL_HAS_NCCL
 #cmakedefine AL_HAS_ROCM
 
+#if defined AL_HAS_ROCM
+#define AL_GPU_RUNTIME_PREFIX hip
+#define AL_GPU_DRV_SUCCESS hipSuccess
+#elif defined AL_HAS_CUDA
+#define AL_GPU_RUNTIME_PREFIX cuda
+#define AL_GPU_DRV_SUCCESS CUDA_SUCCESS
+#endif
+
+// The layers of indirection begin
+#if defined AL_GPU_RUNTIME_PREFIX
+#define AL_ADD_PREFIX_(prefix, rest) prefix##rest
+#define AL_ADD_PREFIX(prefix, rest) AL_ADD_PREFIX_(prefix, rest)
+#define AL_GPU_RT(symb) AL_ADD_PREFIX(AL_GPU_RUNTIME_PREFIX, symb)
+#endif // defined AL_GPU_RUNTIME_PREFIX
+
 #ifdef AL_HAS_MPI_CUDA
 #cmakedefine AL_HAS_MPI_CUDA_RMA
 #endif

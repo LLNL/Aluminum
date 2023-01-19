@@ -40,7 +40,7 @@ namespace ht {
 /** Base implementation for common host-transfer collectives. */
 class HostTransferCollectiveState : public AlState {
 public:
-  HostTransferCollectiveState(cudaStream_t stream_) :
+  HostTransferCollectiveState(AL_GPU_RT(Stream_t) stream_) :
     AlState(nullptr), stream(stream_) {}
 
   bool needs_completion() const override { return false; }
@@ -75,7 +75,7 @@ protected:
 
 private:
   /** Associated compute stream. */
-  cudaStream_t stream;
+  AL_GPU_RT(Stream_t) stream;
   /** Internal MPI request handle. */
   MPI_Request mpi_req = MPI_REQUEST_NULL;
 };
@@ -86,7 +86,7 @@ private:
  */
 class HostTransferCollectiveSignalAtEndState : public HostTransferCollectiveState {
 public:
-  HostTransferCollectiveSignalAtEndState(cudaStream_t stream_) :
+  HostTransferCollectiveSignalAtEndState(AL_GPU_RT(Stream_t) stream_) :
     HostTransferCollectiveState(stream_) {}
 
   PEAction step() override {
@@ -124,7 +124,7 @@ public:
  */
 class HostTransferCollectiveSignalRootEarlyState : public HostTransferCollectiveState {
  public:
-  HostTransferCollectiveSignalRootEarlyState(bool is_root_, cudaStream_t stream_) :
+  HostTransferCollectiveSignalRootEarlyState(bool is_root_, AL_GPU_RT(Stream_t) stream_) :
     HostTransferCollectiveState(stream_), is_root(is_root_) {}
 
   PEAction step() override {
@@ -170,7 +170,7 @@ class HostTransferCollectiveSignalRootEarlyState : public HostTransferCollective
  */
 class HostTransferCollectiveSignalNonRootEarlyState : public HostTransferCollectiveState {
  public:
-  HostTransferCollectiveSignalNonRootEarlyState(bool is_root_, cudaStream_t stream_) :
+  HostTransferCollectiveSignalNonRootEarlyState(bool is_root_, AL_GPU_RT(Stream_t) stream_) :
     HostTransferCollectiveState(stream_), is_root(is_root_) {}
 
   PEAction step() override {

@@ -27,13 +27,19 @@
 
 #pragma once
 
+#include <Al_config.hpp>
+
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <vector>
 #include <functional>
 
+#if defined AL_HAS_ROCM
+#include <hip/hip_runtime.h>
+#elif defined AL_HAS_CUDA
 #include <cuda_runtime.h>
+#endif
 
 namespace Al {
 namespace internal {
@@ -59,7 +65,7 @@ public:
   void clear();
 
   /** Return a default-priority CUDA stream. */
-  cudaStream_t get_stream();
+  AL_GPU_RT(Stream_t) get_stream();
 
   /**
    * Return a high-priority CUDA stream.
@@ -67,7 +73,7 @@ public:
    * If high-priority streams are not supported, returns a default-priority
    * stream.
    */
-  cudaStream_t get_high_priority_stream();
+  AL_GPU_RT(Stream_t) get_high_priority_stream();
 
   /**
    * Replace all streams in the pool with streams from an external source.
@@ -78,12 +84,12 @@ public:
    * may be called an arbitrary number of times. It takes a boolean argument
    * for whether to return a default (false) or high (true) priority stream.
    */
-  void replace_streams(std::function<cudaStream_t(bool)> stream_getter);
+  void replace_streams(std::function<AL_GPU_RT(Stream_t)(bool)> stream_getter);
 
 private:
-  std::vector<cudaStream_t> default_streams;
+  std::vector<AL_GPU_RT(Stream_t)> default_streams;
   std::atomic<uint32_t> default_idx{0};
-  std::vector<cudaStream_t> high_priority_streams;
+  std::vector<AL_GPU_RT(Stream_t)> high_priority_streams;
   std::atomic<uint32_t> high_priority_idx{0};
   /** Whether streams were replaced; we do not free these streams. */
   bool external_streams = false;

@@ -30,18 +30,18 @@
 namespace Al {
 
 // Initialize this.
-cudaEvent_t HostTransferBackend::sync_event = (cudaEvent_t) 0;
+AL_GPU_RT(Event_t) HostTransferBackend::sync_event = (AL_GPU_RT(Event_t)) 0;
 
 namespace internal {
 namespace ht {
 
 void init(int&, char**&) {
-  AL_CHECK_CUDA(cudaEventCreateWithFlags(&HostTransferBackend::sync_event,
-                                         cudaEventDisableTiming));
+  AL_CHECK_CUDA(AL_GPU_RT(EventCreateWithFlags)(&HostTransferBackend::sync_event,
+                                         AL_GPU_RT(EventDisableTiming)));
 }
 
 void finalize() {
-  AL_CHECK_CUDA(cudaEventDestroy(HostTransferBackend::sync_event));
+  AL_CHECK_CUDA(AL_GPU_RT(EventDestroy)(HostTransferBackend::sync_event));
 }
 
 }  // namespace ht

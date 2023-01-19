@@ -42,7 +42,7 @@ namespace cuda {
 
 // Define resource pools.
 Al::internal::LockedResourcePool<int32_t*, CacheLinePinnedMemoryAllocator> sync_pool;
-Al::internal::LockedResourcePool<cudaEvent_t, CUDAEventAllocator> event_pool;
+Al::internal::LockedResourcePool<AL_GPU_RT(Event_t), CUDAEventAllocator> event_pool;
 
 namespace {
 // Whether stream memory operations are supported.
@@ -53,13 +53,15 @@ void init(int&, char**&) {
   // Initialize internal streams.
   stream_pool.allocate(AL_CUDA_STREAM_POOL_SIZE);
   // Check whether stream memory operations are supported.
+  int attr;
+#if defined AL_HAS_ROCM
+  int dev;
+  AL_CHECK_CUDA(hipGetDevice(&dev));
+  AL_CHECK_CUDA(hipDeviceGetAttribute(
+                    &attr, hipDeviceAttributeCanUseStreamWaitValue, dev));
+#elif defined AL_HAS_CUDA
   CUdevice dev;
   AL_CHECK_CUDA_DRV(cuCtxGetDevice(&dev));
-  int attr;
-#ifdef AL_HAS_ROCM
-  AL_CHECK_CUDA_DRV(hipDeviceGetAttribute(
-                      &attr, hipDeviceAttributeCanUseStreamWaitValue, dev));
-#else
   AL_CHECK_CUDA_DRV(cuDeviceGetAttribute(
                       &attr, CU_DEVICE_ATTRIBUTE_CAN_USE_STREAM_MEM_OPS, dev));
 #endif

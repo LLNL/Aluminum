@@ -27,118 +27,111 @@
 
 #pragma once
 
-#include <sstream>
-#include <string>
-
-#include <cuda.h>
-#include <cuda_runtime.h>
-#include <cuda_fp16.h>
-
 #include <Al_config.hpp>
 #include "aluminum/base.hpp"
 
-/**
- * Things we use that hip doesn't support:
- * - cuStreamWaitValue32
- * - cuStreamWriteValue32
- * - cuGetErrorString
- * Of these, the first two are supported by the non-STREAM_MEM_OP code, so we
- * just need to reimplement cuGetErrorString
- */
+#include <sstream>
+#include <string>
+
+#if defined AL_HAS_ROCM
+#include <hip/hip_runtime.h>
+#include <hip/hip_fp16.h>
+#elif defined AL_HAS_CUDA
+#include <cuda.h>
+#include <cuda_runtime.h>
+#include <cuda_fp16.h>
+#endif
 
 #ifdef AL_HAS_ROCM
-inline hipError_t cuGetErrorString(hipError_t /* error */, const char** pStr)
+// HIP has no equivalent for the driver version of this.
+inline hipError_t cuGetErrorString(hipError_t const error, const char** pStr)
 {
-  static char const* unsupported = "hipGetErrorString is unsupported :(";
-  *pStr = unsupported;
-  return CUDA_SUCCESS;
+  *pStr = hipGetErrorString(error);
+  return hipSuccess;
 }
 #endif // AL_HAS_ROCM
 
 // Note: These macros only work inside the Al namespace.
-
-#define AL_CUDA_SYNC(async)                                     \
-  do {                                                          \
-    /* Synchronize GPU and check for errors. */                 \
-    cudaError_t status_CUDA_SYNC = cudaDeviceSynchronize();     \
-    if (status_CUDA_SYNC != cudaSuccess) {                      \
-      std::ostringstream err_CUDA_SYNC;                         \
-      if (async) { err_CUDA_SYNC << "Asynchronous "; }          \
-      err_CUDA_SYNC << "CUDA error: "                           \
-                    << cudaGetErrorString(status_CUDA_SYNC);    \
-      throw_al_exception(err_CUDA_SYNC.str());                  \
-    }                                                           \
+#define AL_GPU_SYNC(async)                                              \
+  do {                                                                  \
+    /* Synchronize GPU and check for errors. */                         \
+    auto status_GPU_SYNC = AL_GPU_RT(DeviceSynchronize)();              \
+    if (status_GPU_SYNC != AL_GPU_RT(Success)) {                        \
+      std::ostringstream err_GPU_SYNC;                                  \
+      if (async) { err_GPU_SYNC << "Asynchronous "; }                   \
+      err_GPU_SYNC << "GPU error: "                                     \
+                   << AL_GPU_RT(GetErrorString)(status_GPU_SYNC);       \
+      throw_al_exception(err_GPU_SYNC.str());                           \
+    }                                                                   \
   } while (0)
 
-#define AL_FORCE_CHECK_CUDA(cuda_call)                          \
+#define AL_FORCE_CHECK_GPU(gpu_rt_call)                         \
   do {                                                          \
-    /* Call CUDA API routine, synchronizing before and */       \
+    /* Call GPU API routine, synchronizing before and */        \
     /* after to check for errors. */                            \
-    AL_CUDA_SYNC(true);                                         \
-    cudaError_t status_CHECK_CUDA = (cuda_call);                \
-    if (status_CHECK_CUDA != cudaSuccess) {                     \
-      throw_al_exception(std::string("CUDA error: ")            \
-                  + cudaGetErrorString(status_CHECK_CUDA));     \
+    AL_GPU_SYNC(true);                                          \
+    auto status_CHECK_GPU = (gpu_rt_call);                      \
+    if (status_CHECK_GPU != AL_GPU_RT(Success)) {               \
+      throw_al_exception(                                       \
+        std::string("GPU error: ")                              \
+        + AL_GPU_RT(GetErrorString)(status_CHECK_GPU));         \
     }                                                           \
-    AL_CUDA_SYNC(false);                                        \
+    AL_GPU_SYNC(false);                                         \
   } while (0)
 
-#define AL_FORCE_CHECK_CUDA_NOSYNC(cuda_call)                   \
-  do {                                                          \
-    cudaError_t status_CHECK_CUDA = (cuda_call);                \
-    if (status_CHECK_CUDA != cudaSuccess) {                     \
-      throw_al_exception(std::string("CUDA error: ")            \
-                  + cudaGetErrorString(status_CHECK_CUDA));     \
-    }                                                           \
+#define AL_FORCE_CHECK_GPU_NOSYNC(gpu_rt_call)          \
+  do {                                                  \
+    auto status_CHECK_GPU = (gpu_rt_call);              \
+    if (status_CHECK_GPU != AL_GPU_RT(Success)) {       \
+      throw_al_exception(                               \
+        std::string("GPU error: ")                      \
+        + AL_GPU_RT(GetErrorString)(status_CHECK_GPU)); \
+    }                                                   \
   } while (0)
 
-#define AL_FORCE_CHECK_CUDA_DRV(cuda_call)                      \
+#define AL_FORCE_CHECK_GPU_DRV(gpu_drv_call)                    \
   do {                                                          \
-    AL_CUDA_SYNC(true);                                         \
-    CUresult status_CHECK_CUDA_DRV = (cuda_call);               \
-    if (status_CHECK_CUDA_DRV != CUDA_SUCCESS) {                \
-      const char* err_msg_CHECK_CUDA_DRV;                       \
+    AL_GPU_SYNC(true);                                          \
+    auto status_CHECK_GPU_DRV = (gpu_drv_call);                 \
+    if (status_CHECK_GPU_DRV != AL_GPU_DRV_SUCCESS) {           \
+      const char* err_msg_CHECK_GPU_DRV;                        \
       AL_IGNORE_NODISCARD(                                      \
-        cuGetErrorString(status_CHECK_CUDA_DRV,                 \
-                         &err_msg_CHECK_CUDA_DRV));             \
-      throw_al_exception(std::string("CUDA driver error: ")     \
-                         + err_msg_CHECK_CUDA_DRV);             \
+        cuGetErrorString(status_CHECK_GPU_DRV,                  \
+                         &err_msg_CHECK_GPU_DRV));              \
+      throw_al_exception(std::string("GPU driver error: ")      \
+                         + err_msg_CHECK_GPU_DRV);              \
     }                                                           \
-    AL_CUDA_SYNC(false);                                        \
+    AL_GPU_SYNC(false);                                         \
   } while (0)
 
-#define AL_FORCE_CHECK_CUDA_DRV_NOSYNC(cuda_call)               \
+#define AL_FORCE_CHECK_GPU_DRV_NOSYNC(gpu_drv_call)             \
   do {                                                          \
-    CUresult status_CHECK_CUDA_DRV = (cuda_call);               \
-    if (status_CHECK_CUDA_DRV != CUDA_SUCCESS) {                \
-      const char* err_msg_CHECK_CUDA_DRV;                       \
+    auto status_CHECK_GPU_DRV = (gpu_drv_call);                 \
+    if (status_CHECK_GPU_DRV != AL_GPU_DRV_SUCCESS) {           \
+      const char* err_msg_CHECK_GPU_DRV;                        \
       AL_IGNORE_NODISCARD(                                      \
-        cuGetErrorString(status_CHECK_CUDA_DRV,                 \
-                         &err_msg_CHECK_CUDA_DRV));             \
-      throw_al_exception(std::string("CUDA driver error: ")     \
-                         + err_msg_CHECK_CUDA_DRV);             \
+        cuGetErrorString(status_CHECK_GPU_DRV,                  \
+                         &err_msg_CHECK_GPU_DRV));              \
+      throw_al_exception(std::string("GPU driver error: ")      \
+                         + err_msg_CHECK_GPU_DRV);              \
     }                                                           \
   } while (0)
 
-#ifdef AL_DEBUG
-#define AL_CHECK_CUDA(cuda_call) AL_FORCE_CHECK_CUDA_NOSYNC(cuda_call)
-#define AL_CHECK_CUDA_NOSYNC(cuda_call) AL_FORCE_CHECK_CUDA_NOSYNC(cuda_call)
-#define AL_CHECK_CUDA_DRV(cuda_call) AL_FORCE_CHECK_CUDA_DRV_NOSYNC(cuda_call)
-#define AL_CHECK_CUDA_DRV_NOSYNC(cuda_call) AL_FORCE_CHECK_CUDA_DRV_NOSYNC(cuda_call)
-#else
-#define AL_CHECK_CUDA(cuda_call) AL_FORCE_CHECK_CUDA_NOSYNC(cuda_call)
-#define AL_CHECK_CUDA_NOSYNC(cuda_call) AL_FORCE_CHECK_CUDA_NOSYNC(cuda_call)
-#define AL_CHECK_CUDA_DRV(cuda_call) AL_FORCE_CHECK_CUDA_DRV_NOSYNC(cuda_call)
-#define AL_CHECK_CUDA_DRV_NOSYNC(cuda_call) AL_FORCE_CHECK_CUDA_DRV_NOSYNC(cuda_call)
-#endif
+// NOTE: These are used throughout the code, so it'd be a LARGE diff
+// to update them to "AL_CHECK_GPU_..."
+#define AL_CHECK_CUDA(cuda_call) AL_FORCE_CHECK_GPU_NOSYNC(cuda_call)
+#define AL_CHECK_CUDA_NOSYNC(cuda_call) AL_FORCE_CHECK_GPU_NOSYNC(cuda_call)
+#define AL_CHECK_CUDA_DRV(cuda_call) AL_FORCE_CHECK_GPU_DRV_NOSYNC(cuda_call)
+#define AL_CHECK_CUDA_DRV_NOSYNC(cuda_call) \
+  AL_FORCE_CHECK_GPU_DRV_NOSYNC(cuda_call)
 
 namespace Al {
 namespace internal {
 namespace cuda {
 
-/** Do CUDA initialization. */
+/** Do GPU initialization. */
 void init(int& argc, char**& argv);
-/** Finalize CUDA. */
+/** Finalize GPU. */
 void finalize();
 
 /** Return whether stream memory operations are supported. */

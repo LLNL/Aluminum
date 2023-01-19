@@ -33,9 +33,9 @@
 namespace Al {
 
 // Initialize this.
-cudaEvent_t NCCLBackend::sync_event = (cudaEvent_t) 0;
+AL_GPU_RT(Event_t) NCCLBackend::sync_event = (AL_GPU_RT(Event_t)) 0;
 
-NCCLCommunicator::NCCLCommunicator(MPI_Comm comm_, cudaStream_t stream_) :
+NCCLCommunicator::NCCLCommunicator(MPI_Comm comm_, AL_GPU_RT(Stream_t) stream_) :
   MPICommAndStreamWrapper(comm_, stream_) {
   // Get a unique ID for this communicator from NCCL and distribute it.
   ncclUniqueId nccl_id;
@@ -50,7 +50,7 @@ NCCLCommunicator::NCCLCommunicator(MPI_Comm comm_, cudaStream_t stream_) :
 NCCLCommunicator::~NCCLCommunicator() {
   int d;
   // Only destroy resources if the driver is still loaded.
-  if (cudaGetDevice(&d) == cudaSuccess) {
+  if (AL_GPU_RT(GetDevice)(&d) == AL_GPU_RT(Success)) {
     try {
       AL_CHECK_NCCL(ncclCommDestroy(m_nccl_comm));
     } catch (const al_exception& e) {
@@ -65,12 +65,12 @@ namespace internal {
 namespace nccl {
 
 void init(int&, char**&) {
-  AL_CHECK_CUDA(cudaEventCreateWithFlags(&NCCLBackend::sync_event,
-                                         cudaEventDisableTiming));
+  AL_CHECK_CUDA(AL_GPU_RT(EventCreateWithFlags)(&NCCLBackend::sync_event,
+                                         AL_GPU_RT(EventDisableTiming)));
 }
 
 void finalize() {
-  AL_CHECK_CUDA(cudaEventDestroy(NCCLBackend::sync_event));
+  AL_CHECK_CUDA(AL_GPU_RT(EventDestroy)(NCCLBackend::sync_event));
 }
 
 }  // namespace nccl

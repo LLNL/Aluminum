@@ -33,8 +33,10 @@
 #include "aluminum/cuda/cuda.hpp"
 #if defined AL_HAS_ROCM
 #include <hipcub/hipcub.hpp>
+#define AL_CUB_NS hipcub
 #elif defined AL_HAS_CUDA
 #include <cub/util_allocator.cuh>
+#define AL_CUB_NS cub
 #endif
 
 namespace Al {
@@ -44,12 +46,12 @@ namespace internal {
 struct CUDAPinnedMemoryAllocator {
   void* allocate(size_t bytes) {
     void* ptr;
-    AL_CHECK_CUDA(cudaMallocHost(&ptr, bytes));
+    AL_CHECK_CUDA(AL_GPU_RT(MallocHost)(&ptr, bytes));
     return ptr;
   }
 
   void deallocate(void* ptr) {
-    AL_CHECK_CUDA(cudaFreeHost(ptr));
+    AL_CHECK_CUDA(AL_GPU_RT(FreeHost)(ptr));
   }
 };
 
@@ -64,7 +66,7 @@ public:
   }
 
   template <typename T>
-  T* allocate(size_t size, cudaStream_t stream) {
+  T* allocate(size_t size, AL_GPU_RT(Stream_t) stream) {
     T* mem = nullptr;
     AL_CHECK_CUDA(cub_pool.DeviceAllocate(reinterpret_cast<void**>(&mem),
                                           sizeof(T)*size, stream));
@@ -79,7 +81,7 @@ public:
   void clear() { AL_IGNORE_NODISCARD(cub_pool.FreeAllCached()); }
 
 private:
-  cub::CachingDeviceAllocator cub_pool;
+  AL_CUB_NS::CachingDeviceAllocator cub_pool;
 };
 
 }  // namespace internal
