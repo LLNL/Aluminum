@@ -319,7 +319,7 @@ inline int get_number_of_gpus() {
       std::abort();
     }
   } else {
-    AL_FORCE_CHECK_CUDA_NOSYNC(cudaGetDeviceCount(&num_gpus));
+    AL_FORCE_CHECK_GPU_NOSYNC(AlGpuGetDeviceCount(&num_gpus));
   }
   return num_gpus;
 }
@@ -391,7 +391,7 @@ inline int set_device() {
               << "(" << local_size << ")" << std::endl;
     std::abort();
   }
-  AL_FORCE_CHECK_CUDA_NOSYNC(cudaSetDevice(local_rank));
+  AL_FORCE_CHECK_GPU_NOSYNC(AlGpuSetDevice(local_rank));
   return local_rank;
 }
 

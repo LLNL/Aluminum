@@ -35,6 +35,7 @@
 #define AlGpuEventQuery AL_GPU_RT(EventQuery)
 #define AlGpuEventRecord AL_GPU_RT(EventRecord)
 #define AlGpuGetDevice AL_GPU_RT(GetDevice)
+#define AlGpuGetDeviceCount AL_GPU_RT(GetDeviceCount)
 #define AlGpuGetErrorString AL_GPU_RT(GetErrorString)
 #define AlGpuHostGetDevicePointer AL_GPU_RT(HostGetDevicePointer)
 #define AlGpuHostRegister AL_GPU_RT(HostRegister)
@@ -45,15 +46,18 @@
 #define AlGpuStreamCreate AL_GPU_RT(StreamCreate)
 #define AlGpuStreamCreateWithPriority AL_GPU_RT(StreamCreateWithPriority)
 #define AlGpuStreamDestroy AL_GPU_RT(StreamDestroy)
+#define AlGpuStreamSynchronize AL_GPU_RT(StreamSynchronize)
 #define AlGpuStreamWaitEvent AL_GPU_RT(StreamWaitEvent)
 
 // Types
+#define AlGpuMemcpyKind AL_GPU_RT(MemcpyKind)
 #define AlGpuStream_t AL_GPU_RT(Stream_t)
 #define AlGpuEvent_t AL_GPU_RT(Event_t)
 
 // Enum values
 #define AlGpuErrorNotReady AL_GPU_RT(ErrorNotReady)
 #define AlGpuEventDisableTiming AL_GPU_RT(EventDisableTiming)
+#define AlGpuMemcpyDefault AL_GPU_RT(MemcpyDefault)
 #define AlGpuMemcpyDeviceToDevice AL_GPU_RT(MemcpyDeviceToDevice)
 #define AlGpuMemcpyDeviceToHost AL_GPU_RT(MemcpyDeviceToHost)
 #define AlGpuMemcpyHostToDevice AL_GPU_RT(MemcpyHostToDevice)

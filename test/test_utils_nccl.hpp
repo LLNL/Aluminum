@@ -38,7 +38,7 @@ template <typename T>
 struct VectorType<T, Al::NCCLBackend> {
   using type = CUDAVector<T>;
 
-  static type gen_data(size_t count, cudaStream_t stream = 0) {
+  static type gen_data(size_t count, AlGpuStream_t stream = 0) {
     auto&& host_data = VectorType<T, Al::MPIBackend>::gen_data(count);
     CUDAVector<T> data(host_data, stream);
     return data;
@@ -53,7 +53,7 @@ struct VectorType<T, Al::NCCLBackend> {
 template <> struct VectorType<__half, Al::NCCLBackend> {
   using type = CUDAVector<__half>;
 
-  static type gen_data(size_t count, cudaStream_t stream = 0) {
+  static type gen_data(size_t count, AlGpuStream_t stream = 0) {
     auto&& host_data = VectorType<float, Al::MPIBackend>::gen_data(count);
     std::vector<__half> host_data_half(count);
     for (size_t i = 0; i < count; ++i) {
@@ -71,7 +71,7 @@ template <> struct VectorType<__half, Al::NCCLBackend> {
 // Specialize to use the Aluminum stream pool, and size it appropriately.
 template <>
 struct StreamManager<Al::NCCLBackend> {
-  using StreamType = cudaStream_t;
+  using StreamType = AlGpuStream_t;
 
   static void init(size_t num_streams) {
     get_stream_pool().allocate(num_streams);
@@ -100,7 +100,7 @@ CommWrapper<Al::NCCLBackend>::CommWrapper(MPI_Comm mpi_comm) {
 template <>
 void complete_operations<Al::NCCLBackend>(
   typename Al::NCCLBackend::comm_type& comm) {
-  AL_FORCE_CHECK_CUDA_NOSYNC(cudaStreamSynchronize(comm.get_stream()));
+  AL_FORCE_CHECK_GPU_NOSYNC(AlGpuStreamSynchronize(comm.get_stream()));
 }
 
 
