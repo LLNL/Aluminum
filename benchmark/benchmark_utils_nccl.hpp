@@ -34,29 +34,29 @@
 template <>
 struct Timer<Al::NCCLBackend> {
   Timer() {
-    AL_FORCE_CHECK_CUDA(cudaEventCreate(&start_event));
-    AL_FORCE_CHECK_CUDA(cudaEventCreate(&end_event));
+    AL_FORCE_CHECK_GPU(AlGpuEventCreate(&start_event));
+    AL_FORCE_CHECK_GPU(AlGpuEventCreate(&end_event));
   }
 
   ~Timer() noexcept(false) {
-    AL_FORCE_CHECK_CUDA(cudaEventDestroy(start_event));
-    AL_FORCE_CHECK_CUDA(cudaEventDestroy(end_event));
+    AL_FORCE_CHECK_GPU(AlGpuEventDestroy(start_event));
+    AL_FORCE_CHECK_GPU(AlGpuEventDestroy(end_event));
   }
 
   void start_timer(typename Al::NCCLBackend::comm_type& comm) {
-    AL_FORCE_CHECK_CUDA_NOSYNC(cudaEventRecord(start_event, comm.get_stream()));
+    AL_FORCE_CHECK_GPU_NOSYNC(AlGpuEventRecord(start_event, comm.get_stream()));
   }
 
   double end_timer(typename Al::NCCLBackend::comm_type &comm) {
-    AL_FORCE_CHECK_CUDA_NOSYNC(cudaEventRecord(end_event, comm.get_stream()));
-    AL_FORCE_CHECK_CUDA_NOSYNC(cudaEventSynchronize(end_event));
+    AL_FORCE_CHECK_GPU_NOSYNC(AlGpuEventRecord(end_event, comm.get_stream()));
+    AL_FORCE_CHECK_GPU_NOSYNC(AlGpuEventSynchronize(end_event));
     float elapsed_time;
-    AL_FORCE_CHECK_CUDA_NOSYNC(cudaEventElapsedTime(
+    AL_FORCE_CHECK_GPU_NOSYNC(AlGpuEventElapsedTime(
                                  &elapsed_time, start_event, end_event));
     // Convert milliseconds to seconds.
     return elapsed_time / 1000.0;
   }
 
-  cudaEvent_t start_event;
-  cudaEvent_t end_event;
+  AlGpuEvent_t start_event;
+  AlGpuEvent_t end_event;
 };
