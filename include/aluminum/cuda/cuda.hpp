@@ -55,12 +55,12 @@ inline hipError_t cuGetErrorString(hipError_t const error, const char** pStr)
 #define AL_GPU_SYNC(async)                                              \
   do {                                                                  \
     /* Synchronize GPU and check for errors. */                         \
-    auto status_GPU_SYNC = AL_GPU_RT(DeviceSynchronize)();              \
-    if (status_GPU_SYNC != AL_GPU_RT(Success)) {                        \
+    auto status_GPU_SYNC = AlGpuDeviceSynchronize();              \
+    if (status_GPU_SYNC != AlGpuSuccess) {                        \
       std::ostringstream err_GPU_SYNC;                                  \
       if (async) { err_GPU_SYNC << "Asynchronous "; }                   \
       err_GPU_SYNC << "GPU error: "                                     \
-                   << AL_GPU_RT(GetErrorString)(status_GPU_SYNC);       \
+                   << AlGpuGetErrorString(status_GPU_SYNC);       \
       throw_al_exception(err_GPU_SYNC.str());                           \
     }                                                                   \
   } while (0)
@@ -71,10 +71,10 @@ inline hipError_t cuGetErrorString(hipError_t const error, const char** pStr)
     /* after to check for errors. */                            \
     AL_GPU_SYNC(true);                                          \
     auto status_CHECK_GPU = (gpu_rt_call);                      \
-    if (status_CHECK_GPU != AL_GPU_RT(Success)) {               \
+    if (status_CHECK_GPU != AlGpuSuccess) {               \
       throw_al_exception(                                       \
         std::string("GPU error: ")                              \
-        + AL_GPU_RT(GetErrorString)(status_CHECK_GPU));         \
+        + AlGpuGetErrorString(status_CHECK_GPU));         \
     }                                                           \
     AL_GPU_SYNC(false);                                         \
   } while (0)
@@ -82,10 +82,10 @@ inline hipError_t cuGetErrorString(hipError_t const error, const char** pStr)
 #define AL_FORCE_CHECK_GPU_NOSYNC(gpu_rt_call)          \
   do {                                                  \
     auto status_CHECK_GPU = (gpu_rt_call);              \
-    if (status_CHECK_GPU != AL_GPU_RT(Success)) {       \
+    if (status_CHECK_GPU != AlGpuSuccess) {       \
       throw_al_exception(                               \
         std::string("GPU error: ")                      \
-        + AL_GPU_RT(GetErrorString)(status_CHECK_GPU)); \
+        + AlGpuGetErrorString(status_CHECK_GPU)); \
     }                                                   \
   } while (0)
 

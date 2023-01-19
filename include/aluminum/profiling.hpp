@@ -52,7 +52,7 @@ namespace profiling {
 void name_thread(std::thread::native_handle_type handle, std::string name);
 #ifdef AL_HAS_CUDA
 /** Assign a name to a CUDA stream. */
-void name_stream(AL_GPU_RT(Stream_t) stream, std::string name);
+void name_stream(AlGpuStream_t stream, std::string name);
 #endif
 
 /** Create an instantaneous marker. */

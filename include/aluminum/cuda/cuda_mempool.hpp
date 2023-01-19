@@ -46,12 +46,12 @@ namespace internal {
 struct CUDAPinnedMemoryAllocator {
   void* allocate(size_t bytes) {
     void* ptr;
-    AL_CHECK_CUDA(AL_GPU_RT(MallocHost)(&ptr, bytes));
+    AL_CHECK_CUDA(AlGpuMallocHost(&ptr, bytes));
     return ptr;
   }
 
   void deallocate(void* ptr) {
-    AL_CHECK_CUDA(AL_GPU_RT(FreeHost)(ptr));
+    AL_CHECK_CUDA(AlGpuFreeHost(ptr));
   }
 };
 
@@ -66,7 +66,7 @@ public:
   }
 
   template <typename T>
-  T* allocate(size_t size, AL_GPU_RT(Stream_t) stream) {
+  T* allocate(size_t size, AlGpuStream_t stream) {
     T* mem = nullptr;
     AL_CHECK_CUDA(cub_pool.DeviceAllocate(reinterpret_cast<void**>(&mem),
                                           sizeof(T)*size, stream));

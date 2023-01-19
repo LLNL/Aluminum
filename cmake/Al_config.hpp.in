@@ -25,6 +25,49 @@
 #define AL_ADD_PREFIX_(prefix, rest) prefix##rest
 #define AL_ADD_PREFIX(prefix, rest) AL_ADD_PREFIX_(prefix, rest)
 #define AL_GPU_RT(symb) AL_ADD_PREFIX(AL_GPU_RUNTIME_PREFIX, symb)
+
+// Functions
+#define AlGpuDeviceGetStreamPriorityRange \
+    AL_GPU_RT(DeviceGetStreamPriorityRange)
+#define AlGpuDeviceSynchronize AL_GPU_RT(DeviceSynchronize)
+#define AlGpuEventCreateWithFlags AL_GPU_RT(EventCreateWithFlags)
+#define AlGpuEventDestroy AL_GPU_RT(EventDestroy)
+#define AlGpuEventQuery AL_GPU_RT(EventQuery)
+#define AlGpuEventRecord AL_GPU_RT(EventRecord)
+#define AlGpuGetDevice AL_GPU_RT(GetDevice)
+#define AlGpuGetErrorString AL_GPU_RT(GetErrorString)
+#define AlGpuHostGetDevicePointer AL_GPU_RT(HostGetDevicePointer)
+#define AlGpuHostRegister AL_GPU_RT(HostRegister)
+#define AlGpuHostRegisterDefault AL_GPU_RT(HostRegisterDefault)
+#define AlGpuHostUnregister AL_GPU_RT(HostUnregister)
+#define AlGpuMemcpyAsync AL_GPU_RT(MemcpyAsync)
+#define AlGpuSetDevice AL_GPU_RT(SetDevice)
+#define AlGpuStreamCreate AL_GPU_RT(StreamCreate)
+#define AlGpuStreamCreateWithPriority AL_GPU_RT(StreamCreateWithPriority)
+#define AlGpuStreamDestroy AL_GPU_RT(StreamDestroy)
+#define AlGpuStreamWaitEvent AL_GPU_RT(StreamWaitEvent)
+
+// Types
+#define AlGpuStream_t AL_GPU_RT(Stream_t)
+#define AlGpuEvent_t AL_GPU_RT(Event_t)
+
+// Enum values
+#define AlGpuErrorNotReady AL_GPU_RT(ErrorNotReady)
+#define AlGpuEventDisableTiming AL_GPU_RT(EventDisableTiming)
+#define AlGpuMemcpyDeviceToDevice AL_GPU_RT(MemcpyDeviceToDevice)
+#define AlGpuMemcpyDeviceToHost AL_GPU_RT(MemcpyDeviceToHost)
+#define AlGpuMemcpyHostToDevice AL_GPU_RT(MemcpyHostToDevice)
+#define AlGpuStreamDefault AL_GPU_RT(StreamDefault)
+#define AlGpuSuccess AL_GPU_RT(Success)
+
+// Special APIs
+#if defined AL_HAS_ROCM
+#define AlGpuFreeHost hipHostFree
+#define AlGpuMallocHost hipHostMalloc
+#elif defined AL_HAS_CUDA
+#define AlGpuFreeHost cudaFreeHost
+#define AlGpuMallocHost cudaMallocHost
+#endif
 #endif // defined AL_GPU_RUNTIME_PREFIX
 
 #ifdef AL_HAS_MPI_CUDA

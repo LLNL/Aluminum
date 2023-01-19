@@ -36,12 +36,12 @@ namespace internal {
 namespace ht {
 
 /** Communicator for host-transfer operations. */
-class HostTransferCommunicator: public MPICommAndStreamWrapper<AL_GPU_RT(Stream_t)> {
+class HostTransferCommunicator: public MPICommAndStreamWrapper<AlGpuStream_t> {
  public:
   /** Use MPI_COMM_WORLD and the default CUDA stream. */
   HostTransferCommunicator() : HostTransferCommunicator(MPI_COMM_WORLD, 0) {}
   /** Use a particular MPI communicator and stream. */
-  HostTransferCommunicator(MPI_Comm comm_, AL_GPU_RT(Stream_t) stream_)
+  HostTransferCommunicator(MPI_Comm comm_, AlGpuStream_t stream_)
     : MPICommAndStreamWrapper(comm_, stream_) {}
   /** Cannot copy this. */
   HostTransferCommunicator(const HostTransferCommunicator& other) = delete;
@@ -57,7 +57,7 @@ class HostTransferCommunicator: public MPICommAndStreamWrapper<AL_GPU_RT(Stream_
    * Create a new HostTransfer communicator with the same processes
    * and a new stream.
    */
-  HostTransferCommunicator copy(AL_GPU_RT(Stream_t) stream = 0) {
+  HostTransferCommunicator copy(AlGpuStream_t stream = 0) {
     return HostTransferCommunicator(get_comm(), stream);
   }
 };

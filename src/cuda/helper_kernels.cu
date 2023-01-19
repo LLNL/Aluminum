@@ -48,7 +48,7 @@ __global__ void spin_wait_kernel(int32_t wait_value, volatile int32_t* wait_mem)
   }
 }
 
-void launch_wait_kernel(AL_GPU_RT(Stream_t) stream,
+void launch_wait_kernel(AlGpuStream_t stream,
                         int32_t wait_value,
                         volatile int32_t* wait_mem) {
   spin_wait_kernel<<<1,1,0,stream>>>(wait_value, wait_mem);

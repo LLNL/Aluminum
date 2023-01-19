@@ -215,7 +215,7 @@ void ProgressEngine::run() {
 #ifdef AL_HAS_CUDA
   // Capture the current CUDA device for the progress engine.
   int device;
-  AL_CHECK_CUDA(AL_GPU_RT(GetDevice)(&device));
+  AL_CHECK_CUDA(AlGpuGetDevice(&device));
   cur_device = device;
 #endif
   thread = std::thread(&ProgressEngine::engine, this);
@@ -463,7 +463,7 @@ void ProgressEngine::bind() {
 void ProgressEngine::engine() {
 #ifdef AL_HAS_CUDA
   // Set the current CUDA device for the thread.
-  AL_CHECK_CUDA_NOSYNC(AL_GPU_RT(SetDevice)(cur_device.load()));
+  AL_CHECK_CUDA_NOSYNC(AlGpuSetDevice(cur_device.load()));
 #endif
   bind();
   // Notify the main thread we're now running.

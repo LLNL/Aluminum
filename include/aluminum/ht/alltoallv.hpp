@@ -44,7 +44,7 @@ public:
                    T* recvbuf,
                    std::vector<size_t> recv_counts_,
                    std::vector<size_t> recv_displs_,
-                   HostTransferCommunicator& comm_, AL_GPU_RT(Stream_t) stream_) :
+                   HostTransferCommunicator& comm_, AlGpuStream_t stream_) :
     HostTransferCollectiveSignalAtEndState(stream_),
     inplace(sendbuf == recvbuf),
     host_sendbuf(inplace ?
@@ -63,17 +63,17 @@ public:
     if (inplace) {
       // If doing an in-place operation, transfer directly to host_recvbuf.
       for (size_t i = 0; i < recv_counts_.size(); ++i) {
-        AL_CHECK_CUDA(AL_GPU_RT(MemcpyAsync)(host_recvbuf + recv_displs_[i],
+        AL_CHECK_CUDA(AlGpuMemcpyAsync(host_recvbuf + recv_displs_[i],
                                       recvbuf + recv_displs_[i],
                                       sizeof(T)*recv_counts_[i],
-                                      AL_GPU_RT(MemcpyDeviceToHost), stream_));
+                                      AlGpuMemcpyDeviceToHost, stream_));
       }
     } else {
       for (size_t i = 0; i < send_counts_.size(); ++i) {
-        AL_CHECK_CUDA(AL_GPU_RT(MemcpyAsync)(host_sendbuf + send_displs_[i],
+        AL_CHECK_CUDA(AlGpuMemcpyAsync(host_sendbuf + send_displs_[i],
                                       sendbuf + send_displs_[i],
                                       sizeof(T)*send_counts_[i],
-                                      AL_GPU_RT(MemcpyDeviceToHost), stream_));
+                                      AlGpuMemcpyDeviceToHost, stream_));
       }
     }
     start_event.record(stream_);
@@ -83,10 +83,10 @@ public:
 
     // Transfer completed buffer back to device.
     for (size_t i = 0; i < recv_counts_.size(); ++i) {
-      AL_CHECK_CUDA(AL_GPU_RT(MemcpyAsync)(recvbuf + recv_displs_[i],
+      AL_CHECK_CUDA(AlGpuMemcpyAsync(recvbuf + recv_displs_[i],
                                     host_recvbuf + recv_displs_[i],
                                     sizeof(T)*recv_counts_[i],
-                                    AL_GPU_RT(MemcpyDeviceToHost), stream_));
+                                    AlGpuMemcpyDeviceToHost, stream_));
     }
     end_event.record(stream_);
   }

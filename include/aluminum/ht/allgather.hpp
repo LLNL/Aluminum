@@ -39,21 +39,21 @@ template <typename T>
 class AllgatherAlState : public HostTransferCollectiveSignalAtEndState {
 public:
   AllgatherAlState(const T* sendbuf, T* recvbuf, size_t count_,
-                   HostTransferCommunicator& comm_, AL_GPU_RT(Stream_t) stream_) :
+                   HostTransferCommunicator& comm_, AlGpuStream_t stream_) :
     HostTransferCollectiveSignalAtEndState(stream_),
     host_mem(mempool.allocate<MemoryType::CUDA_PINNED_HOST, T>(comm_.size()*count_)),
     count(count_),
     comm(comm_.get_comm()) {
     // Transfer data from device to host.
     if (sendbuf == recvbuf) {
-      AL_CHECK_CUDA(AL_GPU_RT(MemcpyAsync)(host_mem + comm_.rank()*count,
+      AL_CHECK_CUDA(AlGpuMemcpyAsync(host_mem + comm_.rank()*count,
                                     sendbuf + comm_.rank()*count,
-                                    sizeof(T)*count, AL_GPU_RT(MemcpyDeviceToHost),
+                                    sizeof(T)*count, AlGpuMemcpyDeviceToHost,
                                     stream_));
     } else {
-      AL_CHECK_CUDA(AL_GPU_RT(MemcpyAsync)(host_mem + comm_.rank()*count,
+      AL_CHECK_CUDA(AlGpuMemcpyAsync(host_mem + comm_.rank()*count,
                                     sendbuf, sizeof(T)*count,
-                                    AL_GPU_RT(MemcpyDeviceToHost), stream_));
+                                    AlGpuMemcpyDeviceToHost, stream_));
     }
     start_event.record(stream_);
 
@@ -61,9 +61,9 @@ public:
     gpu_wait.wait(stream_);
 
     // Transfer completed buffer back to device.
-    AL_CHECK_CUDA(AL_GPU_RT(MemcpyAsync)(recvbuf, host_mem,
+    AL_CHECK_CUDA(AlGpuMemcpyAsync(recvbuf, host_mem,
                                   sizeof(T)*count_*comm_.size(),
-                                  AL_GPU_RT(MemcpyHostToDevice), stream_));
+                                  AlGpuMemcpyHostToDevice, stream_));
     end_event.record(stream_);
   }
 

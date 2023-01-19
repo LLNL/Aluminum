@@ -39,7 +39,7 @@ template <typename T>
 class ReduceAlState : public HostTransferCollectiveSignalNonRootEarlyState {
 public:
   ReduceAlState(const T* sendbuf, T* recvbuf, size_t count_, ReductionOperator op_,
-                int root_, HostTransferCommunicator& comm_, AL_GPU_RT(Stream_t) stream_) :
+                int root_, HostTransferCommunicator& comm_, AlGpuStream_t stream_) :
     HostTransferCollectiveSignalNonRootEarlyState(comm_.rank() == root_, stream_),
     host_mem(mempool.allocate<MemoryType::CUDA_PINNED_HOST, T>(count_)),
     count(count_),
@@ -47,8 +47,8 @@ public:
     op(mpi::ReductionOperator2MPI_Op(op_)),
     comm(comm_.get_comm()) {
     // Transfer data from device to host.
-    AL_CHECK_CUDA(AL_GPU_RT(MemcpyAsync)(host_mem, sendbuf, sizeof(T)*count,
-                                  AL_GPU_RT(MemcpyDeviceToHost), stream_));
+    AL_CHECK_CUDA(AlGpuMemcpyAsync(host_mem, sendbuf, sizeof(T)*count,
+                                  AlGpuMemcpyDeviceToHost, stream_));
     start_event.record(stream_);
 
     // Have the device wait on the host.
@@ -56,8 +56,8 @@ public:
 
     if (is_root) {
       // Transfer completed buffer back to device.
-      AL_CHECK_CUDA(AL_GPU_RT(MemcpyAsync)(recvbuf, host_mem, sizeof(T)*count,
-                                    AL_GPU_RT(MemcpyHostToDevice), stream_));
+      AL_CHECK_CUDA(AlGpuMemcpyAsync(recvbuf, host_mem, sizeof(T)*count,
+                                    AlGpuMemcpyHostToDevice, stream_));
     }
     end_event.record(stream_);
   }

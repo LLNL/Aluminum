@@ -99,13 +99,13 @@ inline std::string algorithm_name(NCCLCollectiveAlgorithm algo) {
 class NCCLBackend;
 
 /** Communicator for NCCL operations. */
-class NCCLCommunicator : public internal::MPICommAndStreamWrapper<AL_GPU_RT(Stream_t)> {
+class NCCLCommunicator : public internal::MPICommAndStreamWrapper<AlGpuStream_t> {
   friend class NCCLBackend;
  public:
   /** Default constructor, uses MPI_COMM_WORLD and the default stream. */
    NCCLCommunicator() : NCCLCommunicator(MPI_COMM_WORLD, 0) {}
   /** Use a particular MPI communicator and stream. */
-  NCCLCommunicator(MPI_Comm comm_, AL_GPU_RT(Stream_t) stream_ = 0);
+  NCCLCommunicator(MPI_Comm comm_, AlGpuStream_t stream_ = 0);
   /** Cannot copy this. */
   NCCLCommunicator(const NCCLCommunicator& other) = delete;
   /** Default move constructor. */
@@ -117,7 +117,7 @@ class NCCLCommunicator : public internal::MPICommAndStreamWrapper<AL_GPU_RT(Stre
   ~NCCLCommunicator();
 
   /** Create a new NCCLCommunicator with the same processes and a new stream. */
-  NCCLCommunicator copy(AL_GPU_RT(Stream_t) stream = 0) {
+  NCCLCommunicator copy(AlGpuStream_t stream = 0) {
     return NCCLCommunicator(get_comm(), stream);
   }
 
@@ -163,17 +163,17 @@ template <> inline ncclDataType_t TypeMap<double>() { return ncclDouble; }
 
 /** Represents a request for the NCCL backend. */
 struct NCCLRequest {
-  NCCLRequest(AL_GPU_RT(Event_t) op_event_, AL_GPU_RT(Stream_t) orig_stream_,
-              AL_GPU_RT(Stream_t) internal_stream_) :
+  NCCLRequest(AlGpuEvent_t op_event_, AlGpuStream_t orig_stream_,
+              AlGpuStream_t internal_stream_) :
     op_event(op_event_), orig_stream(orig_stream_),
     internal_stream(internal_stream_) {}
   ~NCCLRequest() { cuda::event_pool.release(op_event); }
   /** Event pending on completion of the operation. */
-  AL_GPU_RT(Event_t) op_event;
+  AlGpuEvent_t op_event;
   /** Original stream associated with the operation. */
-  AL_GPU_RT(Stream_t) orig_stream;
+  AlGpuStream_t orig_stream;
   /** Internal stream the operation is running on. */
-  AL_GPU_RT(Stream_t) internal_stream;
+  AlGpuStream_t internal_stream;
 };
 
 /**
@@ -301,7 +301,7 @@ class NCCLBackend {
   static void NonblockingAllreduce(const T* sendbuf, T* recvbuf, size_t count,
                                    ReductionOperator op, comm_type& comm,
                                    req_type& req, allreduce_algo_type) {
-    AL_GPU_RT(Stream_t) internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
+    AlGpuStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     do_allreduce(sendbuf, recvbuf, count, op, comm, internal_stream);
     setup_completion_event(internal_stream, comm, req);
@@ -323,7 +323,7 @@ class NCCLBackend {
   template <typename T>
   static void NonblockingSend(const T* sendbuf, size_t count, int dest,
                               comm_type& comm, req_type& req) {
-    AL_GPU_RT(Stream_t) internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
+    AlGpuStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     do_send(sendbuf, count, dest, comm, internal_stream);
     setup_completion_event(internal_stream, comm, req);
@@ -337,7 +337,7 @@ class NCCLBackend {
   template <typename T>
   static void NonblockingRecv(T* recvbuf, size_t count, int src,
                               comm_type& comm, req_type& req) {
-      AL_GPU_RT(Stream_t) internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
+      AlGpuStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
       sync_internal_stream_with_comm(internal_stream, comm);
       do_recv(recvbuf, count, src, comm, internal_stream);
       setup_completion_event(internal_stream, comm, req);
@@ -354,7 +354,7 @@ class NCCLBackend {
   static void NonblockingSendRecv(const T* sendbuf, size_t send_count, int dest,
                                   T* recvbuf, size_t recv_count, int src,
                                   comm_type& comm, req_type& req) {
-    AL_GPU_RT(Stream_t) internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
+    AlGpuStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     do_sendrecv(sendbuf, send_count, dest, recvbuf, recv_count, src,
                 comm, internal_stream);
@@ -367,7 +367,7 @@ class NCCLBackend {
 
   static void NonblockingBarrier(comm_type& comm, req_type& req,
                                  barrier_algo_type) {
-    AL_GPU_RT(Stream_t) internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
+    AlGpuStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     do_barrier(comm, internal_stream);
     setup_completion_event(internal_stream, comm, req);
@@ -382,7 +382,7 @@ class NCCLBackend {
   template <typename T>
   static void NonblockingBcast(T* buf, size_t count, int root,
                                comm_type& comm, req_type& req, bcast_algo_type) {
-    AL_GPU_RT(Stream_t) internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
+    AlGpuStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     do_broadcast(buf, count, root, comm, internal_stream);
     setup_completion_event(internal_stream, comm, req);
@@ -404,7 +404,7 @@ class NCCLBackend {
   static void NonblockingGather(const T* sendbuf, T* recvbuf, size_t count,
                                 int root, comm_type& comm, req_type& req,
                                 gather_algo_type) {
-    AL_GPU_RT(Stream_t) internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
+    AlGpuStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     do_gather(sendbuf, recvbuf, count, root, comm, internal_stream);
     setup_completion_event(internal_stream, comm, req);
@@ -439,7 +439,7 @@ class NCCLBackend {
                                  std::vector<size_t> displs,
                                  int root, comm_type& comm, req_type& req,
                                  gatherv_algo_type) {
-    AL_GPU_RT(Stream_t) internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
+    AlGpuStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     do_gatherv(sendbuf, recvbuf, counts, displs, root, comm, internal_stream);
     setup_completion_event(internal_stream, comm, req);
@@ -472,7 +472,7 @@ class NCCLBackend {
   static void NonblockingReduce(const T* sendbuf, T* recvbuf, size_t count,
                                 ReductionOperator op, int root, comm_type& comm,
                                 req_type& req, reduce_algo_type) {
-    AL_GPU_RT(Stream_t) internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
+    AlGpuStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     do_reduce(sendbuf, recvbuf, count, op, root, comm, internal_stream);
     setup_completion_event(internal_stream, comm, req);
@@ -502,7 +502,7 @@ class NCCLBackend {
   static void NonblockingAllgather(const T* sendbuf, T* recvbuf,
                                    size_t send_count, comm_type& comm,
                                    req_type& req, allgather_algo_type) {
-    AL_GPU_RT(Stream_t) internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
+    AlGpuStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     do_allgather(sendbuf, recvbuf, send_count, comm, internal_stream);
     setup_completion_event(internal_stream, comm, req);
@@ -538,7 +538,7 @@ class NCCLBackend {
                                     std::vector<size_t> displs,
                                     comm_type& comm, req_type& req,
                                     allgatherv_algo_type) {
-    AL_GPU_RT(Stream_t) internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
+    AlGpuStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     do_allgatherv(sendbuf, recvbuf, counts, displs, comm, internal_stream);
     setup_completion_event(internal_stream, comm, req);
@@ -570,7 +570,7 @@ class NCCLBackend {
   static void NonblockingAlltoall(const T* sendbuf, T* recvbuf, size_t count,
                                   comm_type& comm, req_type& req,
                                   alltoall_algo_type) {
-    AL_GPU_RT(Stream_t) internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
+    AlGpuStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     do_alltoall(sendbuf, recvbuf, count, comm, internal_stream);
     setup_completion_event(internal_stream, comm, req);
@@ -615,7 +615,7 @@ class NCCLBackend {
                                    std::vector<size_t> recv_displs,
                                    comm_type& comm, req_type& req,
                                    alltoallv_algo_type) {
-    AL_GPU_RT(Stream_t) internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
+    AlGpuStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     do_alltoallv(sendbuf, send_counts, send_displs,
                  recvbuf, recv_counts, recv_displs,
@@ -655,7 +655,7 @@ class NCCLBackend {
                                         size_t count,
                                         ReductionOperator op, comm_type& comm,
                                         req_type& req, reduce_scatter_algo_type) {
-    AL_GPU_RT(Stream_t) internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
+    AlGpuStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     do_reduce_scatter(sendbuf, recvbuf, count, op, comm, internal_stream);
     setup_completion_event(internal_stream, comm, req);
@@ -693,7 +693,7 @@ class NCCLBackend {
                                          comm_type& comm,
                                          req_type& req,
                                          reduce_scatterv_algo_type) {
-    AL_GPU_RT(Stream_t) internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
+    AlGpuStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     do_reduce_scatterv(sendbuf, recvbuf, counts, op, comm,
                        internal_stream);
@@ -727,7 +727,7 @@ class NCCLBackend {
   static void NonblockingScatter(const T* sendbuf, T* recvbuf, size_t count,
                                  int root, comm_type& comm, req_type& req,
                                  scatter_algo_type) {
-    AL_GPU_RT(Stream_t) internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
+    AlGpuStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     do_scatter(sendbuf, recvbuf, count, root, comm, internal_stream);
     setup_completion_event(internal_stream, comm, req);
@@ -765,7 +765,7 @@ class NCCLBackend {
                                   std::vector<size_t> displs,
                                   int root, comm_type& comm, req_type& req,
                                   scatterv_algo_type) {
-    AL_GPU_RT(Stream_t) internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
+    AlGpuStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     do_scatterv(sendbuf, recvbuf, counts, displs, root, comm,
                 internal_stream);
@@ -785,7 +785,7 @@ class NCCLBackend {
 
  private:
   /** Event for synchronizing between streams. */
-  static AL_GPU_RT(Event_t) sync_event;
+  static AlGpuEvent_t sync_event;
 
   /**
    * Set up stream synchronization.
@@ -793,11 +793,11 @@ class NCCLBackend {
    * associated with comm.
    */
   static void sync_internal_stream_with_comm(
-    AL_GPU_RT(Stream_t) internal_stream, comm_type& comm) {
-    // We can reuse a single event for AL_GPU_RT(StreamWaitEvent) because it uses the
+    AlGpuStream_t internal_stream, comm_type& comm) {
+    // We can reuse a single event for AlGpuStreamWaitEvent because it uses the
     // stream/event state when it is called.
-    AL_CHECK_CUDA(AL_GPU_RT(EventRecord)(sync_event, comm.get_stream()));
-    AL_CHECK_CUDA(AL_GPU_RT(StreamWaitEvent)(internal_stream, sync_event, 0));
+    AL_CHECK_CUDA(AlGpuEventRecord(sync_event, comm.get_stream()));
+    AL_CHECK_CUDA(AlGpuStreamWaitEvent(internal_stream, sync_event, 0));
   }
 
   /**
@@ -805,9 +805,9 @@ class NCCLBackend {
    * This uses an event recorded on the provided internal stream.
    */
   static void setup_completion_event(
-    AL_GPU_RT(Stream_t) internal_stream, comm_type& comm, req_type& req) {
-    AL_GPU_RT(Event_t) event = internal::cuda::event_pool.get();
-    AL_CHECK_CUDA(AL_GPU_RT(EventRecord)(event, internal_stream));
+    AlGpuStream_t internal_stream, comm_type& comm, req_type& req) {
+    AlGpuEvent_t event = internal::cuda::event_pool.get();
+    AL_CHECK_CUDA(AlGpuEventRecord(event, internal_stream));
     req = std::make_shared<internal::nccl::NCCLRequest>(
       event, comm.get_stream(), internal_stream);
   }
@@ -817,7 +817,7 @@ class NCCLBackend {
   template <typename T>
   static void do_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                            ReductionOperator op, comm_type& comm,
-                           AL_GPU_RT(Stream_t) stream) {
+                           AlGpuStream_t stream) {
     if (sendbuf == internal::IN_PLACE<T>()) {
       sendbuf = recvbuf;
     }
@@ -830,7 +830,7 @@ class NCCLBackend {
   /** Do a NCCL send. */
   template <typename T>
   static void do_send(const T* sendbuf, size_t count, int dest, comm_type& comm,
-                      AL_GPU_RT(Stream_t) stream) {
+                      AlGpuStream_t stream) {
     AL_CHECK_NCCL(ncclSend((const void*) sendbuf, count,
                            internal::nccl::TypeMap<T>(), dest,
                            comm.m_nccl_comm, stream));
@@ -839,7 +839,7 @@ class NCCLBackend {
   /** Do a NCCL recv. */
   template <typename T>
   static void do_recv(T* recvbuf, size_t count, int src, comm_type& comm,
-                      AL_GPU_RT(Stream_t) stream) {
+                      AlGpuStream_t stream) {
     AL_CHECK_NCCL(ncclRecv((void*) recvbuf, count,
                            internal::nccl::TypeMap<T>(), src,
                            comm.m_nccl_comm, stream));
@@ -849,7 +849,7 @@ class NCCLBackend {
   template <typename T>
   static void do_sendrecv(const T* sendbuf, size_t send_count, int dest,
                           T* recvbuf, size_t recv_count, int src,
-                          comm_type& comm, AL_GPU_RT(Stream_t) stream) {
+                          comm_type& comm, AlGpuStream_t stream) {
     AL_CHECK_NCCL(ncclGroupStart());
     AL_CHECK_NCCL(ncclSend((const void*) sendbuf, send_count,
                            internal::nccl::TypeMap<T>(), dest,
@@ -861,7 +861,7 @@ class NCCLBackend {
   }
 
   /** Do a NCCL barrier. */
-  static void do_barrier(comm_type& comm, AL_GPU_RT(Stream_t) stream) {
+  static void do_barrier(comm_type& comm, AlGpuStream_t stream) {
     // Implement the barrier as an allreduce on a single value.
     using barrier_t = unsigned char;
     barrier_t* barrier_buf =
@@ -876,7 +876,7 @@ class NCCLBackend {
   /** Do a NCCL broadcast. */
   template <typename T>
   static void do_broadcast(T* buf, size_t count, int root, comm_type& comm,
-                           AL_GPU_RT(Stream_t) stream) {
+                           AlGpuStream_t stream) {
     AL_CHECK_NCCL(ncclBroadcast((const void*) buf, (void*) buf, count,
                                 internal::nccl::TypeMap<T>(), root,
                                 comm.m_nccl_comm, stream));
@@ -885,7 +885,7 @@ class NCCLBackend {
   /** Do a NCCL gather. */
   template <typename T>
   static void do_gather(const T* sendbuf, T* recvbuf, size_t count, int root,
-                        comm_type& comm, AL_GPU_RT(Stream_t) stream) {
+                        comm_type& comm, AlGpuStream_t stream) {
     if (sendbuf == internal::IN_PLACE<T>()) {
       if (comm.rank() == root) {
         sendbuf = recvbuf + comm.rank() * count;
@@ -920,7 +920,7 @@ class NCCLBackend {
   template <typename T>
   static void do_gatherv(const T* sendbuf, T* recvbuf,
                          std::vector<size_t> counts, std::vector<size_t> displs,
-                         int root, comm_type& comm, AL_GPU_RT(Stream_t) stream) {
+                         int root, comm_type& comm, AlGpuStream_t stream) {
     if (sendbuf == internal::IN_PLACE<T>()) {
       if (comm.rank() == root) {
         sendbuf = recvbuf + displs[comm.rank()];
@@ -957,7 +957,7 @@ class NCCLBackend {
   template <typename T>
   static void do_reduce(const T* sendbuf, T* recvbuf, size_t count,
                         ReductionOperator op, int root, comm_type& comm,
-                        AL_GPU_RT(Stream_t) stream) {
+                        AlGpuStream_t stream) {
     if (sendbuf == internal::IN_PLACE<T>()) {
       sendbuf = recvbuf;
     }
@@ -970,7 +970,7 @@ class NCCLBackend {
   /** Do a NCCL allgather. */
   template <typename T>
   static void do_allgather(const T* sendbuf, T* recvbuf, size_t send_count,
-                           comm_type& comm, AL_GPU_RT(Stream_t) stream) {
+                           comm_type& comm, AlGpuStream_t stream) {
     if (sendbuf == internal::IN_PLACE<T>()) {
       sendbuf = recvbuf + comm.rank()*send_count;
     }
@@ -983,7 +983,7 @@ class NCCLBackend {
   template <typename T>
   static void do_allgatherv(const T* sendbuf, T* recvbuf,
                             std::vector<size_t> counts, std::vector<size_t> displs,
-                            comm_type& comm, AL_GPU_RT(Stream_t) stream) {
+                            comm_type& comm, AlGpuStream_t stream) {
     if (sendbuf == internal::IN_PLACE<T>()) {
       sendbuf = recvbuf + displs[comm.rank()];
     }
@@ -1004,7 +1004,7 @@ class NCCLBackend {
   /** Do a NCCL alltoall. */
   template <typename T>
   static void do_alltoall(const T* sendbuf, T* recvbuf, size_t count,
-                          comm_type& comm, AL_GPU_RT(Stream_t) stream) {
+                          comm_type& comm, AlGpuStream_t stream) {
     if (sendbuf == internal::IN_PLACE<T>()) {
       sendbuf = recvbuf;
     }
@@ -1012,9 +1012,9 @@ class NCCLBackend {
     if (sendbuf == recvbuf) {
       tmp_sendbuf = internal::mempool.allocate<internal::MemoryType::CUDA, T>(
         count*comm.size(), stream);
-      AL_CHECK_CUDA(AL_GPU_RT(MemcpyAsync)(tmp_sendbuf, sendbuf,
+      AL_CHECK_CUDA(AlGpuMemcpyAsync(tmp_sendbuf, sendbuf,
                                     count*sizeof(T)*comm.size(),
-                                    AL_GPU_RT(MemcpyDeviceToDevice), stream));
+                                    AlGpuMemcpyDeviceToDevice, stream));
     }
     internal::nccl::safe_nccl_group<2>(
       0, comm.size(),
@@ -1039,7 +1039,7 @@ class NCCLBackend {
                            T* recvbuf,
                            std::vector<size_t> recv_counts,
                            std::vector<size_t> recv_displs,
-                           comm_type& comm, AL_GPU_RT(Stream_t) stream) {
+                           comm_type& comm, AlGpuStream_t stream) {
     T* tmp_sendbuf = const_cast<T*>(sendbuf);
     if (sendbuf == internal::IN_PLACE<T>()) {
       // We send and receive to this buffer, so we need a temporary one.
@@ -1052,10 +1052,10 @@ class NCCLBackend {
         sendbuf_len, stream);
       // TODO: Optimize for the case where everything is contiguous.
       for (size_t i = 0; i < send_counts.size(); ++i) {
-        AL_CHECK_CUDA(AL_GPU_RT(MemcpyAsync)((void*) (tmp_sendbuf + contig_displs[i]),
+        AL_CHECK_CUDA(AlGpuMemcpyAsync((void*) (tmp_sendbuf + contig_displs[i]),
                                       (const void*) (recvbuf + send_displs[i]),
                                       send_counts[i]*sizeof(T),
-                                      AL_GPU_RT(MemcpyDeviceToDevice), stream));
+                                      AlGpuMemcpyDeviceToDevice, stream));
       }
       // The copied data is contiguous.
       send_displs = contig_displs;
@@ -1083,7 +1083,7 @@ class NCCLBackend {
   template <typename T>
   static void do_reduce_scatter(const T* sendbuf, T* recvbuf,
                                 size_t recv_count, ReductionOperator op,
-                                comm_type& comm, AL_GPU_RT(Stream_t) stream) {
+                                comm_type& comm, AlGpuStream_t stream) {
     if (sendbuf == internal::IN_PLACE<T>()) {
       sendbuf = recvbuf;
     }
@@ -1099,7 +1099,7 @@ class NCCLBackend {
                                  std::vector<size_t> counts,
                                  ReductionOperator op,
                                  comm_type& comm,
-                                 AL_GPU_RT(Stream_t) stream) {
+                                 AlGpuStream_t stream) {
     // This is implemented as a reduce followed by a scatterv.
     // Rank 0 is the root.
     size_t count = std::accumulate(counts.begin(), counts.end(), size_t{0});
@@ -1120,7 +1120,7 @@ class NCCLBackend {
   /** Do a NCCL scatter. */
   template <typename T>
   static void do_scatter(const T* sendbuf, T* recvbuf, size_t count, int root,
-                         comm_type& comm, AL_GPU_RT(Stream_t) stream) {
+                         comm_type& comm, AlGpuStream_t stream) {
     if (sendbuf == internal::IN_PLACE<T>() && comm.rank() == root) {
       sendbuf = recvbuf;
       recvbuf = recvbuf + comm.rank()*count;
@@ -1153,7 +1153,7 @@ class NCCLBackend {
   static void do_scatterv(const T* sendbuf, T* recvbuf,
                           std::vector<size_t> counts,
                           std::vector<size_t> displs,
-                          int root, comm_type& comm, AL_GPU_RT(Stream_t) stream) {
+                          int root, comm_type& comm, AlGpuStream_t stream) {
     if (sendbuf == internal::IN_PLACE<T>() && comm.rank() == root) {
       sendbuf = recvbuf;
       recvbuf = recvbuf + displs[comm.rank()];
@@ -1193,7 +1193,7 @@ inline bool Test<NCCLBackend>(typename NCCLBackend::req_type& req) {
     return true;
   }
   // This is purely a host operation.
-  bool r = AL_GPU_RT(EventQuery)(req->op_event) == AL_GPU_RT(Success);
+  bool r = AlGpuEventQuery(req->op_event) == AlGpuSuccess;
   if (r) {
     req = NCCLBackend::null_req;
   }
@@ -1209,7 +1209,7 @@ inline void Wait<NCCLBackend>(typename NCCLBackend::req_type& req) {
   }
   // Synchronize the original stream with the request.
   // This will not block the host.
-  AL_CHECK_CUDA(AL_GPU_RT(StreamWaitEvent)(req->orig_stream, req->op_event, 0));
+  AL_CHECK_CUDA(AlGpuStreamWaitEvent(req->orig_stream, req->op_event, 0));
 }
 
 }  // namespace Al

@@ -42,7 +42,7 @@ namespace cuda {
 
 // Define resource pools.
 Al::internal::LockedResourcePool<int32_t*, CacheLinePinnedMemoryAllocator> sync_pool;
-Al::internal::LockedResourcePool<AL_GPU_RT(Event_t), CUDAEventAllocator> event_pool;
+Al::internal::LockedResourcePool<AlGpuEvent_t, CUDAEventAllocator> event_pool;
 
 namespace {
 // Whether stream memory operations are supported.

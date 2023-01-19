@@ -51,7 +51,7 @@ GPUWait::GPUWait()
         cuMemHostGetDevicePointer(&wait_sync_dev_ptr, wait_sync, 0));
 #endif
   } else {
-    AL_CHECK_CUDA(AL_GPU_RT(HostGetDevicePointer)(
+    AL_CHECK_CUDA(AlGpuHostGetDevicePointer(
         reinterpret_cast<void **>(&wait_sync_dev_ptr_no_stream_mem_ops),
         wait_sync, 0));
   }
@@ -61,7 +61,7 @@ GPUWait::~GPUWait() {
   sync_pool.release(wait_sync);
 }
 
-void GPUWait::wait(AL_GPU_RT(Stream_t) stream) {
+void GPUWait::wait(AlGpuStream_t stream) {
   if (stream_memory_operations_supported()) {
 #ifdef AL_HAS_ROCM
     launch_wait_kernel(stream, 1, static_cast<int32_t *>(wait_sync_dev_ptr));

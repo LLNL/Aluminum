@@ -39,7 +39,7 @@ template <typename T>
 class BcastAlState : public HostTransferCollectiveSignalRootEarlyState {
 public:
   BcastAlState(T* buf, size_t count_, int root_,
-               HostTransferCommunicator& comm_, AL_GPU_RT(Stream_t) stream_) :
+               HostTransferCommunicator& comm_, AlGpuStream_t stream_) :
     HostTransferCollectiveSignalRootEarlyState(comm_.rank() == root_, stream_),
     host_mem(mempool.allocate<MemoryType::CUDA_PINNED_HOST, T>(count_)),
     count(count_),
@@ -47,9 +47,9 @@ public:
     comm(comm_.get_comm()) {
     // Transfer data from device to host.
     if (is_root) {
-      AL_CHECK_CUDA(AL_GPU_RT(MemcpyAsync)(
+      AL_CHECK_CUDA(AlGpuMemcpyAsync(
                       host_mem, buf, sizeof(T)*count,
-                      AL_GPU_RT(MemcpyDeviceToHost), stream_));
+                      AlGpuMemcpyDeviceToHost, stream_));
     }
     start_event.record(stream_);
 
@@ -58,8 +58,8 @@ public:
 
     if (!is_root) {
       // Transfer completed buffer back to device.
-      AL_CHECK_CUDA(AL_GPU_RT(MemcpyAsync)(buf, host_mem, sizeof(T)*count,
-                                    AL_GPU_RT(MemcpyHostToDevice), stream_));
+      AL_CHECK_CUDA(AlGpuMemcpyAsync(buf, host_mem, sizeof(T)*count,
+                                    AlGpuMemcpyHostToDevice, stream_));
     }
     end_event.record(stream_);
   }

@@ -41,7 +41,7 @@ public:
   ScattervAlState(const T* sendbuf, T* recvbuf,
                   std::vector<size_t> counts_, std::vector<size_t> displs_,
                   int root_,
-                  HostTransferCommunicator& comm_, AL_GPU_RT(Stream_t) stream_) :
+                  HostTransferCommunicator& comm_, AlGpuStream_t stream_) :
     HostTransferCollectiveSignalRootEarlyState(comm_.rank() == root_, stream_),
     host_mem(mempool.allocate<MemoryType::CUDA_PINNED_HOST, T>((comm_.rank() == root_) ?
                                   (displs_.back() + counts_.back()) :
@@ -54,19 +54,19 @@ public:
     if (is_root) {
       // Transfer the data from device to host.
       for (size_t i = 0; i < counts_.size(); ++i) {
-        AL_CHECK_CUDA(AL_GPU_RT(MemcpyAsync)(
+        AL_CHECK_CUDA(AlGpuMemcpyAsync(
                         host_mem + displs_[i], sendbuf + displs_[i],
                         sizeof(T) * counts_[i],
-                        AL_GPU_RT(MemcpyDeviceToHost), stream_));
+                        AlGpuMemcpyDeviceToHost, stream_));
       }
       start_event.record(stream_);
       // Root only needs to copy its data to its final destination on the
       // device when it's not in place.
       if (sendbuf != recvbuf) {
-        AL_CHECK_CUDA(AL_GPU_RT(MemcpyAsync)(
+        AL_CHECK_CUDA(AlGpuMemcpyAsync(
                         recvbuf, sendbuf + displs_[comm_.rank()],
                         sizeof(T) * counts_[comm_.rank()],
-                        AL_GPU_RT(MemcpyDeviceToDevice), stream_));
+                        AlGpuMemcpyDeviceToDevice, stream_));
       }
       // Have the device wait on the host.
       gpu_wait.wait(stream_);
@@ -76,9 +76,9 @@ public:
       // Have the device wait on the host.
       gpu_wait.wait(stream_);
       // Transfer completed buffer back to device.
-      AL_CHECK_CUDA(AL_GPU_RT(MemcpyAsync)(recvbuf, host_mem,
+      AL_CHECK_CUDA(AlGpuMemcpyAsync(recvbuf, host_mem,
                                     sizeof(T)*counts_[comm_.rank()],
-                                    AL_GPU_RT(MemcpyHostToDevice), stream_));
+                                    AlGpuMemcpyHostToDevice, stream_));
     }
     end_event.record(stream_);
   }

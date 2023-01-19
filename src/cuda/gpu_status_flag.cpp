@@ -62,7 +62,7 @@ GPUStatusFlag::~GPUStatusFlag() {
   }
 }
 
-void GPUStatusFlag::record(AL_GPU_RT(Stream_t) stream) {
+void GPUStatusFlag::record(AlGpuStream_t stream) {
   if (stream_memory_operations_supported()) {
     // We cannot use std::atomic because we need the actual address of
     // the memory.
@@ -77,7 +77,7 @@ void GPUStatusFlag::record(AL_GPU_RT(Stream_t) stream) {
                         CU_STREAM_WRITE_VALUE_DEFAULT));
 #endif
   } else {
-    AL_CHECK_CUDA(AL_GPU_RT(EventRecord)(plain_event, stream));
+    AL_CHECK_CUDA(AlGpuEventRecord(plain_event, stream));
   }
 }
 
@@ -85,10 +85,10 @@ bool GPUStatusFlag::query() {
   if (stream_memory_operations_supported()) {
     return __atomic_load_n(stream_mem.sync_event, __ATOMIC_SEQ_CST);
   } else {
-    auto r = AL_GPU_RT(EventQuery)(plain_event);
-    if (r == AL_GPU_RT(Success)) {
+    auto r = AlGpuEventQuery(plain_event);
+    if (r == AlGpuSuccess) {
       return true;
-    } else if (r != AL_GPU_RT(ErrorNotReady)) {
+    } else if (r != AlGpuErrorNotReady) {
       AL_CHECK_CUDA(r);
       return false;  // Never reached.
     } else {

@@ -60,7 +60,7 @@ class GPUStatusFlag {
   GPUStatusFlag();
   ~GPUStatusFlag();
   /** Record the event into stream. */
-  void record(AL_GPU_RT(Stream_t) stream);
+  void record(AlGpuStream_t stream);
   /** Return true if the event has completed. */
   bool query();
  private:
@@ -74,7 +74,7 @@ class GPUStatusFlag {
   };
   union {
     stream_mem_t stream_mem;
-    AL_GPU_RT(Event_t) plain_event;
+    AlGpuEvent_t plain_event;
   };
 };
 

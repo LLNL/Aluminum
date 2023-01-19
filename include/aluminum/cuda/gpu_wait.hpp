@@ -58,7 +58,7 @@ class GPUWait {
   GPUWait();
   ~GPUWait();
   /** Enqueue a wait onto stream. */
-  void wait(AL_GPU_RT(Stream_t) stream);
+  void wait(AlGpuStream_t stream);
   /** Signal the stream to continue. */
   void signal();
  private:

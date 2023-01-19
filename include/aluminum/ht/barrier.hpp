@@ -37,7 +37,7 @@ namespace ht {
 
 class BarrierAlState : public HostTransferCollectiveSignalAtEndState {
 public:
-  BarrierAlState(HostTransferCommunicator& comm_, AL_GPU_RT(Stream_t) stream_) :
+  BarrierAlState(HostTransferCommunicator& comm_, AlGpuStream_t stream_) :
     HostTransferCollectiveSignalAtEndState(stream_),
     comm(comm_.get_comm()) {
     // Just wait until we should start this.

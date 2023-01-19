@@ -48,13 +48,13 @@ struct CacheLinePinnedMemoryAllocator {
     // Overallocate to avoid interference.
     int32_t *mem = (int32_t *)std::aligned_alloc(
         AL_DESTRUCTIVE_INTERFERENCE_SIZE, AL_DESTRUCTIVE_INTERFERENCE_SIZE);
-    AL_CHECK_CUDA(AL_GPU_RT(HostRegister)(mem, AL_DESTRUCTIVE_INTERFERENCE_SIZE,
-                                   AL_GPU_RT(HostRegisterDefault)));
+    AL_CHECK_CUDA(AlGpuHostRegister(mem, AL_DESTRUCTIVE_INTERFERENCE_SIZE,
+                                   AlGpuHostRegisterDefault));
     return mem;
   }
 
   void deallocate(int32_t* mem) {
-    AL_CHECK_CUDA(AL_GPU_RT(HostUnregister)(mem));
+    AL_CHECK_CUDA(AlGpuHostUnregister(mem));
     std::free(mem);
   }
 };
