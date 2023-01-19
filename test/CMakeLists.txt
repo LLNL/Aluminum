@@ -17,7 +17,7 @@ if (AL_HAS_NCCL)
   set_source_path(TEST_NCCL_HDRS test_utils_nccl.hpp)
 endif ()
 
-set(TEST_HDRS
+set(TEST_HEADERS
   ${TEST_BASE_HDRS}
   ${TEST_CUDA_HDRS}
   ${TEST_MPI_CUDA_HDRS}
@@ -25,80 +25,51 @@ set(TEST_HDRS
   ${TEST_NCCL_HDRS})
 
 # These headers are used in the benchmark/ directory
-add_library(aluminum_test_headers INTERFACE)
+add_library(aluminum_test_headers INTERFACE "${TEST_HEADERS}")
+target_include_directories(
+  aluminum_test_headers INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}")
 
-if (AL_HAS_ROCM)
-  hipify_header_files(TEST_HEADERS ${TEST_HDRS})
-  add_custom_target(gen_test_headers
-    DEPENDS ${TEST_HEADERS}
-    COMMENT "Generating hipified test headers.")
-  add_dependencies(aluminum_test_headers gen_test_headers)
-  target_include_directories(
-    aluminum_test_headers INTERFACE "${CMAKE_CURRENT_BINARY_DIR}")
-else ()
-  set(TEST_HEADERS ${TEST_HDRS})
-  target_sources(aluminum_test_headers INTERFACE "${TEST_HEADERS}")
-  target_include_directories(
-    aluminum_test_headers INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}")
+# Make a quick exit before we add any tests
+if (NOT AL_ENABLE_TESTS)
+  return()
 endif ()
 
-if (AL_ENABLE_TESTS)
-  set_source_path(TEST_SRCS
-    test_ops.cpp
-    test_exchange.cpp
-    )
+set_source_path(AL_TEST_SOURCES
+  test_ops.cpp
+  test_exchange.cpp
+  test_stream_mem_ops.cpp
+)
 
-  if (AL_HAS_ROCM)
-    hipify_source_files(AL_TEST_SOURCES ${TEST_SRCS})
-  else ()
-    set(AL_TEST_SOURCES ${TEST_SRCS})
-  endif ()
-
-  foreach(src ${AL_TEST_SOURCES})
-    string(REPLACE ".cpp" ".exe" _tmp_test_exe_name "${src}")
-    get_filename_component(_test_exe_name "${_tmp_test_exe_name}" NAME)
-    add_executable(${_test_exe_name} ${src})
-    target_include_directories(
-      ${_test_exe_name} SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/third_party/cxxopts/include)
-    target_link_libraries(${_test_exe_name} PRIVATE Al aluminum_test_headers)
-    if (AL_HAS_CUDA AND NOT AL_HAS_ROCM)
-      target_link_libraries(${_test_exe_name} PUBLIC cuda)
-    endif()
-    target_link_libraries(${_test_exe_name} PRIVATE Threads::Threads)
-
-    # FIXME: Hopefully this can be removed in a future version of ROCm.
-    if (AL_HAS_ROCM AND AL_BUILD_TYPE_UPPER MATCHES "DEBUG")
-      target_compile_options(${_test_exe_name} PRIVATE "-O0")
-    endif ()
-  endforeach()
-
-  # FIXME: Should any of these tests be enabled with ROCm?
+foreach(src ${AL_TEST_SOURCES})
+  string(REPLACE ".cpp" "" _tmp_test_exe_name "${src}")
+  get_filename_component(_test_exe_name "${_tmp_test_exe_name}" NAME)
+  add_executable(${_test_exe_name} ${src})
+  target_include_directories(${_test_exe_name}
+    SYSTEM PRIVATE
+    ${CMAKE_SOURCE_DIR}/third_party/cxxopts/include)
+  target_link_libraries(${_test_exe_name} PRIVATE Al aluminum_test_headers)
   if (AL_HAS_CUDA AND NOT AL_HAS_ROCM)
-    add_executable(test_stream_mem_ops.exe
-      test_stream_mem_ops.cpp ${TEST_HEADERS})
-    target_link_libraries(test_stream_mem_ops.exe PRIVATE Al)
-    target_link_libraries(test_stream_mem_ops.exe PUBLIC cuda)
-    target_link_libraries(${_test_exe_name} PRIVATE Threads::Threads)
-  endif ()
+    target_link_libraries(${_test_exe_name} PUBLIC cuda)
+  endif()
+  target_link_libraries(${_test_exe_name} PRIVATE Threads::Threads)
 
-  if (AL_HAS_MPI_CUDA_RMA AND NOT AL_HAS_ROCM)
-    add_executable(test_rma_ring.exe test_rma_ring.cpp ${TEST_HEADERS})
-    target_include_directories(
-      test_rma_ring.exe SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/third_party/cxxopts/include)
-    target_link_libraries(test_rma_ring.exe PRIVATE Al)
-    target_link_libraries(test_rma_ring.exe PUBLIC cuda)
-    add_executable(test_rma_halo_exchange.exe
-      test_rma_halo_exchange.cpp ${TEST_HEADERS})
-    target_include_directories(
-      test_rma_halo_exchange.exe SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/third_party/cxxopts/include)
-    target_link_libraries(test_rma_halo_exchange.exe PRIVATE Al)
-    target_link_libraries(test_rma_halo_exchange.exe PUBLIC cuda)
-    target_link_libraries(${_test_exe_name} PRIVATE Threads::Threads)
-  endif ()
-
+  # FIXME: Hopefully this can be removed in a future version of ROCm.
   if (AL_HAS_ROCM AND AL_BUILD_TYPE_UPPER MATCHES "DEBUG")
-    set_source_files_properties(
-      ${AL_TEST_SOURCES}
-      COMPILE_OPTIONS "-O0")
+    target_compile_options(${_test_exe_name} PRIVATE "-O0")
   endif ()
+endforeach()
+
+if (AL_HAS_MPI_CUDA_RMA AND NOT AL_HAS_ROCM)
+  add_executable(test_rma_ring.exe test_rma_ring.cpp ${TEST_HEADERS})
+  target_include_directories(
+    test_rma_ring.exe SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/third_party/cxxopts/include)
+  target_link_libraries(test_rma_ring.exe PRIVATE Al)
+  target_link_libraries(test_rma_ring.exe PUBLIC cuda)
+  add_executable(test_rma_halo_exchange.exe
+    test_rma_halo_exchange.cpp ${TEST_HEADERS})
+  target_include_directories(
+    test_rma_halo_exchange.exe SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/third_party/cxxopts/include)
+  target_link_libraries(test_rma_halo_exchange.exe PRIVATE Al)
+  target_link_libraries(test_rma_halo_exchange.exe PUBLIC cuda)
+  target_link_libraries(${_test_exe_name} PRIVATE Threads::Threads)
 endif ()

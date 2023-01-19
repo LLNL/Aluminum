@@ -29,7 +29,7 @@
 #include "Al.hpp"
 
 int main(int argc, char** argv) {
-  cudaSetDevice(0);
+  AL_IGNORE_NODISCARD(AlGpuSetDevice(0));
   Al::Initialize(argc, argv);
   if (Al::internal::cuda::stream_memory_operations_supported()) {
     std::cout << "Supported!" << std::endl;
