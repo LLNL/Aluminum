@@ -391,7 +391,7 @@ if (ALUMINUM_ENABLE_ROCM)
   # regular files must be given a full path. This appears to be the
   # easiest way for both ROCm and non-ROCm builds to both work and
   # install.
-  set(SOURCE_PREFIX "")
+  set(SOURCE_PREFIX "${CMAKE_CURRENT_LIST_DIR}/")
 else ()
   set(SOURCE_PREFIX "${CMAKE_CURRENT_LIST_DIR}/")
 endif ()
