@@ -21,14 +21,14 @@ public:
 class CudaEvent : public Event {
 public:
   CudaEvent() {
-    AL_IGNORE_NODISCARD(
+    AL_CHECK_CUDA(
       AlGpuEventCreateWithFlags(&event, AlGpuEventDisableTiming));
   }
   ~CudaEvent() {
-    AL_IGNORE_NODISCARD(AlGpuEventDestroy(event));
+    AL_CHECK_CUDA(AlGpuEventDestroy(event));
   }
   void record(AlGpuStream_t stream) override {
-    AL_IGNORE_NODISCARD(AlGpuEventRecord(event, stream));
+    AL_CHECK_CUDA(AlGpuEventRecord(event, stream));
   }
   bool query() override {
     return AlGpuEventQuery(event) == AlGpuSuccess;
@@ -40,24 +40,24 @@ private:
 class CustomEvent : public Event {
 public:
   CustomEvent() {
-    AL_IGNORE_NODISCARD(AlGpuMallocHost(&event, sizeof(int32_t)));
+    AL_CHECK_CUDA(AlGpuMallocHost(&event, sizeof(int32_t)));
     __atomic_store_n(event, 1, __ATOMIC_SEQ_CST);
 #if defined AL_HAS_ROCM
-    AL_IGNORE_NODISCARD(hipHostGetDevicePointer(&dev_ptr, event, 0));
+    AL_CHECK_CUDA(hipHostGetDevicePointer(&dev_ptr, event, 0));
 #elif defined AL_HAS_CUDA
-    AL_IGNORE_NODISCARD(cuMemHostGetDevicePointer(&dev_ptr, event, 0));
+    AL_CHECK_CUDA_DRV(cuMemHostGetDevicePointer(&dev_ptr, event, 0));
 #endif
   }
   ~CustomEvent() {
-    AL_IGNORE_NODISCARD(AlGpuFreeHost(event));
+    AL_CHECK_CUDA(AlGpuFreeHost(event));
   }
   void record(AlGpuStream_t stream) override {
     __atomic_store_n(event, 0, __ATOMIC_SEQ_CST);
 #if defined AL_HAS_ROCM
-    AL_IGNORE_NODISCARD(
+    AL_CHECK_CUDA(
       hipStreamWriteValue32(stream, dev_ptr, 1, 0));
 #elif defined AL_HAS_CUDA
-    AL_IGNORE_NODISCARD(
+    AL_CHECK_CUDA_DRV(
       cuStreamWriteValue32(stream, dev_ptr, 1, CU_STREAM_WRITE_VALUE_DEFAULT));
 #endif
   }
@@ -85,16 +85,16 @@ void do_benchmark(AlGpuStream_t stream, Event& event) {
     double end = Al::get_time();
     launch_times.push_back(start - launch_start);
     times.push_back(end - start);
-    AL_IGNORE_NODISCARD(AlGpuStreamSynchronize(stream));
+    AL_CHECK_CUDA(AlGpuStreamSynchronize(stream));
   }
   std::cout << "Launch: " << SummaryStats(launch_times) << std::endl;
   std::cout << "Query: " << SummaryStats(times) << std::endl;
 }
 
 int main(int, char**) {
-  AL_IGNORE_NODISCARD(AlGpuSetDevice(0));
+  AL_CHECK_CUDA(AlGpuSetDevice(0));
   AlGpuStream_t stream;
-  AL_IGNORE_NODISCARD(AlGpuStreamCreate(&stream));
+  AL_CHECK_CUDA(AlGpuStreamCreate(&stream));
   {
     CudaEvent cuda_event;
     CustomEvent custom_event;
@@ -103,7 +103,7 @@ int main(int, char**) {
     std::cout << "CUDA Event:" << std::endl;
     do_benchmark(stream, cuda_event);
   }
-  AL_IGNORE_NODISCARD(AlGpuStreamSynchronize(stream));
-  AL_IGNORE_NODISCARD(AlGpuStreamDestroy(stream));
+  AL_CHECK_CUDA(AlGpuStreamSynchronize(stream));
+  AL_CHECK_CUDA(AlGpuStreamDestroy(stream));
   return 0;
 }
