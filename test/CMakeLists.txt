@@ -37,8 +37,15 @@ endif ()
 set_source_path(AL_TEST_SOURCES
   test_ops.cpp
   test_exchange.cpp
+)
+
+set_source_path(AL_GPU_ONLY_TEST_SOURCES
   test_stream_mem_ops.cpp
 )
+
+if (AL_HAS_CUDA OR AL_HAS_ROCM)
+  list(APPEND AL_TEST_SOURCES ${AL_GPU_ONLY_TEST_SOURCES})
+endif ()
 
 foreach(src ${AL_TEST_SOURCES})
   string(REPLACE ".cpp" "" _tmp_test_exe_name "${src}")

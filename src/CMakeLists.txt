@@ -54,7 +54,8 @@ target_include_directories(Al PUBLIC
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 target_link_libraries(Al PUBLIC
   HWLOC::hwloc
-  MPI::MPI_CXX)
+  MPI::MPI_CXX
+  Threads::Threads)
 
 if (AL_HAS_ROCM)
   set(HIP_CLANG_ROOT "${AL_ROCM_PATH}/llvm")
@@ -107,8 +108,7 @@ if (AL_HAS_ROCM)
     $<$<BOOL:${AL_HAS_NCCL}>:roc::rccl>
     roc::rocprim
     ${ROCM_SMI_LIBRARY}
-    ${Roctracer_LIBRARIES}
-    Threads::Threads)
+    ${Roctracer_LIBRARIES})
 
   # HIP language files are detected by the ".hip" extension. Since
   # we're upcycling ".cu" files for now, we just set their LANGUAGE to
