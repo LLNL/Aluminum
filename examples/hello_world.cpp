@@ -61,9 +61,10 @@ using AlBackend = Al::MPIBackend;
 
 
 int main(int argc, char** argv) {
-  // If using CUDA, you should set the CUDA device before initializing
-  // Aluminum. Aluminum expects there to be only one process per GPU.
-#ifdef AL_HAS_CUDA
+  // If using CUDA/HIP, you should set the CUDA/HIP device before
+  // initializing Aluminum. Aluminum expects there to be only one
+  // process per GPU.
+#if defined AL_HAS_CUDA || defined AL_HAS_ROCM
   // This simply uses cudaGetDeviceCount to determine the number of
   // GPUs. For testing, you can override that with the AL_NUM_GPUS
   // environment variable.
@@ -84,16 +85,16 @@ int main(int argc, char** argv) {
   }
 
   // Set the CUDA device.
-  // AL_FORCE_CHECK_CUDA_NOSYNC checks for CUDA errors and throws an
+  // AL_FORCE_CHECK_GPU_NOSYNC checks for CUDA errors and throws an
   // Aluminum exception if one occurs.
   // The "FORCE" means that the return value is always checked,
   // regardless of debug level.
-  // The "NOSYNC" means that the check does not synchronize the CUDA
-  // device beforehand, so it might also see errors from earlier CUDA
-  // calls.
-  // For general use, AL_CHECK_CUDA is probably the right choice.
-  AL_FORCE_CHECK_CUDA_NOSYNC(cudaSetDevice(local_rank));
-#endif  /** AL_HAS_CUDA */
+  // The "NOSYNC" means that the check does not synchronize the
+  // CUDA/HIP device beforehand, so it might also see errors from
+  // earlier CUDA/HIP calls.
+  // For general use, AL_CHECK_GPU is probably the right choice.
+  AL_FORCE_CHECK_GPU_NOSYNC(AlGpuSetDevice(local_rank));
+#endif  /** AL_HAS_CUDA || AL_HAS_ROCM */
 
   // Initialize Aluminum. Much like MPI, Aluminum takes argc and argv
   // as input. (Unlike MPI, it takes them by reference.)

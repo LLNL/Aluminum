@@ -40,7 +40,15 @@
 #include <Al.hpp>
 
 
-#ifdef AL_HAS_CUDA
+#if defined AL_HAS_CUDA || defined AL_HAS_ROCM
+
+#if !defined AlGpuMalloc
+# define AlGpuMalloc AL_GPU_RT(Malloc)
+#endif
+
+#if !defined AlGpuFree
+# define AlGpuFree AL_GPU_RT(Free)
+#endif
 
 /**
  * Return the number of GPUs to use on the system.
@@ -59,12 +67,12 @@ inline int get_number_of_gpus() {
       std::abort();
     }
   } else {
-    AL_FORCE_CHECK_CUDA_NOSYNC(cudaGetDeviceCount(&num_gpus));
+    AL_FORCE_CHECK_GPU_NOSYNC(AlGpuGetDeviceCount(&num_gpus));
   }
   return num_gpus;
 }
 
-#endif  /** AL_HAS_CUDA */
+#endif  /** AL_HAS_CUDA || AL_HAS_ROCM */
 
 /** Attempt to identify the local rank on a node from the environment. */
 inline int get_local_rank() {
@@ -162,7 +170,7 @@ typename VectorType<T, Backend>::type get_vector(size_t count) {
   return typename VectorType<T, Backend>::type(count);
 }
 
-#ifdef AL_HAS_CUDA
+#if defined AL_HAS_CUDA || defined AL_HAS_ROCM
 
 // Note: This is adapted from the same class in the Aluminum test utils
 // but does not use the Aluminum memory pool to simplify things.
@@ -173,21 +181,21 @@ class CUDAVector {
  public:
   CUDAVector() : m_count(0), m_ptr(nullptr) {}
 
-  CUDAVector(size_t count, cudaStream_t stream = 0) :
+  CUDAVector(size_t count, AlGpuStream_t stream = 0) :
     m_count(count), m_ptr(nullptr), m_stream(stream) {
     allocate();
   }
 
-  CUDAVector(const std::vector<T> &host_vector, cudaStream_t stream = 0) :
+  CUDAVector(const std::vector<T> &host_vector, AlGpuStream_t stream = 0) :
     m_count(host_vector.size()), m_ptr(nullptr), m_stream(stream) {
     allocate();
-    sync_memcpy(m_ptr, host_vector.data(), get_bytes(), cudaMemcpyDefault);
+    sync_memcpy(m_ptr, host_vector.data(), get_bytes(), AlGpuMemcpyDefault);
   }
 
   CUDAVector(const CUDAVector &v) : m_count(v.m_count), m_ptr(nullptr),
                                     m_stream(v.m_stream) {
     allocate();
-    sync_memcpy(m_ptr, v.data(), get_bytes(), cudaMemcpyDefault);
+    sync_memcpy(m_ptr, v.data(), get_bytes(), AlGpuMemcpyDefault);
   }
 
   CUDAVector(CUDAVector &&v) : CUDAVector() {
@@ -211,7 +219,7 @@ class CUDAVector {
 
   void clear() {
     if (m_count > 0) {
-      AL_FORCE_CHECK_CUDA(cudaFree(m_ptr));
+      AL_FORCE_CHECK_GPU(AlGpuFree(m_ptr));
       m_ptr = nullptr;
       m_count = 0;
     }
@@ -220,7 +228,7 @@ class CUDAVector {
   void allocate() {
     assert(m_ptr == nullptr);
     if (m_count > 0) {
-      AL_FORCE_CHECK_CUDA(cudaMalloc(&m_ptr, get_bytes()));
+      AL_FORCE_CHECK_GPU(AlGpuMalloc(&m_ptr, get_bytes()));
     }
   }
 
@@ -230,12 +238,12 @@ class CUDAVector {
       m_count = v.m_count;
       allocate();
     }
-    sync_memcpy(m_ptr, v.m_ptr, get_bytes(), cudaMemcpyDefault);
+    sync_memcpy(m_ptr, v.m_ptr, get_bytes(), AlGpuMemcpyDefault);
     return *this;
   }
 
   CUDAVector& move(const CUDAVector<T> &v) {
-    sync_memcpy(m_ptr, v.m_ptr, v.get_bytes(), cudaMemcpyDefault);
+    sync_memcpy(m_ptr, v.m_ptr, v.get_bytes(), AlGpuMemcpyDefault);
     return *this;
   }
 
@@ -249,16 +257,16 @@ class CUDAVector {
 
   std::vector<T> copyout() const {
     std::vector<T> hv(size());
-    sync_memcpy(hv.data(), m_ptr, get_bytes(), cudaMemcpyDeviceToHost);
+    sync_memcpy(hv.data(), m_ptr, get_bytes(), AlGpuMemcpyDeviceToHost);
     return hv;
   }
 
   void copyout(std::vector<T>& hv) const {
-    sync_memcpy(hv.data(), m_ptr, get_bytes(), cudaMemcpyDeviceToHost);
+    sync_memcpy(hv.data(), m_ptr, get_bytes(), AlGpuMemcpyDeviceToHost);
   }
 
   void copyin(const T *hp) {
-    sync_memcpy(m_ptr, hp, get_bytes(), cudaMemcpyHostToDevice);
+    sync_memcpy(m_ptr, hp, get_bytes(), AlGpuMemcpyHostToDevice);
   }
 
   void copyin(const std::vector<T> &hv) {
@@ -274,22 +282,22 @@ class CUDAVector {
   }
 
   void sync_memcpy(void* dst, const void* src, size_t count,
-                   cudaMemcpyKind kind) const {
+                   AlGpuMemcpyKind kind) const {
     if (count == 0) {
       return;
     }
-    AL_FORCE_CHECK_CUDA_NOSYNC(
-      cudaMemcpyAsync(dst, src, count, kind, m_stream));
-    AL_FORCE_CHECK_CUDA_NOSYNC(cudaStreamSynchronize(m_stream));
+    AL_FORCE_CHECK_GPU_NOSYNC(
+      AlGpuMemcpyAsync(dst, src, count, kind, m_stream));
+    AL_FORCE_CHECK_GPU_NOSYNC(AlGpuStreamSynchronize(m_stream));
   }
 
  private:
   size_t m_count;
   T *m_ptr;
-  cudaStream_t m_stream;
+  AlGpuStream_t m_stream;
 };
 
-#endif  /** AL_HAS_CUDA */
+#endif  /** AL_HAS_CUDA || AL_HAS_ROCM */
 
 // Specialize VectorType for different Aluminum backends.
 
@@ -300,7 +308,7 @@ template <typename T>
 struct VectorType<T, Al::NCCLBackend> {
   using type = CUDAVector<T>;
 
-  static type gen_data(size_t count, cudaStream_t stream = 0) {
+  static type gen_data(size_t count, AlGpuStream_t stream = 0) {
     auto&& host_data = VectorType<T, Al::MPIBackend>::gen_data(count);
     CUDAVector<T> data(host_data, stream);
     return data;
@@ -320,7 +328,7 @@ struct VectorType<T, Al::NCCLBackend> {
 template <> struct VectorType<__half, Al::NCCLBackend> {
   using type = CUDAVector<__half>;
 
-  static type gen_data(size_t count, cudaStream_t stream = 0) {
+  static type gen_data(size_t count, AlGpuStream_t stream = 0) {
     auto&& host_data = VectorType<float, Al::MPIBackend>::gen_data(count);
     std::vector<__half> host_data_half(count);
     for (size_t i = 0; i < count; ++i) {
@@ -344,7 +352,7 @@ template <typename T>
 struct VectorType<T, Al::HostTransferBackend> {
   using type = CUDAVector<T>;
 
-  static type gen_data(size_t count, cudaStream_t stream = 0) {
+  static type gen_data(size_t count, AlGpuStream_t stream = 0) {
     auto&& host_data = VectorType<T, Al::MPIBackend>::gen_data(count);
     CUDAVector<T> data(host_data, stream);
     return data;
@@ -374,7 +382,7 @@ void complete_operations(typename Backend::comm_type &) {}
 template <>
 void complete_operations<Al::NCCLBackend>(
   typename Al::NCCLBackend::comm_type& comm) {
-  AL_FORCE_CHECK_CUDA_NOSYNC(cudaStreamSynchronize(comm.get_stream()));
+  AL_FORCE_CHECK_GPU_NOSYNC(AlGpuStreamSynchronize(comm.get_stream()));
 }
 
 #endif  /** AL_HAS_NCCL */
@@ -384,7 +392,7 @@ void complete_operations<Al::NCCLBackend>(
 template <>
 void complete_operations<Al::HostTransferBackend>(
   typename Al::HostTransferBackend::comm_type& comm) {
-  AL_FORCE_CHECK_CUDA_NOSYNC(cudaStreamSynchronize(comm.get_stream()));
+  AL_FORCE_CHECK_GPU_NOSYNC(AlGpuStreamSynchronize(comm.get_stream()));
 }
 
 #endif  /** AL_HAS_HOST_TRANSFER */

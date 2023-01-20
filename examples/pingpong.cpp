@@ -46,7 +46,7 @@ constexpr size_t num_iters = 4;
 
 int main(int argc, char** argv) {
   // Initialize Aluminum.
-#ifdef AL_HAS_CUDA
+#if defined AL_HAS_CUDA || defined AL_HAS_ROCM
   const int num_gpus = get_number_of_gpus();
   const int local_rank = get_local_rank();
   const int local_size = get_local_size();
@@ -56,7 +56,7 @@ int main(int argc, char** argv) {
               << "(" << local_size << ")" << std::endl;
     std::abort();
   }
-  AL_FORCE_CHECK_CUDA_NOSYNC(cudaSetDevice(local_rank));
+  AL_FORCE_CHECK_GPU_NOSYNC(AlGpuSetDevice(local_rank));
 #endif /** AL_HAS_CUDA */
   Al::Initialize(argc, argv);
 
