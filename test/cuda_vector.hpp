@@ -38,21 +38,21 @@ class CUDAVector {
  public:
   CUDAVector() : m_count(0), m_ptr(nullptr) {}
 
-  CUDAVector(size_t count, cudaStream_t stream = 0) : m_count(count), m_ptr(nullptr),
+  CUDAVector(size_t count, AlGpuStream_t stream = 0) : m_count(count), m_ptr(nullptr),
                                                       m_stream(stream) {
     allocate();
   }
 
-  CUDAVector(const std::vector<T> &host_vector, cudaStream_t stream = 0) :
+  CUDAVector(const std::vector<T> &host_vector, AlGpuStream_t stream = 0) :
     m_count(host_vector.size()), m_ptr(nullptr), m_stream(stream) {
     allocate();
-    sync_memcpy(m_ptr, host_vector.data(), get_bytes(), cudaMemcpyDefault);
+    sync_memcpy(m_ptr, host_vector.data(), get_bytes(), AlGpuMemcpyDefault);
   }
 
   CUDAVector(const CUDAVector &v) : m_count(v.m_count), m_ptr(nullptr),
                                     m_stream(v.m_stream) {
     allocate();
-    sync_memcpy(m_ptr, v.data(), get_bytes(), cudaMemcpyDefault);
+    sync_memcpy(m_ptr, v.data(), get_bytes(), AlGpuMemcpyDefault);
   }
 
   CUDAVector(CUDAVector &&v) : CUDAVector() {
@@ -96,12 +96,12 @@ class CUDAVector {
       m_count = v.m_count;
       allocate();
     }
-    sync_memcpy(m_ptr, v.m_ptr, get_bytes(), cudaMemcpyDefault);
+    sync_memcpy(m_ptr, v.m_ptr, get_bytes(), AlGpuMemcpyDefault);
     return *this;
   }
 
   CUDAVector& move(const CUDAVector<T> &v) {
-    sync_memcpy(m_ptr, v.m_ptr, v.get_bytes(), cudaMemcpyDefault);
+    sync_memcpy(m_ptr, v.m_ptr, v.get_bytes(), AlGpuMemcpyDefault);
     return *this;
   }
 
@@ -115,16 +115,16 @@ class CUDAVector {
 
   std::vector<T> copyout() const {
     std::vector<T> hv(size());
-    sync_memcpy(hv.data(), m_ptr, get_bytes(), cudaMemcpyDeviceToHost);
+    sync_memcpy(hv.data(), m_ptr, get_bytes(), AlGpuMemcpyDeviceToHost);
     return hv;
   }
 
   void copyout(std::vector<T>& hv) const {
-    sync_memcpy(hv.data(), m_ptr, get_bytes(), cudaMemcpyDeviceToHost);
+    sync_memcpy(hv.data(), m_ptr, get_bytes(), AlGpuMemcpyDeviceToHost);
   }
 
   void copyin(const T *hp) {
-    sync_memcpy(m_ptr, hp, get_bytes(), cudaMemcpyHostToDevice);
+    sync_memcpy(m_ptr, hp, get_bytes(), AlGpuMemcpyHostToDevice);
   }
 
   void copyin(const std::vector<T> &hv) {
@@ -140,19 +140,19 @@ class CUDAVector {
   }
 
   void sync_memcpy(void* dst, const void* src, size_t count,
-                   cudaMemcpyKind kind) const {
+                   AlGpuMemcpyKind kind) const {
     if (count == 0) {
       return;
     }
-    AL_FORCE_CHECK_CUDA_NOSYNC(
-      cudaMemcpyAsync(dst, src, count, kind, m_stream));
-    AL_FORCE_CHECK_CUDA_NOSYNC(cudaStreamSynchronize(m_stream));
+    AL_FORCE_CHECK_GPU_NOSYNC(
+      AlGpuMemcpyAsync(dst, src, count, kind, m_stream));
+    AL_FORCE_CHECK_GPU_NOSYNC(AlGpuStreamSynchronize(m_stream));
   }
 
  private:
   size_t m_count;
   T *m_ptr;
-  cudaStream_t m_stream;
+  AlGpuStream_t m_stream;
 };
 
 /** Compare two vectors with a given tolerance. */

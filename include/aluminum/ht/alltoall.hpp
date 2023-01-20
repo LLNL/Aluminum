@@ -39,22 +39,22 @@ template <typename T>
 class AlltoallAlState : public HostTransferCollectiveSignalAtEndState {
 public:
   AlltoallAlState(const T* sendbuf, T* recvbuf, size_t count_,
-                  HostTransferCommunicator& comm_, cudaStream_t stream_) :
+                  HostTransferCommunicator& comm_, AlGpuStream_t stream_) :
     HostTransferCollectiveSignalAtEndState(stream_),
     host_mem(mempool.allocate<MemoryType::CUDA_PINNED_HOST, T>(comm_.size()*count_)),
     count(count_),
     comm(comm_.get_comm()) {
     // Transfer data from device to host.
-    AL_CHECK_CUDA(cudaMemcpyAsync(host_mem, sendbuf, sizeof(T)*count*comm_.size(),
-                                  cudaMemcpyDeviceToHost, stream_));
+    AL_CHECK_CUDA(AlGpuMemcpyAsync(host_mem, sendbuf, sizeof(T)*count*comm_.size(),
+                                  AlGpuMemcpyDeviceToHost, stream_));
     start_event.record(stream_);
 
     // Have the device wait on the host.
     gpu_wait.wait(stream_);
 
     // Transfer completed buffer back to device.
-    AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, host_mem, sizeof(T)*count*comm_.size(),
-                                  cudaMemcpyHostToDevice, stream_));
+    AL_CHECK_CUDA(AlGpuMemcpyAsync(recvbuf, host_mem, sizeof(T)*count*comm_.size(),
+                                  AlGpuMemcpyHostToDevice, stream_));
     end_event.record(stream_);
   }
 

@@ -202,7 +202,7 @@ void run_test_instance(AlOperation op, OpOptions<Backend> op_options,
   // Set CUDA device if needed.
 #ifdef AL_HAS_CUDA
   if (thread_id >= 0) {
-    AL_CHECK_CUDA(cudaSetDevice(device_id));
+    AL_CHECK_CUDA(AlGpuSetDevice(device_id));
   }
 #else
   (void) thread_id;
@@ -268,7 +268,7 @@ void run_test(cxxopts::ParseResult& parsed_opts) {
   // Save the device ID for threads.
 #ifdef AL_HAS_CUDA
   int device_id;
-  AL_CHECK_CUDA(cudaGetDevice(&device_id));
+  AL_CHECK_CUDA(AlGpuGetDevice(&device_id));
 #else
   int device_id = -1;
 #endif

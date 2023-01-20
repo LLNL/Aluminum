@@ -38,7 +38,9 @@
 #ifdef AL_HAS_ROCTRACER
 #include <roctx.h>
 #endif
-#ifdef AL_HAS_CUDA
+#if defined AL_HAS_ROCM
+#include <hip/hip_runtime.h>
+#elif defined AL_HAS_CUDA
 #include <cuda_runtime.h>
 #endif
 
@@ -50,7 +52,7 @@ namespace profiling {
 void name_thread(std::thread::native_handle_type handle, std::string name);
 #ifdef AL_HAS_CUDA
 /** Assign a name to a CUDA stream. */
-void name_stream(cudaStream_t stream, std::string name);
+void name_stream(AlGpuStream_t stream, std::string name);
 #endif
 
 /** Create an instantaneous marker. */

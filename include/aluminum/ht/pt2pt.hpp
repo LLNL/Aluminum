@@ -43,12 +43,12 @@ template <typename T>
 class SendAlState : public AlState {
  public:
   SendAlState(const T* sendbuf, size_t count_, int dest_,
-              HostTransferCommunicator& comm_, cudaStream_t stream) :
+              HostTransferCommunicator& comm_, AlGpuStream_t stream) :
     AlState(nullptr), count(count_), dest(dest_), comm(comm_.get_comm()),
     compute_stream(comm_.get_stream()) {
     mem = mempool.allocate<MemoryType::CUDA_PINNED_HOST, T>(count);
-    AL_CHECK_CUDA(cudaMemcpyAsync(mem, sendbuf, sizeof(T)*count,
-                                  cudaMemcpyDeviceToHost, stream));
+    AL_CHECK_CUDA(AlGpuMemcpyAsync(mem, sendbuf, sizeof(T)*count,
+                                  AlGpuMemcpyDeviceToHost, stream));
     sync_event.record(stream);
   }
   ~SendAlState() override {
@@ -103,7 +103,7 @@ class SendAlState : public AlState {
   cuda::GPUStatusFlag sync_event;
   bool mem_transfer_done = false;
   bool send_started = false;
-  cudaStream_t compute_stream;
+  AlGpuStream_t compute_stream;
 #ifdef AL_HAS_PROF
   profiling::ProfileRange prof_range;
 #endif
@@ -113,13 +113,13 @@ template <typename T>
 class RecvAlState : public AlState {
  public:
   RecvAlState(T* recvbuf, size_t count_, int src_,
-              HostTransferCommunicator& comm_, cudaStream_t stream) :
+              HostTransferCommunicator& comm_, AlGpuStream_t stream) :
     AlState(nullptr), count(count_), src(src_), comm(comm_.get_comm()),
     compute_stream(comm_.get_stream()) {
     mem = mempool.allocate<MemoryType::CUDA_PINNED_HOST, T>(count);
     wait_sync.wait(stream);
-    AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, mem, sizeof(T)*count,
-                                  cudaMemcpyHostToDevice, stream));
+    AL_CHECK_CUDA(AlGpuMemcpyAsync(recvbuf, mem, sizeof(T)*count,
+                                  AlGpuMemcpyHostToDevice, stream));
     sync_event.record(stream);
   }
   ~RecvAlState() override {
@@ -173,7 +173,7 @@ class RecvAlState : public AlState {
   cuda::GPUStatusFlag sync_event;
   cuda::GPUWait wait_sync;
   bool recv_done = false;
-  cudaStream_t compute_stream;
+  AlGpuStream_t compute_stream;
 #ifdef AL_HAS_PROF
   profiling::ProfileRange prof_range;
 #endif
@@ -184,7 +184,7 @@ class SendRecvAlState : public AlState {
  public:
   SendRecvAlState(const T* sendbuf, size_t send_count, int dest,
                   T* recvbuf, size_t recv_count, int src,
-                  HostTransferCommunicator& comm, cudaStream_t stream) :
+                  HostTransferCommunicator& comm, AlGpuStream_t stream) :
     AlState(nullptr),
     send_state(sendbuf, send_count, dest, comm, stream),
     recv_state(recvbuf, recv_count, src, comm, stream) {}

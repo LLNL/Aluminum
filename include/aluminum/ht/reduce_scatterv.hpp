@@ -43,7 +43,7 @@ public:
   ReduceScattervAlState(const T* sendbuf, T* recvbuf,
                         std::vector<size_t> counts_,
                        ReductionOperator op_, HostTransferCommunicator& comm_,
-                       cudaStream_t stream_) :
+                       AlGpuStream_t stream_) :
     HostTransferCollectiveSignalAtEndState(stream_),
     total_size(std::accumulate(counts_.begin(), counts_.end(), size_t{0})),
     host_mem(mempool.allocate<MemoryType::CUDA_PINNED_HOST, T>(total_size)),
@@ -51,17 +51,17 @@ public:
     op(mpi::ReductionOperator2MPI_Op(op_)),
     comm(comm_.get_comm()) {
     // Transfer data from device to host.
-    AL_CHECK_CUDA(cudaMemcpyAsync(host_mem, sendbuf, sizeof(T)*total_size,
-                                  cudaMemcpyDeviceToHost, stream_));
+    AL_CHECK_CUDA(AlGpuMemcpyAsync(host_mem, sendbuf, sizeof(T)*total_size,
+                                  AlGpuMemcpyDeviceToHost, stream_));
     start_event.record(stream_);
 
     // Have the device wait on the host.
     gpu_wait.wait(stream_);
 
     // Transfer completed buffer back to device.
-    AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, host_mem,
+    AL_CHECK_CUDA(AlGpuMemcpyAsync(recvbuf, host_mem,
                                   sizeof(T)*counts_[comm_.rank()],
-                                  cudaMemcpyHostToDevice, stream_));
+                                  AlGpuMemcpyHostToDevice, stream_));
     end_event.record(stream_);
   }
 

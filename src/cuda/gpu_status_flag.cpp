@@ -40,9 +40,15 @@ GPUStatusFlag::GPUStatusFlag() {
     stream_mem.sync_event = sync_pool.get();
     // Initialize to completed to match CUDA event semantics.
     __atomic_store_n(stream_mem.sync_event, 1, __ATOMIC_SEQ_CST);
+#if defined AL_HAS_ROCM
+    AL_CHECK_CUDA(hipHostGetDevicePointer(
+                    &stream_mem.sync_event_dev_ptr,
+                    stream_mem.sync_event, 0));
+#elif defined AL_HAS_CUDA
     AL_CHECK_CUDA_DRV(cuMemHostGetDevicePointer(
                         &stream_mem.sync_event_dev_ptr,
                         stream_mem.sync_event, 0));
+#endif
   } else {
     plain_event = event_pool.get();
   }
@@ -56,22 +62,22 @@ GPUStatusFlag::~GPUStatusFlag() {
   }
 }
 
-void GPUStatusFlag::record(cudaStream_t stream) {
+void GPUStatusFlag::record(AlGpuStream_t stream) {
   if (stream_memory_operations_supported()) {
     // We cannot use std::atomic because we need the actual address of
     // the memory.
     __atomic_store_n(stream_mem.sync_event, 0, __ATOMIC_SEQ_CST);
-#ifdef AL_HAS_ROCM
-    AL_CHECK_CUDA_DRV(hipStreamWriteValue32(
-                        stream, stream_mem.sync_event_dev_ptr, 1,
-                        0));
-#else
+#if defined AL_HAS_ROCM
+    AL_CHECK_CUDA(hipStreamWriteValue32(
+                    stream, stream_mem.sync_event_dev_ptr, 1,
+                    0));
+#elif defined AL_HAS_CUDA
     AL_CHECK_CUDA_DRV(cuStreamWriteValue32(
                         stream, stream_mem.sync_event_dev_ptr, 1,
                         CU_STREAM_WRITE_VALUE_DEFAULT));
 #endif
   } else {
-    AL_CHECK_CUDA(cudaEventRecord(plain_event, stream));
+    AL_CHECK_CUDA(AlGpuEventRecord(plain_event, stream));
   }
 }
 
@@ -79,10 +85,10 @@ bool GPUStatusFlag::query() {
   if (stream_memory_operations_supported()) {
     return __atomic_load_n(stream_mem.sync_event, __ATOMIC_SEQ_CST);
   } else {
-    cudaError_t r = cudaEventQuery(plain_event);
-    if (r == cudaSuccess) {
+    auto r = AlGpuEventQuery(plain_event);
+    if (r == AlGpuSuccess) {
       return true;
-    } else if (r != cudaErrorNotReady) {
+    } else if (r != AlGpuErrorNotReady) {
       AL_CHECK_CUDA(r);
       return false;  // Never reached.
     } else {

@@ -342,9 +342,6 @@ if (ALUMINUM_ENABLE_ROCM)
   endif ()
   message(STATUS "Using AL_ROCM_PATH: ${AL_ROCM_PATH}")
 
-  # Provides hipify_*_files
-  include(HipBuildSystem)
-
   # Provides hip_add_executable
   set(AL_HAS_ROCM TRUE)
 
@@ -387,13 +384,6 @@ if (ALUMINUM_ENABLE_ROCM)
     set(AL_HAS_ROCTRACER ${Roctracer_FOUND})
   endif ()
 
-  # For some reason, hipified files can be relatively specified, but
-  # regular files must be given a full path. This appears to be the
-  # easiest way for both ROCm and non-ROCm builds to both work and
-  # install.
-  set(SOURCE_PREFIX "")
-else ()
-  set(SOURCE_PREFIX "${CMAKE_CURRENT_LIST_DIR}/")
 endif ()
 
 # Pull the Git submodules.
@@ -422,18 +412,11 @@ configure_file(
   "${CMAKE_SOURCE_DIR}/cmake/Al_config.hpp.in"
   "${CMAKE_BINARY_DIR}/Al_config.hpp" @ONLY)
 
-# Macro for setting up paths
+# Macro for setting full paths to source files.
 macro(set_source_path VAR)
   unset(__tmp_names)
-
-  file(RELATIVE_PATH __relative_to
-    "${PROJECT_SOURCE_DIR}" "${CMAKE_CURRENT_LIST_DIR}")
-
   foreach(filename ${ARGN})
-    unset(__name)
-    get_filename_component(__name "${filename}" NAME)
-    list(APPEND __tmp_names "${SOURCE_PREFIX}${__relative_to}/${__name}")
-    #message(DEBUG "Set source path of ${__name} to ${SOURCE_PREFIX}${__relative_to}/${__name}")
+    list(APPEND __tmp_names "${CMAKE_CURRENT_SOURCE_DIR}/${filename}")
   endforeach()
   set(${VAR} "${__tmp_names}")
 endmacro()

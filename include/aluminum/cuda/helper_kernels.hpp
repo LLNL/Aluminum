@@ -34,13 +34,17 @@ namespace Al {
 namespace internal {
 namespace cuda {
 
-void launch_wait_kernel(cudaStream_t stream, int32_t wait_value,
+void launch_wait_kernel(AlGpuStream_t stream, int32_t wait_value,
                         volatile int32_t* wait_mem);
 
-#if defined AL_HAS_CUDA && !defined AL_HAS_ROCM
+#if defined AL_HAS_ROCM
+void launch_wait_kernel(hipStream_t stream,
+                        int32_t wait_value,
+                        hipDeviceptr_t wait_mem);
+#elif defined AL_HAS_CUDA
 void launch_wait_kernel(cudaStream_t stream, int32_t wait_value,
                         CUdeviceptr wait_mem);
-#endif // defined AL_HAS_CUDA && !defined AL_HAS_ROCM
+#endif
 
 } // namespace cuda
 } // namespace internal

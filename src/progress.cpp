@@ -48,13 +48,12 @@
 #endif
 
 #if defined AL_HAS_ROCM
+#include <hip/hip_runtime.h>
 #include <rocm_smi/rocm_smi.h>
 #include <hwloc/rsmi.h>
 #elif defined AL_HAS_CUDA
-#include <hwloc/cudart.h>
-#endif
-#ifdef AL_HAS_CUDA
 #include <cuda_runtime.h>
+#include <hwloc/cudart.h>
 #endif
 
 namespace Al {
@@ -216,7 +215,7 @@ void ProgressEngine::run() {
 #ifdef AL_HAS_CUDA
   // Capture the current CUDA device for the progress engine.
   int device;
-  AL_CHECK_CUDA(cudaGetDevice(&device));
+  AL_CHECK_CUDA(AlGpuGetDevice(&device));
   cur_device = device;
 #endif
   thread = std::thread(&ProgressEngine::engine, this);
@@ -368,7 +367,6 @@ void ProgressEngine::bind() {
     // We only use it here, so initialize it and shut it down.
     rsmi_init(0);
     int device;
-    // The macro will be hipified.
     AL_CHECK_CUDA(hipGetDevice(&device));
     hwloc_rsmi_get_device_cpuset(topo, device, cpuset);
     rsmi_shut_down();
@@ -465,7 +463,7 @@ void ProgressEngine::bind() {
 void ProgressEngine::engine() {
 #ifdef AL_HAS_CUDA
   // Set the current CUDA device for the thread.
-  AL_CHECK_CUDA_NOSYNC(cudaSetDevice(cur_device.load()));
+  AL_CHECK_CUDA_NOSYNC(AlGpuSetDevice(cur_device.load()));
 #endif
   bind();
   // Notify the main thread we're now running.

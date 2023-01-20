@@ -25,7 +25,14 @@
 // permissions and limitations under the license.
 ////////////////////////////////////////////////////////////////////////////////
 
+#include <Al_config.hpp>
+
+#if defined AL_HAS_ROCM
+#include <hip/hip_runtime.h>
+#elif defined AL_HAS_CUDA
 #include <cuda_runtime.h>
+#endif
+
 #include "aluminum/cuda/helper_kernels.hpp"
 
 namespace Al {
@@ -41,19 +48,27 @@ __global__ void spin_wait_kernel(int32_t wait_value, volatile int32_t* wait_mem)
   }
 }
 
-void launch_wait_kernel(cudaStream_t stream, int32_t wait_value, volatile int32_t* wait_mem) {
+void launch_wait_kernel(AlGpuStream_t stream,
+                        int32_t wait_value,
+                        volatile int32_t* wait_mem) {
   spin_wait_kernel<<<1,1,0,stream>>>(wait_value, wait_mem);
 }
 
-void launch_wait_kernel(cudaStream_t stream, int32_t wait_value, CUdeviceptr wait_mem) {
-#ifdef AL_HAS_ROCM
-  AL_CHECK_CUDA_DRV(hipStreamWaitValue32(
+#if defined AL_HAS_ROCM
+void launch_wait_kernel(hipStream_t stream,
+                        int32_t wait_value,
+                        hipDeviceptr_t wait_mem) {
+  AL_CHECK_CUDA(hipStreamWaitValue32(
                       stream, wait_mem, wait_value, hipStreamWaitValueEq));
-#else
+}
+#elif defined AL_HAS_CUDA
+void launch_wait_kernel(cudaStream_t stream,
+                        int32_t wait_value,
+                        CUdeviceptr wait_mem) {
   AL_CHECK_CUDA_DRV(cuStreamWaitValue32(
                       stream, wait_mem, wait_value, CU_STREAM_WAIT_VALUE_EQ));
-#endif
 }
+#endif
 
 } // namespace cuda
 } // namespace internal

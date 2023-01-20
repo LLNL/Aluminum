@@ -39,7 +39,7 @@ template <typename T>
 class ScatterAlState : public HostTransferCollectiveSignalRootEarlyState {
 public:
   ScatterAlState(const T* sendbuf, T* recvbuf, size_t count_, int root_,
-                HostTransferCommunicator& comm_, cudaStream_t stream_) :
+                HostTransferCommunicator& comm_, AlGpuStream_t stream_) :
     HostTransferCollectiveSignalRootEarlyState(comm_.rank() == root_, stream_),
     host_mem(mempool.allocate<MemoryType::CUDA_PINNED_HOST, T>(comm_.rank() == root_
                                   ? comm_.size()*count_ : count_)),
@@ -48,16 +48,16 @@ public:
     comm(comm_.get_comm()) {
     if (is_root) {
       // Transfer the data from device to host.
-      AL_CHECK_CUDA(cudaMemcpyAsync(
+      AL_CHECK_CUDA(AlGpuMemcpyAsync(
                       host_mem, sendbuf, sizeof(T)*count*comm_.size(),
-                      cudaMemcpyDeviceToHost, stream_));
+                      AlGpuMemcpyDeviceToHost, stream_));
       start_event.record(stream_);
       // Root only needs to copy its data to its final destination on the
       // device when it's not in place.
       if (sendbuf != recvbuf) {
-        AL_CHECK_CUDA(cudaMemcpyAsync(
+        AL_CHECK_CUDA(AlGpuMemcpyAsync(
                         recvbuf, sendbuf + comm_.rank()*count,
-                        count*sizeof(T), cudaMemcpyDeviceToDevice, stream_));
+                        count*sizeof(T), AlGpuMemcpyDeviceToDevice, stream_));
       }
       // Have the device wait on the host.
       gpu_wait.wait(stream_);
@@ -67,8 +67,8 @@ public:
       // Have the device wait on the host.
       gpu_wait.wait(stream_);
       // Transfer completed buffer back to device.
-      AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, host_mem, sizeof(T)*count,
-                                    cudaMemcpyHostToDevice, stream_));
+      AL_CHECK_CUDA(AlGpuMemcpyAsync(recvbuf, host_mem, sizeof(T)*count,
+                                    AlGpuMemcpyHostToDevice, stream_));
     }
     end_event.record(stream_);
   }

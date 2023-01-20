@@ -41,19 +41,22 @@ namespace cuda {
  * cache line.
  */
 struct CUDAEventAllocator {
-  cudaEvent_t allocate() {
-    cudaEvent_t event;
-    AL_CHECK_CUDA(cudaEventCreateWithFlags(&event, cudaEventDisableTiming));
+  AlGpuEvent_t allocate() {
+    AlGpuEvent_t event;
+    AL_CHECK_CUDA(
+      AlGpuEventCreateWithFlags(&event,
+                                      AlGpuEventDisableTiming));
     return event;
   }
 
-  void deallocate(cudaEvent_t event) {
-    AL_CHECK_CUDA(cudaEventDestroy(event));
+  void deallocate(AlGpuEvent_t event) {
+    AL_CHECK_CUDA(AlGpuEventDestroy(event));
   }
 };
 
 /** Resource pool for synchronization memory. */
-extern Al::internal::LockedResourcePool<cudaEvent_t, CUDAEventAllocator> event_pool;
+extern Al::internal::LockedResourcePool<AlGpuEvent_t,
+                                        CUDAEventAllocator> event_pool;
 
 }  // namespace cuda
 }  // namespace internal

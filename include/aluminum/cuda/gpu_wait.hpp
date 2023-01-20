@@ -27,10 +27,16 @@
 
 #pragma once
 
+#include <Al_config.hpp>
+
 #include <cstdint>
 
+#if defined AL_HAS_ROCM
+#include <hip/hip_runtime.h>
+#elif defined AL_HAS_CUDA
 #include <cuda.h>
 #include <cuda_runtime.h>
+#endif
 
 namespace Al {
 namespace internal {
@@ -52,14 +58,18 @@ class GPUWait {
   GPUWait();
   ~GPUWait();
   /** Enqueue a wait onto stream. */
-  void wait(cudaStream_t stream);
+  void wait(AlGpuStream_t stream);
   /** Signal the stream to continue. */
   void signal();
  private:
   int32_t* wait_sync __attribute__((aligned(64)));
   union {
     int32_t *wait_sync_dev_ptr_no_stream_mem_ops __attribute__((aligned(64)));
+#if defined AL_HAS_ROCM
+    hipDeviceptr_t wait_sync_dev_ptr;
+#elif defined AL_HAS_CUDA
     CUdeviceptr wait_sync_dev_ptr;
+#endif
   };
 };
 

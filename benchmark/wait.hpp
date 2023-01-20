@@ -27,8 +27,13 @@
 
 #pragma once
 
-#include <cuda.h>
+#include <Al_config.hpp>
+
+#if defined AL_HAS_ROCM
+#include <hip/hip_runtime.h>
+#elif defined AL_HAS_CUDA
 #include <cuda_runtime.h>
+#endif
 
 /** Cause the stream to wait for length seconds. */
-void gpu_wait(double length, cudaStream_t stream);
+void gpu_wait(double length, AlGpuStream_t stream);

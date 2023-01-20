@@ -31,7 +31,12 @@
 #include <string>
 #include <vector>
 
+#include <Al_config.hpp>
+#if defined AL_HAS_ROCM
+#include <hip/hip_runtime.h>
+#elif defined AL_HAS_CUDA
 #include <cuda_runtime.h>
+#endif
 
 #include "aluminum/base.hpp"
 #include "aluminum/cuda/cuda.hpp"
@@ -100,17 +105,17 @@ void finalize();
 
 /** Represents a request for the host-transfer backend. */
 struct HostTransferRequest {
-  HostTransferRequest(cudaEvent_t op_event_, cudaStream_t orig_stream_,
-                      cudaStream_t internal_stream_) :
+  HostTransferRequest(AlGpuEvent_t op_event_, AlGpuStream_t orig_stream_,
+                      AlGpuStream_t internal_stream_) :
     op_event(op_event_), orig_stream(orig_stream_),
     internal_stream(internal_stream_) {}
   ~HostTransferRequest() { cuda::event_pool.release(op_event); }
   /** Event pending on completion of the operation. */
-  cudaEvent_t op_event;
+  AlGpuEvent_t op_event;
   /** Original stream associated with the operation. */
-  cudaStream_t orig_stream;
+  AlGpuStream_t orig_stream;
   /** Internal stream the operation is running on. */
-  cudaStream_t internal_stream;
+  AlGpuStream_t internal_stream;
 };
 
 }  // namespace ht
@@ -165,7 +170,7 @@ class HostTransferBackend {
       comm_type& comm,
       req_type& req,
       allreduce_algo_type algo) {
-    cudaStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
+    AlGpuStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     switch (algo) {
     case HostTransferAllreduceAlgorithm::automatic:
@@ -196,7 +201,7 @@ class HostTransferBackend {
   template <typename T>
   static void NonblockingSend(const T* sendbuf, size_t count, int dest,
                               comm_type& comm, req_type& req) {
-    cudaStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
+    AlGpuStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     do_send(sendbuf, count, dest, comm, internal_stream);
     setup_completion_event(internal_stream, comm, req);
@@ -210,7 +215,7 @@ class HostTransferBackend {
   template <typename T>
   static void NonblockingRecv(T* recvbuf, size_t count, int src,
                               comm_type& comm, req_type& req) {
-    cudaStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
+    AlGpuStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     do_recv(recvbuf, count, src, comm, internal_stream);
     setup_completion_event(internal_stream, comm, req);
@@ -227,7 +232,7 @@ class HostTransferBackend {
   static void NonblockingSendRecv(const T* sendbuf, size_t send_count, int dest,
                                   T* recvbuf, size_t recv_count, int src,
                                   comm_type& comm, req_type& req) {
-    cudaStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
+    AlGpuStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     do_sendrecv(sendbuf, send_count, dest, recvbuf, recv_count, src, comm,
                 internal_stream);
@@ -257,7 +262,7 @@ class HostTransferBackend {
   static void NonblockingAllgather(
     const T* sendbuf, T* recvbuf, size_t count,
     comm_type& comm, req_type& req, allgather_algo_type algo) {
-    cudaStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
+    AlGpuStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     switch (algo) {
     case HostTransferCollectiveAlgorithm::automatic:
@@ -303,7 +308,7 @@ class HostTransferBackend {
     const T* sendbuf, T* recvbuf,
     std::vector<size_t> counts, std::vector<size_t> displs,
     comm_type& comm, req_type& req, allgatherv_algo_type algo) {
-    cudaStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
+    AlGpuStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     switch (algo) {
     case HostTransferCollectiveAlgorithm::automatic:
@@ -346,7 +351,7 @@ class HostTransferBackend {
   static void NonblockingAlltoall(
     const T* sendbuf, T* recvbuf, size_t count,
     comm_type& comm, req_type& req, alltoall_algo_type algo) {
-    cudaStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
+    AlGpuStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     switch (algo) {
     case HostTransferCollectiveAlgorithm::automatic:
@@ -397,7 +402,7 @@ class HostTransferBackend {
     T* recvbuf,
     std::vector<size_t> recv_counts, std::vector<size_t> recv_displs,
     comm_type& comm, req_type& req, alltoallv_algo_type algo) {
-    cudaStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
+    AlGpuStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     switch (algo) {
     case HostTransferCollectiveAlgorithm::automatic:
@@ -432,7 +437,7 @@ class HostTransferBackend {
 
   static void NonblockingBarrier(
     comm_type& comm, req_type& req, barrier_algo_type algo) {
-    cudaStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
+    AlGpuStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     switch (algo) {
     case HostTransferCollectiveAlgorithm::automatic:
@@ -460,7 +465,7 @@ class HostTransferBackend {
   static void NonblockingBcast(
     T* buf, size_t count, int root,
     comm_type& comm, req_type& req, bcast_algo_type algo) {
-    cudaStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
+    AlGpuStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     switch (algo) {
     case HostTransferCollectiveAlgorithm::automatic:
@@ -495,7 +500,7 @@ class HostTransferBackend {
   static void NonblockingGather(
     const T* sendbuf, T* recvbuf, size_t count, int root,
     comm_type& comm, req_type& req, gather_algo_type algo) {
-    cudaStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
+    AlGpuStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     switch (algo) {
     case HostTransferCollectiveAlgorithm::automatic:
@@ -540,7 +545,7 @@ class HostTransferBackend {
     const T* sendbuf, T* recvbuf,
     std::vector<size_t> counts, std::vector<size_t> displs, int root,
     comm_type& comm, req_type& req, gatherv_algo_type algo) {
-    cudaStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
+    AlGpuStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     switch (algo) {
     case HostTransferCollectiveAlgorithm::automatic:
@@ -583,7 +588,7 @@ class HostTransferBackend {
   static void NonblockingReduce(
     const T* sendbuf, T* recvbuf, size_t count, ReductionOperator op, int root,
     comm_type& comm, req_type& req, reduce_algo_type algo) {
-    cudaStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
+    AlGpuStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     switch (algo) {
     case HostTransferCollectiveAlgorithm::automatic:
@@ -626,7 +631,7 @@ class HostTransferBackend {
   static void NonblockingReduce_scatter(
     const T* sendbuf, T* recvbuf, size_t count, ReductionOperator op,
     comm_type& comm, req_type& req, reduce_scatter_algo_type algo) {
-    cudaStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
+    AlGpuStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     switch (algo) {
     case HostTransferCollectiveAlgorithm::automatic:
@@ -669,7 +674,7 @@ class HostTransferBackend {
   static void NonblockingReduce_scatterv(
     const T* sendbuf, T* recvbuf, std::vector<size_t> counts, ReductionOperator op,
     comm_type& comm, req_type& req, reduce_scatterv_algo_type algo) {
-    cudaStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
+    AlGpuStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     switch (algo) {
     case HostTransferCollectiveAlgorithm::automatic:
@@ -711,7 +716,7 @@ class HostTransferBackend {
   static void NonblockingScatter(
     const T* sendbuf, T* recvbuf, size_t count, int root,
     comm_type& comm, req_type& req, scatter_algo_type algo) {
-    cudaStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
+    AlGpuStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     switch (algo) {
     case HostTransferCollectiveAlgorithm::automatic:
@@ -756,7 +761,7 @@ class HostTransferBackend {
     const T* sendbuf, T* recvbuf,
     std::vector<size_t> counts, std::vector<size_t> displs, int root,
     comm_type& comm, req_type& req, scatterv_algo_type algo) {
-    cudaStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
+    AlGpuStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
     sync_internal_stream_with_comm(internal_stream, comm);
     switch (algo) {
     case HostTransferCollectiveAlgorithm::automatic:
@@ -779,27 +784,27 @@ class HostTransferBackend {
 
  private:
   /** Event for synchronizing between streams. */
-  static cudaEvent_t sync_event;
+  static AlGpuEvent_t sync_event;
   /**
    * Set up stream synchronization.
    * This will cause the provided internal stream to synchronize with the stream
    * associated with comm.
    */
   static void sync_internal_stream_with_comm(
-    cudaStream_t internal_stream, comm_type& comm) {
-    // We can reuse a single event for cudaStreamWaitEvent because it uses the
+    AlGpuStream_t internal_stream, comm_type& comm) {
+    // We can reuse a single event for AlGpuStreamWaitEvent because it uses the
     // stream/event state when it is called.
-    AL_CHECK_CUDA(cudaEventRecord(sync_event, comm.get_stream()));
-    AL_CHECK_CUDA(cudaStreamWaitEvent(internal_stream, sync_event, 0));
+    AL_CHECK_CUDA(AlGpuEventRecord(sync_event, comm.get_stream()));
+    AL_CHECK_CUDA(AlGpuStreamWaitEvent(internal_stream, sync_event, 0));
   }
   /**
    * Set up the request for completion checking.
    * This uses an event recorded on the provided internal stream.
    */
   static void setup_completion_event(
-    cudaStream_t internal_stream, comm_type& comm, req_type& req) {
-    cudaEvent_t event = internal::cuda::event_pool.get();
-    AL_CHECK_CUDA(cudaEventRecord(event, internal_stream));
+    AlGpuStream_t internal_stream, comm_type& comm, req_type& req) {
+    AlGpuEvent_t event = internal::cuda::event_pool.get();
+    AL_CHECK_CUDA(AlGpuEventRecord(event, internal_stream));
     req = std::make_shared<internal::ht::HostTransferRequest>(
       event, comm.get_stream(), internal_stream);
   }
@@ -808,7 +813,7 @@ class HostTransferBackend {
   template <typename T>
   static void do_allreduce(
     const T* sendbuf, T* recvbuf, size_t count, ReductionOperator op,
-    comm_type& comm, cudaStream_t stream) {
+    comm_type& comm, AlGpuStream_t stream) {
     internal::ht::AllreduceAlState<T>* state = new internal::ht::AllreduceAlState<T>(
       sendbuf, recvbuf, count, op, comm, stream);
     internal::get_progress_engine()->enqueue(state);
@@ -817,7 +822,7 @@ class HostTransferBackend {
   template <typename T>
   static void do_send(
     const T* sendbuf, size_t count, int dest, comm_type& comm,
-    cudaStream_t stream) {
+    AlGpuStream_t stream) {
     internal::ht::SendAlState<T>* state =
       new internal::ht::SendAlState<T>(
         sendbuf, count, dest, comm, stream);
@@ -827,7 +832,7 @@ class HostTransferBackend {
   template <typename T>
   static void do_recv(
     T* recvbuf, size_t count, int src, comm_type& comm,
-    cudaStream_t stream) {
+    AlGpuStream_t stream) {
     internal::ht::RecvAlState<T>* state =
       new internal::ht::RecvAlState<T>(
         recvbuf, count, src, comm, stream);
@@ -838,7 +843,7 @@ class HostTransferBackend {
   static void do_sendrecv(
     const T* sendbuf, size_t send_count, int dest,
     T* recvbuf, size_t recv_count, int src, comm_type& comm,
-    cudaStream_t stream) {
+    AlGpuStream_t stream) {
     internal::ht::SendRecvAlState<T>* state =
       new internal::ht::SendRecvAlState<T>(
         sendbuf, send_count, dest, recvbuf, recv_count, src, comm, stream);
@@ -848,7 +853,7 @@ class HostTransferBackend {
   template <typename T>
   static void do_allgather(
     const T* sendbuf, T* recvbuf, size_t count, comm_type& comm,
-    cudaStream_t stream) {
+    AlGpuStream_t stream) {
     internal::ht::AllgatherAlState<T>* state =
       new internal::ht::AllgatherAlState<T>(
         sendbuf, recvbuf, count, comm, stream);
@@ -859,7 +864,7 @@ class HostTransferBackend {
   static void do_allgatherv(
     const T* sendbuf, T* recvbuf,
     std::vector<size_t> counts, std::vector<size_t> displs,
-    comm_type& comm, cudaStream_t stream) {
+    comm_type& comm, AlGpuStream_t stream) {
     internal::ht::AllgathervAlState<T>* state =
       new internal::ht::AllgathervAlState<T>(
         sendbuf, recvbuf, counts, displs, comm, stream);
@@ -869,7 +874,7 @@ class HostTransferBackend {
   template <typename T>
   static void do_alltoall(
     const T* sendbuf, T* recvbuf, size_t count, comm_type& comm,
-    cudaStream_t stream) {
+    AlGpuStream_t stream) {
     internal::ht::AlltoallAlState<T>* state =
       new internal::ht::AlltoallAlState<T>(
         sendbuf, recvbuf, count, comm, stream);
@@ -882,7 +887,7 @@ class HostTransferBackend {
     std::vector<size_t> send_counts, std::vector<size_t> send_displs,
     T* recvbuf,
     std::vector<size_t> recv_counts, std::vector<size_t> recv_displs,
-    comm_type& comm, cudaStream_t stream) {
+    comm_type& comm, AlGpuStream_t stream) {
     internal::ht::AlltoallvAlState<T>* state =
       new internal::ht::AlltoallvAlState<T>(
         sendbuf, send_counts, send_displs,
@@ -890,7 +895,7 @@ class HostTransferBackend {
     internal::get_progress_engine()->enqueue(state);
   }
 
-  static void do_barrier(comm_type& comm, cudaStream_t stream) {
+  static void do_barrier(comm_type& comm, AlGpuStream_t stream) {
     internal::ht::BarrierAlState* state =
       new internal::ht::BarrierAlState(comm, stream);
     internal::get_progress_engine()->enqueue(state);
@@ -899,7 +904,7 @@ class HostTransferBackend {
   template <typename T>
   static void do_bcast(
     T* buf, size_t count, int root, comm_type& comm,
-    cudaStream_t stream) {
+    AlGpuStream_t stream) {
     internal::ht::BcastAlState<T>* state =
       new internal::ht::BcastAlState<T>(
         buf, count, root, comm, stream);
@@ -909,7 +914,7 @@ class HostTransferBackend {
   template <typename T>
   static void do_gather(
     const T* sendbuf, T* recvbuf, size_t count, int root, comm_type& comm,
-    cudaStream_t stream) {
+    AlGpuStream_t stream) {
     internal::ht::GatherAlState<T>* state =
       new internal::ht::GatherAlState<T>(
         sendbuf, recvbuf, count, root, comm, stream);
@@ -920,7 +925,7 @@ class HostTransferBackend {
   static void do_gatherv(
     const T* sendbuf, T* recvbuf,
     std::vector<size_t> counts, std::vector<size_t> displs,
-    int root, comm_type& comm, cudaStream_t stream) {
+    int root, comm_type& comm, AlGpuStream_t stream) {
     internal::ht::GathervAlState<T>* state =
       new internal::ht::GathervAlState<T>(
         sendbuf, recvbuf, counts, displs, root, comm, stream);
@@ -931,7 +936,7 @@ class HostTransferBackend {
   static void do_reduce(
     const T* sendbuf, T* recvbuf, size_t count, ReductionOperator op,
     int root, comm_type& comm,
-    cudaStream_t stream) {
+    AlGpuStream_t stream) {
     internal::ht::ReduceAlState<T>* state =
       new internal::ht::ReduceAlState<T>(
         sendbuf, recvbuf, count, op, root, comm, stream);
@@ -941,7 +946,7 @@ class HostTransferBackend {
   template <typename T>
   static void do_reduce_scatter(
     const T* sendbuf, T* recvbuf, size_t count, ReductionOperator op,
-    comm_type& comm, cudaStream_t stream) {
+    comm_type& comm, AlGpuStream_t stream) {
     internal::ht::ReduceScatterAlState<T>* state =
       new internal::ht::ReduceScatterAlState<T>(
         sendbuf, recvbuf, count, op, comm, stream);
@@ -951,7 +956,7 @@ class HostTransferBackend {
   template <typename T>
   static void do_reduce_scatterv(
     const T* sendbuf, T* recvbuf, std::vector<size_t> counts,
-    ReductionOperator op, comm_type& comm, cudaStream_t stream) {
+    ReductionOperator op, comm_type& comm, AlGpuStream_t stream) {
     internal::ht::ReduceScattervAlState<T>* state =
       new internal::ht::ReduceScattervAlState<T>(
         sendbuf, recvbuf, counts, op, comm, stream);
@@ -961,7 +966,7 @@ class HostTransferBackend {
   template <typename T>
   static void do_scatter(
     const T* sendbuf, T* recvbuf, size_t count, int root, comm_type& comm,
-    cudaStream_t stream) {
+    AlGpuStream_t stream) {
     internal::ht::ScatterAlState<T>* state =
       new internal::ht::ScatterAlState<T>(
         sendbuf, recvbuf, count, root, comm, stream);
@@ -972,7 +977,7 @@ class HostTransferBackend {
   static void do_scatterv(
     const T* sendbuf, T* recvbuf,
     std::vector<size_t> counts, std::vector<size_t> displs,
-    int root, comm_type& comm, cudaStream_t stream) {
+    int root, comm_type& comm, AlGpuStream_t stream) {
     internal::ht::ScattervAlState<T>* state =
       new internal::ht::ScattervAlState<T>(
         sendbuf, recvbuf, counts, displs, root, comm, stream);
@@ -988,7 +993,7 @@ inline bool Test<HostTransferBackend>(typename HostTransferBackend::req_type& re
     return true;
   }
   // This is purely a host operation.
-  bool r = cudaEventQuery(req->op_event) == cudaSuccess;
+  bool r = AlGpuEventQuery(req->op_event) == AlGpuSuccess;
   if (r) {
     req = HostTransferBackend::null_req;
   }
@@ -1004,7 +1009,7 @@ inline void Wait<HostTransferBackend>(typename HostTransferBackend::req_type& re
   }
   // Synchronize the original stream with the request.
   // This will not block the host.
-  AL_CHECK_CUDA(cudaStreamWaitEvent(req->orig_stream, req->op_event, 0));
+  AL_CHECK_CUDA(AlGpuStreamWaitEvent(req->orig_stream, req->op_event, 0));
 }
 
 }  // namespace Al

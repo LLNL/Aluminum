@@ -37,30 +37,12 @@ endif ()
 set(ALUMINUM_CXX_SOURCES "${CXX_SOURCES}" "${THIS_DIR_CXX_SOURCES}")
 set(ALUMINUM_CUDA_SOURCES "${CUDA_SOURCES}" "${THIS_DIR_CUDA_SOURCES}")
 
-if (AL_HAS_ROCM)
-  hipify_source_files(ALUMINUM_HIP_SOURCES
-    ${ALUMINUM_CXX_SOURCES}
-    ${ALUMINUM_CUDA_SOURCES})
-  hipify_header_files(ALUMINUM_HIP_HEADERS
-    ${ALUMINUM_HEADERS})
-  # Some generators seem to miss the memo about having to pre-generate
-  # all the headers before attempting to compile the source
-  # files. This should circumvent that issue.
-  add_custom_target(HipifiedHeaders
-    DEPENDS ${ALUMINUM_HIP_HEADERS})
-
-  add_library(Al "${ALUMINUM_HIP_SOURCES}")
-  add_dependencies(Al HipifiedHeaders)
-  target_include_directories(Al PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include>)
-else ()
-  add_library(Al
-    "${ALUMINUM_CXX_SOURCES}"
-    "${ALUMINUM_CUDA_SOURCES}"
-    "${ALUMINUM_HEADERS}")
-  target_include_directories(Al PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>)
-endif ()
+add_library(Al
+  "${ALUMINUM_CXX_SOURCES}"
+  "${ALUMINUM_CUDA_SOURCES}"
+  "${ALUMINUM_HEADERS}")
+target_include_directories(Al PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>)
 
 set_target_properties(Al
   PROPERTIES
@@ -72,14 +54,16 @@ target_include_directories(Al PUBLIC
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 target_link_libraries(Al PUBLIC
   HWLOC::hwloc
-  MPI::MPI_CXX)
+  MPI::MPI_CXX
+  Threads::Threads)
 
 if (AL_HAS_ROCM)
   set(HIP_CLANG_ROOT "${AL_ROCM_PATH}/llvm")
 
   ##############################
   # FIXME: This bit is to fix errors in the HIP CMake config
-  # file. Hopefully this can be removed in a future version of ROCm.
+  #        file. Hopefully this can be removed in a future version of
+  #        ROCm.
   file(GLOB HIP_CLANG_INCLUDE_SEARCH_PATHS
     "${HIP_CLANG_ROOT}/lib/clang/*/include")
   find_path(HIP_CLANG_INCLUDE_PATH stddef.h
@@ -116,21 +100,24 @@ if (AL_HAS_ROCM)
   # END FIXME BLOCK
   ##############################
 
-  if (AL_HAS_NCCL)
-    set(AL_NCCL_LIBRARY roc::rccl)
-  else ()
-    set(AL_NCCL_LIBRARY)
-  endif ()
   target_include_directories(Al PRIVATE
     $<BUILD_INTERFACE:${ROCM_SMI_INCLUDE_DIR}>)
   target_link_libraries(Al PUBLIC
     hip::host
     hip::hipcub
-    ${AL_NCCL_LIBRARY}
+    $<$<BOOL:${AL_HAS_NCCL}>:roc::rccl>
     roc::rocprim
     ${ROCM_SMI_LIBRARY}
-    ${Roctracer_LIBRARIES}
-    Threads::Threads)
+    ${Roctracer_LIBRARIES})
+
+  # HIP language files are detected by the ".hip" extension. Since
+  # we're upcycling ".cu" files for now, we just set their LANGUAGE to
+  # be HIP.
+  get_target_property(AL_HIP_SOURCES Al SOURCES)
+  list(FILTER AL_HIP_SOURCES INCLUDE REGEX ".cu$")
+  set_source_files_properties(${AL_HIP_SOURCES}
+    PROPERTIES LANGUAGE HIP)
+
 elseif (AL_HAS_CUDA)
   target_link_libraries(Al PUBLIC
     CUDA::cudart
@@ -141,25 +128,14 @@ elseif (AL_HAS_CUDA)
   target_compile_features(Al PUBLIC cuda_std_14)
 endif (AL_HAS_ROCM)
 
-# Header installation. For HIP, install the generated files. For
-# NOGPU/CUDA, install the real files.
-if (AL_HAS_ROCM)
-  install(
-    DIRECTORY ${CMAKE_BINARY_DIR}/include/aluminum
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-    FILES_MATCHING PATTERN "*.hpp")
-  install(
-    FILES ${CMAKE_BINARY_DIR}/include/Al.hpp
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
-else ()
-  install(
-    DIRECTORY ${CMAKE_SOURCE_DIR}/include/aluminum
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-    FILES_MATCHING PATTERN "*.hpp")
-  install(
-    FILES ${CMAKE_SOURCE_DIR}/include/Al.hpp
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
-endif ()
+# Header installation.
+install(
+  DIRECTORY ${CMAKE_SOURCE_DIR}/include/aluminum
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+  FILES_MATCHING PATTERN "*.hpp")
+install(
+  FILES ${CMAKE_SOURCE_DIR}/include/Al.hpp
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
 install(TARGETS Al
   EXPORT AluminumTargets

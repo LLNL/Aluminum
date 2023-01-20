@@ -39,7 +39,7 @@ template <typename T>
 class GatherAlState : public HostTransferCollectiveSignalNonRootEarlyState {
 public:
   GatherAlState(const T* sendbuf, T* recvbuf, size_t count_, int root_,
-                HostTransferCommunicator& comm_, cudaStream_t stream_) :
+                HostTransferCommunicator& comm_, AlGpuStream_t stream_) :
     HostTransferCollectiveSignalNonRootEarlyState(comm_.rank() == root_, stream_),
     host_mem(mempool.allocate<MemoryType::CUDA_PINNED_HOST, T>(comm_.rank() == root_
                                   ? comm_.size()*count_ : count_)),
@@ -48,13 +48,13 @@ public:
     comm(comm_.get_comm()) {
     // Transfer data from device to host.
     if (is_root) {
-      AL_CHECK_CUDA(cudaMemcpyAsync(
+      AL_CHECK_CUDA(AlGpuMemcpyAsync(
           host_mem + comm_.rank()*count,
           (sendbuf == recvbuf) ? sendbuf + comm_.rank()*count : sendbuf,
-          sizeof(T)*count, cudaMemcpyDeviceToHost, stream_));
+          sizeof(T)*count, AlGpuMemcpyDeviceToHost, stream_));
     } else {
-      AL_CHECK_CUDA(cudaMemcpyAsync(host_mem, sendbuf, sizeof(T)*count,
-                                    cudaMemcpyDeviceToHost, stream_));
+      AL_CHECK_CUDA(AlGpuMemcpyAsync(host_mem, sendbuf, sizeof(T)*count,
+                                    AlGpuMemcpyDeviceToHost, stream_));
     }
     start_event.record(stream_);
 
@@ -63,8 +63,8 @@ public:
 
     if (is_root) {
       // Transfer completed buffer back to device.
-      AL_CHECK_CUDA(cudaMemcpyAsync(recvbuf, host_mem, sizeof(T)*count*comm_.size(),
-                                    cudaMemcpyHostToDevice, stream_));
+      AL_CHECK_CUDA(AlGpuMemcpyAsync(recvbuf, host_mem, sizeof(T)*count*comm_.size(),
+                                    AlGpuMemcpyHostToDevice, stream_));
     }
     end_event.record(stream_);
   }
