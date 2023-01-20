@@ -486,4 +486,5 @@ install(FILES
 install(FILES
   cmake/FindHWLOC.cmake
   cmake/FindNCCL.cmake
+  cmake/FindRoctracer.cmake
   DESTINATION ${CMAKE_INSTALL_DIR})

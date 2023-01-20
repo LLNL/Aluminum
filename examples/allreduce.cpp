@@ -49,10 +49,10 @@ constexpr size_t num_elements = 4;
 // e.g., for GPUs, communication will be synchronized with respect to
 // that backend, and *not* the calling host code.
 //
-// Hence, for a CUDA-aware backend (NCCL, HostTransfer), Aluminum
-// operations follow standard CUDA semantics, and the host-side call
-// will complete after the operation has been enqueued. It is up to
-// you to ensure appropriate synchronization.
+// Hence, for a GPU-aware backend (NCCL, HostTransfer), Aluminum
+// operations follow standard CUDA/ROCm semantics, and the host-side
+// call will complete after the operation has been enqueued. It is up
+// to you to ensure appropriate synchronization.
 //
 // The MPI backend does not strictly have any streams associated with
 // it, but you can think of it as having a default stream which is the
@@ -61,7 +61,7 @@ constexpr size_t num_elements = 4;
 
 int main(int argc, char** argv) {
   // Initialize Aluminum.
-#ifdef AL_HAS_CUDA
+#if defined AL_HAS_CUDA || defined AL_HAS_ROCM
   const int num_gpus = get_number_of_gpus();
   const int local_rank = get_local_rank();
   const int local_size = get_local_size();
@@ -71,8 +71,8 @@ int main(int argc, char** argv) {
               << "(" << local_size << ")" << std::endl;
     std::abort();
   }
-  AL_FORCE_CHECK_CUDA_NOSYNC(cudaSetDevice(local_rank));
-#endif  /** AL_HAS_CUDA */
+  AL_FORCE_CHECK_GPU_NOSYNC(AlGpuSetDevice(local_rank));
+#endif  /** AL_HAS_CUDA || AL_HAS_ROCM */
   Al::Initialize(argc, argv);
 
   // Create our communicator.
