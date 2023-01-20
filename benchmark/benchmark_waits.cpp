@@ -19,7 +19,7 @@ public:
     __atomic_store_n(wait_sync, 0, __ATOMIC_SEQ_CST);
   }
   ~Wait() {
-    AL_CHECK_CUDA(AlGpuFreeHost(wait_sync));
+    AL_IGNORE_NODISCARD(AlGpuFreeHost(wait_sync));
   }
   virtual void wait(AlGpuStream_t stream) = 0;
   virtual void signal() {

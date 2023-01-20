@@ -25,7 +25,7 @@ public:
       AlGpuEventCreateWithFlags(&event, AlGpuEventDisableTiming));
   }
   ~CudaEvent() {
-    AL_CHECK_CUDA(AlGpuEventDestroy(event));
+    AL_IGNORE_NODISCARD(AlGpuEventDestroy(event));
   }
   void record(AlGpuStream_t stream) override {
     AL_CHECK_CUDA(AlGpuEventRecord(event, stream));
@@ -49,7 +49,7 @@ public:
 #endif
   }
   ~CustomEvent() {
-    AL_CHECK_CUDA(AlGpuFreeHost(event));
+    AL_IGNORE_NODISCARD(AlGpuFreeHost(event));
   }
   void record(AlGpuStream_t stream) override {
     __atomic_store_n(event, 0, __ATOMIC_SEQ_CST);
