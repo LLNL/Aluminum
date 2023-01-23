@@ -4,6 +4,7 @@ import argparse
 import subprocess
 from collections import namedtuple
 import math
+import os.path
 
 
 parser = argparse.ArgumentParser(
@@ -38,14 +39,18 @@ parser.add_argument('--nonblocking', default=None, action='store_true',
                     help='Run only nonblocking algorithms')
 parser.add_argument('--threads', type=int, default=None,
                     help='Number of threads to test with')
+parser.add_argument('--no-abort-on-hang', default=None, action='store_true',
+                    help='Do not abort when a hang is detected')
 
 
+# Default time spent waiting before declaring the process hung (in seconds)
+hang_timeout = 5
 # Supported datatypes for backends.
 mpi_datatypes = ['char', 'schar', 'uchar', 'short', 'ushort', 'int', 'uint',
                  'long', 'ulong', 'longlong', 'ulonglong',
                  'float', 'double',]# 'longdouble']
 nccl_datatypes = ['char', 'uchar', 'int', 'uint', 'longlong', 'ulonglong',
-                  'half', 'float', 'double']
+                  'float', 'double']
 # Standard sets of operations.
 # inplace is one of 'both', True, or False.
 # root is either True or False.
@@ -96,9 +101,8 @@ def get_ppn_and_nodes(num_procs, procs_per_node):
     return ppn, num_nodes
 
 
-def get_jsrun_launcher(num_procs, args):
+def get_jsrun_launcher(num_procs, args, ppn, num_nodes):
     """Return the base launch command using jsrun."""
-    ppn, num_nodes = get_ppn_and_nodes(num_procs, args.procs_per_node)
     return ['jsrun',
             '--nrs', str(num_nodes),
             '--rs_per_host', '1',
@@ -109,9 +113,8 @@ def get_jsrun_launcher(num_procs, args):
             '--launch_distribution', 'packed']
 
 
-def get_srun_launcher(num_procs, args):
+def get_srun_launcher(num_procs, args, ppn, num_nodes):
     """Return the base launch command using srun."""
-    ppn, num_nodes = get_ppn_and_nodes(num_procs, args.procs_per_node)
     return ['srun',
             f'-n {num_nodes * ppn}',
             f'--nodes={num_nodes}',
@@ -120,9 +123,8 @@ def get_srun_launcher(num_procs, args):
             #'--nvidia_compute_mode=default']
 
 
-def get_flux_launcher(num_procs, args):
+def get_flux_launcher(num_procs, args, ppn, num_nodes):
     """Return the base launch command using flux."""
-    ppn, num_nodes = get_ppn_and_nodes(num_procs, args.procs_per_node)
     return ['flux', 'mini', 'run',
             f'--nodes={num_nodes}',
             f'--tasks-per-node={ppn}',
@@ -136,10 +138,77 @@ launcher_funcs = {
 }
 
 
+def get_launcher_cmd(num_procs, args, ppn=None, num_nodes=None):
+    """Return the launcher command."""
+    default_ppn, default_num_nodes = get_ppn_and_nodes(num_procs,
+                                                       args.procs_per_node)
+    if ppn is None:
+        ppn = default_ppn
+    if num_nodes is None:
+        num_nodes = default_num_nodes
+    return launcher_funcs[args.launcher](num_procs, args, ppn, num_nodes)
+
+
+def run_subprocess(process_args, timeout=None):
+    """Run a subprocess.
+
+    This supports a timeout without killing the process.
+
+    """
+    if timeout is None:
+        # Just use the standard interface in this case.
+        return subprocess.run(process_args, capture_output=True, text=True,
+                              check=False)
+    with subprocess.Popen(process_args,
+                          stdout=subprocess.PIPE,
+                          stderr=subprocess.PIPE,
+                          text=True) as process:
+        stdout = ''
+        stderr = ''
+        while True:
+            try:
+                r = process.communicate(None, timeout=timeout)
+                stdout += r[0]
+                stderr += r[1]
+                break
+            except subprocess.TimeoutExpired as e:
+                # Ran out of time. Report what we got and keep waiting.
+                print('Hit timeout in process',
+                      ' '.join(process_args), flush=True)
+                if e.stdout:
+                    print(e.stdout.decode(), flush=True)
+                    stdout += e.stdout.decode()
+                if e.stderr:
+                    print(e.stderr.decode(), flush=True)
+                    stderr += e.stderr.decode()
+                timeout = None
+            except:
+                process.kill()
+                raise
+        retcode = process.poll()
+        if retcode is None:
+            raise RuntimeError('Process should have terminated')
+        return subprocess.CompletedProcess(process.args, retcode,
+                                           stdout, stderr)
+
+
+def clear_processes(args):
+    """Ensure all test processes have exited.
+
+    Sometimes this doesn't happen, so we have to kill them.
+
+    """
+    exe = os.path.basename(args.test_ops)
+    launcher_cmd = get_launcher_cmd(args.num_nodes, args, ppn=1)
+    kill_cmd = ['killall', '-s', 'KILL', exe]
+    # Not interested in the return.
+    subprocess.run(launcher_cmd + kill_cmd, capture_output=True)
+
+
 def run_test(args, num_procs, backend, operator, datatype, inplace,
              nonblocking, root):
     """Run a specified test."""
-    launcher_cmd = launcher_funcs[args.launcher](num_procs, args)
+    launcher_cmd = get_launcher_cmd(num_procs, args)
     if args.extra_args:
         launcher_cmd += args.extra_args.split(' ')
     test_cmd = [args.test_ops,
@@ -149,8 +218,10 @@ def run_test(args, num_procs, backend, operator, datatype, inplace,
                 # Keep things relatively small.
                 '--max-size', '2048',
                 # Don't wait too long.
-                '--hang-timeout', '5',
+                '--hang-timeout', str(hang_timeout),
                 '--dump-on-error', '--max-dump-size', '64']
+    if args.no_abort_on_hang:
+        test_cmd.append('--no-abort-on-hang')
     if args.threads is not None:
         test_cmd += ['--threads', str(args.threads)]
     test_desc = f'procs:{num_procs} {backend} {operator} {datatype}'
@@ -163,16 +234,16 @@ def run_test(args, num_procs, backend, operator, datatype, inplace,
     if root is not None:
         test_cmd += ['--root', str(root)]
         test_desc += f' root:{root}'
-    r = subprocess.run(launcher_cmd + test_cmd, capture_output=True, text=True,
-                       check=False)
+    r = run_subprocess(launcher_cmd + test_cmd, timeout=(2*hang_timeout))
     if r.returncode == 0:
-        print('[Pass] ' + test_desc)
+        print('[Pass] ' + test_desc, flush=True)
     else:
-        print('[Fail] ' + test_desc)
+        print('[Fail] ' + test_desc, flush=True)
         if r.stdout:
-            print(r.stdout)
+            print(r.stdout, flush=True)
         if r.stderr:
-            print(r.stderr)
+            print(r.stderr, flush=True)
+    clear_processes(args)
 
 
 def run_all_tests(args):
