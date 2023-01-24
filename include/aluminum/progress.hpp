@@ -58,8 +58,6 @@ class MPICommunicator;
 
 /**
  * Encapsulates the asynchronous progress engine.
- * Note this is intended to be used from only one thread (in addition to the
- * progress thread) and is not optimized (or tested) for other cases.
  */
 class ProgressEngine {
  public:
@@ -89,8 +87,6 @@ class ProgressEngine {
 #else
     SPSCQueue<AlState*> q;
 #endif
-    /** Whether a blocking operation is being executed. */
-    bool blocked = false;
     /** Associated compute stream. */
     void* compute_stream = DEFAULT_STREAM;
   };
@@ -135,16 +131,10 @@ class ProgressEngine {
    * Per-stream pipelined run queues.
    * This should be accessed only by the progress engine.
    * Using a vector for compactness and to avoid repeated memory allocations.
-   * @todo May extend OrderedArray / make a new class to handle this.
    */
   std::unordered_map<void*, std::array<std::vector<AlState*>, AL_PE_NUM_PIPELINE_STAGES>> run_queues;
   /** Number of currently-active bounded-length operations. */
   size_t num_bounded = 0;
-  /**
-   * Map requests that are currently blocking to the associated input queue.
-   * This should be accessed only by the progress engine.
-   */
-  std::unordered_map<AlState*, size_t> blocking_reqs;
   /** World communicator. */
   mpi::MPICommunicator* world_comm;
 #ifdef AL_HAS_CUDA

@@ -317,18 +317,6 @@ std::ostream& ProgressEngine::dump_state(std::ostream& ss) {
       }
     }
   }
-  /*const size_t req_queue_size = num_input_streams.load();
-  ss << "Request queues (" << req_queue_size << "):\n";
-  for (size_t i = 0; i < req_queue_size; ++i) {
-    ss << i << ": blocked=" << request_queues[i].blocked;
-    const size_t front = request_queues[i].q.front.load();
-    const size_t back = request_queues[i].q.back.load();
-    ss << " front=" << front << " back=" << back << "\n";
-    for (size_t j = front; j < back; ++j) {
-      ss << "\t" << j << ": " << request_queues[i].q.data[j]->get_name()
-         << " " << request_queues[i].q.data[j]->get_desc() << "\n";
-    }
-    }*/
   return ss;
 }
 
@@ -456,49 +444,43 @@ void ProgressEngine::engine() {
     // Check for newly-submitted requests.
     size_t cur_input_streams = num_input_streams.load();
     for (size_t i = 0; i < cur_input_streams; ++i) {
-      if (!request_queues[i].blocked) {
-        AlState* req = request_queues[i].q.peek();
-        if (req != nullptr) {
-          // Add to the correct run queue if one is available.
-          bool do_start = false;
-          switch (req->get_run_type()) {
-          case RunType::bounded:
-            // Move to the run queue if any of the following hold:
-            //   1. num_bounded < AL_PE_NUM_CONCURRENT_OPS.
-            //   2. The run_queue for this stream doesn't exist.
-            //   3. The run_queue for this stream's first stage is empty.
-            if (num_bounded < AL_PE_NUM_CONCURRENT_OPS
-                || !run_queues.count(req->get_compute_stream())
-                || !run_queues[req->get_compute_stream()][0].size()) {
-              ++num_bounded;
-              do_start = true;
-            }
-            break;
-          case RunType::unbounded:
+      AlState* req = request_queues[i].q.peek();
+      if (req != nullptr) {
+        // Add to the correct run queue if one is available.
+        bool do_start = false;
+        switch (req->get_run_type()) {
+        case RunType::bounded:
+          // Move to the run queue if any of the following hold:
+          //   1. num_bounded < AL_PE_NUM_CONCURRENT_OPS.
+          //   2. The run_queue for this stream doesn't exist.
+          //   3. The run_queue for this stream's first stage is empty.
+          if (num_bounded < AL_PE_NUM_CONCURRENT_OPS
+              || !run_queues.count(req->get_compute_stream())
+              || !run_queues[req->get_compute_stream()][0].size()) {
+            ++num_bounded;
             do_start = true;
-            break;
           }
-          if (do_start) {
-            // Add to end of first pipeline stage.
-            // Create run queues if needed.
-            if (!run_queues.count(req->get_compute_stream())) {
-              run_queues.emplace(req->get_compute_stream(),
-                                 decltype(run_queues)::mapped_type{});
-            }
-            run_queues[req->get_compute_stream()][0].push_back(req);
-            req->start();
+          break;
+        case RunType::unbounded:
+          do_start = true;
+          break;
+        }
+        if (do_start) {
+          // Add to end of first pipeline stage.
+          // Create run queues if needed.
+          if (!run_queues.count(req->get_compute_stream())) {
+            run_queues.emplace(req->get_compute_stream(),
+                               decltype(run_queues)::mapped_type{});
+          }
+          run_queues[req->get_compute_stream()][0].push_back(req);
+          req->start();
 #ifdef AL_DEBUG_HANG_CHECK
-            req->start_time = get_time();
+          req->start_time = get_time();
 #endif
 #ifdef AL_TRACE
-            trace::record_pe_start(*req);
+          trace::record_pe_start(*req);
 #endif
-            request_queues[i].q.pop_always();
-            if (req->blocks()) {
-              request_queues[i].blocked = true;
-              blocking_reqs[req] = i;
-            }
-          }
+          request_queues[i].q.pop_always();
         }
       }
     }
@@ -528,7 +510,7 @@ void ProgressEngine::engine() {
                             << " compute_stream=" << req->get_compute_stream()
                             << " run_type="
                             << (req->get_run_type() == RunType::bounded ? "bounded" : "unbounded")
-                            << " blocks=" << req->blocks() << std::endl;
+                            << std::endl;
                   req->hang_reported = true;
                 }
               }
@@ -554,11 +536,6 @@ void ProgressEngine::engine() {
             case PEAction::complete:
               if (req->get_run_type() == RunType::bounded) {
                 --num_bounded;
-              }
-              if (req->blocks()) {
-                // Unblock the associated input queue.
-                request_queues[blocking_reqs[req]].blocked = false;
-                blocking_reqs.erase(req);
               }
 #ifdef AL_TRACE
               trace::record_pe_done(*req);

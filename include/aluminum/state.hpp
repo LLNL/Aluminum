@@ -93,8 +93,6 @@ class AlState {
   virtual void* get_compute_stream() const { return DEFAULT_STREAM; }
   /** Return the run queue type this operation should use. */
   virtual RunType get_run_type() const { return RunType::bounded; }
-  /** True if this is meant to block operations until completion. */
-  virtual bool blocks() const { return false; }
   /** Return a name identifying the state (for debugging/info purposes). */
   virtual std::string get_name() const { return "AlState"; }
   /** Return a string description of the state (for debugging/info purposes). */
