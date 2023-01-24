@@ -296,26 +296,6 @@ void ProgressEngine::enqueue(AlState* state) {
 #endif
 }
 
-bool ProgressEngine::is_complete(AlRequest& req) {
-  if (req == NULL_REQUEST) {
-    return true;
-  }
-  if (req->load(std::memory_order_acquire)) {
-    req = NULL_REQUEST;
-    return true;
-  }
-  return false;
-}
-
-void ProgressEngine::wait_for_completion(AlRequest& req) {
-  if (req == NULL_REQUEST) {
-    return;
-  }
-  // Spin until the request has completed.
-  while (!req->load(std::memory_order_acquire)) {}
-  req = NULL_REQUEST;
-}
-
 std::ostream& ProgressEngine::dump_state(std::ostream& ss) {
   // Note: This pulls *directly from internal state*.
   // This is *not* thread safe, and stuff might blow up.
@@ -572,9 +552,6 @@ void ProgressEngine::engine() {
               }
               break;
             case PEAction::complete:
-              if (req->needs_completion()) {
-                req->get_req()->store(true, std::memory_order_release);
-              }
               if (req->get_run_type() == RunType::bounded) {
                 --num_bounded;
               }

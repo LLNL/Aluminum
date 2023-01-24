@@ -44,7 +44,7 @@ class SendAlState : public AlState {
  public:
   SendAlState(const T* sendbuf, size_t count_, int dest_,
               HostTransferCommunicator& comm_, AlGpuStream_t stream) :
-    AlState(nullptr), count(count_), dest(dest_), comm(comm_.get_comm()),
+    AlState(), count(count_), dest(dest_), comm(comm_.get_comm()),
     compute_stream(comm_.get_stream()) {
     mem = mempool.allocate<MemoryType::CUDA_PINNED_HOST, T>(count);
     AL_CHECK_CUDA(AlGpuMemcpyAsync(mem, sendbuf, sizeof(T)*count,
@@ -87,7 +87,6 @@ class SendAlState : public AlState {
 #endif
     return flag ? PEAction::complete : PEAction::cont;
   }
-  bool needs_completion() const override { return false; }
   void* get_compute_stream() const override { return compute_stream; }
   RunType get_run_type() const override { return RunType::unbounded; }
   std::string get_name() const override { return "HTSend"; }
@@ -114,7 +113,7 @@ class RecvAlState : public AlState {
  public:
   RecvAlState(T* recvbuf, size_t count_, int src_,
               HostTransferCommunicator& comm_, AlGpuStream_t stream) :
-    AlState(nullptr), count(count_), src(src_), comm(comm_.get_comm()),
+    AlState(), count(count_), src(src_), comm(comm_.get_comm()),
     compute_stream(comm_.get_stream()) {
     mem = mempool.allocate<MemoryType::CUDA_PINNED_HOST, T>(count);
     wait_sync.wait(stream);
@@ -157,7 +156,6 @@ class RecvAlState : public AlState {
     return sync_event.query() ? PEAction::complete : PEAction::cont;
 #endif
   }
-  bool needs_completion() const override { return false; }
   void* get_compute_stream() const override { return compute_stream; }
   RunType get_run_type() const override { return RunType::unbounded; }
   std::string get_name() const override { return "HTRecv"; }
@@ -185,7 +183,7 @@ class SendRecvAlState : public AlState {
   SendRecvAlState(const T* sendbuf, size_t send_count, int dest,
                   T* recvbuf, size_t recv_count, int src,
                   HostTransferCommunicator& comm, AlGpuStream_t stream) :
-    AlState(nullptr),
+    AlState(),
     send_state(sendbuf, send_count, dest, comm, stream),
     recv_state(recvbuf, recv_count, src, comm, stream) {}
   void start() override {
@@ -206,7 +204,6 @@ class SendRecvAlState : public AlState {
     }
     return send_done && recv_done ? PEAction::complete : PEAction::cont;
   }
-  bool needs_completion() const override { return false; }
   void* get_compute_stream() const override {
     return send_state.get_compute_stream();
   }

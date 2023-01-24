@@ -41,9 +41,8 @@ namespace ht {
 class HostTransferCollectiveState : public AlState {
 public:
   HostTransferCollectiveState(AlGpuStream_t stream_) :
-    AlState(nullptr), stream(stream_) {}
+    AlState(), stream(stream_) {}
 
-  bool needs_completion() const override { return false; }
   void *get_compute_stream() const override { return stream; }
 
 protected:

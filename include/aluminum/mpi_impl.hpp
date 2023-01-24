@@ -27,7 +27,9 @@
 
 #pragma once
 
+#include <atomic>
 #include <cstddef>
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
@@ -63,9 +65,6 @@ namespace mpi {
 void init(int& argc, char**& argv);
 /** MPI finalization. */
 void finalize();
-
-/** Default tag for blocking operations. */
-constexpr int default_tag = 0;
 
 }  // namespace mpi
 }  // namespace internal
@@ -133,7 +132,7 @@ class MPIBackend {
   using scatter_algo_type = MPICollectiveAlgorithm;
   using scatterv_algo_type = MPICollectiveAlgorithm;
   using comm_type = internal::mpi::MPICommunicator;
-  using req_type = internal::AlRequest;
+  using req_type = internal::mpi::AlMPIReq;
   static constexpr std::nullptr_t null_req = nullptr;
 
   template <typename T>
@@ -878,16 +877,25 @@ private:
 template <typename Backend> bool Test(typename Backend::req_type&);
 template <>
 inline bool Test<MPIBackend>(typename MPIBackend::req_type& req) {
-  internal::ProgressEngine* pe = internal::get_progress_engine();
-  return pe->is_complete(req);
+  if (req == MPIBackend::null_req) {
+    return true;
+  }
+  if (req->load(std::memory_order_acquire)) {
+    req = MPIBackend::null_req;
+  }
+  return false;
 }
 
 // Forward declare:
 template <typename Backend> void Wait(typename Backend::req_type&);
 template <>
 inline void Wait<MPIBackend>(typename MPIBackend::req_type& req) {
-  internal::ProgressEngine* pe = internal::get_progress_engine();
-  pe->wait_for_completion(req);
+  if (req == MPIBackend::null_req) {
+    return;
+  }
+  // Spin until the request has completed.
+  while (!req->load(std::memory_order_acquire)) {}
+  req = MPIBackend::null_req;
 }
 
 }  // namespace Al

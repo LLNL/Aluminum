@@ -46,7 +46,7 @@ template <typename T>
 class BcastAlState : public MPIState {
 public:
   BcastAlState(T* buf_, size_t count_, int root_,
-               MPICommunicator& comm_, AlRequest req_) :
+               MPICommunicator& comm_, AlMPIReq req_) :
     MPIState(req_),
     buf(buf_), count(count_), root(root_),
     comm(comm_.get_comm()) {}
@@ -69,8 +69,8 @@ private:
 
 template <typename T>
 void passthrough_nb_bcast(T* buf, size_t count, int root,
-                          MPICommunicator& comm, AlRequest& req) {
-  req = internal::get_free_request();
+                          MPICommunicator& comm, AlMPIReq& req) {
+  req = get_free_request();
   internal::mpi::BcastAlState<T>* state =
     new internal::mpi::BcastAlState<T>(
       buf, count, root, comm, req);

@@ -47,7 +47,7 @@ template <typename T>
 class AlltoallAlState : public MPIState {
 public:
   AlltoallAlState(const T* sendbuf_, T* recvbuf_, size_t count_,
-                  MPICommunicator& comm_, AlRequest req_) :
+                  MPICommunicator& comm_, AlMPIReq req_) :
     MPIState(req_),
     sendbuf(sendbuf_), recvbuf(recvbuf_), count(count_),
     comm(comm_.get_comm()) {}
@@ -71,8 +71,8 @@ private:
 
 template <typename T>
 void passthrough_nb_alltoall(const T* sendbuf, T* recvbuf, size_t count,
-                              MPICommunicator& comm, AlRequest& req) {
-  req = internal::get_free_request();
+                              MPICommunicator& comm, AlMPIReq& req) {
+  req = get_free_request();
   internal::mpi::AlltoallAlState<T>* state =
     new internal::mpi::AlltoallAlState<T>(
       sendbuf, recvbuf, count, comm, req);

@@ -27,15 +27,25 @@
 
 #pragma once
 
+#include <atomic>
+#include <memory>
+#include <mpi.h>
 #include "aluminum/progress.hpp"
 
 namespace Al {
 namespace internal {
 namespace mpi {
 
+using AlMPIReq = std::shared_ptr<std::atomic<bool>>;
+
+/** Return a free request for use. */
+inline AlMPIReq get_free_request() {
+  return std::make_shared<std::atomic<bool>>(false);
+}
+
 class MPIState : public AlState {
 public:
-  MPIState(AlRequest req_) : AlState(req_) {}
+  MPIState(AlMPIReq req_) : req(req_) {}
 
   void start() override {
     AlState::start();
@@ -44,6 +54,8 @@ public:
 
   PEAction step() override {
     if (poll_mpi()) {
+      // Mark the request as completed.
+      req->store(true, std::memory_order_release);
       return PEAction::complete;
     } else {
       return PEAction::cont;
@@ -63,6 +75,9 @@ protected:
   }
 
 private:
+  /** Copy of the user's request object. */
+  AlMPIReq req;
+  /** MPI request associated with the operation. */
   MPI_Request mpi_req = MPI_REQUEST_NULL;
 };
 

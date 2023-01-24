@@ -53,7 +53,7 @@ public:
   ReduceScattervAlState(const T* sendbuf_, T* recvbuf_,
                         std::vector<size_t> counts_,
                         ReductionOperator op_, MPICommunicator& comm_,
-                        AlRequest req_) :
+                        AlMPIReq req_) :
     MPIState(req_),
     sendbuf(sendbuf_), recvbuf(recvbuf_),
     counts(intify_size_t_vector(counts_)),
@@ -84,8 +84,8 @@ void passthrough_nb_reduce_scatterv(const T* sendbuf, T* recvbuf,
                                     std::vector<size_t> counts,
                                     ReductionOperator op,
                                     MPICommunicator& comm,
-                                    AlRequest& req) {
-  req = internal::get_free_request();
+                                    AlMPIReq& req) {
+  req = get_free_request();
   internal::mpi::ReduceScattervAlState<T>* state =
     new internal::mpi::ReduceScattervAlState<T>(
       sendbuf, recvbuf, counts, op, comm, req);

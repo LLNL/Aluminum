@@ -39,9 +39,9 @@ namespace rma_ipc {
 
 class NotifyState: public AlState {
  public:
-  NotifyState(AlRequest req, int peer, MPICUDACommunicator &comm,
+  NotifyState(mpi::AlMPIReq req, int peer, MPICUDACommunicator &comm,
               cudaEvent_t ev):
-      AlState(req), m_peer(peer), m_comm(comm), m_ev(ev) {}
+    AlState(), m_req(req), m_peer(peer), m_comm(comm), m_ev(ev) {}
   void start() override {
     AlState::start();
     AL_CHECK_CUDA(cudaEventRecord(m_ev, m_comm.get_stream()));
@@ -57,6 +57,7 @@ class NotifyState: public AlState {
   }
  private:
   int key = 0;
+  mpi::AlMPIReq m_req;
   int m_peer;
   MPICUDACommunicator &m_comm;
   cudaEvent_t m_ev;
@@ -65,25 +66,25 @@ class NotifyState: public AlState {
 
 class WaitState: public AlState {
  public:
-  WaitState(AlRequest req, int peer, MPICUDACommunicator &comm,
+  WaitState(mpi::AlMPIReq req, int peer, MPICUDACommunicator &comm,
             cudaEvent_t ev_peer):
-      AlState(req), m_peer(peer), m_comm(comm),
+      AlState(), m_req(req), m_peer(peer), m_comm(comm),
       m_ev_peer(ev_peer),
       m_stream_wait_set(false) {}
   void start() override {
     AlState::start();
     MPI_Irecv(&key, 1, MPI_INT, m_peer, 0,
-              m_comm.get_comm(), &m_req);
+              m_comm.get_comm(), &m_mpi_req);
   }
   PEAction step() override {
     int flag;
-    MPI_Test(&m_req, &flag, MPI_STATUS_IGNORE);
+    MPI_Test(&m_mpi_req, &flag, MPI_STATUS_IGNORE);
     if (flag) {
       if (!m_stream_wait_set) {
         AL_CHECK_CUDA(cudaStreamWaitEvent(
             m_comm.get_stream(), m_ev_peer, 0));
         MPI_Isend(&key, 1, MPI_INT, m_peer, 0,
-                  m_comm.get_comm(), &m_req);
+                  m_comm.get_comm(), &m_mpi_req);
         m_stream_wait_set = true;
         return PEAction::cont;
       } else {
@@ -94,18 +95,19 @@ class WaitState: public AlState {
   }
  private:
   int key = 0;
+  mpi::AlMPIReq m_req;
   int m_peer;
   MPICUDACommunicator &m_comm;
   cudaEvent_t m_ev_peer;
   bool m_stream_wait_set;
-  MPI_Request m_req;
+  MPI_Request m_mpi_req;
 };
 
 class SyncState: public AlState {
  public:
-  SyncState(AlRequest req, int peer, MPICUDACommunicator &comm,
+  SyncState(mpi::AlMPIReq req, int peer, MPICUDACommunicator &comm,
             cudaEvent_t ev_self, cudaEvent_t ev_peer):
-      AlState(req), m_peer(peer), m_comm(comm),
+    AlState(), m_req(req), m_peer(peer), m_comm(comm),
       m_ev_self(ev_self), m_ev_peer(ev_peer),
       m_stream_wait_set(false) {}
   void start() override {
@@ -136,6 +138,7 @@ class SyncState: public AlState {
   }
  private:
   int key = 0;
+  mpi::AlMPIReq m_req;
   int m_peer;
   MPICUDACommunicator &m_comm;
   cudaEvent_t m_ev_self;
@@ -252,7 +255,7 @@ class ConnectionIPC: public Connection {
     }
   }
 
-  void notify(AlRequest &req) {
+  void notify(mpi::AlMPIReq &req) {
     if (!m_connected) {
       throw_al_exception("Not connected");
     }
@@ -261,7 +264,7 @@ class ConnectionIPC: public Connection {
     internal::get_progress_engine()->enqueue(state);
   }
 
-  void wait(AlRequest &req) {
+  void wait(mpi::AlMPIReq &req) {
     if (!m_connected) {
       throw_al_exception("Not connected");
     }
@@ -270,7 +273,7 @@ class ConnectionIPC: public Connection {
     internal::get_progress_engine()->enqueue(state);
   }
 
-  void sync(AlRequest &req) {
+  void sync(mpi::AlMPIReq &req) {
     if (!m_connected) {
       std::stringstream msg;
       msg << "Not connected to " << m_peer;

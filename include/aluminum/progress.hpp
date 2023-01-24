@@ -73,17 +73,6 @@ class ProgressEngine {
   void stop();
   /** Enqueue state for asynchronous execution. */
   void enqueue(AlState* state);
-  /**
-   * Check whether a request has completed.
-   * If the request is completed, it is removed.
-   * This does not block and may spuriously return false.
-   */
-  bool is_complete(AlRequest& req);
-  /**
-   * Wait until a request has completed, then remove it.
-   * This will block the calling thread.
-   */
-  void wait_for_completion(AlRequest& req);
 
   /**
    * Best effort to dump progress engine state for debugging.

@@ -51,7 +51,7 @@ template <typename T>
 class ReduceAlState : public MPIState {
 public:
   ReduceAlState(const T* sendbuf_, T* recvbuf_, size_t count_, ReductionOperator op_,
-                int root_, MPICommunicator& comm_, AlRequest req_) :
+                int root_, MPICommunicator& comm_, AlMPIReq req_) :
     MPIState(req_),
     sendbuf(sendbuf_), recvbuf(recvbuf_), count(count_),
     op(ReductionOperator2MPI_Op(op_)), root(root_),
@@ -84,8 +84,8 @@ private:
 template <typename T>
 void passthrough_nb_reduce(const T* sendbuf, T* recvbuf, size_t count,
                            ReductionOperator op, int root,
-                           MPICommunicator& comm, AlRequest& req) {
-  req = internal::get_free_request();
+                           MPICommunicator& comm, AlMPIReq& req) {
+  req = get_free_request();
   internal::mpi::ReduceAlState<T>* state =
     new internal::mpi::ReduceAlState<T>(
       sendbuf, recvbuf, count, op, root, comm, req);

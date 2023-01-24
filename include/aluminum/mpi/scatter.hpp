@@ -53,7 +53,7 @@ template <typename T>
 class ScatterAlState : public MPIState {
 public:
   ScatterAlState(const T* sendbuf_, T* recvbuf_, size_t count_, int root_,
-                 MPICommunicator& comm_, AlRequest req_) :
+                 MPICommunicator& comm_, AlMPIReq req_) :
     MPIState(req_),
     sendbuf(sendbuf_), recvbuf(recvbuf_), count(count_), root(root_),
     comm(comm_.get_comm()), rank(comm_.rank()) {}
@@ -85,8 +85,8 @@ private:
 // When in-place, it is recvbuf that uses IN_PLACE.
 template <typename T>
 void passthrough_nb_scatter(const T* sendbuf, T* recvbuf, size_t count,
-                            int root, MPICommunicator& comm, AlRequest& req) {
-  req = internal::get_free_request();
+                            int root, MPICommunicator& comm, AlMPIReq& req) {
+  req = get_free_request();
   internal::mpi::ScatterAlState<T>* state =
     new internal::mpi::ScatterAlState<T>(
       sendbuf, recvbuf, count, root, comm, req);

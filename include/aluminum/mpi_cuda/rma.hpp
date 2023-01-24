@@ -48,9 +48,9 @@ class Connection {
   virtual void *attach_remote_buffer(void *local_addr) = 0;
   virtual void detach_remote_buffer(void *remote_addr) = 0;
   virtual void detach_all_remote_buffers() = 0;
-  virtual void notify(AlRequest &req) = 0;
-  virtual void wait(AlRequest &req) = 0;
-  virtual void sync(AlRequest &req) = 0;
+  virtual void notify(mpi::AlMPIReq &req) = 0;
+  virtual void wait(mpi::AlMPIReq &req) = 0;
+  virtual void sync(mpi::AlMPIReq &req) = 0;
   virtual void put(const void *src, void *dst,
                    size_t size) = 0;
 
@@ -71,6 +71,14 @@ class RMA {
   int m_dev;
   std::vector<int> m_local_devices;
   std::map<int, Connection *> m_connections;
+
+  void wait_for_completion(mpi::AlMPIReq& req) {
+    if (req == NULL_REQUEST) {
+      return;
+    }
+    while (!req->load(std::memory_order_acquire)) {}
+    req = NULL_REQUEST;
+  }
 
  public:
   RMA(MPICUDACommunicator &comm): m_comm(comm) {
@@ -140,35 +148,35 @@ class RMA {
 
   void notify(int dst_rank) {
     auto conn = get_connection(dst_rank);
-    AlRequest req = internal::get_free_request();
+    mpi::AlMPIReq req = get_free_request();
     conn->notify(req);
-    internal::get_progress_engine()->wait_for_completion(req);
+    wait_for_completion(req);
   }
 
   void wait(int dst_rank) {
     auto conn = get_connection(dst_rank);
-    AlRequest req = internal::get_free_request();
+    mpi::AlMPIReq req = get_free_request();
     conn->wait(req);
-    internal::get_progress_engine()->wait_for_completion(req);
+    wait_for_completion(req);
   }
 
   void sync(int peer) {
     auto conn = get_connection(peer);
-    AlRequest req = internal::get_free_request();
+    mpi::AlMPIReq req = get_free_request();
     conn->sync(req);
-    internal::get_progress_engine()->wait_for_completion(req);
+    wait_for_completion(req);
   }
 
   void sync(const int *peers, int num_peers) {
-    AlRequest *requests = new AlRequest[num_peers];
+    mpi::AlMPIReq *requests = new mpi::AlMPIReq[num_peers];
     for (int i = 0; i < num_peers; ++i) {
       auto conn = get_connection(peers[i]);
-      AlRequest req = internal::get_free_request();
+      mpi::AlMPIReq req = get_free_request();
       conn->sync(req);
       requests[i] = req;
     }
     for (int i = 0; i < num_peers; ++i) {
-      internal::get_progress_engine()->wait_for_completion(requests[i]);
+      wait_for_completion(req);
     }
   }
 
