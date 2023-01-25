@@ -101,6 +101,10 @@ class ProgressEngine {
   std::condition_variable startup_cv;
   /** Atomic flag indicating that the progress engine has completed startup. */
   std::atomic<bool> started_flag;
+#ifdef AL_PE_START_ON_DEMAND
+  /** Atomic flag indicating that a thread is starting the progess engine. */
+  std::atomic<bool> doing_start_flag;
+#endif
   /**
    * Per-stream request queues.
    *

@@ -120,7 +120,9 @@ void Initialize(int& argc, char**& argv) {
   }
   internal::mpi::init(argc, argv);
   progress_engine = new internal::ProgressEngine();
+#ifndef AL_PE_START_ON_DEMAND
   progress_engine->run();
+#endif
   is_initialized = true;
 #ifdef AL_HAS_CUDA
   internal::cuda::init(argc, argv);
