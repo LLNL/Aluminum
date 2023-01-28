@@ -391,6 +391,12 @@ inline int set_device() {
               << "(" << local_size << ")" << std::endl;
     std::abort();
   }
+  char* env = std::getenv("AL_GPU_ID");
+  if (env) {
+    const int gpu_id = std::atoi(env);
+    AL_FORCE_CHECK_GPU_NOSYNC(AlGpuSetDevice(gpu_id));
+    return gpu_id;
+  }
   AL_FORCE_CHECK_GPU_NOSYNC(AlGpuSetDevice(local_rank));
   return local_rank;
 }
