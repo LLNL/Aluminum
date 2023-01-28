@@ -26,6 +26,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "benchmark_utils.hpp"
+#include <map>
 #include <cxxopts.hpp>
 
 
@@ -152,8 +153,12 @@ void run_benchmark(cxxopts::ParseResult& parsed_opts) {
     auto summaries = profile.get_summary_stats(
       parsed_opts["summarize"].as<int>());
     if (comm_wrapper.rank() == 0) {
+      // Print in sorted order by size for better readability.
+      std::map<typename decltype(summaries)::key_type,
+               typename decltype(summaries)::mapped_type>
+        sorted_summaries(summaries.begin(), summaries.end());
       std::cout << "Size Mean Median Stdev Min Max" << std::endl;
-      for (const auto& p : summaries) {
+      for (const auto& p : sorted_summaries) {
         std::cout << p.first << " " << p.second << std::endl;
       }
     }
