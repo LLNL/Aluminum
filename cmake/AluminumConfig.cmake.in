@@ -1,9 +1,18 @@
+# Aluminum currently has 4 known components: MPI, NCCL, HOST_TRANSFER,
+# and MPI_CUDA. "MPI" is always available. The others are found if
+# AL_HAS_<COMP>.
 include(CMakeFindDependencyMacro)
 
 list(APPEND CMAKE_MODULE_PATH "@CMAKE_MODULE_LOCATION@")
 
 include(${CMAKE_CURRENT_LIST_DIR}/AluminumConfigVersion.cmake)
 set(ALUMINUM_VERSION ${PACKAGE_VERSION})
+
+set(_AL_KNOWN_COMPONENTS
+  MPI
+  NCCL
+  HOST_TRANSFER
+  MPI_CUDA)
 
 set(AL_HAS_CUDA @AL_HAS_CUDA@)
 set(AL_HAS_ROCM @AL_HAS_ROCM@)
@@ -77,6 +86,12 @@ endforeach (_DIR ${_TMP_LIBRARY_DIRS})
 if (NOT TARGET AL::Al)
   include(${CMAKE_CURRENT_LIST_DIR}/AluminumTargets.cmake)
 endif ()
+
+foreach (comp ${_AL_KNOWN_COMPONENTS})
+  if (AL_HAS_${comp})
+    set(Aluminum_${comp}_FOUND 1)
+  endif ()
+endforeach ()
 
 check_required_components(Aluminum)
 
