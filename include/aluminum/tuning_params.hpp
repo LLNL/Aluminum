@@ -58,6 +58,14 @@
  */
 // #define AL_PE_STREAM_QUEUE_CACHE 1
 
+/**
+ * Whether to delay starting the progress engine until it is actually
+ * needed. This results in a one-time penalty on the first call to an
+ * operation that uses the progress engine, but only a quick check
+ * thereafter.
+ */
+#define AL_PE_START_ON_DEMAND 1
+
 /** Amount of sync object memory to preallocate in the pool. */
 #define AL_SYNC_MEM_PREALLOC 1024
 

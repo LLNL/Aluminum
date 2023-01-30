@@ -198,12 +198,19 @@ std::unordered_map<void*, ProgressEngine::InputQueue*> ProgressEngine::stream_to
 ProgressEngine::ProgressEngine() {
   stop_flag = false;
   started_flag = false;
+  doing_start_flag = false;
   world_comm = new mpi::MPICommunicator(MPI_COMM_WORLD);
 #ifdef AL_PE_ADD_DEFAULT_STREAM
   // Initialze with the default stream.
   num_input_streams = 1;
 #else
   num_input_streams = 0;
+#endif
+#ifdef AL_HAS_CUDA
+  // Capture the current CUDA device for the progress engine.
+  int device;
+  AL_CHECK_CUDA(AlGpuGetDevice(&device));
+  cur_device = device;
 #endif
 }
 
@@ -212,20 +219,26 @@ ProgressEngine::~ProgressEngine() {
 }
 
 void ProgressEngine::run() {
-#ifdef AL_HAS_CUDA
-  // Capture the current CUDA device for the progress engine.
-  int device;
-  AL_CHECK_CUDA(AlGpuGetDevice(&device));
-  cur_device = device;
+  // Wait for the progress engine to start.
+  std::unique_lock<std::mutex> lock(startup_mutex);
+#ifdef AL_PE_START_ON_DEMAND
+  // Ensure only one thread starts this.
+  if (doing_start_flag.load()) {
+    // Another thread is already starting the progress engine.
+    startup_cv.wait(lock, [this] {return started_flag.load();});
+    return;
+  }
+  doing_start_flag = true;
 #endif
   thread = std::thread(&ProgressEngine::engine, this);
   profiling::name_thread(thread.native_handle(), "al-progress");
-  // Wait for the progress engine to start.
-  std::unique_lock<std::mutex> lock(startup_mutex);
-  startup_cv.wait(lock, [this] {return started_flag.load() == true;});
+  startup_cv.wait(lock, [this] {return started_flag.load() ;});
 }
 
 void ProgressEngine::stop() {
+  if (!started_flag.load()) {
+    return;  // Progress engine never started.
+  }
   if (stop_flag.load()) {
     throw_al_exception("Stop called twice on progress engine");
   }
@@ -234,6 +247,11 @@ void ProgressEngine::stop() {
 }
 
 void ProgressEngine::enqueue(AlState* state) {
+#ifdef AL_PE_START_ON_DEMAND
+  if (!started_flag.load()) {
+    run();
+  }
+#endif
 #ifdef AL_PE_STREAM_QUEUE_CACHE
   // Check the thread-local queue cache.
   auto iter = ProgressEngine::stream_to_queue.find(state->get_compute_stream());
@@ -439,7 +457,11 @@ void ProgressEngine::engine() {
     std::unique_lock<std::mutex> lock(startup_mutex);
     started_flag = true;
   }
+#ifdef AL_PE_START_ON_DEMAND
+  startup_cv.notify_all();
+#else
   startup_cv.notify_one();
+#endif
   while (!stop_flag.load(std::memory_order_acquire)) {
     // Check for newly-submitted requests.
     size_t cur_input_streams = num_input_streams.load();
