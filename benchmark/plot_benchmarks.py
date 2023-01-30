@@ -75,12 +75,13 @@ def load_result_directory(result_dir, inplace, nonblocking):
     coll_results = []
     pt2pt_results = []
     for filename in os.listdir(result_dir):
+        full_path = os.path.join(result_dir, filename)
+        if not os.path.isfile(full_path):
+            continue
         try:
-            df = pd.read_csv(os.path.join(result_dir, filename),
-                             delim_whitespace=True)
+            df = pd.read_csv(full_path, delim_whitespace=True)
         except:
-            print(('Could not load benchmark data from '
-                   f'{os.path.join(result_dir, filename)}'))
+            print(f'Could not load benchmark data from {full_filename}')
             continue
         op = df.Operation[0]
         if op in pt2pt_ops:
@@ -154,7 +155,7 @@ def get_config_name(op, args, rank=None, root=None):
         name += '_nonblocking'
     else:
         name += '_blocking'
-    if rank:
+    if rank is not None:
         name += f'_rank{rank}'
     if root is True:
         name += '_root'
@@ -184,6 +185,12 @@ def estimate_reasonable_max(df, x):
     return q3.max() + 1.5*iqr
 
 
+def drop_outliers(df):
+    """Drop rows that are major outliers."""
+    limit = df.Time.quantile(0.999)
+    return df[df.Time < limit]
+
+
 def plot_time_v_procs(df, out_dir, name):
     """Plot time vs process count for a fixed operator."""
     for size, size_df in df.groupby('Size'):
@@ -196,7 +203,8 @@ def plot_time_v_procs(df, out_dir, name):
         ax.set_ylim(bottom=0, top=ymax)
         ax.set_xticklabels(ax.get_xticklabels(), rotation='vertical',
                            fontsize='small')
-        ax.legend(fontsize='x-small')
+        ncols = len(df['Impl'].unique()) // 5 + 1
+        ax.legend(fontsize='x-small', ncol=ncols)
         fig.tight_layout()
         fig.savefig(os.path.join(out_dir, name + f'_tvp_size{size}.pdf'))
         plt.close()
@@ -215,7 +223,8 @@ def plot_time_v_sizes(df, out_dir, name):
         ax.set_ylim(top=ymax)
         ax.set_xticklabels(ax.get_xticklabels(), rotation='vertical',
                            fontsize='small')
-        ax.legend(fontsize='x-small')
+        ncols = len(df['Impl'].unique()) // 5 + 1
+        ax.legend(fontsize='x-small', ncol=ncols)
         fig.tight_layout()
         fig.savefig(os.path.join(out_dir, name + f'_tvs_procs{procs}.pdf'))
         plt.close()
@@ -303,6 +312,7 @@ def plot_all_results(args):
             pt2pt_dfs.append(pt2pt_df)
     if coll_dfs:
         coll_df = filter_df(pd.concat(coll_dfs), args)
+        coll_df = drop_outliers(coll_df)
         for op, op_df in coll_df.groupby('Operation'):
             if args.separate_ranks:
                 for rank, rank_op_df in op_df.groupby('CommRank'):
@@ -319,6 +329,7 @@ def plot_all_results(args):
                 do_all_plots(op_df, args, get_config_name(op, args))
     if pt2pt_dfs:
         pt2pt_df = filter_df(pd.concat(pt2pt_dfs), args)
+        pt2pt_df = drop_outliers(pt2pt_df)
         for op, op_df in pt2pt_df.groupby('Operation'):
             if args.separate_ranks:
                 for rank, rank_op_df in op_df.groupby('CommRank'):
