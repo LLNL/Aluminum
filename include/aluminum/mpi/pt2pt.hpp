@@ -49,7 +49,7 @@ template <typename T>
 class SendAlState : public MPIState {
  public:
   SendAlState(const T* sendbuf_, size_t count_, int dest_,
-              MPICommunicator& comm_, AlRequest req_) :
+              MPICommunicator& comm_, AlMPIReq req_) :
     MPIState(req_),
     sendbuf(sendbuf_), count(count_), dest(dest_),
     comm(comm_.get_comm()) {}
@@ -73,8 +73,8 @@ protected:
 
 template <typename T>
 void passthrough_nb_send(const T* sendbuf, size_t count, int dest,
-                         MPICommunicator& comm, AlRequest& req) {
-  req = internal::get_free_request();
+                         MPICommunicator& comm, AlMPIReq& req) {
+  req = get_free_request();
   internal::mpi::SendAlState<T>* state =
     new internal::mpi::SendAlState<T>(
       sendbuf, count, dest, comm, req);
@@ -92,7 +92,7 @@ template <typename T>
 class RecvAlState : public MPIState {
  public:
   RecvAlState(T* recvbuf_, size_t count_, int src_,
-              MPICommunicator& comm_, AlRequest req_) :
+              MPICommunicator& comm_, AlMPIReq req_) :
     MPIState(req_),
     recvbuf(recvbuf_), count(count_), src(src_),
     comm(comm_.get_comm()) {}
@@ -116,8 +116,8 @@ protected:
 
 template <typename T>
 void passthrough_nb_recv(T* recvbuf, size_t count, int src,
-                         MPICommunicator& comm, AlRequest& req) {
-  req = internal::get_free_request();
+                         MPICommunicator& comm, AlMPIReq& req) {
+  req = get_free_request();
   internal::mpi::RecvAlState<T>* state =
     new internal::mpi::RecvAlState<T>(
       recvbuf, count, src, comm, req);
@@ -138,7 +138,7 @@ class SendRecvAlState : public MPIState {
  public:
   SendRecvAlState(const T* sendbuf_, size_t send_count_, int dest_,
                   T* recvbuf_, size_t recv_count_, int src_,
-                  MPICommunicator& comm_, AlRequest req_) :
+                  MPICommunicator& comm_, AlMPIReq req_) :
     MPIState(req_),
     sendbuf(sendbuf_), send_count(send_count_), dest(dest_),
     recvbuf(recvbuf_), recv_count(recv_count_), src(src_),
@@ -175,8 +175,8 @@ protected:
 template <typename T>
 void passthrough_nb_sendrecv(const T* sendbuf, size_t send_count, int dest,
                              T* recvbuf, size_t recv_count, int src,
-                             MPICommunicator& comm, AlRequest& req) {
-  req = internal::get_free_request();
+                             MPICommunicator& comm, AlMPIReq& req) {
+  req = get_free_request();
   internal::mpi::SendRecvAlState<T>* state =
     new internal::mpi::SendRecvAlState<T>(
       sendbuf, send_count, dest, recvbuf, recv_count, src, comm, req);

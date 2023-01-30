@@ -61,7 +61,7 @@ public:
                   std::vector<size_t> counts_,
                   std::vector<size_t> displs_,
                   int root_,
-                  MPICommunicator& comm_, AlRequest req_) :
+                  MPICommunicator& comm_, AlMPIReq req_) :
     MPIState(req_),
     sendbuf(sendbuf_), recvbuf(recvbuf_),
     counts(intify_size_t_vector(counts_)),
@@ -99,8 +99,8 @@ template <typename T>
 void passthrough_nb_scatterv(const T* sendbuf, T* recvbuf,
                              std::vector<size_t> counts,
                              std::vector<size_t> displs,
-                             int root, MPICommunicator& comm, AlRequest& req) {
-  req = internal::get_free_request();
+                             int root, MPICommunicator& comm, AlMPIReq& req) {
+  req = get_free_request();
   internal::mpi::ScattervAlState<T>* state =
     new internal::mpi::ScattervAlState<T>(
       sendbuf, recvbuf, counts, displs, root, comm, req);

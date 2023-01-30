@@ -47,7 +47,7 @@ template <typename T>
 class AllreduceAlState : public MPIState {
 public:
   AllreduceAlState(const T* sendbuf_, T* recvbuf_, size_t count_,
-                   ReductionOperator op_, MPICommunicator& comm_, AlRequest req_) :
+                   ReductionOperator op_, MPICommunicator& comm_, AlMPIReq req_) :
     MPIState(req_),
     sendbuf(sendbuf_), recvbuf(recvbuf_), count(count_),
     op(ReductionOperator2MPI_Op(op_)), comm(comm_.get_comm()) {}
@@ -73,8 +73,8 @@ private:
 template <typename T>
 void passthrough_nb_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                               ReductionOperator op, MPICommunicator& comm,
-                              AlRequest& req) {
-  req = internal::get_free_request();
+                              AlMPIReq& req) {
+  req = get_free_request();
   internal::mpi::AllreduceAlState<T>* state =
     new internal::mpi::AllreduceAlState<T>(
       sendbuf, recvbuf, count, op, comm, req);

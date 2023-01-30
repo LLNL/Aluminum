@@ -42,7 +42,7 @@ inline void passthrough_barrier(MPICommunicator& comm) {
 
 class BarrierAlState : public MPIState {
 public:
-  BarrierAlState(MPICommunicator& comm_, AlRequest req_)
+  BarrierAlState(MPICommunicator& comm_, AlMPIReq req_)
       : MPIState(req_), comm(comm_.get_comm()) {}
   ~BarrierAlState() override {}
 
@@ -57,8 +57,8 @@ private:
   MPI_Comm comm;
 };
 
-inline void passthrough_nb_barrier(MPICommunicator& comm, AlRequest& req) {
-  req = internal::get_free_request();
+inline void passthrough_nb_barrier(MPICommunicator& comm, AlMPIReq& req) {
+  req = get_free_request();
   internal::mpi::BarrierAlState* state =
     new internal::mpi::BarrierAlState(comm, req);
   get_progress_engine()->enqueue(state);

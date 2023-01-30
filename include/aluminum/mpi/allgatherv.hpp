@@ -54,7 +54,7 @@ public:
   AllgathervAlState(const T* sendbuf_, T* recvbuf_,
                     std::vector<size_t> counts_,
                     std::vector<size_t> displs_,
-                    MPICommunicator& comm_, AlRequest req_) :
+                    MPICommunicator& comm_, AlMPIReq req_) :
     MPIState(req_),
     sendbuf(sendbuf_), recvbuf(recvbuf_),
     counts(intify_size_t_vector(counts_)),
@@ -85,8 +85,8 @@ template <typename T>
 void passthrough_nb_allgatherv(const T* sendbuf, T* recvbuf,
                                std::vector<size_t> counts,
                                std::vector<size_t> displs,
-                               MPICommunicator& comm, AlRequest& req) {
-  req = internal::get_free_request();
+                               MPICommunicator& comm, AlMPIReq& req) {
+  req = get_free_request();
   internal::mpi::AllgathervAlState<T>* state =
     new internal::mpi::AllgathervAlState<T>(
       sendbuf, recvbuf, counts, displs, comm, req);

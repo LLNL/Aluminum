@@ -49,7 +49,7 @@ class ReduceScatterAlState : public MPIState {
 public:
   ReduceScatterAlState(const T* sendbuf_, T* recvbuf_, size_t count_,
                        ReductionOperator op_, MPICommunicator& comm_,
-                       AlRequest req_) :
+                       AlMPIReq req_) :
     MPIState(req_),
     sendbuf(sendbuf_), recvbuf(recvbuf_), count(count_),
     op(ReductionOperator2MPI_Op(op_)),
@@ -76,8 +76,8 @@ private:
 template <typename T>
 void passthrough_nb_reduce_scatter(const T* sendbuf, T* recvbuf, size_t count,
                                    ReductionOperator op, MPICommunicator& comm,
-                                   AlRequest& req) {
-  req = internal::get_free_request();
+                                   AlMPIReq& req) {
+  req = get_free_request();
   internal::mpi::ReduceScatterAlState<T>* state =
     new internal::mpi::ReduceScatterAlState<T>(
       sendbuf, recvbuf, count, op, comm, req);

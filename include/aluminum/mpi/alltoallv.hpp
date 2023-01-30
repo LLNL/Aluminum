@@ -64,7 +64,7 @@ public:
                    T* recvbuf_,
                    std::vector<size_t> recv_counts_,
                    std::vector<size_t> recv_displs_,
-                   MPICommunicator& comm_, AlRequest req_) :
+                   MPICommunicator& comm_, AlMPIReq req_) :
     MPIState(req_),
     sendbuf(sendbuf_),
     send_counts(intify_size_t_vector(send_counts_)),
@@ -104,8 +104,8 @@ void passthrough_nb_alltoallv(const T* sendbuf,
                               T* recvbuf,
                               std::vector<size_t> recv_counts,
                               std::vector<size_t> recv_displs,
-                              MPICommunicator& comm, AlRequest& req) {
-  req = internal::get_free_request();
+                              MPICommunicator& comm, AlMPIReq& req) {
+  req = get_free_request();
   internal::mpi::AlltoallvAlState<T>* state =
     new internal::mpi::AlltoallvAlState<T>(
       sendbuf, send_counts, send_displs,
