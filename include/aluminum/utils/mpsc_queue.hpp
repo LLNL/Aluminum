@@ -91,16 +91,17 @@ public:
         throw_al_exception("Queue full");
       }
 #endif
-      old_tail = tail;
-      old_next = tail->next;
-      if (old_tail == tail) {
+      old_tail = __atomic_load_n(&tail, __ATOMIC_SEQ_CST);
+      old_next = __atomic_load_n(&(old_tail->next), __ATOMIC_SEQ_CST);
+      if (old_tail == __atomic_load_n(&tail, __ATOMIC_SEQ_CST)) {
         if (old_next != nullptr) {
           // We didn't read the actual tail, help it get updated.
           __atomic_compare_exchange_n(&tail, &old_tail, old_next, true,
                                       __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
         } else {
           // Attempt to add our entry as the node after the current tail.
-          if (__atomic_compare_exchange_n(&tail->next, &old_next, entry, true,
+          queue_entry* cur_tail = __atomic_load_n(&tail, __ATOMIC_SEQ_CST);
+          if (__atomic_compare_exchange_n(&(cur_tail->next), &old_next, entry, true,
                                           __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
             // Update the tail.
             __atomic_compare_exchange_n(&tail, &old_tail, entry, true,
@@ -117,11 +118,12 @@ public:
 
   /** Return the next element in the queue; nullptr if empty. */
   T pop() noexcept {
-    if (head->next == nullptr) {
+    queue_entry* next = __atomic_load_n(&(head->next), __ATOMIC_SEQ_CST);
+    if (next == nullptr) {
       return nullptr;
     }
-    T value = head->next->value;
-    head = head->next;
+    T value = __atomic_load_n(&(next->value), __ATOMIC_SEQ_CST);
+    __atomic_store_n(&head, next, __ATOMIC_SEQ_CST);
 #ifdef AL_DEBUG
     --cur_size;
 #endif
@@ -138,12 +140,13 @@ public:
     noexcept
 #endif
   {
+    queue_entry* next = __atomic_load_n(&(head->next), __ATOMIC_SEQ_CST);
 #ifdef AL_DEBUG
-    if (head->next == nullptr) {
+    if (next == nullptr) {
       throw_al_exception("Tried to pop_always when empty");
     }
 #endif
-    head = head->next;
+    __atomic_store_n(&head, next, __ATOMIC_SEQ_CST);
 #ifdef AL_DEBUG
     --cur_size;
 #endif
@@ -151,7 +154,9 @@ public:
 
   /** Return the next element in the queue; nullptr if empty. */
   T peek() noexcept {
-    return (head->next == nullptr) ? nullptr : head->next->value;
+    queue_entry* next = __atomic_load_n(&(head->next), __ATOMIC_SEQ_CST);
+    return (next == nullptr) ? nullptr : __atomic_load_n(
+      &(next->value), __ATOMIC_SEQ_CST);
   }
 
 private:
