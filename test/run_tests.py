@@ -48,9 +48,9 @@ hang_timeout = 5
 # Supported datatypes for backends.
 mpi_datatypes = ['char', 'schar', 'uchar', 'short', 'ushort', 'int', 'uint',
                  'long', 'ulong', 'longlong', 'ulonglong',
-                 'float', 'double', 'half']# 'longdouble']
+                 'float', 'double', 'half', 'bfloat16']# 'longdouble']
 nccl_datatypes = ['char', 'uchar', 'int', 'uint', 'longlong', 'ulonglong',
-                  'float', 'double', 'half']
+                  'float', 'double', 'half', 'bfloat16']
 # Standard sets of operations.
 # inplace is one of 'both', True, or False.
 # root is either True or False.

@@ -69,7 +69,7 @@ For GPU backends (`NCCL` and `HostTransfer`):
 * CUB (any recent version)
 
 For the `NCCL`/`RCCL` backend:
-* NCCL (for Nvidia GPUs) or RCCL (for AMD GPUs), at least version 2.7.0
+* NCCL (for Nvidia GPUs) or RCCL (for AMD GPUs), at least version 2.10.0
 
 ### Building
 

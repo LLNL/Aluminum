@@ -121,6 +121,9 @@ template <> struct IsTypeSupported<Al::HostTransferBackend, long double> : std::
 #ifdef AL_HAS_HALF
 template <> struct IsTypeSupported<Al::HostTransferBackend, __half> : std::true_type {};
 #endif
+#ifdef AL_HAS_BFLOAT
+template <> struct IsTypeSupported<Al::HostTransferBackend, al_bfloat16> : std::true_type {};
+#endif
 
 // Reduction operator support (all are supported).
 template <Al::ReductionOperator op>

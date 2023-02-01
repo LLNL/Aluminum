@@ -42,6 +42,14 @@ MPI_Op half_min_op;
 MPI_Op half_max_op;
 #endif
 
+#ifdef AL_HAS_BFLOAT
+// Reduction operators for bfloat.
+MPI_Op bfloat_sum_op;
+MPI_Op bfloat_prod_op;
+MPI_Op bfloat_min_op;
+MPI_Op bfloat_max_op;
+#endif
+
 namespace {
 // Whether we initialized MPI, or it was already initialized.
 bool initialized_mpi = false;
@@ -90,6 +98,49 @@ void half_max_reduction(void* invec_, void* inoutvec_, int* len,
   }
 }
 #endif
+
+#ifdef AL_HAS_BFLOAT
+// Operator implementations for bfloat.
+void bfloat_sum_reduction(void* invec_, void* inoutvec_, int* len,
+                        MPI_Datatype*) {
+  const al_bfloat16* invec = reinterpret_cast<const al_bfloat16*>(invec_);
+  al_bfloat16* inoutvec = reinterpret_cast<al_bfloat16*>(inoutvec_);
+  for (int i = 0; i < *len; ++i) {
+    inoutvec[i] = __float2bfloat16(
+      __bfloat162float(invec[i]) + __bfloat162float(inoutvec[i]));
+  }
+}
+
+void bfloat_prod_reduction(void* invec_, void* inoutvec_, int* len,
+                        MPI_Datatype*) {
+  const al_bfloat16* invec = reinterpret_cast<const al_bfloat16*>(invec_);
+  al_bfloat16* inoutvec = reinterpret_cast<al_bfloat16*>(inoutvec_);
+  for (int i = 0; i < *len; ++i) {
+    inoutvec[i] = __float2bfloat16(
+      __bfloat162float(invec[i]) * __bfloat162float(inoutvec[i]));
+  }
+}
+
+void bfloat_min_reduction(void* invec_, void* inoutvec_, int* len,
+                        MPI_Datatype*) {
+  const al_bfloat16* invec = reinterpret_cast<const al_bfloat16*>(invec_);
+  al_bfloat16* inoutvec = reinterpret_cast<al_bfloat16*>(inoutvec_);
+  for (int i = 0; i < *len; ++i) {
+    inoutvec[i] = __float2bfloat16(
+      std::min(__bfloat162float(invec[i]), __bfloat162float(inoutvec[i])));
+  }
+}
+
+void bfloat_max_reduction(void* invec_, void* inoutvec_, int* len,
+                        MPI_Datatype*) {
+  const al_bfloat16* invec = reinterpret_cast<const al_bfloat16*>(invec_);
+  al_bfloat16* inoutvec = reinterpret_cast<al_bfloat16*>(inoutvec_);
+  for (int i = 0; i < *len; ++i) {
+    inoutvec[i] = __float2bfloat16(
+      std::max(__bfloat162float(invec[i]), __bfloat162float(inoutvec[i])));
+  }
+}
+#endif
 }
 
 void init(int& argc, char**& argv) {
@@ -128,6 +179,14 @@ void init(int& argc, char**& argv) {
   MPI_Op_create(&half_min_reduction, true, &half_min_op);
   MPI_Op_create(&half_max_reduction, true, &half_max_op);
 #endif
+
+#ifdef AL_HAS_BFLOAT
+  // Set up reduction operators for bfloat.
+  MPI_Op_create(&bfloat_sum_reduction, true, &bfloat_sum_op);
+  MPI_Op_create(&bfloat_prod_reduction, true, &bfloat_prod_op);
+  MPI_Op_create(&bfloat_min_reduction, true, &bfloat_min_op);
+  MPI_Op_create(&bfloat_max_reduction, true, &bfloat_max_op);
+#endif
 }
 
 void finalize() {
@@ -140,6 +199,13 @@ void finalize() {
     MPI_Op_free(&half_prod_op);
     MPI_Op_free(&half_min_op);
     MPI_Op_free(&half_max_op);
+#endif
+#ifdef AL_HAS_BFLOAT
+    // Clean up reduction operations.
+    MPI_Op_free(&bfloat_sum_op);
+    MPI_Op_free(&bfloat_prod_op);
+    MPI_Op_free(&bfloat_min_op);
+    MPI_Op_free(&bfloat_max_op);
 #endif
     if (initialized_mpi) {
       MPI_Finalize();
