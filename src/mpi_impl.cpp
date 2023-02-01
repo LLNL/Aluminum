@@ -133,8 +133,17 @@ void init(int& argc, char**& argv) {
 void finalize() {
   int flag;
   MPI_Finalized(&flag);
-  if (!flag && initialized_mpi) {
-    MPI_Finalize();
+  if (!flag) {
+#ifdef AL_HAS_HALF
+    // Clean up reduction operations.
+    MPI_Op_free(&half_sum_op);
+    MPI_Op_free(&half_prod_op);
+    MPI_Op_free(&half_min_op);
+    MPI_Op_free(&half_max_op);
+#endif
+    if (initialized_mpi) {
+      MPI_Finalize();
+    }
   }
 }
 
