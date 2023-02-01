@@ -165,7 +165,7 @@ public:
   void run_mpi_impl(std::vector<T>& input,
                     std::vector<T>& output,
                     typename Backend::comm_type& comm) {
-    MPI_Op reduction_op = Al::internal::mpi::ReductionOperator2MPI_Op(
+    MPI_Op reduction_op = Al::internal::mpi::ReductionOperator2MPI_Op<T>(
       this->get_options().reduction_op);
     MPI_Allreduce(this->buf_or_inplace(input.data()), output.data(),
                   this->get_options().inplace ? output.size() : input.size(),
@@ -575,7 +575,7 @@ public:
                     std::vector<T>& output,
                     typename Backend::comm_type& comm) {
     int root = this->get_options().root;
-    MPI_Op reduction_op = Al::internal::mpi::ReductionOperator2MPI_Op(
+    MPI_Op reduction_op = Al::internal::mpi::ReductionOperator2MPI_Op<T>(
       this->get_options().reduction_op);
     // Account for in-place only being used at the root.
     void* sendbuf = (comm.rank() == root)
@@ -641,7 +641,7 @@ public:
   void run_mpi_impl(std::vector<T>& input,
                     std::vector<T>& output,
                     typename Backend::comm_type& comm) {
-    MPI_Op reduction_op = Al::internal::mpi::ReductionOperator2MPI_Op(
+    MPI_Op reduction_op = Al::internal::mpi::ReductionOperator2MPI_Op<T>(
       this->get_options().reduction_op);
     MPI_Reduce_scatter_block(this->buf_or_inplace(input.data()), output.data(),
                              (this->get_options().inplace ? output.size() : input.size()) / comm.size(),
@@ -697,7 +697,7 @@ public:
   void run_mpi_impl(std::vector<T>& input,
                     std::vector<T>& output,
                     typename Backend::comm_type& comm) {
-    MPI_Op reduction_op = Al::internal::mpi::ReductionOperator2MPI_Op(
+    MPI_Op reduction_op = Al::internal::mpi::ReductionOperator2MPI_Op<T>(
       this->get_options().reduction_op);
     std::vector<int> counts = Al::internal::mpi::intify_size_t_vector(
       this->get_options().recv_counts);

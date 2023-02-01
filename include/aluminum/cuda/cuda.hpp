@@ -35,12 +35,12 @@
 
 #if defined AL_HAS_ROCM
 #include <hip/hip_runtime.h>
-#include <hip/hip_fp16.h>
 #elif defined AL_HAS_CUDA
 #include <cuda.h>
 #include <cuda_runtime.h>
-#include <cuda_fp16.h>
 #endif
+
+#include "aluminum/datatypes.hpp"
 
 #ifdef AL_HAS_ROCM
 // HIP has no equivalent for the driver version of this.

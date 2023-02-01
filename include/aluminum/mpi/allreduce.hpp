@@ -40,7 +40,7 @@ template <typename T>
 void passthrough_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                            ReductionOperator op, MPICommunicator& comm) {
   MPI_Allreduce(buf_or_inplace(sendbuf), recvbuf, count, TypeMap<T>(),
-                ReductionOperator2MPI_Op(op), comm.get_comm());
+                ReductionOperator2MPI_Op<T>(op), comm.get_comm());
 }
 
 template <typename T>
@@ -50,7 +50,7 @@ public:
                    ReductionOperator op_, MPICommunicator& comm_, AlMPIReq req_) :
     MPIState(req_),
     sendbuf(sendbuf_), recvbuf(recvbuf_), count(count_),
-    op(ReductionOperator2MPI_Op(op_)), comm(comm_.get_comm()) {}
+    op(ReductionOperator2MPI_Op<T>(op_)), comm(comm_.get_comm()) {}
 
   ~AllreduceAlState() override {}
 

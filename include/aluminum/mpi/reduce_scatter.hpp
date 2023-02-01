@@ -40,7 +40,7 @@ template <typename T>
 void passthrough_reduce_scatter(const T* sendbuf, T* recvbuf, size_t count,
                                 ReductionOperator op, MPICommunicator& comm) {
   MPI_Reduce_scatter_block(buf_or_inplace(sendbuf), recvbuf, count,
-                           TypeMap<T>(), ReductionOperator2MPI_Op(op),
+                           TypeMap<T>(), ReductionOperator2MPI_Op<T>(op),
                            comm.get_comm());
 }
 
@@ -52,7 +52,7 @@ public:
                        AlMPIReq req_) :
     MPIState(req_),
     sendbuf(sendbuf_), recvbuf(recvbuf_), count(count_),
-    op(ReductionOperator2MPI_Op(op_)),
+    op(ReductionOperator2MPI_Op<T>(op_)),
     comm(comm_.get_comm()) {}
 
   ~ReduceScatterAlState() override {}

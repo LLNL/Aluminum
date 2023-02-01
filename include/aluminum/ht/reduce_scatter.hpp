@@ -44,7 +44,7 @@ public:
     HostTransferCollectiveSignalAtEndState(stream_),
     host_mem(mempool.allocate<MemoryType::CUDA_PINNED_HOST, T>(comm_.size()*count_)),
     count(count_),
-    op(mpi::ReductionOperator2MPI_Op(op_)),
+    op(mpi::ReductionOperator2MPI_Op<T>(op_)),
     comm(comm_.get_comm()) {
     // Transfer data from device to host.
     AL_CHECK_CUDA(AlGpuMemcpyAsync(host_mem, sendbuf, sizeof(T)*count*comm_.size(),

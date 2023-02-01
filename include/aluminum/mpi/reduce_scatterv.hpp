@@ -44,7 +44,7 @@ void passthrough_reduce_scatterv(const T* sendbuf, T* recvbuf,
   std::vector<int> counts_ = intify_size_t_vector(counts);
   MPI_Reduce_scatter(buf_or_inplace(sendbuf), recvbuf,
                      counts_.data(), TypeMap<T>(),
-                     ReductionOperator2MPI_Op(op), comm.get_comm());
+                     ReductionOperator2MPI_Op<T>(op), comm.get_comm());
 }
 
 template <typename T>
@@ -57,7 +57,7 @@ public:
     MPIState(req_),
     sendbuf(sendbuf_), recvbuf(recvbuf_),
     counts(intify_size_t_vector(counts_)),
-    op(ReductionOperator2MPI_Op(op_)),
+    op(ReductionOperator2MPI_Op<T>(op_)),
     comm(comm_.get_comm()) {}
 
   ~ReduceScattervAlState() override {}

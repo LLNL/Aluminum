@@ -66,6 +66,9 @@ template <> struct IsTypeSupported<Al::MPIBackend, unsigned long long> : std::tr
 template <> struct IsTypeSupported<Al::MPIBackend, float> : std::true_type {};
 template <> struct IsTypeSupported<Al::MPIBackend, double> : std::true_type {};
 template <> struct IsTypeSupported<Al::MPIBackend, long double> : std::true_type {};
+#ifdef AL_HAS_HALF
+template <> struct IsTypeSupported<Al::MPIBackend, __half> : std::true_type {};
+#endif
 
 // Reduction operator support (all are supported).
 template <Al::ReductionOperator op>
