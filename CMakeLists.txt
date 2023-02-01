@@ -260,7 +260,7 @@ endif ()
 
 if (ALUMINUM_ENABLE_CUDA)
   enable_language(CUDA)
-  find_package(CUDAToolkit 10.0 REQUIRED)
+  find_package(CUDAToolkit 11.0 REQUIRED)
 
   # If the previous find_package fails, we won't get here.
   set(AL_HAS_CUDA TRUE)
@@ -294,13 +294,7 @@ if (ALUMINUM_ENABLE_CUDA)
     set(AL_HAS_NVPROF ON)
   endif ()
 
-  # CUDA 11 ships CUB with its usual runtime headers.
-  if (CUDAToolkit_VERSION_MAJOR LESS 11)
-    find_package(CUB REQUIRED)
-    set(AL_HAS_EXTERNAL_CUB TRUE)
-  endif ()
-
-    # Check that a backend is found
+  # Check that a backend is found
   if (NOT AL_HAS_NCCL AND NOT AL_HAS_MPI_CUDA AND NOT AL_HAS_HOST_TRANSFER)
     message(FATAL_ERROR "CUDA support has been requested and detected. "
       "However, no backend was enabled.")
@@ -316,7 +310,7 @@ if (ALUMINUM_ENABLE_ROCM)
   # AMDDeviceLibsConfig.cmake will block future calls from finding the
   # correct AMD_DEVICE_LIBS_PREFIX, which will cause the command line
   # to have an invalid argument.
-  find_package(hip CONFIG REQUIRED)
+  find_package(hip 5.0 CONFIG REQUIRED)
 
   # Now that that's handled, we can enable HIP as a language.
   enable_language(HIP)
@@ -361,7 +355,7 @@ if (ALUMINUM_ENABLE_ROCM)
   endif ()
 
   if (ALUMINUM_ENABLE_NCCL)
-    find_package(rccl CONFIG QUIET
+    find_package(rccl 2.7.0 CONFIG QUIET
       HINTS ${RCCL_DIR} $ENV{RCCL_DIR} ${AL_ROCM_PATH}
       PATH_SUFFIXES lib64/cmake/rccl lib/cmake/rccl
       NO_DEFAULT_PATH)

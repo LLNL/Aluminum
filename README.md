@@ -20,10 +20,11 @@ If you use Aluminum, please cite [our paper](https://ieeexplore.ieee.org/documen
 * GPU-centric communication semantics
 * Supported backends:
   * `MPI`: MPI and custom algorithms implemented on top of MPI
-  * `NCCL`: Interface to Nvidia's [NCCL 2](https://developer.nvidia.com/nccl) library (including point-to-point operations and collectives built on them)
-  * `HostTransfer`: Provides GPU support even when your MPI is not CUDA-aware
+  * `NCCL`: Interface to Nvidia's [NCCL 2](https://developer.nvidia.com/nccl) library (including point-to-point operations and collectives built on them) or to AMD's [RCCL](https://github.com/ROCmSoftwarePlatform/rccl)
+  * `HostTransfer`: Provides GPU support even when your MPI is not CUDA or HIP/ROCm-aware
   * `MPI-CUDA`: Experimental intra-node RMA support
-* Experimental support for AMD systems using HIP/ROCm and [RCCL](https://github.com/ROCmSoftwarePlatform/rccl)
+  
+See the [examples](examples) for basic usage examples.
 
 ### GPU-centric Communication
 
@@ -34,7 +35,7 @@ All communication on the communicator will be with respect to the computation on
 * The communication will not begin until all outstanding operations on the stream at the time the communication operation was called have completed.
 * No computation on the stream enqueued after the communication operation was will begin until the communication completes.
 
-These semantics are comparable to those provided by NCCL.
+These semantics are comparable to those provided by NCCL/RCCL.
 
 ### Non-blocking GPU Communication
 
@@ -64,7 +65,7 @@ For all builds:
 * CMake 3.17 or later
 
 For GPU backends (`NCCL` and `HostTransfer`):
-* CUDA (at least 9.0, for Nvidia GPUs) or HIP/ROCm (at least 3.6, for AMD GPUs)
+* CUDA (at least 11.0, for Nvidia GPUs) or HIP/ROCm (at least 5.0, for AMD GPUs)
 * CUB (any recent version)
 
 For the `NCCL`/`RCCL` backend:
@@ -121,7 +122,7 @@ path/to/aluminum/source
 
 ## API Overview
 
-The `MPI`, `NCCL`/`RCCL`, and `HostTransfer` backends support the following operations, including non-blocking and in-place (where meaingful) versions:
+The `MPI`, `NCCL` (which uses `RCCL` on AMD HIP/ROCm systems), and `HostTransfer` backends support the following operations, including non-blocking and in-place (where meaingful) versions:
 * Collectives:
   * Allgather
   * Vector allgather
