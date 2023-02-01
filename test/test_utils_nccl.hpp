@@ -49,25 +49,6 @@ struct VectorType<T, Al::NCCLBackend> {
   }
 };
 
-// Specialization for half. Standard RNGs do not support half.
-template <> struct VectorType<__half, Al::NCCLBackend> {
-  using type = CUDAVector<__half>;
-
-  static type gen_data(size_t count, AlGpuStream_t stream = 0) {
-    auto&& host_data = VectorType<float, Al::MPIBackend>::gen_data(count);
-    std::vector<__half> host_data_half(count);
-    for (size_t i = 0; i < count; ++i) {
-      host_data_half[i] = __float2half(host_data[i]);
-    }
-    CUDAVector<__half> data(host_data_half, stream);
-    return data;
-  }
-
-  static std::vector<__half> copy_to_host(const type& v) {
-    return v.copyout();
-  }
-};
-
 // Specialize to use the Aluminum stream pool, and size it appropriately.
 template <>
 struct StreamManager<Al::NCCLBackend> {

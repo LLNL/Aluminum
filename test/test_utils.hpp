@@ -95,7 +95,7 @@
 // universally (since we don't actually use the CUB features of
 // CUB...).
 
-#if defined(AL_HAS_ROCM) && defined(AL_HAS_NCCL)
+#if defined(AL_HAS_ROCM) && defined(AL_HAS_HALF)
 
 inline std::ostream& operator<<(std::ostream& os, __half const& x) {
   return os << static_cast<float>(x);
@@ -139,6 +139,33 @@ T gen_random_val(Generator& g) {
   return rng(g);
 }
 
+/** Helper for generating random vectors. */
+template <typename T>
+struct RandVectorGen {
+  template <typename Generator>
+  static std::vector<T> gen(size_t count, Generator& g) {
+    std::vector<T> v(count);
+    for (size_t i = 0; i < count; ++i) {
+      v[i] = gen_random_val<T>(g);
+    }
+    return v;
+  }
+};
+#ifdef AL_HAS_HALF
+// Specialization for half. Standard RNGs do not support half.
+template <>
+struct RandVectorGen<__half> {
+  template <typename Generator>
+  static std::vector<__half> gen(size_t count, Generator& g) {
+    std::vector<__half> v(count);
+    for (size_t i = 0; i < count; ++i) {
+      v[i] = __float2half(gen_random_val<float>(g));
+    }
+    return v;
+  }
+};
+#endif
+
 /**
  * Identify the type of vector to be used for each backend.
  *
@@ -163,11 +190,7 @@ struct VectorType {
         rng_seeded = true;
       }
     }
-    type v(count);
-    for (size_t i = 0; i < count; ++i) {
-      v[i] = gen_random_val<T>(rng_gen);
-    }
-    return v;
+    return RandVectorGen<T>::gen(count, rng_gen);
   }
 
   /** Return a copy of the data on the host. */
@@ -262,7 +285,7 @@ void dispatch_to_backend_type_helper(cxxopts::ParseResult& parsed_opts,
     {"float", [&]() { functor.template operator()<Backend, float>(parsed_opts); } },
     {"double", [&]() { functor.template operator()<Backend, double>(parsed_opts); } },
     {"longdouble", [&]() { functor.template operator()<Backend, long double>(parsed_opts); } },
-#ifdef AL_HAS_NCCL
+#ifdef AL_HAS_HALF
     {"half", [&]() { functor.template operator()<Backend, __half>(parsed_opts); } },
 #endif
   };

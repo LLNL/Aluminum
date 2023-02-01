@@ -48,7 +48,7 @@ public:
     total_size(std::accumulate(counts_.begin(), counts_.end(), size_t{0})),
     host_mem(mempool.allocate<MemoryType::CUDA_PINNED_HOST, T>(total_size)),
     counts(mpi::intify_size_t_vector(counts_)),
-    op(mpi::ReductionOperator2MPI_Op(op_)),
+    op(mpi::ReductionOperator2MPI_Op<T>(op_)),
     comm(comm_.get_comm()) {
     // Transfer data from device to host.
     AL_CHECK_CUDA(AlGpuMemcpyAsync(host_mem, sendbuf, sizeof(T)*total_size,

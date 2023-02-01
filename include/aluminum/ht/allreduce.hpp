@@ -44,7 +44,7 @@ class AllreduceAlState : public HostTransferCollectiveSignalAtEndState {
     HostTransferCollectiveSignalAtEndState(stream_),
     host_mem(mempool.allocate<MemoryType::CUDA_PINNED_HOST, T>(count_)),
     count(count_),
-    op(mpi::ReductionOperator2MPI_Op(op_)),
+    op(mpi::ReductionOperator2MPI_Op<T>(op_)),
     comm(comm_.get_comm()) {
     // Transfer data from device to host.
     if (sendbuf != recvbuf) {

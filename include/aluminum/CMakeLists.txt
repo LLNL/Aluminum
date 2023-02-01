@@ -1,11 +1,12 @@
 set_source_path(THIS_DIR_HEADERS
-  internal.hpp
-  progress.hpp
   base.hpp
+  datatypes.hpp
+  internal.hpp
   mempool.hpp
   mpi_comm_and_stream_wrapper.hpp
   mpi_impl.hpp
   profiling.hpp
+  progress.hpp
   state.hpp
   trace.hpp
   tuning_params.hpp

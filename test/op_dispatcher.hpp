@@ -179,6 +179,9 @@ template <> struct IsTypeSupportedByMPI<unsigned long long> : std::true_type {};
 template <> struct IsTypeSupportedByMPI<float> : std::true_type {};
 template <> struct IsTypeSupportedByMPI<double> : std::true_type {};
 template <> struct IsTypeSupportedByMPI<long double> : std::true_type {};
+#ifdef AL_HAS_HALF
+template <> struct IsTypeSupportedByMPI<__half> : std::true_type {};
+#endif
 
 // Traits for reduction operator support.
 template <typename Backend, Al::ReductionOperator op>

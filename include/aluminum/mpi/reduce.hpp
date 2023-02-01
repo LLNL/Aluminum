@@ -44,7 +44,7 @@ void passthrough_reduce(const T* sendbuf, T* recvbuf, size_t count,
     sendbuf = recvbuf;
   }
   MPI_Reduce(buf_or_inplace(sendbuf), recvbuf, count, TypeMap<T>(),
-             ReductionOperator2MPI_Op(op), root, comm.get_comm());
+             ReductionOperator2MPI_Op<T>(op), root, comm.get_comm());
 }
 
 template <typename T>
@@ -54,7 +54,7 @@ public:
                 int root_, MPICommunicator& comm_, AlMPIReq req_) :
     MPIState(req_),
     sendbuf(sendbuf_), recvbuf(recvbuf_), count(count_),
-    op(ReductionOperator2MPI_Op(op_)), root(root_),
+    op(ReductionOperator2MPI_Op<T>(op_)), root(root_),
     comm(comm_.get_comm()), rank(comm_.rank()) {}
 
   ~ReduceAlState() override {}

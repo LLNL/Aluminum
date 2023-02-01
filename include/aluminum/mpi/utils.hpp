@@ -32,8 +32,10 @@
 
 #include <mpi.h>
 
+#include <Al_config.hpp>
 #include "aluminum/base.hpp"
 #include "aluminum/internal.hpp"
+#include "aluminum/datatypes.hpp"
 
 namespace Al {
 namespace internal {
@@ -56,6 +58,12 @@ template <> inline MPI_Datatype TypeMap<unsigned long long int>() { return MPI_U
 template <> inline MPI_Datatype TypeMap<float>() { return MPI_FLOAT; }
 template <> inline MPI_Datatype TypeMap<double>() { return MPI_DOUBLE; }
 template <> inline MPI_Datatype TypeMap<long double>() { return MPI_LONG_DOUBLE; }
+#ifdef AL_HAS_HALF
+// We use short as a dummy two-byte type.
+// This is dispatched to special reduction operators when needed.
+template <> inline MPI_Datatype TypeMap<__half>() { return MPI_SHORT; }
+#endif
+
 
 /** Return either sendbuf or MPI_IN_PLACE. */
 template <typename T>
@@ -89,7 +97,19 @@ inline void assert_count_fits_mpi(size_t count) {
   }
 }
 
+#ifdef AL_HAS_HALF
+/** Sum operator for half. */
+extern MPI_Op half_sum_op;
+/** Product operator for half. */
+extern MPI_Op half_prod_op;
+/** Min operator for half. */
+extern MPI_Op half_min_op;
+/** Max operator for half. */
+extern MPI_Op half_max_op;
+#endif
+
 /** Convert a ReductionOperator to the corresponding MPI_Op. */
+template <typename T>
 inline MPI_Op ReductionOperator2MPI_Op(ReductionOperator op) {
   switch (op) {
   case ReductionOperator::sum:
@@ -116,6 +136,24 @@ inline MPI_Op ReductionOperator2MPI_Op(ReductionOperator op) {
     throw_al_exception("Reduction operator not supported");
   }
 }
+
+#ifdef AL_HAS_HALF
+template <>
+inline MPI_Op ReductionOperator2MPI_Op<__half>(ReductionOperator op) {
+  switch (op) {
+  case ReductionOperator::sum:
+    return half_sum_op;
+  case ReductionOperator::prod:
+    return half_prod_op;
+  case ReductionOperator::min:
+    return half_min_op;
+  case ReductionOperator::max:
+    return half_max_op;
+  default:
+    throw_al_exception("Reduction operator not supported");
+  }
+}
+#endif
 
 }  // namespace mpi
 }  // namespace internal
