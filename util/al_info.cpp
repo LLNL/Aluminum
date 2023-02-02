@@ -26,6 +26,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include <Al_config.hpp>
+#include <aluminum/datatypes.hpp>
 
 #include <iostream>
 
@@ -80,6 +81,12 @@ int main(int, char**) {
 #endif
 #ifdef AL_MPI_SERIALIZE
   std::cout << " mpi-serialize";
+#endif
+#ifdef AL_HAS_HALF
+  std::cout << " half";
+#endif
+#ifdef AL_HAS_BFLOAT
+  std::cout << " bfloat";
 #endif
   std::cout << std::endl;
   return 0;
