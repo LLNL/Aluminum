@@ -70,7 +70,7 @@ private:
 
 /** Predefined reduction operations. */
 enum class ReductionOperator {
-  sum, prod, min, max, lor, land, lxor, bor, band, bxor
+  sum, prod, min, max, lor, land, lxor, bor, band, bxor, avg
 };
 
 } // namespace Al

@@ -75,7 +75,8 @@ Al::ReductionOperator get_reduction_op(const std::string redop_str) {
     {"lxor", Al::ReductionOperator::lxor},
     {"bor", Al::ReductionOperator::bor},
     {"band", Al::ReductionOperator::band},
-    {"bxor", Al::ReductionOperator::bxor}
+    {"bxor", Al::ReductionOperator::bxor},
+    {"avg", Al::ReductionOperator::avg},
   };
   auto i = op_lookup.find(redop_str);
   if (i == op_lookup.end()) {
