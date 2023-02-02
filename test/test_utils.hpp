@@ -165,6 +165,20 @@ struct RandVectorGen<__half> {
   }
 };
 #endif
+#ifdef AL_HAS_BFLOAT
+// Specialization for bfloat. Standard RNGs do not support bfloat.
+template <>
+struct RandVectorGen<al_bfloat16> {
+  template <typename Generator>
+  static std::vector<al_bfloat16> gen(size_t count, Generator& g) {
+    std::vector<al_bfloat16> v(count);
+    for (size_t i = 0; i < count; ++i) {
+      v[i] = __float2bfloat16(gen_random_val<float>(g));
+    }
+    return v;
+  }
+};
+#endif
 
 /**
  * Identify the type of vector to be used for each backend.
@@ -287,6 +301,9 @@ void dispatch_to_backend_type_helper(cxxopts::ParseResult& parsed_opts,
     {"longdouble", [&]() { functor.template operator()<Backend, long double>(parsed_opts); } },
 #ifdef AL_HAS_HALF
     {"half", [&]() { functor.template operator()<Backend, __half>(parsed_opts); } },
+#endif
+#ifdef AL_HAS_BFLOAT
+    {"bfloat16", [&]() { functor.template operator()<Backend, al_bfloat16>(parsed_opts); } },
 #endif
   };
   auto datatype = parsed_opts["datatype"].as<std::string>();

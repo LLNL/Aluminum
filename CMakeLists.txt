@@ -282,7 +282,7 @@ if (ALUMINUM_ENABLE_CUDA)
   #   - CUDA::nvToolsExt
 
   if (ALUMINUM_ENABLE_NCCL)
-    find_package(NCCL 2.7.0 REQUIRED)
+    find_package(NCCL 2.10.0 REQUIRED)
     set(AL_HAS_NCCL TRUE)
   endif ()
 
@@ -355,7 +355,7 @@ if (ALUMINUM_ENABLE_ROCM)
   endif ()
 
   if (ALUMINUM_ENABLE_NCCL)
-    find_package(rccl 2.7.0 CONFIG QUIET
+    find_package(rccl 2.10.0 CONFIG QUIET
       HINTS ${RCCL_DIR} $ENV{RCCL_DIR} ${AL_ROCM_PATH}
       PATH_SUFFIXES lib64/cmake/rccl lib/cmake/rccl
       NO_DEFAULT_PATH)

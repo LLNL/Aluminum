@@ -63,6 +63,10 @@ template <> inline MPI_Datatype TypeMap<long double>() { return MPI_LONG_DOUBLE;
 // This is dispatched to special reduction operators when needed.
 template <> inline MPI_Datatype TypeMap<__half>() { return MPI_SHORT; }
 #endif
+#ifdef AL_HAS_BFLOAT
+// Same as for half.
+template <> inline MPI_Datatype TypeMap<al_bfloat16>() { return MPI_SHORT; }
+#endif
 
 
 /** Return either sendbuf or MPI_IN_PLACE. */
@@ -108,6 +112,17 @@ extern MPI_Op half_min_op;
 extern MPI_Op half_max_op;
 #endif
 
+#ifdef AL_HAS_BFLOAT
+/** Sum operator for bfloat. */
+extern MPI_Op bfloat_sum_op;
+/** Product operator for bfloat. */
+extern MPI_Op bfloat_prod_op;
+/** Min operator for bfloat. */
+extern MPI_Op bfloat_min_op;
+/** Max operator for bfloat. */
+extern MPI_Op bfloat_max_op;
+#endif
+
 /** Convert a ReductionOperator to the corresponding MPI_Op. */
 template <typename T>
 inline MPI_Op ReductionOperator2MPI_Op(ReductionOperator op) {
@@ -149,6 +164,24 @@ inline MPI_Op ReductionOperator2MPI_Op<__half>(ReductionOperator op) {
     return half_min_op;
   case ReductionOperator::max:
     return half_max_op;
+  default:
+    throw_al_exception("Reduction operator not supported");
+  }
+}
+#endif
+
+#ifdef AL_HAS_BFLOAT
+template <>
+inline MPI_Op ReductionOperator2MPI_Op<al_bfloat16>(ReductionOperator op) {
+  switch (op) {
+  case ReductionOperator::sum:
+    return bfloat_sum_op;
+  case ReductionOperator::prod:
+    return bfloat_prod_op;
+  case ReductionOperator::min:
+    return bfloat_min_op;
+  case ReductionOperator::max:
+    return bfloat_max_op;
   default:
     throw_al_exception("Reduction operator not supported");
   }

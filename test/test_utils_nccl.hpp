@@ -112,6 +112,7 @@ template <> struct IsTypeSupported<Al::NCCLBackend, unsigned int> : std::true_ty
 template <> struct IsTypeSupported<Al::NCCLBackend, long long int> : std::true_type {};
 template <> struct IsTypeSupported<Al::NCCLBackend, unsigned long long int> : std::true_type {};
 template <> struct IsTypeSupported<Al::NCCLBackend, __half> : std::true_type {};
+template <> struct IsTypeSupported<Al::NCCLBackend, al_bfloat16> : std::true_type {};
 template <> struct IsTypeSupported<Al::NCCLBackend, float> : std::true_type {};
 template <> struct IsTypeSupported<Al::NCCLBackend, double> : std::true_type {};
 
