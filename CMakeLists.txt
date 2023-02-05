@@ -444,7 +444,7 @@ include(CMakePackageConfigHelpers)
 export(EXPORT AluminumTargets NAMESPACE AL:: FILE AluminumTargets.cmake)
 write_basic_package_version_file(
   "${CMAKE_BINARY_DIR}/AluminumConfigVersion.cmake" VERSION
-  ${ALUMINUM_VERSION} COMPATIBILITY SameMinorVersion )
+  ${ALUMINUM_VERSION} COMPATIBILITY SameMajorVersion )
 
 set(INCLUDE_INSTALL_DIRS ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/src)
 set(LIB_INSTALL_DIR src)
