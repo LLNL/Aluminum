@@ -38,15 +38,23 @@ parser.add_argument('--blocking', default=None, action='store_true',
                     help='Run only blocking algorithms')
 parser.add_argument('--nonblocking', default=None, action='store_true',
                     help='Run only nonblocking algorithms')
+parser.add_argument('--num-iters', type=int, default=None,
+                    help='Number of benchmarking iterations')
+parser.add_argument('--size', type=int, default=None,
+                    help='Size of message to benchmark')
+parser.add_argument('--min-size', type=int, default=None,
+                    help='Minimum message size to benchmark')
+parser.add_argument('--max-size', type=int, default=None,
+                    help='Maximum message size to benchmark')
 
 
 # TODO: This is copied from run_tests.py, I'd prefer to have a single source.
 # Supported datatypes for backends.
 mpi_datatypes = ['char', 'schar', 'uchar', 'short', 'ushort', 'int', 'uint',
                  'long', 'ulong', 'longlong', 'ulonglong',
-                 'float', 'double', 'longdouble']
+                 'float', 'double', 'longdouble', 'bfloat16']
 nccl_datatypes = ['char', 'uchar', 'int', 'uint', 'longlong', 'ulonglong',
-                  'half', 'float', 'double']
+                  'half', 'float', 'double', 'bfloat16']
 # Standard sets of operations.
 # inplace is one of 'both', True, or False.
 # root is either True or False.
@@ -177,6 +185,14 @@ def run_benchmark(args, num_procs, backend, operator, datatype, algorithm,
     if root is not None:
         test_cmd += ['--root', str(root)]
         test_desc += f' root:{root}'
+    if args.num_iters is not None:
+        test_cmd += ['--num-iters', args.num_iters]
+    if args.size is not None:
+        test_cmd += ['--size', args.size]
+    if args.min_size is not None:
+        test_cmd += ['--min-size', args.min_size]
+    if args.max_size is not None:
+        test_cmd += ['--max-size', args.max_size]
     r = subprocess.run(launcher_cmd + test_cmd, capture_output=True, text=True,
                        check=False)
     if r.returncode == 0:

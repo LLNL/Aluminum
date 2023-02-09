@@ -187,8 +187,17 @@ def estimate_reasonable_max(df, x):
 
 def drop_outliers(df):
     """Drop rows that are major outliers."""
-    limit = df.Time.quantile(0.999)
-    return df[df.Time < limit]
+    # Drop separately for each operation, comm size, and message size.
+    for op, comm_size, size in itertools.product(
+            df['Operation'].unique(), df['CommSize'].unique(),
+            df['Size'].unique()):
+        restrict = ((df['Operation'] == op)
+                    & (df['CommSize'] == comm_size)
+                    & (df['Size'] == size))
+        limit = df[restrict]['Time'].quantile(0.999)
+        # Select the invalid values, then negate.
+        df = df[~(restrict & (df['Time'] >= limit))]
+    return df
 
 
 def plot_time_v_procs(df, out_dir, name):
