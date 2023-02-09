@@ -25,6 +25,7 @@
 // permissions and limitations under the license.
 ////////////////////////////////////////////////////////////////////////////////
 
+#include <Al_config.hpp>
 #include "aluminum/trace.hpp"
 
 #include <unistd.h>
@@ -32,6 +33,9 @@
 
 #include <fstream>
 #include <vector>
+#ifdef AL_THREAD_MULTIPLE
+#include <mutex>
+#endif
 
 #include "aluminum/state.hpp"
 
@@ -40,11 +44,17 @@ namespace internal {
 namespace trace {
 
 namespace {
+#ifdef AL_THREAD_MULTIPLE
+std::mutex log_mutex;
+#endif
 std::vector<std::string> trace_log;
 std::vector<std::string> pe_trace_log;
 }
 
 void save_trace_entry(std::string entry, bool progress) {
+#ifdef AL_THREAD_MULTIPLE
+  std::lock_guard<std::mutex> lock(log_mutex);
+#endif
   if (progress) {
     pe_trace_log.push_back(entry);
   } else {
@@ -78,6 +88,9 @@ void record_pe_done(const AlState& state) {
 
 std::ostream& write_trace_log(std::ostream& os) {
 #ifdef AL_TRACE
+#ifdef AL_THREAD_MULTIPLE
+  std::lock_guard<std::mutex> lock(log_mutex);
+#endif
   os << "Trace:\n";
   for (const auto& entry : trace_log) os << entry << "\n";
   os << "Progress engine trace:\n";
