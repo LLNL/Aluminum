@@ -74,5 +74,5 @@ CommWrapper<Al::MPICUDABackend>::CommWrapper(MPI_Comm mpi_comm) {
 template <>
 void complete_operations<Al::MPICUDABackend>(
   typename Al::MPICUDABackend::comm_type& comm) {
-  AL_FORCE_CHECK_CUDA_NOSYNC(cudaStreamSynchronize(comm.get_stream()));
+  AL_FORCE_CHECK_GPU_NOSYNC(cudaStreamSynchronize(comm.get_stream()));
 }

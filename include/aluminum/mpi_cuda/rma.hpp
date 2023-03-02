@@ -73,11 +73,11 @@ class RMA {
   std::map<int, Connection *> m_connections;
 
   void wait_for_completion(mpi::AlMPIReq& req) {
-    if (req == NULL_REQUEST) {
+    if (req == MPIBackend::null_req) {
       return;
     }
     while (!req->load(std::memory_order_acquire)) {}
-    req = NULL_REQUEST;
+    req = MPIBackend::null_req;
   }
 
  public:
@@ -148,21 +148,21 @@ class RMA {
 
   void notify(int dst_rank) {
     auto conn = get_connection(dst_rank);
-    mpi::AlMPIReq req = get_free_request();
+    mpi::AlMPIReq req = mpi::get_free_request();
     conn->notify(req);
     wait_for_completion(req);
   }
 
   void wait(int dst_rank) {
     auto conn = get_connection(dst_rank);
-    mpi::AlMPIReq req = get_free_request();
+    mpi::AlMPIReq req = mpi::get_free_request();
     conn->wait(req);
     wait_for_completion(req);
   }
 
   void sync(int peer) {
     auto conn = get_connection(peer);
-    mpi::AlMPIReq req = get_free_request();
+    mpi::AlMPIReq req = mpi::get_free_request();
     conn->sync(req);
     wait_for_completion(req);
   }
@@ -171,12 +171,12 @@ class RMA {
     mpi::AlMPIReq *requests = new mpi::AlMPIReq[num_peers];
     for (int i = 0; i < num_peers; ++i) {
       auto conn = get_connection(peers[i]);
-      mpi::AlMPIReq req = get_free_request();
+      mpi::AlMPIReq req = mpi::get_free_request();
       conn->sync(req);
       requests[i] = req;
     }
     for (int i = 0; i < num_peers; ++i) {
-      wait_for_completion(req);
+      wait_for_completion(requests[i]);
     }
   }
 
