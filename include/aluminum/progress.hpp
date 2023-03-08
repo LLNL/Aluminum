@@ -141,10 +141,14 @@ class ProgressEngine {
   size_t num_bounded = 0;
   /** World communicator. */
   mpi::MPICommunicator* world_comm;
+  /** Core to bind the progress engine to. */
+  int core_to_bind = -1;
 #ifdef AL_HAS_CUDA
   /** Used to pass the original CUDA device to the progress engine thread. */
   std::atomic<int> cur_device;
 #endif
+  /** Initialize progress engine binding (must be called before bind). */
+  void bind_init();
   /**
    * Bind the progress engine to a core.
    * This binds to the last core in the NUMA node the process is in.
