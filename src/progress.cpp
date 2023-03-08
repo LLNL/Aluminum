@@ -185,6 +185,44 @@ int get_hwloc_offset(
   return offset;
 }
 
+// Get the local CPU set we want to use for binding.
+bool get_hwloc_cpuset(hwloc_cpuset_t& cpuset, hwloc_topology_t& topo) {
+  #ifdef AL_HAS_ROCM
+  {
+    // We need RSMI to be initialized for the hwloc_rsmi call.
+    // We only use it here, so initialize it and shut it down.
+    rsmi_init(0);
+    int device;
+    AL_CHECK_CUDA(hipGetDevice(&device));
+    hwloc_rsmi_get_device_cpuset(topo, device, cpuset);
+    rsmi_shut_down();
+  }
+#elif defined AL_HAS_CUDA
+  {
+    // If we have CUDA support, always assume we're using GPUs.
+    // This also assumes the CUDA device has already been set.
+    // Get the locality domain for the current GPU.
+    int device;
+    AL_CHECK_CUDA(cudaGetDevice(&device));
+    hwloc_cudart_get_device_cpuset(topo, device, cpuset);
+  }
+#else
+  {
+    // Use the NUMA node we're currently on.
+    hwloc_get_cpubind(topo, cpuset, 0);
+    hwloc_nodeset_t nodeset = hwloc_bitmap_alloc();
+    hwloc_cpuset_to_nodeset(topo, cpuset, nodeset);
+    hwloc_bitmap_singlify(nodeset);
+    hwloc_cpuset_from_nodeset(topo, cpuset, nodeset);
+    hwloc_bitmap_free(nodeset);
+  }
+#endif
+  if (hwloc_bitmap_iszero(cpuset)) {
+    return false;
+  }
+  return true;
+}
+
 }  // anonymous namespace
 
 #ifdef AL_PE_STREAM_QUEUE_CACHE
@@ -212,6 +250,7 @@ ProgressEngine::ProgressEngine() {
   AL_CHECK_CUDA(AlGpuGetDevice(&device));
   cur_device = device;
 #endif
+  bind_init();
 }
 
 ProgressEngine::~ProgressEngine() {
@@ -338,7 +377,7 @@ std::ostream& ProgressEngine::dump_state(std::ostream& ss) {
   return ss;
 }
 
-void ProgressEngine::bind() {
+void ProgressEngine::bind_init() {
   check_hwloc_api_version();
   // Determine topology information.
   hwloc_topology_t topo;
@@ -347,37 +386,7 @@ void ProgressEngine::bind() {
   // cpuset will be filled out with the set of CPUs we might want to
   // bind this rank to.
   hwloc_cpuset_t cpuset = hwloc_bitmap_alloc();
-#ifdef AL_HAS_ROCM
-  {
-    // We need RSMI to be initialized for the hwloc_rsmi call.
-    // We only use it here, so initialize it and shut it down.
-    rsmi_init(0);
-    int device;
-    AL_CHECK_CUDA(hipGetDevice(&device));
-    hwloc_rsmi_get_device_cpuset(topo, device, cpuset);
-    rsmi_shut_down();
-  }
-#elif defined AL_HAS_CUDA
-  {
-    // If we have CUDA support, always assume we're using GPUs.
-    // This also assumes the CUDA device has already been set.
-    // Get the locality domain for the current GPU.
-    int device;
-    AL_CHECK_CUDA(cudaGetDevice(&device));
-    hwloc_cudart_get_device_cpuset(topo, device, cpuset);
-  }
-#else
-  {
-    // Use the NUMA node we're currently on.
-    hwloc_get_cpubind(topo, cpuset, 0);
-    hwloc_nodeset_t nodeset = hwloc_bitmap_alloc();
-    hwloc_cpuset_to_nodeset(topo, cpuset, nodeset);
-    hwloc_bitmap_singlify(nodeset);
-    hwloc_cpuset_from_nodeset(topo, cpuset, nodeset);
-    hwloc_bitmap_free(nodeset);
-  }
-#endif
-  if (hwloc_bitmap_iszero(cpuset)) {
+  if (!get_hwloc_cpuset(cpuset, topo)) {
     std::cerr << world_comm->rank()
               << ": Could not get starting cpuset; not binding progress thread"
               << std::endl;
@@ -419,8 +428,33 @@ void ProgressEngine::bind() {
     return;
   }
 
-  // Bind to the core.
-  int core_to_bind = num_cores - offset - 1;
+  core_to_bind = num_cores - offset - 1;
+
+  hwloc_bitmap_free(cpuset);
+  hwloc_topology_destroy(topo);
+}
+
+void ProgressEngine::bind() {
+  if (core_to_bind < 0) {
+    std::cerr << world_comm->rank()
+              << ": progress engine binding not initialized"
+              << std::endl;
+    return;
+  }
+
+  hwloc_topology_t topo;
+  hwloc_topology_init(&topo);
+  hwloc_topology_load(topo);
+  hwloc_cpuset_t cpuset = hwloc_bitmap_alloc();
+  if (!get_hwloc_cpuset(cpuset, topo)) {
+    std::cerr << world_comm->rank()
+              << ": Could not get starting cpuset; not binding progress thread"
+              << std::endl;
+    hwloc_bitmap_free(cpuset);
+    hwloc_topology_destroy(topo);
+    return;
+  }
+
   hwloc_obj_t core = hwloc_get_obj_inside_cpuset_by_type(
     topo, cpuset, HWLOC_OBJ_CORE, core_to_bind);
   if (core == NULL) {
