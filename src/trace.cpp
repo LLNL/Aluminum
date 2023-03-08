@@ -56,9 +56,9 @@ void save_trace_entry(std::string entry, bool progress) {
   std::lock_guard<std::mutex> lock(log_mutex);
 #endif
   if (progress) {
-    pe_trace_log.push_back(entry);
+    pe_trace_log.push_back(std::move(entry));
   } else {
-    trace_log.push_back(entry);
+    trace_log.push_back(std::move(entry));
   }
 }
 
