@@ -69,13 +69,17 @@ void save_trace_entry(std::string entry, bool progress = false);
 /** Record an operation to the trace log. */
 template <typename Backend, typename T, typename... Args>
 #ifdef AL_TRACE
-void record_op(std::string op, typename Backend::comm_type& comm, Args... args) {
-  std::stringstream ss;
-  ss << get_time() << ": "
+void record_op(std::string const& op,
+               typename Backend::comm_type const& comm,
+               Args&&... args) {
+  std::ostringstream ss;
+  ss << static_cast<size_t>(get_time()) << ": "
      << Backend::Name() << " "
+     << comm.get_stream() << " "
      << typeid(T).name() << " "
      << op << " "
      << comm.rank() << " " << comm.size() << " ";
+
   // See:
   // https://stackoverflow.com/questions/27375089/what-is-the-easiest-way-to-print-a-variadic-parameter-pack-using-stdostream
   using expander = int[];
@@ -83,7 +87,9 @@ void record_op(std::string op, typename Backend::comm_type& comm, Args... args) 
   save_trace_entry(ss.str(), false);
 }
 #else  // AL_TRACE
-void record_op(std::string, typename Backend::comm_type&, Args...) {
+void record_op(std::string const&,
+               typename Backend::comm_type const&,
+               Args&&...) {
 }
 #endif  // AL_TRACE
 
