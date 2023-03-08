@@ -33,13 +33,13 @@
 #pragma once
 
 /** Number of concurrent operations the progress engine will perform. */
-#define AL_PE_NUM_CONCURRENT_OPS 4
+#define AL_PE_NUM_CONCURRENT_OPS @AL_PE_NUM_CONCURRENT_OPS@
 /** Max number of streams the progress engine supports. */
-#define AL_PE_NUM_STREAMS 64
+#define AL_PE_NUM_STREAMS @AL_PE_NUM_STREAMS@
 /** Max number of pipeline stages the progress engine supports. */
-#define AL_PE_NUM_PIPELINE_STAGES 2
+#define AL_PE_NUM_PIPELINE_STAGES @AL_PE_NUM_PIPELINE_STAGES@
 /** Max number of entries in each stream's input queue. */
-#define AL_PE_INPUT_QUEUE_SIZE 8192
+#define AL_PE_INPUT_QUEUE_SIZE @AL_PE_INPUT_QUEUE_SIZE@
 /**
  * Whether to have a default stream entry for the progress engine
  * added automatically.
@@ -47,7 +47,7 @@
  * This makes sense when using MPI, but not so when using the
  * host-transfer backend, which does not use the default stream.
  */
-// #define AL_PE_ADD_DEFAULT_STREAM 1
+#cmakedefine AL_PE_ADD_DEFAULT_STREAM
 /**
  * Whether to use a thread-local cache to map streams to input queues
  * for the progress engine.
@@ -56,7 +56,7 @@
  * is unlikely to help, since searching it will take as long as
  * searching the actual list.
  */
-// #define AL_PE_STREAM_QUEUE_CACHE 1
+#cmakedefine AL_PE_STREAM_QUEUE_CACHE
 
 /**
  * Whether to delay starting the progress engine until it is actually
@@ -64,17 +64,17 @@
  * operation that uses the progress engine, but only a quick check
  * thereafter.
  */
-#define AL_PE_START_ON_DEMAND 1
+#cmakedefine AL_PE_START_ON_DEMAND
 
 /** Amount of sync object memory to preallocate in the pool. */
-#define AL_SYNC_MEM_PREALLOC 1024
+#define AL_SYNC_MEM_PREALLOC @AL_SYNC_MEM_PREALLOC@
 
 /**
  * Cache line size in bytes.
  *
  * On x86 this is usually 64. On POWER this is 128. On A64FX this is 256.
  */
-#define AL_CACHE_LINE_SIZE 64
+#define AL_CACHE_LINE_SIZE @AL_CACHE_LINE_SIZE@
 
 /**
  * Minimum size in bytes to avoid destructive interference.
@@ -83,7 +83,7 @@
  * be twice the cache line size, because Intel processors can fetch
  * two adjacent cache lines (see Intel Optimization Manual, 3.7.3).
  */
-#define AL_DESTRUCTIVE_INTERFERENCE_SIZE 128
+#define AL_DESTRUCTIVE_INTERFERENCE_SIZE @AL_DESTRUCTIVE_INTERFERENCE_SIZE@
 
 /** Number of CUDA streams in the default stream pool. */
-#define AL_CUDA_STREAM_POOL_SIZE 5
+#define AL_CUDA_STREAM_POOL_SIZE @AL_CUDA_STREAM_POOL_SIZE@

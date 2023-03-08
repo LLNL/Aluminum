@@ -9,7 +9,6 @@ set_source_path(THIS_DIR_HEADERS
   progress.hpp
   state.hpp
   trace.hpp
-  tuning_params.hpp
   )
 set_source_path(THIS_DIR_CUDA_HEADERS
   cuda.hpp

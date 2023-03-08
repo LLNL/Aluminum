@@ -144,6 +144,64 @@ option(ALUMINUM_ENABLE_BENCHMARKS
   "Build benchmarks."
   OFF)
 
+# Tuning parameters (in the order they appear in the file). Recall:
+# Cache values previously set are not modified. These only take effect
+# if the cache values do not already exist.
+#
+# See extended documentation in cmake/tuning_params.hpp.in.
+set(AL_PE_NUM_CONCURRENT_OPS 4
+  CACHE STRING
+  "Number of concurrent operations the progress engine will perform")
+
+set(AL_PE_NUM_STREAMS 64
+  CACHE STRING
+  "Max number of streams the progress engine supports")
+
+set(AL_PE_NUM_PIPELINE_STAGES 2
+  CACHE STRING
+  "Max number of pipeline stages the progress engine supports")
+
+set(AL_PE_INPUT_QUEUE_SIZE 8192
+  CACHE STRING
+  "Max number of entries in each stream's input queue")
+
+option(AL_PE_ADD_DEFAULT_STREAM
+  "Automatically add a default stream entry form the progress engine"
+  OFF)
+
+option(AL_PE_STREAM_QUEUE_CACHE
+  "Use thread-local cache to map streams to input queues"
+  OFF)
+
+option(AL_PE_START_ON_DEMAND
+  "Delay starting the progress engine until needed"
+  ON)
+
+set(AL_SYNC_MEM_PREALLOC 1024
+  CACHE STRING
+  "Amount of sync object memory to preallocate in the pool")
+
+set(AL_DEFAULT_CACHE_LINE_SIZE 64) # x86_64
+if (CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "^ppc")
+  set(AL_DEFAULT_CACHE_LINE_SIZE 128) # power
+endif ()
+# TODO: I'd like to also detect A64FX but fugaku head nodes are x86
+# and cross-compiles are wonky and that's too much work. For now, just
+# manually set this on the command line on A64FX.
+set(AL_CACHE_LINE_SIZE ${AL_DEFAULT_CACHE_LINE_SIZE}
+  CACHE STRING
+  "Cache line size in bytes (x86: 64; POWER: 128; A64FX: 256)")
+
+set(AL_DESTRUCTIVE_INTERFERENCE_SIZE 128
+  CACHE STRING
+  "Minimum size in bytes to avoid destructive interference")
+
+set(AL_CUDA_STREAM_POOL_SIZE 5
+  CACHE STRING
+  "Number of CUDA streams in the default stream pool")
+
+# END Tuning parameters
+
 if (ALUMINUM_HAS_GPU
     AND NOT ALUMINUM_ENABLE_NCCL
     AND NOT ALUMINUM_ENABLE_MPI_CUDA
@@ -406,6 +464,10 @@ configure_file(
   "${CMAKE_SOURCE_DIR}/cmake/Al_config.hpp.in"
   "${CMAKE_BINARY_DIR}/Al_config.hpp" @ONLY)
 
+configure_file(
+  "${CMAKE_SOURCE_DIR}/cmake/tuning_params.hpp.in"
+  "${CMAKE_BINARY_DIR}/aluminum/tuning_params.hpp" @ONLY)
+
 # Macro for setting full paths to source files.
 macro(set_source_path VAR)
   unset(__tmp_names)
@@ -475,6 +537,9 @@ install(FILES
   DESTINATION ${CMAKE_INSTALL_DIR})
 install(FILES
   "${CMAKE_BINARY_DIR}/Al_config.hpp" DESTINATION ${INCLUDE_INSTALL_DIRS})
+install(FILES
+  "${CMAKE_BINARY_DIR}/aluminum/tuning_params.hpp"
+  DESTINATION ${INCLUDE_INSTALL_DIRS}/aluminum)
 
 # Install the CMake modules we need
 install(FILES
