@@ -537,6 +537,9 @@ install(FILES
   DESTINATION ${CMAKE_INSTALL_DIR})
 install(FILES
   "${CMAKE_BINARY_DIR}/Al_config.hpp" DESTINATION ${INCLUDE_INSTALL_DIRS})
+install(FILES
+  "${CMAKE_BINARY_DIR}/aluminum/tuning_params.hpp"
+  DESTINATION ${INCLUDE_INSTALL_DIRS}/aluminum)
 
 # Install the CMake modules we need
 install(FILES
