@@ -236,7 +236,9 @@ std::unordered_map<void*, ProgressEngine::InputQueue*> ProgressEngine::stream_to
 ProgressEngine::ProgressEngine() {
   stop_flag = false;
   started_flag = false;
+#ifdef AL_PE_START_ON_DEMAND
   doing_start_flag = false;
+#endif
   world_comm = new mpi::MPICommunicator(MPI_COMM_WORLD);
 #ifdef AL_PE_ADD_DEFAULT_STREAM
   // Initialze with the default stream.
