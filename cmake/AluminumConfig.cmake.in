@@ -26,6 +26,7 @@ set(MPI_CXX_COMPILER "@MPI_CXX_COMPILER@" CACHE FILEPATH
 find_package(MPI 3.0 REQUIRED COMPONENTS CXX)
 
 find_dependency(HWLOC)
+find_dependency(Threads)
 
 if (AL_HAS_ROCM)
   # The API for Aluminum does not require that HIP language support
