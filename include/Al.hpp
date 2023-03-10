@@ -1101,6 +1101,23 @@ void SendRecv(const T* sendbuf, size_t send_count, int dest,
                                 recvbuf, recv_count, src, comm);
 }
 
+/**
+ * Perform an in-place simultaneous send and recv.
+ * @param buf Input and output data; input will be overwritten.
+ * @param count Length of buf.
+ * @param dest Rank in comm to send to.
+ * @param src Rank in comm to receive from.
+ * @param comm Communicator to send/recv within.
+ */
+template <typename Backend, typename T>
+void SendRecv(T* buf, size_t count, int dest, int src,
+              typename Backend::comm_type& comm) {
+  internal::trace::record_op<Backend, T>("sendrecv", comm, buf, count,
+                                         dest, src);
+  Backend::template SendRecv<T>(buf, count, dest, src, comm);
+}
+
+/** Non-blocking version of SendRecv. */
 template <typename Backend, typename T>
 void NonblockingSendRecv(const T* sendbuf, size_t send_count, int dest,
                          T* recvbuf, size_t recv_count, int src,
@@ -1112,6 +1129,16 @@ void NonblockingSendRecv(const T* sendbuf, size_t send_count, int dest,
   Backend::template NonblockingSendRecv<T>(sendbuf, send_count, dest,
                                            recvbuf, recv_count, src,
                                            comm, req);
+}
+
+/** In-place version on NonblockingSendRecv; same semantics apply. */
+template <typename Backend, typename T>
+void NonblockingSendRecv(T* buf, size_t count, int dest, int src,
+                         typename Backend::comm_type& comm,
+                         typename Backend::req_type& req) {
+  internal::trace::record_op<Backend, T>("nonblocking-sendrecv", comm,
+                                         buf, count, dest, src);
+  Backend::template NonblockingSendRecv<T>(buf, count, dest, src, comm, req);
 }
 
 /**

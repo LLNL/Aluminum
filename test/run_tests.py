@@ -71,7 +71,7 @@ vector_coll_ops = [OpDesc('allgatherv'),
                    OpDesc('scatterv', root=True)]
 pt2pt_ops = [OpDesc('send', inplace=False, min_procs=2),
              OpDesc('recv', inplace=False, min_procs=2),
-             OpDesc('sendrecv', inplace=False, min_procs=2)]
+             OpDesc('sendrecv', inplace='both', min_procs=2)]
 
 # Full set of cases.
 test_cases = {
@@ -239,6 +239,10 @@ def run_test(args, num_procs, backend, operator, datatype, inplace,
         print('[Pass] ' + test_desc, flush=True)
     else:
         print('[Fail] ' + test_desc, flush=True)
+        if isinstance(r.args, str):
+            print(r.args, flush=True)
+        else:
+            print(' '.join(r.args), flush=True)
         if r.stdout:
             print(r.stdout, flush=True)
         if r.stderr:
