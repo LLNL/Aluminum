@@ -229,6 +229,12 @@ class HostTransferBackend {
   }
 
   template <typename T>
+  static void SendRecv(T* buf, size_t count, int dest, int src, comm_type& comm) {
+    // The way we copy buffers means this is safe.
+    SendRecv(buf, count, dest, buf, count, src, comm);
+  }
+
+  template <typename T>
   static void NonblockingSendRecv(const T* sendbuf, size_t send_count, int dest,
                                   T* recvbuf, size_t recv_count, int src,
                                   comm_type& comm, req_type& req) {
@@ -237,6 +243,13 @@ class HostTransferBackend {
     do_sendrecv(sendbuf, send_count, dest, recvbuf, recv_count, src, comm,
                 internal_stream);
     setup_completion_event(internal_stream, comm, req);
+  }
+
+  template <typename T>
+  static void NonblockingSendRecv(T* buf, size_t count, int dest, int src,
+                                  comm_type& comm, req_type& req) {
+    // The way we copy buffers means this is safe.
+    NonblockingSendRecv(buf, count, dest, buf, count, src, comm, req);
   }
 
   template <typename T>

@@ -237,6 +237,11 @@ class MPIBackend {
   }
 
   template <typename T>
+  static void SendRecv(T* buf, size_t count, int dest, int src, comm_type& comm) {
+    SendRecv(internal::IN_PLACE<T>(), count, dest, buf, count, src, comm);
+  }
+
+  template <typename T>
   static void NonblockingSendRecv(const T* sendbuf, size_t send_count, int dest,
                                   T* recvbuf, size_t recv_count, int src,
                                   comm_type& comm, req_type& req) {
@@ -245,6 +250,13 @@ class MPIBackend {
     internal::mpi::passthrough_nb_sendrecv(sendbuf, send_count, dest,
                                            recvbuf, recv_count, src,
                                            comm, req);
+  }
+
+  template <typename T>
+  static void NonblockingSendRecv(T* buf, size_t count, int dest, int src,
+                                  comm_type& comm, req_type& req) {
+    NonblockingSendRecv(internal::IN_PLACE<T>(), count, dest, buf, count, src,
+                        comm, req);
   }
 
   template <typename T>

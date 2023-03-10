@@ -992,18 +992,14 @@ public:
   void run_impl(typename VectorType<T, Backend>::type& input,
                 typename VectorType<T, Backend>::type& output,
                 typename Backend::comm_type& comm) {
-    if (this->get_options().inplace) {
-      std::cerr << "No in-place for sendrecv" << std::endl;
-      std::abort();
-    }
     int src = this->get_options().src;
     int dst = this->get_options().dst;
     typename Backend::req_type& req = this->get_options().req;
     this->inplace_nb_dispatch(
       [&]() { Al::SendRecv<Backend>(input.data(), input.size(), dst, output.data(), output.size(), src, comm); },
-      [&]() {},
+      [&]() { Al::SendRecv<Backend>(output.data(), output.size(), dst, src, comm); },
       [&]() { Al::NonblockingSendRecv<Backend>(input.data(), input.size(), dst, output.data(), output.size(), src, comm, req); },
-      [&]() {});
+      [&]() { Al::NonblockingSendRecv<Backend>(output.data(), output.size(), dst, src, comm, req); });
   }
 
   template <typename T2 = T,
@@ -1011,13 +1007,21 @@ public:
   void run_mpi_impl(std::vector<T>& input,
                     std::vector<T>& output,
                     typename Backend::comm_type& comm) {
-    MPI_Sendrecv(input.data(), input.size(),
-                 Al::internal::mpi::TypeMap<T>(),
-                 this->get_options().dst, 0,
-                 output.data(), output.size(),
-                 Al::internal::mpi::TypeMap<T>(),
-                 this->get_options().src, 0,
-                 comm.get_comm(), MPI_STATUS_IGNORE);
+    if (this->get_options().inplace) {
+      MPI_Sendrecv_replace(output.data(), output.size(),
+                           Al::internal::mpi::TypeMap<T>(),
+                           this->get_options().dst, 0,
+                           this->get_options().src, 0,
+                           comm.get_comm(), MPI_STATUS_IGNORE);
+    } else {
+      MPI_Sendrecv(input.data(), input.size(),
+                   Al::internal::mpi::TypeMap<T>(),
+                   this->get_options().dst, 0,
+                   output.data(), output.size(),
+                   Al::internal::mpi::TypeMap<T>(),
+                   this->get_options().src, 0,
+                   comm.get_comm(), MPI_STATUS_IGNORE);
+    }
   }
 
   size_t get_input_size_impl(size_t base_size,

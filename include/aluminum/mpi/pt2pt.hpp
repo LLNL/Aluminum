@@ -31,6 +31,10 @@
 #include "aluminum/mpi/base_state.hpp"
 #include "aluminum/mpi/communicator.hpp"
 #include "aluminum/mpi/utils.hpp"
+#include "aluminum/utils/caching_allocator.hpp"
+#include "aluminum/mempool.hpp"
+#include <algorithm>
+#include <mpi.h>
 
 namespace Al {
 namespace internal {
@@ -128,9 +132,14 @@ template <typename T>
 void passthrough_sendrecv(const T* sendbuf, size_t send_count, int dest,
                           T* recvbuf, size_t recv_count, int src,
                           MPICommunicator& comm) {
-  MPI_Sendrecv(sendbuf, send_count, TypeMap<T>(), dest, pt2pt_tag,
-               recvbuf, recv_count, TypeMap<T>(), src, pt2pt_tag,
-               comm.get_comm(), MPI_STATUS_IGNORE);
+  if (sendbuf == internal::IN_PLACE<T>()) {
+    MPI_Sendrecv_replace(recvbuf, recv_count, TypeMap<T>(), dest, pt2pt_tag,
+                         src, pt2pt_tag, comm.get_comm(), MPI_STATUS_IGNORE);
+  } else {
+    MPI_Sendrecv(sendbuf, send_count, TypeMap<T>(), dest, pt2pt_tag,
+                 recvbuf, recv_count, TypeMap<T>(), src, pt2pt_tag,
+                 comm.get_comm(), MPI_STATUS_IGNORE);
+  }
 }
 
 template <typename T>
@@ -142,17 +151,40 @@ class SendRecvAlState : public MPIState {
     MPIState(req_),
     sendbuf(sendbuf_), send_count(send_count_), dest(dest_),
     recvbuf(recvbuf_), recv_count(recv_count_), src(src_),
-    comm(comm_.get_comm()) {}
+    comm(comm_.get_comm()), tmp_buf(nullptr) {
+    if (sendbuf == internal::IN_PLACE<T>()) {
+      tmp_buf = internal::mempool.allocate<internal::MemoryType::HOST, T>(
+        recv_count);
+    }
+  }
+
+  ~SendRecvAlState() {
+    if (tmp_buf) {
+      internal::mempool.release<internal::MemoryType::HOST>(tmp_buf);
+      tmp_buf = nullptr;
+    }
+  }
 
   RunType get_run_type() const override { return RunType::unbounded; }
   std::string get_name() const override { return "MPISendRecv"; }
 
 protected:
   void start_mpi_op() override {
-    MPI_Irecv(recvbuf, recv_count, TypeMap<T>(), src, pt2pt_tag, comm,
-              &mpi_reqs[0]);
-    MPI_Isend(sendbuf, send_count, TypeMap<T>(), dest, pt2pt_tag, comm,
-              &mpi_reqs[1]);
+    // Note: MPI_Isendrecv(_replace) was added in MPI 4.0,
+    // which is probably too new.
+    if (sendbuf == internal::IN_PLACE<T>()) {
+      // Copy the send buffer to the temporary buffer.
+      std::copy_n(recvbuf, recv_count, tmp_buf);
+      MPI_Irecv(recvbuf, recv_count, TypeMap<T>(), src, pt2pt_tag, comm,
+                &mpi_reqs[0]);
+      MPI_Isend(tmp_buf, recv_count, TypeMap<T>(), dest, pt2pt_tag, comm,
+                &mpi_reqs[1]);
+    } else {
+      MPI_Irecv(recvbuf, recv_count, TypeMap<T>(), src, pt2pt_tag, comm,
+                &mpi_reqs[0]);
+      MPI_Isend(sendbuf, send_count, TypeMap<T>(), dest, pt2pt_tag, comm,
+                &mpi_reqs[1]);
+    }
   }
 
   bool poll_mpi() override {
@@ -170,6 +202,7 @@ protected:
   int src;
   MPI_Comm comm;
   MPI_Request mpi_reqs[2];
+  T* tmp_buf;
 };
 
 template <typename T>

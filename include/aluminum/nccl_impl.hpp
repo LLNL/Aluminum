@@ -354,6 +354,11 @@ class NCCLBackend {
   }
 
   template <typename T>
+  static void SendRecv(T* buf, size_t count, int dest, int src, comm_type& comm) {
+    SendRecv(internal::IN_PLACE<T>(), count, dest, buf, count, src, comm);
+  }
+
+  template <typename T>
   static void NonblockingSendRecv(const T* sendbuf, size_t send_count, int dest,
                                   T* recvbuf, size_t recv_count, int src,
                                   comm_type& comm, req_type& req) {
@@ -362,6 +367,13 @@ class NCCLBackend {
     do_sendrecv(sendbuf, send_count, dest, recvbuf, recv_count, src,
                 comm, internal_stream);
     setup_completion_event(internal_stream, comm, req);
+  }
+
+  template <typename T>
+  static void NonblockingSendRecv(T* buf, size_t count, int dest, int src,
+                                  comm_type& comm, req_type& req) {
+    NonblockingSendRecv(internal::IN_PLACE<T>(), count, dest, buf, count, src,
+                        comm, req);
   }
 
   static void Barrier(comm_type& comm, barrier_algo_type) {
@@ -853,14 +865,24 @@ class NCCLBackend {
   static void do_sendrecv(const T* sendbuf, size_t send_count, int dest,
                           T* recvbuf, size_t recv_count, int src,
                           comm_type& comm, AlGpuStream_t stream) {
+    T* tmp_sendbuf = const_cast<T*>(sendbuf);
+    if (sendbuf == internal::IN_PLACE<T>()) {
+      tmp_sendbuf = internal::mempool.allocate<internal::MemoryType::CUDA, T>(
+        recv_count, stream);
+      AL_CHECK_CUDA(AlGpuMemcpyAsync(tmp_sendbuf, recvbuf, send_count*sizeof(T),
+                                     AlGpuMemcpyDeviceToDevice, stream));
+    }
     AL_CHECK_NCCL(ncclGroupStart());
-    AL_CHECK_NCCL(ncclSend((const void*) sendbuf, send_count,
+    AL_CHECK_NCCL(ncclSend((const void*) tmp_sendbuf, send_count,
                            internal::nccl::TypeMap<T>(), dest,
                            comm.m_nccl_comm, stream));
     AL_CHECK_NCCL(ncclRecv((void*) recvbuf, recv_count,
                            internal::nccl::TypeMap<T>(), src,
                            comm.m_nccl_comm, stream));
     AL_CHECK_NCCL(ncclGroupEnd());
+    if (tmp_sendbuf != sendbuf) {
+      internal::mempool.release<internal::MemoryType::CUDA>(tmp_sendbuf);
+    }
   }
 
   /** Do a NCCL barrier. */
