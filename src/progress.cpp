@@ -111,7 +111,7 @@ void bitmap_from_ulongs(hwloc_bitmap_t bitmap, unsigned nr,
 // Returns one bitmap for each processor, in their local rank order.
 // Bitmaps must be freed by the caller.
 std::vector<hwloc_bitmap_t> local_exchange_hwloc_bitmaps(
-  mpi::MPICommunicator* comm, hwloc_const_bitmap_t bitmap) {
+  const mpi::MPICommunicator& comm, hwloc_const_bitmap_t bitmap) {
   // Extract the bitmap into longs for exchanging.
   int len = get_bitmap_len(bitmap);
   if (len == -1) {
@@ -121,8 +121,8 @@ std::vector<hwloc_bitmap_t> local_exchange_hwloc_bitmaps(
   bitmap_to_ulongs(bitmap, len, ul_bitmap.data());
 
   // Exchange bitmap sizes (in case they are different lengths).
-  MPI_Comm local_comm = comm->get_local_comm();
-  std::vector<int> bitmap_lens = std::vector<int>(comm->local_size());
+  MPI_Comm local_comm = comm.get_local_comm();
+  std::vector<int> bitmap_lens = std::vector<int>(comm.local_size());
   MPI_Allgather(&len, 1, MPI_INT,
                 bitmap_lens.data(), 1, MPI_INT,
                 local_comm);
@@ -141,8 +141,8 @@ std::vector<hwloc_bitmap_t> local_exchange_hwloc_bitmaps(
                  MPI_UNSIGNED_LONG, local_comm);
 
   // Extract back to real bitmaps.
-  std::vector<hwloc_bitmap_t> bitmaps = std::vector<hwloc_bitmap_t>(comm->local_size());
-  for (int i = 0; i < comm->local_size(); ++i) {
+  std::vector<hwloc_bitmap_t> bitmaps = std::vector<hwloc_bitmap_t>(comm.local_size());
+  for (int i = 0; i < comm.local_size(); ++i) {
     bitmaps[i] = hwloc_bitmap_alloc();
     bitmap_from_ulongs(bitmaps[i], bitmap_lens[i],
                        gathered_bitmaps.data() + displs[i]);
@@ -155,9 +155,9 @@ std::vector<hwloc_bitmap_t> local_exchange_hwloc_bitmaps(
 // This will include the current local rank.
 std::vector<bool> get_same_indices(
   const std::vector<hwloc_bitmap_t>& bitmaps,
-  mpi::MPICommunicator* comm) {
+  const mpi::MPICommunicator& comm) {
   std::vector<bool> marks = std::vector<bool>(bitmaps.size());
-  size_t local_rank = static_cast<size_t>(comm->local_rank());
+  size_t local_rank = static_cast<size_t>(comm.local_rank());
   for (size_t i = 0; i < bitmaps.size(); ++i) {
     if (i == local_rank ||
         hwloc_bitmap_isequal(bitmaps[local_rank], bitmaps[i])) {
@@ -174,10 +174,10 @@ std::vector<bool> get_same_indices(
 // If two ranks have the same bitmap, their offsets are ordered by rank.
 int get_hwloc_offset(
   const std::vector<hwloc_bitmap_t>& bitmaps,
-  mpi::MPICommunicator* comm) {
+  const mpi::MPICommunicator& comm) {
   std::vector<bool> marks = get_same_indices(bitmaps, comm);
   int offset = 0;
-  for (int i = 0; i < comm->local_rank(); ++i) {
+  for (int i = 0; i < comm.local_rank(); ++i) {
     if (marks[i]) {
       ++offset;
     }
@@ -239,7 +239,6 @@ ProgressEngine::ProgressEngine() {
 #ifdef AL_PE_START_ON_DEMAND
   doing_start_flag = false;
 #endif
-  world_comm = new mpi::MPICommunicator(MPI_COMM_WORLD);
 #ifdef AL_PE_ADD_DEFAULT_STREAM
   // Initialze with the default stream.
   num_input_streams = 1;
@@ -255,9 +254,7 @@ ProgressEngine::ProgressEngine() {
   bind_init();
 }
 
-ProgressEngine::~ProgressEngine() {
-  delete world_comm;
-}
+ProgressEngine::~ProgressEngine() {}
 
 void ProgressEngine::run() {
   // Wait for the progress engine to start.
@@ -389,7 +386,7 @@ void ProgressEngine::bind_init() {
   // bind this rank to.
   hwloc_cpuset_t cpuset = hwloc_bitmap_alloc();
   if (!get_hwloc_cpuset(cpuset, topo)) {
-    std::cerr << world_comm->rank()
+    std::cerr << mpi::get_world_comm().rank()
               << ": Could not get starting cpuset; not binding progress thread"
               << std::endl;
     hwloc_bitmap_free(cpuset);
@@ -399,8 +396,8 @@ void ProgressEngine::bind_init() {
   // Now identify how we want to share the CPU among local ranks and compute
   // appropriate offsets.
   std::vector<hwloc_bitmap_t> local_cpusets = local_exchange_hwloc_bitmaps(
-    world_comm, cpuset);
-  int offset = get_hwloc_offset(local_cpusets, world_comm);
+    mpi::get_world_comm(), cpuset);
+  int offset = get_hwloc_offset(local_cpusets, mpi::get_world_comm());
   // Free local_cpusets.
   for (auto& local_cpuset : local_cpusets) {
     hwloc_bitmap_free(local_cpuset);
@@ -410,7 +407,7 @@ void ProgressEngine::bind_init() {
   int num_cores = hwloc_get_nbobjs_inside_cpuset_by_type(
     topo, cpuset, HWLOC_OBJ_CORE);
   if (num_cores <= 0) {
-    std::cerr << world_comm->rank()
+    std::cerr << mpi::get_world_comm().rank()
               << ": Could not get cores for cpuset; not binding progress thread"
               << std::endl;
     hwloc_bitmap_free(cpuset);
@@ -418,7 +415,7 @@ void ProgressEngine::bind_init() {
     return;
   }
   if (offset >= num_cores) {
-    std::cerr << world_comm->rank()
+    std::cerr << mpi::get_world_comm().rank()
               << ": computed cores offset of "
               << offset
               << " but have only "
@@ -438,7 +435,7 @@ void ProgressEngine::bind_init() {
 
 void ProgressEngine::bind() {
   if (core_to_bind < 0) {
-    std::cerr << world_comm->rank()
+    std::cerr << mpi::get_world_comm().rank()
               << ": progress engine binding not initialized"
               << std::endl;
     return;
@@ -449,7 +446,7 @@ void ProgressEngine::bind() {
   hwloc_topology_load(topo);
   hwloc_cpuset_t cpuset = hwloc_bitmap_alloc();
   if (!get_hwloc_cpuset(cpuset, topo)) {
-    std::cerr << world_comm->rank()
+    std::cerr << mpi::get_world_comm().rank()
               << ": Could not get starting cpuset; not binding progress thread"
               << std::endl;
     hwloc_bitmap_free(cpuset);
@@ -460,7 +457,7 @@ void ProgressEngine::bind() {
   hwloc_obj_t core = hwloc_get_obj_inside_cpuset_by_type(
     topo, cpuset, HWLOC_OBJ_CORE, core_to_bind);
   if (core == NULL) {
-    std::cerr << world_comm->rank()
+    std::cerr << mpi::get_world_comm().rank()
               << ": could not get core "
               << core_to_bind
               << "; not binding progress thread"
@@ -472,7 +469,7 @@ void ProgressEngine::bind() {
   hwloc_cpuset_t coreset = hwloc_bitmap_dup(core->cpuset);
   hwloc_bitmap_singlify(coreset);
   if (hwloc_set_cpubind(topo, coreset, HWLOC_CPUBIND_THREAD) == -1) {
-    std::cerr << world_comm->rank()
+    std::cerr << mpi::get_world_comm().rank()
               << ": failed to bind progress thread"
               << std::endl;
   }

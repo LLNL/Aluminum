@@ -102,8 +102,8 @@ class NCCLBackend;
 class NCCLCommunicator : public internal::MPICommAndStreamWrapper<AlGpuStream_t> {
   friend class NCCLBackend;
  public:
-  /** Default constructor, uses MPI_COMM_WORLD and the default stream. */
-   NCCLCommunicator() : NCCLCommunicator(MPI_COMM_WORLD, 0) {}
+  /** Default constructor, uses Aluminum's world and the default stream. */
+  NCCLCommunicator();
   /** Use a particular MPI communicator and stream. */
   NCCLCommunicator(MPI_Comm comm_, AlGpuStream_t stream_ = 0);
   /** Cannot copy this. */

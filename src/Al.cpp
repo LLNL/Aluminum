@@ -114,11 +114,15 @@ void handle_signal(int signal) {
 }
 
 void Initialize(int& argc, char**& argv) {
+  Initialize(argc, argv, MPI_COMM_WORLD);
+}
+
+void Initialize(int& argc, char**& argv, MPI_Comm world_comm) {
   // Avoid repeated initialization.
   if (is_initialized) {
     return;
   }
-  internal::mpi::init(argc, argv);
+  internal::mpi::init(argc, argv, world_comm);
   progress_engine = new internal::ProgressEngine();
 #ifndef AL_PE_START_ON_DEMAND
   progress_engine->run();

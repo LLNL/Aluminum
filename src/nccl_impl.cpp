@@ -26,6 +26,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "aluminum/nccl_impl.hpp"
+#include "aluminum/mpi/communicator.hpp"
 
 #include <exception>
 #include <iostream>
@@ -34,6 +35,9 @@ namespace Al {
 
 // Initialize this.
 AlGpuEvent_t NCCLBackend::sync_event = (AlGpuEvent_t) 0;
+
+NCCLCommunicator::NCCLCommunicator() :
+  NCCLCommunicator(internal::mpi::get_world_comm().get_comm(), 0) {}
 
 NCCLCommunicator::NCCLCommunicator(MPI_Comm comm_, AlGpuStream_t stream_) :
   MPICommAndStreamWrapper(comm_, stream_) {

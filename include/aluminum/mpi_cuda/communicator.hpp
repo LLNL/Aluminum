@@ -30,6 +30,7 @@
 #include <memory>
 #include "Al.hpp"
 #include "aluminum/mpi_comm_and_stream_wrapper.hpp"
+#include "aluminum/mpi/communicator.hpp"
 
 namespace Al {
 namespace internal {
@@ -41,7 +42,8 @@ class RMA;
 
 class MPICUDACommunicator: public MPICommAndStreamWrapper<cudaStream_t> {
  public:
-  MPICUDACommunicator() : MPICUDACommunicator(MPI_COMM_WORLD, 0) {}
+  MPICUDACommunicator()
+    : MPICUDACommunicator(mpi::get_world_comm().get_comm(), 0) {}
   MPICUDACommunicator(MPI_Comm comm_, cudaStream_t stream_)
     : MPICommAndStreamWrapper(comm_, stream_)
 #ifdef AL_HAS_MPI_CUDA_RMA

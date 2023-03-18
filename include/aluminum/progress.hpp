@@ -139,8 +139,6 @@ class ProgressEngine {
   std::unordered_map<void*, std::array<std::vector<AlState*>, AL_PE_NUM_PIPELINE_STAGES>> run_queues;
   /** Number of currently-active bounded-length operations. */
   size_t num_bounded = 0;
-  /** World communicator. */
-  mpi::MPICommunicator* world_comm;
   /** Core to bind the progress engine to. */
   int core_to_bind = -1;
 #ifdef AL_HAS_CUDA
