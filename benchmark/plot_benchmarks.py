@@ -15,6 +15,7 @@ non-root ranks separately.
 import argparse
 import os
 import os.path
+import itertools
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -53,6 +54,8 @@ parser.add_argument('--run-names', type=str, default=None, nargs='+',
                     help='Special names to give each run')
 parser.add_argument('--separate-ranks', default=False, action='store_true',
                     help='Make a separate plot for each rank')
+parser.add_argument('--rank', type=int, default=None,
+                    help='Plot results only for this rank')
 
 
 rooted_ops = set([
@@ -62,6 +65,8 @@ pt2pt_ops = set(['send', 'recv', 'sendrecv'])
 
 def load_result_directory(result_dir, inplace, nonblocking):
     """Load all data in result_dir.
+
+    If result_dir is actually a file, only it will be loaded.
 
     A new column, Run, will be added to the dataframe with the value
     being result_dir to identify it.
@@ -74,15 +79,27 @@ def load_result_directory(result_dir, inplace, nonblocking):
     """
     coll_results = []
     pt2pt_results = []
-    for filename in os.listdir(result_dir):
-        full_path = os.path.join(result_dir, filename)
-        if not os.path.isfile(full_path):
-            continue
+    if os.path.isdir(result_dir):
+        for filename in os.listdir(result_dir):
+            full_path = os.path.join(result_dir, filename)
+            if not os.path.isfile(full_path):
+                continue
+            try:
+                df = pd.read_csv(full_path, delim_whitespace=True)
+            except:
+                print(f'Could not load benchmark data from {full_filename}')
+                continue
+            op = df.Operation[0]
+            if op in pt2pt_ops:
+                pt2pt_results.append(df)
+            else:
+                coll_results.append(df)
+    elif os.path.isfile(result_dir):
         try:
-            df = pd.read_csv(full_path, delim_whitespace=True)
+            df = pd.read_csv(result_dir, delim_whitespace=True)
         except:
-            print(f'Could not load benchmark data from {full_filename}')
-            continue
+            print(f'Could not load benchmark data from {result_dir}')
+            raise
         op = df.Operation[0]
         if op in pt2pt_ops:
             pt2pt_results.append(df)
@@ -327,6 +344,10 @@ def plot_all_results(args):
                 for rank, rank_op_df in op_df.groupby('CommRank'):
                     do_all_plots(rank_op_df, args,
                                  get_config_name(op, args, rank=rank))
+            elif args.rank is not None:
+                rank_df = op_df[op_df.CommRank == args.rank]
+                do_all_plots(rank_df, args,
+                             get_config_name(op, args, rank=args.rank))
             elif op in rooted_ops:
                 root_op_df = op_df[op_df.CommRank == op_df.Root]
                 do_all_plots(root_op_df, args,
@@ -344,6 +365,10 @@ def plot_all_results(args):
                 for rank, rank_op_df in op_df.groupby('CommRank'):
                     do_all_plots(rank_op_df, args,
                                  get_config_name(op, args, rank=rank))
+            elif args.rank is not None:
+                rank_df = op_df[op_df.CommRank == args.rank]
+                do_all_plots(rank_df, args,
+                             get_config_name(op, args, rank=args.rank))
             else:
                 do_all_plots(op_df, args, get_config_name(op, args))
 

@@ -509,11 +509,12 @@ std::vector<size_t> get_sizes(size_t start_size, size_t max_size,
 std::vector<size_t> get_sizes_from_opts(cxxopts::ParseResult& parsed_opts) {
   size_t min_size = parsed_opts["min-size"].as<size_t>();
   size_t max_size = parsed_opts["max-size"].as<size_t>();
+  bool odd_sizes = parsed_opts.count("odd-sizes");
   if (parsed_opts.count("size")) {
     min_size = parsed_opts["size"].as<size_t>();
     max_size = min_size;
   }
-  return get_sizes(min_size, max_size);
+  return get_sizes(min_size, max_size, odd_sizes);
 }
 
 /** Return a human-readable string for size. */
