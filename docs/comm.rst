@@ -7,6 +7,8 @@ See the API documentation for details on exact arguments.
 
 However, first it is helpful to give some general terminology.
 
+.. _comm-nonblocking:
+
 Non-Blocking Operations
 -----------------------
 
@@ -23,6 +25,8 @@ In Aluminum, the :cpp:func:`Al::Wait()` and :cpp:func:`Al::Test()` methods are u
 If you use this on an accelerator backend, this will result in the accelerator waiting for the operation to complete, *not* the host CPU.
 ``Test`` is **always** a host-side operation, and will return ``true`` if the operation has completed, and ``false`` otherwise.
 
+.. _comm-inplace:
+
 In-Place Operations
 -------------------
 
@@ -33,6 +37,8 @@ In some cases, this can save memory (because you only need one buffer) and be fa
 In other cases, the semantics of the operation and system limitations may still require a separate buffer.
 In these cases, either the underlying library or Aluminum handles this.
 
+.. _comm-rooted:
+
 Rooted Operations
 -----------------
 
@@ -40,6 +46,8 @@ Certain operations have "roots", which distinguish a special rank in the collect
 While it is common for the root to be rank 0, they can be any rank.
 The root typically operates differently than all the other ranks, and may need different sized buffers.
 Typically, the root is responsible for providing data that will be received by all other ranks (e.g., in ``Bcast`` or ``Scatter``) or receiving all data produced by both it and other ranks (e.g., in ``Gather`` or ``Reduce``).
+
+.. _comm-reduction:
 
 Reductions
 ----------
@@ -50,6 +58,8 @@ The prototypical reduction operation is summation, but you can use other operati
 
 Certain Aluminum backends also support averaging as a reduction operation.
 (Averaging vectors is technically not a reduction for slightly complicated reasons, but it is useful to treat it as such.)
+
+.. _comm-vector:
 
 Vector Operations
 -----------------
@@ -70,6 +80,8 @@ Point-to-Point Operations
 
 These are operations in which data is sent directly between two processes, and other processes are not involved.
 
+.. _send-and-recv:
+
 Send and Receive
 ^^^^^^^^^^^^^^^^
 
@@ -86,6 +98,8 @@ There are no special in-place versions of send or receive, as they only have one
 * :cpp:func:`Al::NonblockingSend()`
 * :cpp:func:`Al::Recv()`
 * :cpp:func:`Al::NonblockingRecv()`
+
+.. _sendrecv:
 
 SendRecv
 ^^^^^^^^
@@ -109,6 +123,8 @@ Collectives are communication operations where all ranks in a communicator must 
 (If any rank does not call the collective, all the ranks may hang.)
 While in principle you could implement all of them using point-to-point operations, using collectives is both simpler and allows one to take advantage of more efficient algorithms and optimized implementations for specific operations.
 
+.. _allgather:
+
 Allgather
 ^^^^^^^^^
 
@@ -122,6 +138,8 @@ For an in-place ``Allgather``, the send data must be placed at the location in t
 * :cpp:func:`Al::Allgather()`
 * :cpp:func:`Al::NonblockingAllgather()`
 
+.. _allgatherv:
+
 Allgatherv (vector Allgather)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -129,6 +147,8 @@ This is the vector version of ``Allgather``, and operates the same way, except t
 
 * :cpp:func:`Al::Allgatherv()`
 * :cpp:func:`Al::NonblockingAllgatherv()`
+
+.. _allreduce:
 
 Allreduce
 ^^^^^^^^^
@@ -142,6 +162,8 @@ For an in-place ``Allreduce``, the same buffer is used for both each rank's init
 
 * :cpp:func:`Al::Allreduce()`
 * :cpp:func:`Al::NonblockingAllreduce()`
+
+.. _alltoall:
 
 Alltoall
 ^^^^^^^^
@@ -157,6 +179,8 @@ For an in-place ``Alltoall``, the same buffer is used for both each rank's initi
 * :cpp:func:`Al::Alltoall()`
 * :cpp:func:`Al::NonblockingAlltoall()`
 
+.. _alltoallv:
+
 Alltoallv (vector Alltoall)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -164,6 +188,8 @@ This is the vector version of ``Alltoall``, and operates the same way, except th
 
 * :cpp:func:`Al::Alltoallv()`
 * :cpp:func:`Al::NonblockingAlltoallv()`
+
+.. _barrier:
 
 Barrier
 ^^^^^^^
@@ -176,6 +202,8 @@ There is no in-place ``Barrier``, as no data is communicated.
 * :cpp:func:`Al::Barrier()`
 * :cpp:func:`Al::NonblockingBarrier()`
 
+.. _bcast:
+
 Bcast
 ^^^^^^^^^
 
@@ -186,6 +214,8 @@ It is always in-place.
 
 * :cpp:func:`Al::Bcast()`
 * :cpp:func:`Al::NonblockingBcast()`
+
+.. _gather:
 
 Gather
 ^^^^^^
@@ -200,6 +230,8 @@ There is only one buffer used on non-roots regardless of whether the operation i
 * :cpp:func:`Al::Gather()`
 * :cpp:func:`Al::NonblockingGather()`
 
+.. _gatherv:
+
 Gatherv (vector Gather)
 ^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -207,6 +239,8 @@ This is the vector version of ``Gather``, and operates the same way, except each
 
 * :cpp:func:`Al::Gatherv()`
 * :cpp:func:`Al::NonblockingGatherv()`
+
+.. _reduce:
 
 Reduce
 ^^^^^^
@@ -220,6 +254,8 @@ There is only one buffer used on non-roots regardless of whether the operation i
 
 * :cpp:func:`Al::Reduce()`
 * :cpp:func:`Al::NonblockingReduce()`
+
+.. _reduce-scatter:
 
 Reduce-scatter
 ^^^^^^^^^^^^^^
@@ -238,6 +274,8 @@ See ``Reduce_scatterv`` for the operation equivalent to ``MPI_Reduce_scatter``.
 * :cpp:func:`Al::Reduce_scatter()`
 * :cpp:func:`Al::NonblockingReduce_scatter()`
 
+.. _reduce-scatterv:
+
 Reduce-scatterv (vector Reduce-scatter)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -249,6 +287,8 @@ See ``Reduce_scatter`` for the operation equivalent to ``MPI_Reduce_scatter_bloc
 
 * :cpp:func:`Al::Reduce_scatterv()`
 * :cpp:func:`Al::NonblockingReduce_scatterv()`
+
+.. _scatter:
 
 Scatter
 ^^^^^^^
@@ -262,6 +302,8 @@ There is only one buffer used on non-roots regardless of whether the operation i
 
 * :cpp:func:`Al::Scatter()`
 * :cpp:func:`Al::NonblockingScatter()`
+
+.. _scatterv:
 
 Scatterv
 ^^^^^^^^
