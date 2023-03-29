@@ -34,6 +34,8 @@
 #include <cstddef>
 #include <vector>
 
+#include <mpi.h>
+
 #include <Al_config.hpp>
 #include "aluminum/base.hpp"
 #include "aluminum/trace.hpp"
@@ -46,6 +48,10 @@ namespace Al {
  * call this multiple times.
  */
 void Initialize(int& argc, char**& argv);
+/**
+ * Initialize Aluminum and provide an explicit MPI world communicator.
+ */
+void Initialize(int& argc, char**& argv, MPI_Comm world_comm);
 /**
  * Clean up Aluminum.
  * Do not make any further calls to the library after calling this.

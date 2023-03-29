@@ -30,6 +30,7 @@
 #include <memory>
 #include "Al.hpp"
 #include "aluminum/mpi_comm_and_stream_wrapper.hpp"
+#include "aluminum/mpi/communicator.hpp"
 
 namespace Al {
 namespace internal {
@@ -38,8 +39,9 @@ namespace ht {
 /** Communicator for host-transfer operations. */
 class HostTransferCommunicator: public MPICommAndStreamWrapper<AlGpuStream_t> {
  public:
-  /** Use MPI_COMM_WORLD and the default CUDA stream. */
-  HostTransferCommunicator() : HostTransferCommunicator(MPI_COMM_WORLD, 0) {}
+  /** Use Aluminum's world and the default CUDA stream. */
+  HostTransferCommunicator()
+    : HostTransferCommunicator(mpi::get_world_comm().get_comm(), 0) {}
   /** Use a particular MPI communicator and stream. */
   HostTransferCommunicator(MPI_Comm comm_, AlGpuStream_t stream_)
     : MPICommAndStreamWrapper(comm_, stream_) {}

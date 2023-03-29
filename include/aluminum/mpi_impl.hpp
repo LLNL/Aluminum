@@ -62,7 +62,7 @@ namespace internal {
 namespace mpi {
 
 /** MPI initialization. */
-void init(int& argc, char**& argv);
+void init(int& argc, char**& argv, MPI_Comm world_comm);
 /** MPI finalization. */
 void finalize();
 

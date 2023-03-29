@@ -55,6 +55,8 @@ namespace {
 bool initialized_mpi = false;
 // Maximum tag value in MPI.
 int max_tag = 0;
+// World MPI communicator.
+MPICommunicator* al_world_comm = nullptr;
 
 #ifdef AL_HAS_HALF
 // Operator implementations for half.
@@ -143,7 +145,7 @@ void bfloat_max_reduction(void* invec_, void* inoutvec_, int* len,
 #endif
 }
 
-void init(int& argc, char**& argv) {
+void init(int& argc, char**& argv, MPI_Comm world_comm) {
   int flag;
 #ifdef AL_MPI_SERIALIZE
   int required = MPI_THREAD_SERIALIZED;
@@ -168,9 +170,12 @@ void init(int& argc, char**& argv) {
     }
   }
   // Get the upper bound for tags; this is always set in MPI_COMM_WORLD.
+  // This explicitly uses MPI_COMM_WORLD rather than world_comm because of this.
   int* p;
   MPI_Comm_get_attr(MPI_COMM_WORLD, MPI_TAG_UB, &p, &flag);
   max_tag = *p;
+
+  al_world_comm = new MPICommunicator(world_comm);
 
 #ifdef AL_HAS_HALF
   // Set up reduction operators for half.
@@ -190,6 +195,12 @@ void init(int& argc, char**& argv) {
 }
 
 void finalize() {
+  // Communicator teardown is safe even when MPI has already been finalized.
+  if (al_world_comm) {
+    delete al_world_comm;
+    al_world_comm = nullptr;
+  }
+
   int flag;
   MPI_Finalized(&flag);
   if (!flag) {
@@ -214,6 +225,15 @@ void finalize() {
 }
 
 int get_max_tag() { return max_tag; }
+
+const MPICommunicator& get_world_comm() {
+#ifdef AL_DEBUG
+  if (!al_world_comm) {
+    throw_al_exception("Tried to get Aluminum world comm before being set");
+  }
+#endif
+  return *al_world_comm;
+}
 
 }  // namespace mpi
 }  // namespace internal

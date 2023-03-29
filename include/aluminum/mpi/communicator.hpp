@@ -36,11 +36,17 @@ namespace mpi {
 
 int get_max_tag();
 
+// Forward-declare.
+class MPICommunicator;
+
+/** Retrieve Aluminum's world MPI communicator. */
+const MPICommunicator& get_world_comm();
+
 /** Communicator for MPI-based operations. */
 class MPICommunicator : public MPICommAndStreamWrapper<int> {
  public:
-  /** Default constructor; use MPI_COMM_WORLD. */
-  MPICommunicator() : MPICommunicator(MPI_COMM_WORLD) {}
+  /** Default constructor; use Aluminum's world. */
+  MPICommunicator() : MPICommunicator(get_world_comm().get_comm()) {}
   /**
    * Use a particular MPI communicator and stream.
    *
