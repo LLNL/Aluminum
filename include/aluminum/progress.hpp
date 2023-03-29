@@ -25,7 +25,10 @@
 // permissions and limitations under the license.
 ////////////////////////////////////////////////////////////////////////////////
 
-/** Asynchronous progress engine. */
+/**
+ * @file
+ * Asynchronous progress engine.
+ */
 
 #pragma once
 

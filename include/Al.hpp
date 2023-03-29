@@ -26,7 +26,11 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 /**
- * Various optimized collective implementations.
+ * @file
+ * Aluminum initialization and communication operations.
+ *
+ * Aluminum provides an interface to high-performance and accelerator-aware
+ * communication operations.
  */
 
 #pragma once
@@ -44,30 +48,66 @@ namespace Al {
 
 /**
  * Initialize Aluminum.
- * This must be called before any other calls to the library. It is safe to
- * call this multiple times.
+ *
+ * This must be called before any other calls to Aluminum are made,
+ * except for Initialized(). It is safe to call this multiple times,
+ * but it may not be called after Finalize().
+ *
+ * The \p argc and \p argv arguments are used to initialize MPI. They
+ * may be null if the underlying MPI library does not rely on arguments
+ * to initialize.
+ *
+ * This will initialize Aluminum to use the whole `MPI_COMM_WORLD`.
+ * See Initialize(int&, char**&, MPI_Comm) if a specific subcommunicator
+ * is desired.
+ *
+ * @param argc, argv The `argc` and `argv` arguments provided to the
+ * binary.
  */
 void Initialize(int& argc, char**& argv);
 /**
- * Initialize Aluminum and provide an explicit MPI world communicator.
+ * Initialize Aluminum with an explicit MPI world communicator.
+ *
+ * This is identical to Initialize(int&, char**&), however, it allows
+ * a different world communicator \p world_comm to be specified.
+ * Aluminum will treat this as its world in instances where a default
+ * world communicator is needed.
+ *
+ * Aluminum will create a duplicate of \p world_comm.
+ *
+ * @param argc, argv The `argc` and `argv` arguments provided to the
+ * binary.
+ * @param world_comm A default world communicator for Aluminum.
  */
 void Initialize(int& argc, char**& argv, MPI_Comm world_comm);
 /**
  * Clean up Aluminum.
- * Do not make any further calls to the library after calling this.
+ *
+ * This will clean up all outstanding Aluminum resources and shut down
+ * communication libraries.
+ *
+ * Do not make any additional calls to Aluminum after calling this
+ * function, except for Initialized().
  */
 void Finalize();
-/** Return true if Aluminum has been initialized. */
+/**
+ * Return true if Aluminum has been initialized and has not been finalized.
+ *
+ * It is always safe to call this.
+ */
 bool Initialized();
 
 /**
  * Perform an allreduce.
- * @param sendbuf Input data.
- * @param recvbuf Output data; should already be allocated.
- * @param count Length of sendbuf and recvbuf.
- * @param op The reduction operation to perform.
- * @param comm The communicator to reduce over.
- * @param algo Request a particular allreduce algorithm.
+ *
+ * See \verbatim embed:rst:inline :ref:`Allreduce <allreduce>`. \endverbatim
+ *
+ * @param[in] sendbuf Buffer containing the local vector to be reduced.
+ * @param[out] recvbuf Buffer for the reduced vector.
+ * @param[in] count Length of \p sendbuf and \p recvbuf in elements of type `T`.
+ * @param[in] op The reduction operation to perform.
+ * @param[in] comm The communicator to reduce over.
+ * @param[in] algo Request a particular allreduce algorithm.
  */
 template <typename Backend, typename T>
 void Allreduce(const T* sendbuf, T* recvbuf, size_t count,
@@ -80,29 +120,35 @@ void Allreduce(const T* sendbuf, T* recvbuf, size_t count,
 }
 
 /**
- * Perform an in-place allreduce.
- * @param recvbuf Input and output data; input will be overwritten.
- * @param count Length of recvbuf.
+ * Perform an \verbatim embed:rst:inline :ref:`in-place <comm-inplace>` \endverbatim Allreduce().
+ *
+ * @param[in,out] buffer Input and output buffer initially containing
+ * the local vector to be reduced. Will be replaced with the reduced
+ * vector.
+ * @param count Length of \p buffer in elements of type `T`.
  * @param op The reduction operation to perform.
  * @param comm The communicator to reduce over.
  * @param algo Request a particular allreduce algorithm.
  */
 template <typename Backend, typename T>
-void Allreduce(T* recvbuf, size_t count,
+void Allreduce(T* buffer, size_t count,
                ReductionOperator op, typename Backend::comm_type& comm,
                typename Backend::allreduce_algo_type algo =
                Backend::allreduce_algo_type::automatic) {
-  internal::trace::record_op<Backend, T>("allreduce", comm, recvbuf, count);
-  Backend::template Allreduce<T>(recvbuf, count, op, comm, algo);
+  internal::trace::record_op<Backend, T>("allreduce", comm, buffer, count);
+  Backend::template Allreduce<T>(buffer, count, op, comm, algo);
 }
 
 /**
- * Non-blocking version of Allreduce.
- * This returns immediately (i.e. does only local operations) and starts the
- * allreduce asynchronously. The request object is set to an opaque reference
- * for the allreduce, and can be checked using Test and Wait.
- * It is not safe to modify sendbuf or recvbuf until the request indicates that
- * the operation has completed.
+ * Perform a \verbatim embed:rst:inline :ref:`non-blocking <comm-nonblocking>` \endverbatim Allreduce().
+ *
+ * @param[in] sendbuf Buffer containing the local vector to be reduced.
+ * @param[out] recvbuf Buffer for the reduced vector.
+ * @param[in] count Length of \p sendbuf and \p recvbuf in elements of type `T`.
+ * @param[in] op The reduction operation to perform.
+ * @param[in] comm The communicator to reduce over.
+ * @param[out] req Request object for the asynchronous operation.
+ * @param[in] algo Request a particular allreduce algorithm.
  */
 template <typename Backend, typename T>
 void NonblockingAllreduce(
@@ -118,30 +164,45 @@ void NonblockingAllreduce(
                                             comm, req, algo);
 }
 
-/** In-place version of NonblockingAllreduce; same semantics apply. */
+/**
+ * Perform a \verbatim embed:rst:inline :ref:`non-blocking <comm-nonblocking>` \endverbatim
+ * \verbatim embed:rst:inline :ref:`in-place <comm-inplace>` \endverbatim Allreduce().
+ *
+ * @param[in,out] buffer Input and output buffer initially containing
+ * the local vector to be reduced. Will be replaced with the reduced
+ * vector.
+ * @param count Length of \p buffer in elements of type `T`.
+ * @param op The reduction operation to perform.
+ * @param comm The communicator to reduce over.
+ * @param[out] req Request object for the asynchronous operation.
+ * @param algo Request a particular allreduce algorithm.
+ */
 template <typename Backend, typename T>
 void NonblockingAllreduce(
-  T* recvbuf, size_t count,
+  T* buffer, size_t count,
   ReductionOperator op,
   typename Backend::comm_type& comm,
   typename Backend::req_type& req,
   typename Backend::allreduce_algo_type algo =
   Backend::allreduce_algo_type::automatic) {
   internal::trace::record_op<Backend, T>("nonblocking-allreduce", comm,
-                                         recvbuf, count);
-  Backend::template NonblockingAllreduce<T>(recvbuf, count, op,
+                                         buffer, count);
+  Backend::template NonblockingAllreduce<T>(buffer, count, op,
                                             comm, req, algo);
 }
 
 /**
- * Perform a reduction.
- * @param sendbuf Input data.
- * @param recvbuf Output data; should already be allocated.
- * @param count Length of sendbuf and recvbuf.
- * @param op The reduction operation to perform.
- * @param root The root of the reduction, which gets the final result.
- * @param comm The communicator to reduce over.
- * @param algo Request a particular reduction algorithm.
+ * Perform a reduce-to-one.
+ *
+ * See \verbatim embed:rst:inline :ref:`Reduce <reduce>`. \endverbatim
+ *
+ * @param[in] sendbuf Buffer containing the local vector to be reduced.
+ * @param[out] recvbuf Buffer for the reduced vector.
+ * @param[in] count Length of \p sendbuf and \p recvbuf in elements of type `T`.
+ * @param[in] op The reduction operation to perform.
+ * @param[in] root Root rank for the operation.
+ * @param[in] comm The communicator to reduce over.
+ * @param[in] algo Request a particular reduction algorithm.
  */
 template <typename Backend, typename T>
 void Reduce(const T* sendbuf, T* recvbuf, size_t count,
@@ -154,29 +215,37 @@ void Reduce(const T* sendbuf, T* recvbuf, size_t count,
 }
 
 /**
- * Perform an in-place reduction.
- * @param recvbuf Input and output data; input will be overwritten.
- * @param count Length of recvbuf.
- * @param op The reduction operation to perform.
- * @param root The root of the reduction, which gets the final result.
- * @param comm The communicator to reduce over.
- * @param algo Request a particular reduction algorithm.
+ * Perform an \verbatim embed:rst:inline :ref:`in-place <comm-inplace>` \endverbatim Reduce().
+ *
+ * @param[in,out] buffer Input and output buffer initially containing
+ * the local vector to be reduced. Will be replaced with the reduced
+ * vector.
+ * @param[in] count Length of \p recvbuf in elements of type `T`.
+ * @param[in] op The reduction operation to perform.
+ * @param[in] root Root rank for the operation.
+ * @param[in] comm The communicator to reduce over.
+ * @param[in] algo Request a particular reduction algorithm.
  */
 template <typename Backend, typename T>
-void Reduce(T* recvbuf, size_t count,
+void Reduce(T* buffer, size_t count,
             ReductionOperator op, int root, typename Backend::comm_type& comm,
             typename Backend::reduce_algo_type algo =
             Backend::reduce_algo_type::automatic) {
-  internal::trace::record_op<Backend, T>("reduce", comm, recvbuf, count, root);
-  Backend::template Reduce<T>(recvbuf, count, op, root, comm, algo);
+  internal::trace::record_op<Backend, T>("reduce", comm, buffer, count, root);
+  Backend::template Reduce<T>(buffer, count, op, root, comm, algo);
 }
 
 /**
- * Non-blocking version of Reduce.
- * This returns immediately (i.e. does only local operations) and starts the
- * reduction asynchronously.
- * It is not safe to modify sendbuf or recvbuf until the request indicates that
- * the operation has completed.
+ * Perform a \verbatim embed:rst:inline :ref:`non-blocking <comm-nonblocking>` \endverbatim Reduce().
+ *
+ * @param[in] sendbuf Buffer containing the local vector to be reduced.
+ * @param[out] recvbuf Buffer for the reduced vector.
+ * @param[in] count Length of \p sendbuf and \p recvbuf in elements of type `T`.
+ * @param[in] op The reduction operation to perform.
+ * @param[in] root Root rank for the operation.
+ * @param[in] comm The communicator to reduce over.
+ * @param[out] req Request object for the asynchronous operation.
+ * @param[in] algo Request a particular reduction algorithm.
  */
 template <typename Backend, typename T>
 void NonblockingReduce(
@@ -192,33 +261,46 @@ void NonblockingReduce(
   Backend::template NonblockingReduce<T>(sendbuf, recvbuf, count, op, root, comm, req, algo);
 }
 
-/** In-place version of NonblockingReduce; same semantics apply. */
+/**
+ * Perform a \verbatim embed:rst:inline :ref:`non-blocking <comm-nonblocking>` \endverbatim
+ * \verbatim embed:rst:inline :ref:`in-place <comm-inplace>` \endverbatim Reduce().
+ *
+ * @param[in,out] buffer Input and output buffer initially containing
+ * the local vector to be reduced. Will be replaced with the reduced
+ * vector.
+ * @param[in] count Length of \p buffer in elements of type `T`.
+ * @param[in] op The reduction operation to perform.
+ * @param[in] root Root rank for the operation.
+ * @param[in] comm The communicator to reduce over.
+ * @param[out] req Request object for the asynchronous operation.
+ * @param[in] algo Request a particular reduction algorithm.
+ */
 template <typename Backend, typename T>
 void NonblockingReduce(
-  T* recvbuf, size_t count,
+  T* buffer, size_t count,
   ReductionOperator op,
   int root,
   typename Backend::comm_type& comm,
   typename Backend::req_type& req,
   typename Backend::reduce_algo_type algo =
   Backend::reduce_algo_type::automatic) {
-  internal::trace::record_op<Backend, T>("nonblocking-reduce", comm, recvbuf,
+  internal::trace::record_op<Backend, T>("nonblocking-reduce", comm, buffer,
                                          count, root);
-  Backend::template NonblockingReduce<T>(recvbuf, count, op, root, comm, req, algo);
+  Backend::template NonblockingReduce<T>(buffer, count, op, root, comm, req, algo);
 }
 
 /**
- * @brief Perform a reduce-scatter.
+ * Perform a reduce-scatter.
  *
- * This is analogous to "MPI_Reduce_scatter_block" and matches NCCL's
- * interface.
+ * See \verbatim embed:rst:inline :ref:`Reduce-scatter <reduce-scatter>`. \endverbatim
  *
- * @param sendbuf Input data.
- * @param recvbuf Output data; should already be allocated.
- * @param count Length of recvbuf.
- * @param op The reduction operation to perform.
- * @param comm The communicator to reduce/scatter over.
- * @param algo Request a particular reduce-scatter algorithm.
+ * @param[in] sendbuf Buffer containing the local vector to be reduced/scattered.
+ * @param[out] recvbuf Buffer for the scattered portion of the reduced vector.
+ * @param[in] count Length of \p recvbuf in elements of type `T`.
+ * \p sendbuf should be `count * comm.size()` elements.
+ * @param[in] op The reduction operation to perform.
+ * @param[in] comm The communicator to reduce/scatter over.
+ * @param[in] algo Request a particular reduce-scatter algorithm.
  */
 template <typename Backend, typename T>
 void Reduce_scatter(
@@ -232,37 +314,39 @@ void Reduce_scatter(
 }
 
 /**
- * @brief Perform an in-place reduce-scatter.
+ * Perform an \verbatim embed:rst:inline :ref:`in-place <comm-inplace>` \endverbatim Reduce_scatter().
  *
- * This is analogous to "MPI_Reduce_scatter_block" and matches NCCL's
- * interface.
- *
- * @param recvbuf Input and output data; input will be overwritten.
- * @param count Length of data to be received.
- * @param op The reduction operation to perform.
- * @param comm The communicator to reduce/scatter over.
- * @param algo Request a particular reduce-scatter algorithm.
+ * @param[in,out] buffer Input and output buffer initially containing
+ * the local vector to be reduced/scattered. Will be replaced with the
+ * scattered portion of the reduced vector.
+ * @param[in] count Length, in elements of type `T`, of the scattered
+ * portion of the reduced vector. \p buffer should be `count * comm.size()`
+ * elements.
+ * @param[in] op The reduction operation to perform.
+ * @param[in] comm The communicator to reduce/scatter over.
+ * @param[in] algo Request a particular reduce-scatter algorithm.
  */
 template <typename Backend, typename T>
 void Reduce_scatter(
-  T* recvbuf, size_t count,
+  T* buffer, size_t count,
   ReductionOperator op, typename Backend::comm_type& comm,
   typename Backend::reduce_scatter_algo_type algo =
   Backend::reduce_scatter_algo_type::automatic) {
-  internal::trace::record_op<Backend, T>("reduce_scatter", comm, recvbuf, count);
-  Backend::template Reduce_scatter<T>(recvbuf, count, op, comm, algo);
+  internal::trace::record_op<Backend, T>("reduce_scatter", comm, buffer, count);
+  Backend::template Reduce_scatter<T>(buffer, count, op, comm, algo);
 }
 
 /**
- * @brief Non-blocking version of Reduce_scatter.
+ * Perform a \verbatim embed:rst:inline :ref:`non-blocking <comm-nonblocking>` \endverbatim Reduce_scatter().
  *
- * This is analogous to "MPI_Ireduce_scatter_block" and matches NCCL's
- * interface.
- *
- * This returns immediately (i.e. does only local operations) and starts the
- * reduce-scatter asynchronously.
- * It is not safe to modify sendbuf or recvbuf until the request indicates that
- * the operation has completed.
+ * @param[in] sendbuf Buffer containing the local vector to be reduced/scattered.
+ * @param[out] recvbuf Buffer for the scattered portion of the reduced vector.
+ * @param[in] count Length of \p recvbuf in elements of type `T`.
+ * \p sendbuf should be `count * comm.size()` elements.
+ * @param[in] op The reduction operation to perform.
+ * @param[in] comm The communicator to reduce/scatter over.
+ * @param[out] req Request object for the asynchronous operation.
+ * @param[in] algo Request a particular reduce-scatter algorithm.
  */
 template <typename Backend, typename T>
 void NonblockingReduce_scatter(
@@ -278,34 +362,45 @@ void NonblockingReduce_scatter(
     sendbuf, recvbuf, count, op, comm, req, algo);
 }
 
-/** @brief In-place version of NonblockingReduce_scatter.
+/**
+ * Perform a \verbatim embed:rst:inline :ref:`non-blocking <comm-nonblocking>` \endverbatim
+ * \verbatim embed:rst:inline :ref:`in-place <comm-inplace>` \endverbatim Reduce_scatter().
  *
- *  The same semantics apply.
+ * @param[in,out] buffer Inout and output buffer initially containing
+ * the local vector to be reduced/scattered. Will be replaced with the
+ * scattered portion of the reduced vector.
+ * @param[in] count Length, in elements of type `T`, of the scattered
+ * portion of the reduced vector. \p buffer should be `count * comm.size()`
+ * elements.
+ * @param[in] op The reduction operation to perform.
+ * @param[in] comm The communicator to reduce/scatter over.
+ * @param[out] req Request object for the asynchronous operation.
+ * @param[in] algo Request a particular reduce-scatter algorithm.
  */
 template <typename Backend, typename T>
 void NonblockingReduce_scatter(
-  T* recvbuf, size_t count,
+  T* buffer, size_t count,
   ReductionOperator op,
   typename Backend::comm_type& comm,
   typename Backend::req_type& req,
   typename Backend::reduce_scatter_algo_type algo =
   Backend::reduce_scatter_algo_type::automatic) {
   internal::trace::record_op<Backend, T>("nonblocking-reduce_scatter", comm,
-                                         recvbuf, count);
-  Backend::template NonblockingReduce_scatter<T>(recvbuf, count, op, comm, req, algo);
+                                         buffer, count);
+  Backend::template NonblockingReduce_scatter<T>(buffer, count, op, comm, req, algo);
 }
 
 /**
- * @brief Perform a vector reduce-scatter.
+ * Perform a \verbatim embed:rst:inline :ref:`vector <comm-vector>` \endverbatim
+ * Reduce_scatter().
  *
- * This is analogous to "MPI_Reduce_scatter".
- *
- * @param sendbuf Input data.
- * @param recvbuf Output data.
- * @param counts Amount of data each rank should receive.
- * @param op The reduction operation to perform.
- * @param comm The communicator to reduce/scatter over.
- * @param algo Request a particular vector reduce-scatter algorithm.
+ * @param[in] sendbuf Buffer containing the local vector to be reduced/scattered.
+ * @param[out] recvbuf Buffer for the scattered portion of the reduced vector.
+ * @param[in] counts Vector of the length of the scattered vector each rank
+ * should receive, in elements of type `T`.
+ * @param[in] op The reduction operation to perform.
+ * @param[in] comm The communicator to reduce/scatter over.
+ * @param[in] algo Request a particular reduce-scatterv algorithm.
  */
 template <typename Backend, typename T>
 void Reduce_scatterv(
@@ -320,30 +415,40 @@ void Reduce_scatterv(
 }
 
 /**
- * @brief Perform an in-place vector reduce-scatter.
+ * Perform an \verbatim embed:rst:inline :ref:`in-place <comm-inplace>` \endverbatim Reduce_scatterv().
  *
- * This is analogous to "MPI_Reduce_scatter".
- *
- * @param buf Input and output data.
- * @param counts Amount of data each rank should receive.
- * @param op The reduction operation to perform.
- * @param comm The communicator to reduce/scatter over.
- * @param algo Request a particular vector reduce-scatter algorithm.
+ * @param[in,out] buffer Input and output buffer initially containing
+ * the local vector to be reduced/scattered. Will be replaced with the
+ * scattered portion of the reduced vector.
+ * @param[in] counts Vector of the length of the scattered vector each rank
+ * should receive, in elements of type `T`.
+ * @param[in] op The reduction operation to perform.
+ * @param[in] comm The communicator to reduce/scatter over.
+ * @param[in] algo Request a particular reduce-scatterv algorithm.
  */
 template <typename Backend, typename T>
 void Reduce_scatterv(
-  T* buf, std::vector<size_t> counts,
+  T* buffer, std::vector<size_t> counts,
   ReductionOperator op, typename Backend::comm_type& comm,
   typename Backend::reduce_scatterv_algo_type algo =
   Backend::reduce_scatterv_algo_type::automatic) {
   internal::trace::record_op<Backend, T>(
-    "reduce_scatterv", comm, buf, counts);
-  Backend::template Reduce_scatterv<T>(buf, counts,
+    "reduce_scatterv", comm, buffer, counts);
+  Backend::template Reduce_scatterv<T>(buffer, counts,
                                        op, comm, algo);
 }
 
 /**
- * Non-blocking vector reduce-scatter.
+ * Perform a \verbatim embed:rst:inline :ref:`non-blocking <comm-nonblocking>` \endverbatim Reduce_scatterv().
+ *
+ * @param[in] sendbuf Buffer containing the local vector to be reduced/scattered.
+ * @param[out] recvbuf Buffer for the scattered portion of the reduced vector.
+ * @param[in] counts Vector of the length of the scattered vector each rank
+ * should receive, in elements of type `T`.
+ * @param[in] op The reduction operation to perform.
+ * @param[in] comm The communicator to reduce/scatter over.
+ * @param[out] req Request object for the asynchronous operation.
+ * @param[in] algo Request a particular reduce-scatterv algorithm.
  */
 template <typename Backend, typename T>
 void NonblockingReduce_scatterv(
@@ -359,28 +464,43 @@ void NonblockingReduce_scatterv(
 }
 
 /**
- * In-place non-blocking vector reduce-scatter.
+ * Perform a \verbatim embed:rst:inline :ref:`non-blocking <comm-nonblocking>` \endverbatim
+ * \verbatim embed:rst:inline :ref:`in-place <comm-inplace>` \endverbatim Reduce_scatterv().
+ *
+ * @param[in,out] buffer Input and output buffer initially containing
+ * the local vector to be reduced/scattered. Will be replaced with the
+ * scattered portion of the reduced vector.
+ * @param[in] counts Vector of the length of the scattered vector each rank
+ * should receive, in elements of type `T`.
+ * @param[in] op The reduction operation to perform.
+ * @param[in] comm The communicator to reduce/scatter over.
+ * @param[out] req Request object for the asynchronous operation.
+ * @param[in] algo Request a particular reduce-scatterv algorithm.
  */
 template <typename Backend, typename T>
 void NonblockingReduce_scatterv(
-  T* buf, std::vector<size_t> counts,
+  T* buffer, std::vector<size_t> counts,
   ReductionOperator op, typename Backend::comm_type& comm,
   typename Backend::req_type& req,
   typename Backend::reduce_scatterv_algo_type algo =
   Backend::reduce_scatterv_algo_type::automatic) {
   internal::trace::record_op<Backend, T>(
-    "nonblocking-reduce_scatterv", comm, buf, counts);
+    "nonblocking-reduce_scatterv", comm, buffer, counts);
   Backend::template NonblockingReduce_scatterv<T>(
-    buf, counts, op, comm, req, algo);
+    buffer, counts, op, comm, req, algo);
 }
 
 /**
  * Perform an allgather.
- * @param sendbuf Input data.
- * @param recvbuf Output data; should already be allocated.
- * @param count Length of sendbuf.
- * @param comm The communicator to allgather over.
- * @param algo Request a particular allgather algorithm.
+ *
+ * See \verbatim embed:rst:inline :ref:`Allgather <allgather>`. \endverbatim
+ *
+ * @param[in] sendbuf Buffer containing the local slice of data.
+ * @param[out] recvbuf Buffer for the gathered vector.
+ * @param[in] count Length of \p sendbuf in elements of type `T`.
+ * \p recvbuf should be `count * comm.size()` elements.
+ * @param[in] comm The communicator to allgather over.
+ * @param[in] algo Request a particular allgather algorithm.
  */
 template <typename Backend, typename T>
 void Allgather(const T* sendbuf, T* recvbuf, size_t count,
@@ -393,27 +513,34 @@ void Allgather(const T* sendbuf, T* recvbuf, size_t count,
 }
 
 /**
- * Perform an in-place allgather.
- * @param recvbuf Input and output data; input will be overwritten.
- * @param count Length of data to send.
- * @param comm The communicator to allgather over.
- * @param algo Request a particular allgather algorithm.
+ * Perform an \verbatim embed:rst:inline :ref:`in-place <comm-inplace>` \endverbatim Allgather().
+ *
+ * @param[in,out] buffer Input and output buffer initially containing
+ * the local slice of data. Will contain the gathered vector.
+ * @param[in] count Length, in elements of type `T`, of the local slice
+ * of data. \p buffer should be `count * comm.size()` elements.
+ * @param[in] comm The communicator to allgather over.
+ * @param[in] algo Request a particular allgather algorithm.
  */
 template <typename Backend, typename T>
-void Allgather(T* recvbuf, size_t count,
+void Allgather(T* buffer, size_t count,
                typename Backend::comm_type& comm,
                typename Backend::allgather_algo_type algo =
                Backend::allgather_algo_type::automatic) {
-  internal::trace::record_op<Backend, T>("allgather", comm, recvbuf, count);
-  Backend::template Allgather<T>(recvbuf, count, comm, algo);
+  internal::trace::record_op<Backend, T>("allgather", comm, buffer, count);
+  Backend::template Allgather<T>(buffer, count, comm, algo);
 }
 
 /**
- * Non-blocking version of allgather.
- * This returns immediately (i.e. does only local operations) and starts the
- * allgather asynchronously.
- * It is not safe to modify sendbuf or recvbuf until the request indicates that
- * the operation has completed.
+ * Perform a \verbatim embed:rst:inline :ref:`non-blocking <comm-nonblocking>` \endverbatim Allgather().
+ *
+ * @param[in] sendbuf Buffer containing the local slice of data.
+ * @param[out] recvbuf Buffer for the gathered vector.
+ * @param[in] count Length of \p sendbuf in elements of type `T`.
+ * \p recvbuf should be `count * comm.size()` elements.
+ * @param[in] comm The communicator to allgather over.
+ * @param[out] req Request object for the asynchronous operation.
+ * @param[in] algo Request a particular allgather algorithm.
  */
 template <typename Backend, typename T>
 void NonblockingAllgather(
@@ -427,27 +554,40 @@ void NonblockingAllgather(
   Backend::template NonblockingAllgather<T>(sendbuf, recvbuf, count, comm, req, algo);
 }
 
-/** In-place version of NonblockingAllgather; same semantics apply. */
+/**
+ * Perform a \verbatim embed:rst:inline :ref:`non-blocking <comm-nonblocking>` \endverbatim
+ * \verbatim embed:rst:inline :ref:`in-place <comm-inplace>` \endverbatim Allgather().
+ *
+ * @param[in,out] buffer Input and output buffer initially containing
+ * the local slice of data. Will contain the gathered vector.
+ * @param[in] count Length, in elements of type `T`, of the local slice
+ * of data. \p buffer should be `count * comm.size()` elements.
+ * @param[in] comm The communicator to allgather over.
+ * @param[out] req Request object for the asynchronous operation.
+ * @param[in] algo Request a particular allgather algorithm.
+ */
 template <typename Backend, typename T>
 void NonblockingAllgather(
-  T* recvbuf, size_t count,
+  T* buffer, size_t count,
   typename Backend::comm_type& comm,
   typename Backend::req_type& req,
   typename Backend::allgather_algo_type algo =
   Backend::allgather_algo_type::automatic) {
   internal::trace::record_op<Backend, T>("nonblocking-allgather", comm,
-                                         recvbuf, count);
-  Backend::template NonblockingAllgather<T>(recvbuf, count, comm, req, algo);
+                                         buffer, count);
+  Backend::template NonblockingAllgather<T>(buffer, count, comm, req, algo);
 }
 
 /**
- * Perform a vector allgather.
- * @param sendbuf Input data.
- * @param recvbuf Output data; should already be allocated.
- * @param counts Length of sendbuf on each processor.
- * @param displs Offsets in recvbuf to receive each message.
- * @param comm The communicator to allgatherv over.
- * @param algo Request a particular allgatherv algorithm.
+ * Perform a \verbatim embed:rst:inline :ref:`vector <comm-vector>` \endverbatim Allgather().
+ *
+ * @param[in] sendbuf Buffer containing the local slice of data.
+ * @param[out] recvbuf Buffer for the gathered vector.
+ * @param[in] counts Length of \p sendbuf on each rank in elements of type `T`.
+ * @param[in] displs Offsets, in elements of type `T`, into \p recvbuf
+ * where data from the corresponding rank should be received.
+ * @param[in] comm The communicator to allgatherv over.
+ * @param[in] algo Request a particular allgatherv algorithm.
  */
 template <typename Backend, typename T>
 void Allgatherv(const T* sendbuf, T* recvbuf,
@@ -462,12 +602,15 @@ void Allgatherv(const T* sendbuf, T* recvbuf,
 }
 
 /**
- * Perform an in-place vector allgather.
- * @param buffer Input and output data; input will be overwritten.
- * @param counts Length of data to send on each processor.
- * @param displs Offsets in recvbuf for each message.
- * @param comm The communicator to allgatherv over.
- * @param algo Request a particular allgatherv algorithm.
+ * Perform an \verbatim embed:rst:inline :ref:`in-place <comm-inplace>` \endverbatim Allgatherv().
+ *
+ * @param[in,out] buffer Input and output buffer initially containing
+ * the local slice of data. Will contain the gathered vector.
+ * @param[in] counts Length of each rank's slice in elements of type `T`.
+ * @param[in] displs Offsets, in elements of type `T`, into \p buffer
+ * where data from the corresponding rank should be received.
+ * @param[in] comm The communicator to allgatherv over.
+ * @param[in] algo Request a particular allgatherv algorithm.
  */
 template <typename Backend, typename T>
 void Allgatherv(T* buffer,
@@ -482,13 +625,16 @@ void Allgatherv(T* buffer,
 }
 
 /**
- * Non-blocking vector allgather.
+ * Perform a \verbatim embed:rst:inline :ref:`non-blocking <comm-nonblocking>` \endverbatim Allgatherv().
  *
- * This returns immediately (i.e., does only local operations) and starts the
- * vector allgather asynchronously.
- *
- * It is not safe to modify sendbuf or recvbuf until the request indicates that
- * the operation has completed.
+ * @param[in] sendbuf Buffer containing the local slice of data.
+ * @param[out] recvbuf Buffer for the gathered vector.
+ * @param[in] counts Length of \p sendbuf on each rank in elements of type `T`.
+ * @param[in] displs Offsets, in elements of type `T`, into \p recvbuf
+ * where data from the corresponding rank should be received.
+ * @param[in] comm The communicator to allgatherv over.
+ * @param[out] req Request object for the asynchronous operation.
+ * @param[in] algo Request a particular allgatherv algorithm.
  */
 template <typename Backend, typename T>
 void NonblockingAllgatherv(const T* sendbuf, T* recvbuf,
@@ -503,7 +649,19 @@ void NonblockingAllgatherv(const T* sendbuf, T* recvbuf,
   Backend::template NonblockingAllgatherv<T>(sendbuf, recvbuf, counts, displs, comm, req, algo);
 }
 
-/** In-place version of NonblockingAllgatherv; same semantics apply. */
+/**
+ * Perform a \verbatim embed:rst:inline :ref:`non-blocking <comm-nonblocking>` \endverbatim
+ * \verbatim embed:rst:inline :ref:`in-place <comm-inplace>` \endverbatim Allgatherv().
+ *
+ * @param[in,out] buffer Input and output buffer initially containing
+ * the local slice of data. Will contain the gathered vector.
+ * @param[in] counts Length of each rank's slice in elements of type `T`.
+ * @param[in] displs Offsets, in elements of type `T`, into \p buffer
+ * where data from the corresponding rank should be received.
+ * @param[in] comm The communicator to allgatherv over.
+ * @param[out] req Request object for the asynchronous operation.
+ * @param[in] algo Request a particular allgatherv algorithm.
+ */
 template <typename Backend, typename T>
 void NonblockingAllgatherv(T* buffer,
                            std::vector<size_t> counts,
@@ -520,10 +678,10 @@ void NonblockingAllgatherv(T* buffer,
 /**
  * Perform a barrier synchronization.
  *
- * This will not complete until every process in comm has entered the barrier.
+ * See \verbatim embed:rst:inline :ref:`Barrier <barrier>`. \endverbatim
  *
- * @param comm The communicator to synchronize over.
- * @param algo Request a particular barrier algorithm.
+ * @param[in] comm The communicator to synchronize over.
+ * @param[in] algo Request a particular barrier algorithm.
  */
 template <typename Backend>
 void Barrier(typename Backend::comm_type& comm,
@@ -533,7 +691,13 @@ void Barrier(typename Backend::comm_type& comm,
   Backend::Barrier(comm, algo);
 }
 
-/** Non-blocking barrier synchronization. */
+/**
+ * Perform a \verbatim embed:rst:inline :ref:`non-blocking <comm-nonblocking>` \endverbatim Barrier().
+ *
+ * @param[in] comm The communicator to synchronize over.
+ * @param[out] req Request object for the asynchronous operation.
+ * @param[in] algo Request a particular barrier algorithm.
+ */
 template <typename Backend>
 void NonblockingBarrier(typename Backend::comm_type& comm,
                         typename Backend::req_type& req,
@@ -543,55 +707,69 @@ void NonblockingBarrier(typename Backend::comm_type& comm,
   Backend::NonblockingBarrier(comm, req, algo);
 }
 
-// There are no in-place broadcast versions; it is always in-place.
-
 /**
  * Perform a broadcast.
- * @param buf Data to send on root; received into on other processes.
- * @param count Length of buf.
- * @param root The root of the broadcast.
- * @param comm The communicator to broadcast over.
- * @param algo Request a particular broadcast algorithm.
+ *
+ * Broadcast is always \verbatim embed:rst:inline :ref:`in-place <comm-inplace>`. \endverbatim
+ *
+ * See \verbatim embed:rst:inline :ref:`Bcast <bcast>`. \endverbatim
+ *
+ * @param[in,out] buffer On the root, buffer containing the data to
+ * broadcast. On other ranks, buffer that will receive the broadcasted data.
+ * @param[in] count Length of \p buffer in elements of type `T`.
+ * @param[in] root Root rank for the operation.
+ * @param[in] comm The communicator to broadcast over.
+ * @param[in] algo Request a particular broadcast algorithm.
  */
 template <typename Backend, typename T>
-void Bcast(T* buf,
+void Bcast(T* buffer,
            size_t count,
            int root,
            typename Backend::comm_type& comm,
            typename Backend::bcast_algo_type algo =
            Backend::bcast_algo_type::automatic) {
-  internal::trace::record_op<Backend, T>("bcast", comm, buf, count, root);
-  Backend::template Bcast<T>(buf, count, root, comm, algo);
+  internal::trace::record_op<Backend, T>("bcast", comm, buffer, count, root);
+  Backend::template Bcast<T>(buffer, count, root, comm, algo);
 }
 
 /**
- * Non-blocking version of Bcast.
- * This returns immediately (i.e. does only local operations) and starts the
- * broadcast asynchronously.
- * It is not safe to modify buf until the request indicates that the operation
- * has completed.
+ * Perform a \verbatim embed:rst:inline :ref:`non-blocking <comm-nonblocking>` \endverbatim Bcast().
+ *
+ * Broadcast is always \verbatim embed:rst:inline :ref:`in-place <comm-inplace>`. \endverbatim
+ *
+ * @param[in,out] buffer On the root, buffer containing the data to
+ * broadcast. On other ranks, buffer that will receive the broadcasted data.
+ * @param[in] count Length of \p buffer in elements of type `T`.
+ * @param[in] root Root rank for the operation.
+ * @param[in] comm The communicator to broadcast over.
+ * @param[out] req Request for the asynchronous operation.
+ * @param[in] algo Request a particular broadcast algorithm.
  */
 template <typename Backend, typename T>
 void NonblockingBcast(
-  T* buf,
+  T* buffer,
   size_t count,
   int root,
   typename Backend::comm_type& comm,
   typename Backend::req_type& req,
   typename Backend::bcast_algo_type algo =
   Backend::bcast_algo_type::automatic) {
-  internal::trace::record_op<Backend, T>("nonblocking-bcast", comm, buf,
+  internal::trace::record_op<Backend, T>("nonblocking-bcast", comm, buffer,
                                          count, root);
-  Backend::template NonblockingBcast<T>(buf,  count, root, comm, req, algo);
+  Backend::template NonblockingBcast<T>(buffer, count, root, comm, req, algo);
 }
 
 /**
- * All-to-all scatter/gather operation.
- * @param sendbuf The source data buffer.
- * @param recvbuf The destination data buffer.
- * @param count The per-rank data count.
- * @param comm The communicator for this all-to-all operation.
- * @param algo Request a particular all-to-all algorithm.
+ * Perform an all-to-all.
+ *
+ * See \verbatim embed:rst:inline :ref:`Alltoall <alltoall>`. \endverbatim
+ *
+ * @param[in] sendbuf Buffer containing the local vector slices.
+ * @param[out] recvbuf Buffer for the assembled slices.
+ * @param[in] count Length of each slice in \p sendbuf in elements of type `T`.
+ * \p sendbuf and \p recvbuf should be `count * comm.size()` elements.
+ * @param[in] comm The communicator for this all-to-all operation.
+ * @param[in] algo Request a particular all-to-all algorithm.
  */
 template <typename Backend, typename T>
 void Alltoall(
@@ -605,11 +783,14 @@ void Alltoall(
 }
 
 /**
- * In-place all-to-all scatter/gather operation.
- * @param buffer The data buffer; overwritten on completion.
- * @param count The per-rank data count.
- * @param comm The communicator fo this all-to-all operation.
- * @param algo Request a particular all-to-all algorithm.
+ * Perform an \verbatim embed:rst:inline :ref:`in-place <comm-inplace>` \endverbatim Alltoall().
+ *
+ * @param[in,out] buffer Input and output buffer initially containing
+ * the local vector slices. Will be replaced with the assembled slices.
+ * @param[in] count Length of each slice in \p sendbuf in elements of type `T`.
+ * \p buffer should be `count * comm.size()` elements.
+ * @param[in] comm The communicator fo this all-to-all operation.
+ * @param[in] algo Request a particular all-to-all algorithm.
  */
 template <typename Backend, typename T>
 void Alltoall(
@@ -621,11 +802,15 @@ void Alltoall(
 }
 
 /**
- * Non-blocking version of Alltoall.
- * This returns immediately (i.e. does only local operations) and
- * starts the all-to-all asynchronously.
- * It is not safe to modify sendbuf or recvbuf until the request
- * indicates that the operation has completed.
+ * Perform a \verbatim embed:rst:inline :ref:`nonblocking <comm-nonblocking>` \endverbatim Alltoall().
+ *
+ * @param[in] sendbuf Buffer containing the local vector slices.
+ * @param[out] recvbuf Buffer for the assembled slices.
+ * @param[in] count Length of each slice in \p sendbuf in elements of type `T`.
+ * \p sendbuf and \p recvbuf should be `count * comm.size()` elements.
+ * @param[in] comm The communicator for this all-to-all operation.
+ * @param[out] req Request object for the asynchronous operation.
+ * @param[in] algo Request a particular all-to-all algorithm.
  */
 template <typename Backend, typename T>
 void NonblockingAlltoall(
@@ -640,7 +825,18 @@ void NonblockingAlltoall(
                                            comm, req, algo);
 }
 
-/** In-place version of NonblockingAlltoall; same semantics apply. */
+/**
+ * Perform a \verbatim embed:rst:inline :ref:`non-blocking <comm-nonblocking>` \endverbatim
+ * \verbatim embed:rst:inline :ref:`in-place <comm-inplace>` \endverbatim Alltoall().
+ *
+ * @param[in,out] buffer Input and output buffer initially containing
+ * the local vector slices. Will be replaced with the assembled slices.
+ * @param[in] count Length of each slice in \p sendbuf in elements of type `T`.
+ * \p buffer should be `count * comm.size()` elements.
+ * @param[in] comm The communicator fo this all-to-all operation.
+ * @param[out] req Request object for the asynchronous operation.
+ * @param[in] algo Request a particular all-to-all algorithm.
+ */
 template <typename Backend, typename T>
 void NonblockingAlltoall(
   T* buffer, size_t count, typename Backend::comm_type& comm,
@@ -653,15 +849,19 @@ void NonblockingAlltoall(
 }
 
 /**
- * Vector all-to-all scatter/gather operation.
- * @param sendbuf Source data buffer.
- * @param send_counts Length of data to send to each processor.
- * @param send_displs Offset in sendbuf for each message.
- * @param recvbuf Destination data buffer.
- * @param recv_counts Length of data to receive from each processor.
- * @param recv_displs Offset in recvbuf for each message.
- * @param comm Communicator for this all-to-all operation.
- * @param algo Request a particular vector all-to-all algorithm.
+ * Perform a \verbatim embed:rst:inline :ref:`vector <comm-vector>` \endverbatim Alltoall().
+ *
+ * @param[in] sendbuf Buffer containing the local vector slices.
+ * @param[in] send_counts Length of each slice in \p sendbuf in elements of type `T`.
+ * @param[in] send_displs Offsets, in elements of type `T`, into \p sendbuf
+ * where the data for the corresponding rank begins.
+ * @param[out] recvbuf Buffer for the assembled slices.
+ * @param[in] recv_counts Length of each slice that will be received in
+ * \p recvbuf in elements of type `T`.
+ * @param[in] recv_displs Offsets, in elements of type `T`, into \p recvbuf
+ * where data from the corresponding rank should be received.
+ * @param[in] comm Communicator for this all-to-all operation.
+ * @param[in] algo Request a particular vector all-to-all algorithm.
  */
 template <typename Backend, typename T>
 void Alltoallv(
@@ -682,12 +882,17 @@ void Alltoallv(
 }
 
 /**
- * In-place vector all-to-all scatter/gather operation.
- * @param buffer Send and receive data buffer.
- * @param counts Length of data to send and receive from each processor.
- * @param displs Offset in buffer for each message sent and received.
- * @param comm Communicator for this all-to-all operation.
- * @param algo Request a particular vector all-to-all algorithm.
+ * Perform an \verbatim embed:rst:inline :ref:`in-place <comm-inplace>` \endverbatim Alltoallv().
+ *
+ * @param[in,out] buffer Input and output buffer initially containing
+ * the local vector slices for each rank. Will contain the assembled
+ * slices for this rank.
+ * @param[in] counts Length of the slice sent to and received from each
+ * rank, in elements of type `T`.
+ * @param[in] displs Offsets, in elements of type `T`, into \p buffer
+ * for data sent to and received from the corresponding rank.
+ * @param[in] comm Communicator for this all-to-all operation.
+ * @param[in] algo Request a particular vector all-to-all algorithm.
  */
 template <typename Backend, typename T>
 void Alltoallv(
@@ -702,7 +907,20 @@ void Alltoallv(
 }
 
 /**
- * Non-blocking vector all-to-all.
+ * Perform a \verbatim embed:rst:inline :ref:`non-blocking <comm-nonblocking>` \endverbatim Alltoallv().
+ *
+ * @param[in] sendbuf Buffer containing the local vector slices.
+ * @param[in] send_counts Length of each slice in \p sendbuf in elements of type `T`.
+ * @param[in] send_displs Offsets, in elements of type `T`, into \p sendbuf
+ * where the data for the corresponding rank begins.
+ * @param[out] recvbuf Buffer for the assembled slices.
+ * @param[in] recv_counts Length of each slice that will be received in
+ * \p recvbuf in elements of type `T`.
+ * @param[in] recv_displs Offsets, in elements of type `T`, into \p recvbuf
+ * where data from the corresponding rank should be received.
+ * @param[in] comm Communicator for this all-to-all operation.
+ * @param[out] req Request object for the asynchronous operation.
+ * @param[in] algo Request a particular vector all-to-all algorithm.
  */
 template <typename Backend, typename T>
 void NonblockingAlltoallv(
@@ -724,7 +942,21 @@ void NonblockingAlltoallv(
     comm, req, algo);
 }
 
-/** In-place version of NonblockingAlltoall; same semantics apply. */
+/**
+ * Perform a \verbatim embed:rst:inline :ref:`non-blocking <comm-nonblocking>` \endverbatim
+ * \verbatim embed:rst:inline :ref:`in-place <comm-inplace>` \endverbatim Alltoallv().
+ *
+ * @param[in,out] buffer Input and output buffer initially containing
+ * the local vector slices for each rank. Will contain the assembled
+ * slices for this rank.
+ * @param[in] counts Length of the slice sent to and received from each
+ * rank, in elements of type `T`.
+ * @param[in] displs Offsets, in elements of type `T`, into \p buffer
+ * for data sent to and received from the corresponding rank.
+ * @param[in] comm Communicator for this all-to-all operation.
+ * @param[out] req Request object for the asynchronous operation.
+ * @param[in] algo Request a particular vector all-to-all algorithm.
+ */
 template <typename Backend, typename T>
 void NonblockingAlltoallv(
   T* buffer,
@@ -740,13 +972,18 @@ void NonblockingAlltoallv(
 }
 
 /**
- * Gather-to-one operation.
- * @param sendbuf The source data buffer.
- * @param recvbuf The destination data buffer.
- * @param count The per-rank data count.
- * @param root The root process to which data is gathered.
- * @param comm The communicator for this gather operation.
- * @param algo Request a particular gather algorithm.
+ * Perform a gather-to-one.
+ *
+ * See \verbatim embed:rst:inline :ref:`Gather <gather>`. \endverbatim
+ *
+ * @param[in] sendbuf Buffer containing the local slice of data.
+ * @param[out] recvbuf Buffer for the gathered vector on the root.
+ * @param[in] count Length of each local slice in elements of type `T`.
+ * \p sendbuf should be `count` elements and \p recvbuf should be
+ * `count * comm.size()` elements on the root.
+ * @param[in] root Root rank for the operation.
+ * @param[in] comm The communicator for this gather operation.
+ * @param[in] algo Request a particular gather algorithm.
  */
 template <typename Backend, typename T>
 void Gather(
@@ -760,15 +997,18 @@ void Gather(
 }
 
 /**
- * In-place gather-to-one operation.
- * @param buffer The data buffer; overwritten on completion. For root
- *               processes, has size count*comm.size() and acts as
- *               recvbuf above. For nonroot processes, has size count
- *               and acts as sendbuf above.
- * @param count The per-rank data count.
- * @param root The root process to which data is gathered.
- * @param comm The communicator fo this gather operation.
- * @param algo Request a particular gather algorithm.
+ * Perform a \verbatim embed:rst:inline :ref:`in-place <comm-inplace>` \endverbatim Gather().
+ *
+ * @param[in,out] buffer Input and output buffer initially containing the
+ * local slice of data. On the root, its slice must be in the location
+ * corresponding to its rank position. On non-roots, the entire buffer
+ * is the slice. Will be replaced with the gathered vector on the root.
+ * @param[in] count Length of each local slice in elements of type `T`.
+ * \p buffer should be `count` elements on non-roots and `count * comm.size()`
+ * elements on the root.
+ * @param[in] root Root rank for the operation.
+ * @param[in] comm The communicator fo this gather operation.
+ * @param[in] algo Request a particular gather algorithm.
  */
 template <typename Backend, typename T>
 void Gather(
@@ -780,11 +1020,17 @@ void Gather(
 }
 
 /**
- * Non-blocking version of Gather.
- * This returns immediately (i.e. does only local operations) and
- * starts the gather asynchronously.
- * It is not safe to modify sendbuf or recvbuf until the request
- * indicates that the operation has completed.
+ * Perform a \verbatim embed:rst:inline :ref:`non-blocking <comm-nonblocking>` \endverbatim Gather().
+ *
+ * @param[in] sendbuf Buffer containing the local slice of data.
+ * @param[out] recvbuf Buffer for the gathered vector on the root.
+ * @param[in] count Length of each local slice in elements of type `T`.
+ * \p sendbuf should be `count` elements and \p recvbuf should be
+ * `count * comm.size()` elements on the root.
+ * @param[in] root Root rank for the operation.
+ * @param[in] comm The communicator for this gather operation.
+ * @param[out] req Request object for the asynchronous operation.
+ * @param[in] algo Request a particular gather algorithm.
  */
 template <typename Backend, typename T>
 void NonblockingGather(
@@ -799,7 +1045,22 @@ void NonblockingGather(
                                          comm, req, algo);
 }
 
-/** In-place version of NonblockingGather; same semantics apply. */
+/**
+ * Perform a \verbatim embed:rst:inline :ref:`non-blocking <comm-nonblocking>` \endverbatim
+ * \verbatim embed:rst:inline :ref:`in-place <comm-inplace>` \endverbatim Gather().
+ *
+ * @param[in,out] buffer Input and output buffer initially containing the
+ * local slice of data. On the root, its slice must be in the location
+ * corresponding to its rank position. On non-roots, the entire buffer
+ * is the slice. Will be replaced with the gathered vector on the root.
+ * @param[in] count Length of each local slice in elements of type `T`.
+ * \p buffer should be `count` elements on non-roots and `count * comm.size()`
+ * elements on the root.
+ * @param[in] root Root rank for the operation.
+ * @param[in] comm The communicator fo this gather operation.
+ * @param[out] req Request object for the asynchronous operation.
+ * @param[in] algo Request a particular gather algorithm.
+ */
 template <typename Backend, typename T>
 void NonblockingGather(
   T* buffer, size_t count, int root, typename Backend::comm_type& comm,
@@ -812,14 +1073,16 @@ void NonblockingGather(
 }
 
 /**
- * Vector gather-to-one operation.
- * @param sendbuf The source data buffer.
- * @param recvbuf The destination data buffer.
- * @param counts Amount of data each processor contributes.
- * @param displs Offset in recvbuf for each received message.
- * @param root The root process to which data is gathered.
- * @param comm The communicator for this gather operation.
- * @param algo Request a particular vector gather algorithm.
+ * Perform a \verbatim embed:rst:inline :ref:`vector <comm-vector>` \endverbatim Gather().
+ *
+ * @param[in] sendbuf Buffer containing the local slice of data.
+ * @param[out] recvbuf Buffer for the gathered vector on the root.
+ * @param[in] counts Length of each rank's slice in elements of type `T`.
+ * @param[in] displs Offsets, in elements of type `T`, into \p recvbuf
+ * where data from the corresponding rank will be received on the root.
+ * @param[in] root Root rank for the operation.
+ * @param[in] comm The communicator for this gather operation.
+ * @param[in] algo Request a particular vector gather algorithm.
  */
 template <typename Backend, typename T>
 void Gatherv(
@@ -834,13 +1097,18 @@ void Gatherv(
 }
 
 /**
- * In-place vector gather-to-one operation.
- * @param buffer Source and destination buffer.
- * @param counts Amount of data each processor contributes.
- * @param displs Offset in buffer for each received message.
- * @param root The root process to which data is gathered.
- * @param comm The communicator for this gather operation.
- * @param algo Request a particular vector gather algorithm.
+ * Perform a \verbatim embed:rst:inline :ref:`in-place <comm-inplace>` \endverbatim Gatherv().
+ *
+ * @param[in,out] buffer Inout and output buffer initially containing the
+ * local slice of data. On the root, its slice must be in the location
+ * corresponding to its rank position. On non-roots, the entire buffer
+ * is the slice. Will be replaced with the gathered vector on the root.
+ * @param[in] counts Length of each rank's slice in elements of type `T`.
+ * @param[in] displs Offsets, in elements of type `T`, into \p recvbuf
+ * where data from the corresponding rank will be received on the root.
+ * @param[in] root Root rank for the operation.
+ * @param[in] comm The communicator for this gather operation.
+ * @param[in] algo Request a particular vector gather algorithm.
  */
 template <typename Backend, typename T>
 void Gatherv(
@@ -855,7 +1123,17 @@ void Gatherv(
 }
 
 /**
- * Non-blocking vector gather-to-one operation.
+ * Perform a \verbatim embed:rst:inline :ref:`non-blocking <comm-nonblocking>` \endverbatim Gatherv().
+ *
+ * @param[in] sendbuf Buffer containing the local slice of data.
+ * @param[out] recvbuf Buffer for the gathered vector on the root.
+ * @param[in] counts Length of each rank's slice in elements of type `T`.
+ * @param[in] displs Offsets, in elements of type `T`, into \p recvbuf
+ * where data from the corresponding rank will be received on the root.
+ * @param[in] root Root rank for the operation.
+ * @param[in] comm The communicator for this gather operation.
+ * @param[out] req Request object for the asynchronous operation.
+ * @param[in] algo Request a particular vector gather algorithm.
  */
 template <typename Backend, typename T>
 void NonblockingGatherv(
@@ -872,7 +1150,22 @@ void NonblockingGatherv(
     sendbuf, recvbuf, counts, displs, root, comm, req, algo);
 }
 
-/** In-place non-blocking vector gather-to-one operation. */
+/**
+ * Perform a \verbatim embed:rst:inline :ref:`non-blocking <comm-nonblocking>` \endverbatim
+ * \verbatim embed:rst:inline :ref:`in-place <comm-inplace>` \endverbatim Gatherv().
+ *
+ * @param[in,out] buffer Inout and output buffer initially containing the
+ * local slice of data. On the root, its slice must be in the location
+ * corresponding to its rank position. On non-roots, the entire buffer
+ * is the slice. Will be replaced with the gathered vector on the root.
+ * @param[in] counts Length of each rank's slice in elements of type `T`.
+ * @param[in] displs Offsets, in elements of type `T`, into \p recvbuf
+ * where data from the corresponding rank will be received on the root.
+ * @param[in] root Root rank for the operation.
+ * @param[in] comm The communicator for this gather operation.
+ * @param[out] req Request object for the asynchronous operation.
+ * @param[in] algo Request a particular vector gather algorithm.
+ */
 template <typename Backend, typename T>
 void NonblockingGatherv(
   T* buffer,
@@ -889,13 +1182,19 @@ void NonblockingGatherv(
 }
 
 /**
- * Scatter-to-all operation.
- * @param sendbuf The source data buffer.
- * @param recvbuf The destination data buffer.
- * @param count The per-rank data count.
- * @param root The root process from which data is scattered.
- * @param comm The communicator for this scatter operation.
- * @param algo Request a particular scatter algorithm.
+ * Perform a scatter-to-all.
+ *
+ * See \verbatim embed:rst:inline :ref:`Scatter <scatter>`. \endverbatim
+ *
+ * @param[in] sendbuf Buffer containing the complete vector at the root.
+ * Empty on non-roots.
+ * @param[out] recvbuf Buffer for the scattered slice.
+ * @param[in] count Length of each scattered slice in elements of type `T`.
+ * \p sendbuf should be `count * comm.size()` elements on the root and
+ * empty on non-roots. \p recvbuf should be `count` elements.
+ * @param[in] root Root rank for the operation.
+ * @param[in] comm The communicator for this scatter operation.
+ * @param[in] algo Request a particular scatter algorithm.
  */
 template <typename Backend, typename T>
 void Scatter(
@@ -909,15 +1208,18 @@ void Scatter(
 }
 
 /**
- * In-place scatter-to-all operation.
- * @param buffer The data buffer; overwritten on completion. For root
- *               processes, has size count*comm.size() and acts as
- *               sendbuf above. For nonroot processes, has size count
- *               and acts as recvbuf above.
- * @param count The per-rank data count.
- * @param root The root process from which data is scattered.
- * @param comm The communicator fo this scatter operation.
- * @param algo Request a particular scatter algorithm.
+ * Perform an \verbatim embed:rst:inline :ref:`in-place <comm-inplace>` \endverbatim Scatter().
+ *
+ * @param[in,out] buffer Input and output buffer initially containing the
+ * complete vector at the root and empty on non-roots. Will be replaced
+ * with the scattered slice on each rank. At the root, the scattered
+ * slice is in its corresponding rank position.
+ * @param[in] count Length of each scattered slice in elements of type `T`.
+ * \p buffer should be `count * comm.size()` elements on the root and
+ * `count` elements on non-roots.
+ * @param[in] root Root rank for the operation.
+ * @param[in] comm The communicator for this scatter operation.
+ * @param[in] algo Request a particular scatter algorithm.
  */
 template <typename Backend, typename T>
 void Scatter(
@@ -929,11 +1231,18 @@ void Scatter(
 }
 
 /**
- * Non-blocking version of Scatter.
- * This returns immediately (i.e. does only local operations) and
- * starts the scatter asynchronously.
- * It is not safe to modify sendbuf or recvbuf until the request
- * indicates that the operation has completed.
+ * Perform a \verbatim embed:rst:inline :ref:`non-blocking <comm-nonblocking>` \endverbatim Scatter().
+ *
+ * @param[in] sendbuf Buffer containing the complete vector at the root.
+ * Empty on non-roots.
+ * @param[out] recvbuf Buffer for the scattered slice.
+ * @param[in] count Length of each scattered slice in elements of type `T`.
+ * \p sendbuf should be `count * comm.size()` elements on the root and
+ * empty on non-roots. \p recvbuf should be `count` elements.
+ * @param[in] root Root rank for the operation.
+ * @param[in] comm The communicator for this scatter operation.
+ * @param[out] req Request object for the asynchronous operation.
+ * @param[in] algo Request a particular scatter algorithm.
  */
 template <typename Backend, typename T>
 void NonblockingScatter(
@@ -948,7 +1257,22 @@ void NonblockingScatter(
                                          comm, req, algo);
 }
 
-/** In-place version of NonblockingScatter; same semantics apply. */
+/**
+ * Perform a \verbatim embed:rst:inline :ref:`non-blocking <comm-nonblocking>` \endverbatim
+ * \verbatim embed:rst:inline :ref:`in-place <comm-inplace>` \endverbatim Scatter().
+ *
+ * @param[in,out] buffer Input and output buffer initially containing the
+ * complete vector at the root and empty on non-roots. Will be replaced
+ * with the scattered slice on each rank. At the root, the scattered
+ * slice is in its corresponding rank position.
+ * @param[in] count Length of each scattered slice in elements of type `T`.
+ * \p buffer should be `count * comm.size()` elements on the root and
+ * `count` elements on non-roots.
+ * @param[in] root Root rank for the operation.
+ * @param[in] comm The communicator for this scatter operation.
+ * @param[out] req Request object for the asynchronous operation.
+ * @param[in] algo Request a particular scatter algorithm.
+ */
 template <typename Backend, typename T>
 void NonblockingScatter(
   T* buffer, size_t count, int root, typename Backend::comm_type& comm,
@@ -961,14 +1285,18 @@ void NonblockingScatter(
 }
 
 /**
- * Vector scatter-to-all operation.
- * @param sendbuf Source data buffer.
- * @param recvbuf Destination data buffer.
- * @param counts Length of each message in sendbuf.
- * @param displs Offsets of each message in sendbuf.
- * @param root The root process from which data is scattered.
- * @param comm The communicator for this scatter operation.
- * @param algo Request a particular vector scatter algorithm.
+ * Perform a \verbatim embed:rst:inline :ref:`vector <comm-vector>` \endverbatim Scatter().
+ *
+ * @param[in] sendbuf Buffer containing the complete vector at the root.
+ * Empty on non-roots.
+ * @param[out] recvbuf Buffer for the scattered slice.
+ * @param[in] counts Length of the slice each rank will receive, in
+ * elements of type `T`.
+ * @param[in] displs Offsets, in elements of type `T`, into \p sendbuf
+ * where the slices for each corresponding rank begin.
+ * @param[in] root Root rank for the operation.
+ * @param[in] comm The communicator for this scatter operation.
+ * @param[in] algo Request a particular vector scatter algorithm.
  */
 template <typename Backend, typename T>
 void Scatterv(
@@ -985,13 +1313,19 @@ void Scatterv(
 }
 
 /**
- * In-place vector scatter-to-all operation.
- * @param buffer Source and destination data buffer.
- * @param counts Length of each message in buffer.
- * @param displs Offsets of each message in buffer.
- * @param root The root process from which data is scattered.
- * @param comm The communicator for this scatter operation.
- * @param algo Request a particular vector scatter algorithm.
+ * Perform a \verbatim embed:rst:inline :ref:`in-place <comm-inplace>` \endverbatim Scatterv().
+ *
+ * @param[in,out] buffer Input and output buffer initially containing the
+ * complete vector at the root and empty on non-roots. Will be replaced
+ * with the scattered slice on each rank. At the root, the scattered
+ * slice is in its corresponding rank position.
+ * @param[in] counts Length of the slice each rank will receive, in
+ * elements of type `T`.
+ * @param[in] displs Offsets, in elements of type `T`, into \p buffer
+ * where the slices for each corresponding rank begin.
+ * @param[in] root Root rank for the operation.
+ * @param[in] comm The communicator for this scatter operation.
+ * @param[in] algo Request a particular vector scatter algorithm.
  */
 template <typename Backend, typename T>
 void Scatterv(
@@ -1007,7 +1341,19 @@ void Scatterv(
 }
 
 /**
- * Non-blocking vector scatter-to-all operation.
+ * Perform a \verbatim embed:rst:inline :ref:`non-blocking <comm-nonblocking>` \endverbatim Scatterv().
+ *
+ * @param[in] sendbuf Buffer containing the complete vector at the root.
+ * Empty on non-roots.
+ * @param[out] recvbuf Buffer for the scattered slice.
+ * @param[in] counts Length of the slice each rank will receive, in
+ * elements of type `T`.
+ * @param[in] displs Offsets, in elements of type `T`, into \p sendbuf
+ * where the slices for each corresponding rank begin.
+ * @param[in] root Root rank for the operation.
+ * @param[in] comm The communicator for this scatter operation.
+ * @param[out] req Request object for the asynchronus operation.
+ * @param[in] algo Request a particular vector scatter algorithm.
  */
 template <typename Backend, typename T>
 void NonblockingScatterv(
@@ -1024,7 +1370,23 @@ void NonblockingScatterv(
     sendbuf, recvbuf, counts, displs, root, comm, req, algo);
 }
 
-/** In-place version of NonblockingScatterv. */
+/**
+ * Perform a \verbatim embed:rst:inline :ref:`non-blocking <comm-nonblocking>` \endverbatim
+ * \verbatim embed:rst:inline :ref:`in-place <comm-inplace>` \endverbatim Scatterv().
+ *
+ * @param[in,out] buffer Input and output buffer initially containing the
+ * complete vector at the root and empty on non-roots. Will be replaced
+ * with the scattered slice on each rank. At the root, the scattered
+ * slice is in its corresponding rank position.
+ * @param[in] counts Length of the slice each rank will receive, in
+ * elements of type `T`.
+ * @param[in] displs Offsets, in elements of type `T`, into \p buffer
+ * where the slices for each corresponding rank begin.
+ * @param[in] root Root rank for the operation.
+ * @param[in] comm The communicator for this scatter operation.
+ * @param[out] req Request object for the asynchronous operation.
+ * @param[in] algo Request a particular vector scatter algorithm.
+ */
 template <typename Backend, typename T>
 void NonblockingScatterv(
   T* buffer,
@@ -1041,10 +1403,13 @@ void NonblockingScatterv(
 
 /**
  * Send a point-to-point message.
- * @param sendbuf The data to send.
- * @param count Length of sendbuf.
- * @param dest Rank in comm to send to.
- * @param comm Communicator to send within.
+ *
+ * See \verbatim :embed:rst:inline :ref:`Send and Recv <send-and-recv>`. \endverbatim
+ *
+ * @param[in] sendbuf Buffer containing the local data to send.
+ * @param[in] count Length of \p sendbuf in elements of type `T`.
+ * @param[in] dest Rank in comm to send to.
+ * @param[in] comm Communicator to send within.
  */
 template <typename Backend, typename T>
 void Send(const T* sendbuf, size_t count, int dest,
@@ -1053,7 +1418,15 @@ void Send(const T* sendbuf, size_t count, int dest,
   Backend::template Send<T>(sendbuf, count, dest, comm);
 }
 
-/** Non-blocking version of Send. */
+/**
+ * Perform a \verbatim embed:rst:inline :ref:`non-blocking <comm-nonblocking>` \endverbatim Send().
+ *
+ * @param[in] sendbuf Buffer containing the local data to send.
+ * @param[in] count Length of \p sendbuf in elements of type `T`.
+ * @param[in] dest Rank in comm to send to.
+ * @param[out] req Request object for the asynchronous operation.
+ * @param[in] comm Communicator to send within.
+ */
 template <typename Backend, typename T>
 void NonblockingSend(const T* sendbuf, size_t count, int dest,
                      typename Backend::comm_type& comm,
@@ -1065,10 +1438,13 @@ void NonblockingSend(const T* sendbuf, size_t count, int dest,
 
 /**
  * Receive a point-to-point message.
- * @param recvbuf Buffer to receive into.
- * @param count Length of recvbuf.
- * @param src Rank in comm to receive from.
- * @param comm Communicator to receive within.
+ *
+ * See \verbatim :embed:rst:inline :ref:`Send and Recv <send-and-recv>`. \endverbatim
+ *
+ * @param[out] recvbuf Buffer to receive the sent data.
+ * @param[in] count Length of \p recvbuf in elements of type `T`.
+ * @param[in] src Rank in comm to receive from.
+ * @param[in] comm Communicator to receive within.
  */
 template <typename Backend, typename T>
 void Recv(T* recvbuf, size_t count, int src,
@@ -1077,7 +1453,15 @@ void Recv(T* recvbuf, size_t count, int src,
   Backend::template Recv<T>(recvbuf, count, src, comm);
 }
 
-/** Non-blocking version of Recv. */
+/**
+ * Perform a \verbatim embed:rst:inline :ref:`non-blocking <comm-nonblocking>` \endverbatim Recv().
+ *
+ * @param[out] recvbuf Buffer to receive the sent data.
+ * @param[in] count Length of \p recvbuf in elements of type `T`.
+ * @param[in] src Rank in comm to receive from.
+ * @param[out] req Request object for the asynchronous operation.
+ * @param[in] comm Communicator to receive within.
+ */
 template <typename Backend, typename T>
 void NonblockingRecv(T* recvbuf, size_t count, int src,
                      typename Backend::comm_type& comm,
@@ -1088,14 +1472,17 @@ void NonblockingRecv(T* recvbuf, size_t count, int src,
 }
 
 /**
- * Perform a simultaneous send and recv.
- * @param sendbuf The data to send.
- * @param send_count Length of sendbuf.
- * @param dest Rank in comm to send to.
- * @param recvbuf Buffer to receive into.
- * @param recv_count Length of recvbuf.
- * @param src Rank in comm to receive from.
- * @param comm Communicator to send/recv within.
+ * Perform a simultaneous Send() and Recv().
+ *
+ * See \verbatim :embed:rst:inline :ref:`SendRecv <sendrecv>`. \endverbatim
+ *
+ * @param[in] sendbuf Buffer containing the local data to send.
+ * @param[in] send_count Length of \p sendbuf in elements of type `T`.
+ * @param[in] dest Rank in comm to send to.
+ * @param[out] recvbuf Buffer to receive the sent data.
+ * @param[in] recv_count Length of \p recvbuf in elements of type `T`.
+ * @param[in] src Rank in comm to receive from.
+ * @param[in] comm Communicator to send/recv within.
  */
 template <typename Backend, typename T>
 void SendRecv(const T* sendbuf, size_t send_count, int dest,
@@ -1108,22 +1495,36 @@ void SendRecv(const T* sendbuf, size_t send_count, int dest,
 }
 
 /**
- * Perform an in-place simultaneous send and recv.
- * @param buf Input and output data; input will be overwritten.
- * @param count Length of buf.
- * @param dest Rank in comm to send to.
- * @param src Rank in comm to receive from.
- * @param comm Communicator to send/recv within.
+ * Perform an \verbatim embed:rst:inline :ref:`in-place <comm-inplace>` \endverbatim SendRecv().
+ *
+ * @param[in,out] buffer Input and output buffer initially contaiuning the
+ * local data to send. Will be replaced with the received data.
+ * @param[in] count Length of data to send and receive. \p buffer should
+ * be `count` elements.
+ * @param[in] dest Rank in comm to send to.
+ * @param[in] src Rank in comm to receive from.
+ * @param[in] comm Communicator to send/recv within.
  */
 template <typename Backend, typename T>
-void SendRecv(T* buf, size_t count, int dest, int src,
+void SendRecv(T* buffer, size_t count, int dest, int src,
               typename Backend::comm_type& comm) {
-  internal::trace::record_op<Backend, T>("sendrecv", comm, buf, count,
+  internal::trace::record_op<Backend, T>("sendrecv", comm, buffer, count,
                                          dest, src);
-  Backend::template SendRecv<T>(buf, count, dest, src, comm);
+  Backend::template SendRecv<T>(buffer, count, dest, src, comm);
 }
 
-/** Non-blocking version of SendRecv. */
+/**
+ * Perform a \verbatim embed:rst:inline :ref:`non-blocking <comm-nonblocking>` \endverbatim SendRecv().
+ *
+ * @param[in] sendbuf Buffer containing the local data to send.
+ * @param[in] send_count Length of \p sendbuf in elements of type `T`.
+ * @param[in] dest Rank in comm to send to.
+ * @param[out] recvbuf Buffer to receive the sent data.
+ * @param[in] recv_count Length of \p recvbuf in elements of type `T`.
+ * @param[in] src Rank in comm to receive from.
+ * @param[out] req Request object for the asynchronous operation.
+ * @param[in] comm Communicator to send/recv within.
+ */
 template <typename Backend, typename T>
 void NonblockingSendRecv(const T* sendbuf, size_t send_count, int dest,
                          T* recvbuf, size_t recv_count, int src,
@@ -1137,22 +1538,55 @@ void NonblockingSendRecv(const T* sendbuf, size_t send_count, int dest,
                                            comm, req);
 }
 
-/** In-place version on NonblockingSendRecv; same semantics apply. */
+/**
+ * Perform a \verbatim embed:rst:inline :ref:`non-blocking <comm-nonblocking>` \endverbatim
+ * \verbatim embed:rst:inline :ref:`in-place <comm-inplace>` \endverbatim SendRecv().
+ *
+ * @param[in,out] buffer Input and output buffer initially contaiuning the
+ * local data to send. Will be replaced with the received data.
+ * @param[in] count Length of data to send and receive. \p buffer should
+ * be `count` elements.
+ * @param[in] dest Rank in comm to send to.
+ * @param[in] src Rank in comm to receive from.
+ * @param[out] req Request object for the asynchronous operation.
+ * @param[in] comm Communicator to send/recv within.
+ */
 template <typename Backend, typename T>
-void NonblockingSendRecv(T* buf, size_t count, int dest, int src,
+void NonblockingSendRecv(T* buffer, size_t count, int dest, int src,
                          typename Backend::comm_type& comm,
                          typename Backend::req_type& req) {
   internal::trace::record_op<Backend, T>("nonblocking-sendrecv", comm,
-                                         buf, count, dest, src);
-  Backend::template NonblockingSendRecv<T>(buf, count, dest, src, comm, req);
+                                         buffer, count, dest, src);
+  Backend::template NonblockingSendRecv<T>(buffer, count, dest, src, comm, req);
 }
 
 /**
- * Test whether req has completed or not, returning true if it has.
+ * Return true if the asynchronous operation associated with \p req
+ * has completed.
+ *
+ * This does not block. If the operation has completed, \p req will be
+ * reset to `Backend::null_req`.
+ *
+ * See \verbatim embed:rst:inline :ref:`comm-nonblocking`. \endverbatim
+ *
+ * @param[in,out] req Request object for the asynchronous operation.
  */
 template <typename Backend>
 bool Test(typename Backend::req_type& req);
-/** Wait until req has been completed. */
+
+/**
+ * Wait until the asynchronous operation associated with \p req has
+ * has completed.
+ *
+ * This blocks the compute stream associated with the operation.
+ *
+ * \p req will be reset to `Backend::null_req` after the operation
+ * completes.
+ *
+ * See \verbatim embed:rst:inline :ref:`comm-nonblocking`. \endverbatim
+ *
+ * @param[in,out] req Request object for the asynchronous operation.
+ */
 template <typename Backend>
 void Wait(typename Backend::req_type& req);
 
