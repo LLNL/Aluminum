@@ -1,8 +1,10 @@
 ![Al](al.svg) Aluminum
 ======================
 
-**Aluminum** provides a generic interface to high-performance communication libraries for both CPU and GPU platforms and GPU-friendly semantics.
+**Aluminum** is a high-performance communication library for CPUs, GPUs, and other accelerator platforms.
+It leverages existing libraries, such as MPI, NCCL, and RCCL, plus its own infrastructure, to deliver performance and accelerator-centric communication.
 
+Aluminum is open-source and maintained by the Lawrence Livermore National Laboratory.
 If you use Aluminum, please cite [our paper](https://ieeexplore.ieee.org/document/8638639):
 ```
 @inproceedings{dryden2018aluminum,
@@ -16,153 +18,35 @@ If you use Aluminum, please cite [our paper](https://ieeexplore.ieee.org/documen
 ## Features
 
 * Support for blocking and non-blocking collective and point-to-point operations
-* GPU-aware algorithms
-* GPU-centric communication semantics
-* Supported backends:
-  * `MPI`: MPI and custom algorithms implemented on top of MPI
-  * `NCCL`: Interface to Nvidia's [NCCL 2](https://developer.nvidia.com/nccl) library (including point-to-point operations and collectives built on them) or to AMD's [RCCL](https://github.com/ROCmSoftwarePlatform/rccl)
-  * `HostTransfer`: Provides GPU support even when your MPI is not CUDA or HIP/ROCm-aware
-  * `MPI-CUDA`: Experimental intra-node RMA support
-  
-See the [examples](examples) for basic usage examples.
+* Accelerator-centric communication
+* Supported communication backends:
+  * `MPI`: Uses the Message Passing Interface and supports any hardware your underlying MPI library supports.
+  * `NCCL`: Uses either Nvidia's [NCCL](https://developer.nvidia.com/nccl) library for Nvidia GPUs or AMD's [RCCL](https://github.com/ROCmSoftwarePlatform/rccl) library for AMD GPUs.
+  * `HostTransfer`: Uses MPI plus the CUDA or HIP runtime to support Nvidia or AMD GPUs without specialized libraries.
 
-### GPU-centric Communication
+## Getting Started
 
-Aluminum aims to provide GPU-centric communication semantics with the `HostTransfer` backend: A communication operation should function "just like a CUDA kernel".
-Aluminum supports associating a CUDA stream with a communicator.
-All communication on the communicator will be with respect to the computation on that stream:
-* The communication will proceed asynchronously and not block the initiating host thread.
-* The communication will not begin until all outstanding operations on the stream at the time the communication operation was called have completed.
-* No computation on the stream enqueued after the communication operation was will begin until the communication completes.
+For full details, see the [Aluminum documentation](https://aluminum.readthedocs.io/).
 
-These semantics are comparable to those provided by NCCL/RCCL.
+For basic usage examples, see the [examples](examples).
 
-### Non-blocking GPU Communication
+### Building and Installation
 
-Aluminum provides support for non-blocking GPU communication operations in its `NCCL` and `HostTransfer` backends.
-Much like non-blocking MPI operations can be initiated by a thread, progress in the background, and be waited on for completion later, a CUDA stream can do the same thing.
-Aluminum will manage the necessary synchronization and progress, and the communication will be performed on an internal CUDA stream.
+Aluminum is available via [Spack](https://spack.io/) or can be installed manually from source.
 
-### Thread Safety
+Source builds need a recent CMake, C++ compiler (with support for C++17), MPI, and hwloc.
+Accelerator backends need the appropriate runtime libraries.
 
-Aluminum provides different levels of thread safety, depending on user requirements.
-This must be chosen at compile time.
-All builds of Aluminum are safe to use in the presence of external threads, but Aluminum offers different guarantes when multiple threads attempt to use Aluminum concurrently.
-* A standard build of Aluminum supports only a single thread calling an Aluminum API at a given time. However, Aluminum APIs may be called by multiple different threads, so long as access is synchronized by the caller. (This is equivalent to `MPI_THREAD_SERIALIZED`.)
-* Aluminum may be built with `-D ALUMINUM_ENABLE_THREAD_MULTIPLE=YES` to enable support for multiple threads to call Aluminum APIs concurrently. Aluminum will provide the appropriate synchronization, but the caller is required to ensure that no cyclic dependencies, deadlocks, races, or the like are introduced. (This is equivalent to `MPI_THREAD_MULTIPLE`.)
-
-There is one exception: Concurrent construction of communicators is not guaranteed to be safe.
-
-## Getting started
-
-Aluminum is also available via [Spack](https://spack.io/).
-
-### Dependencies
-For all builds:
-* A compiler with at least C++14 support
-* MPI (at least MPI 3.0)
-* HWLOC (any recent version should work)
-* CMake 3.17 or later
-
-For GPU backends (`NCCL` and `HostTransfer`):
-* CUDA (at least 11.0, for Nvidia GPUs) or HIP/ROCm (at least 5.0, for AMD GPUs)
-* CUB (any recent version)
-
-For the `NCCL`/`RCCL` backend:
-* NCCL (for Nvidia GPUs) or RCCL (for AMD GPUs), at least version 2.10.0
-
-### Building
-
-Aluminum uses CMake. An out-of-source build is required.
-A basic build can be done with:
+A basic out-of-source build can be done with
 ```
 mkdir build && cd build
-cmake /path/to/aluminum/source
+cmake /path/to/Aluminum/source
 ```
 
-The supported communication backends are selected when you run `cmake`.
-The `MPI` backend is always available. For other backends:
-* `NCCL`: `-D ALUMINUM_ENABLE_NCCL=YES`
-* `HostTransfer`: `-D ALUMINUM_ENABLE_HOST_TRANSFER=YES`
-* `MPI-CUDA`: `-D ALUMINUM_ENABLE_MPI_CUDA=YES -D ALUMINUM_ENABLE_MPI_CUDA_RMA=YES`
-
-To manually specify CUDA or ROCm support, use `-D ALUMINUM_ENABLE_CUDA=YES` or `-D ALUMINUM_ENABLE_ROCM=YES`.
-If you specify a GPU communication backend, CUDA support will be assumed unless ROCm support is explicitly requested.
-
-#### Other useful CMake flags
-
-For specifying the MPI location, see the [CMake FindMPI documentation](https://cmake.org/cmake/help/latest/module/FindMPI.html).
-
-To manually specify the a CUDA compiler, pass `-D CMAKE_CUDA_COMPILER=/path/to/nvcc`.
-
-If HWLOC is installed in a nonstandard location, pass `-D HWLOC_DIR=/path/to/hwloc/prefix`.
-
-If NCCL (or RCCL) is installed in a nonstandard location, pass `-D NCCL_DIR=/path/to/nccl/prefix`.
-
-To specify an install directory, use the standard CMake flag: `-D CMAKE_INSTALL_PREFIX=/path/to/install/destination`.
-
-##### Debug Builds
-
-A standard debug build can be enabled by using `-D CMAKE_BUILD_TYPE=Debug`.
-For additional debugging help, mostly intended for developers:
-* Internal hang checking for the progress engine: `-D ALUMINUM_DEBUG_HANG_CHECK=YES`.
-* Operation tracing: `-D ALUMINUM_ENABLE_TRACE=YES`.
-
-### Example Build
-
-For a "standard" Nvidia GPU system, you might use the following:
-```
-cmake \
--D ALUMINUM_ENABLE_NCCL=YES \
--D NCCL_DIR=/path/to/nccl \
--D ALUMINUM_ENABLE_HOST_TRANSFER=YES \
--D CMAKE_INSTALL_PREFIX=/path/to/install \
-path/to/aluminum/source
-```
-
-## API Overview
-
-The `MPI`, `NCCL` (which uses `RCCL` on AMD HIP/ROCm systems), and `HostTransfer` backends support the following operations, including non-blocking and in-place (where meaingful) versions:
-* Collectives:
-  * Allgather
-  * Vector allgather
-  * Allreduce
-  * Alltoall
-  * Vector alltoall
-  * Barrier
-  * Broadcast
-  * Gather
-  * Vector gather
-  * Reduce
-  * ReduceScatter (equivalent to `MPI_Reduce_scatter_block`)
-  * Vector ReduceScatter (equivalent to `MPI_Reduce_scatter`)
-  * Scatter
-  * Vector scatter
-* Point-to-point:
-  * Send
-  * Recv
-  * SendRecv
-
-Full API documentation is coming soon...
-
-## Tests and benchmarks
-
-The `test` directory contains tests for every operation Aluminum supports.
-The tests are only built when `-D ALUMINUM_ENABLE_TESTS=ON` is passed to CMake or a debug build is requested.
-
-The main interface to the tests is `text_ops.exe`, which supports any combination of operation, backend, datatype, and so on that Aluminum supports.
-For example, to test the `Alltoall` operation on the NCCL backend:
-```
-mpirun -n 128 ./test_ops.exe --op alltoall --backend nccl
-```
-Run it with `--help` for full details.
-
-The `benchmark` directory contains benchmarks for all operations and can be run similarly using `benchmark_ops.exe`.
-The benchmarks are only built when `-D ALUMINUM_ENABLE_BENCHMARKS=ON` is passed to CMake.
-
-Note that building the benchmarks or tests can take a long time.
+For full details on building, configuration, testing, and benchmarking, see the [documentation](https://aluminum.readthedocs.io/en/latest/build.html).
 
 ## Authors
+
 * [Nikoli Dryden](https://github.com/ndryden)
 * [Naoya Maruyama](https://github.com/naoyam)
 * [Tom Benson](https://github.com/benson31)
