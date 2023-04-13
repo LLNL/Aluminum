@@ -84,6 +84,9 @@ inline int get_local_rank() {
     env = std::getenv("SLURM_LOCALID");
   }
   if (!env) {
+    env = std::getenv("FLUX_TASK_LOCAL_ID");
+  }
+  if (!env) {
     std::cerr << "Cannot determine local rank" << std::endl;
     std::abort();
   }
@@ -98,6 +101,19 @@ inline int get_local_size() {
   }
   if (!env) {
     env = std::getenv("SLURM_NTASKS_PER_NODE");
+  }
+  // Flux doesn't have an environment variable for this directly, so we
+  // assume an even distribution.
+  if (!env) {
+    char* flux_size = std::getenv("FLUX_JOB_SIZE");
+    if (flux_size) {
+      char* flux_nnodes = std::getenv("FLUX_JOB_NNODES");
+      if (flux_nnodes) {
+        int size = std::atoi(flux_size);
+        int nnodes = std::atoi(flux_nnodes);
+        return (size + nnodes - 1) / nnodes;
+      }
+    }
   }
   if (!env) {
     std::cerr << "Cannot determine local size" << std::endl;
@@ -126,6 +142,47 @@ T gen_random_val(Generator& g) {
   return rng(g);
 }
 
+/** Helper for generating random vectors. */
+template <typename T>
+struct RandVectorGen {
+  template <typename Generator>
+  static std::vector<T> gen(size_t count, Generator& g) {
+    std::vector<T> v(count);
+    for (size_t i = 0; i < count; ++i) {
+      v[i] = gen_random_val<T>(g);
+    }
+    return v;
+  }
+};
+#ifdef AL_HAS_HALF
+// Specialization for half. Standard RNGs do not support half.
+template <>
+struct RandVectorGen<__half> {
+  template <typename Generator>
+  static std::vector<__half> gen(size_t count, Generator& g) {
+    std::vector<__half> v(count);
+    for (size_t i = 0; i < count; ++i) {
+      v[i] = __float2half(gen_random_val<float>(g));
+    }
+    return v;
+  }
+};
+#endif
+#ifdef AL_HAS_BFLOAT
+// Specialization for bfloat. Standard RNGs do not support bfloat.
+template <>
+struct RandVectorGen<al_bfloat16> {
+  template <typename Generator>
+  static std::vector<al_bfloat16> gen(size_t count, Generator& g) {
+    std::vector<al_bfloat16> v(count);
+    for (size_t i = 0; i < count; ++i) {
+      v[i] = __float2bfloat16(gen_random_val<float>(g));
+    }
+    return v;
+  }
+};
+#endif
+
 /**
  * Identify a vector type for each backend and support generating an
  * instance of it with random data.
@@ -151,11 +208,7 @@ struct VectorType {
         rng_seeded = true;
       }
     }
-    type v(count);
-    for (size_t i = 0; i < count; ++i) {
-      v[i] = gen_random_val<T>(rng_gen);
-    }
-    return v;
+    return RandVectorGen<T>::gen(count, rng_gen);
   }
 
   /** Return a copy of the data on the host. */
@@ -319,29 +372,6 @@ struct VectorType<T, Al::NCCLBackend> {
   }
 };
 
-/**
- * Version of VectorType for the NCCLBackend and half data.
- *
- * Standard C++ RNGs do not support half, so we have a separate
- * specialization.
- */
-template <> struct VectorType<__half, Al::NCCLBackend> {
-  using type = CUDAVector<__half>;
-
-  static type gen_data(size_t count, AlGpuStream_t stream = 0) {
-    auto&& host_data = VectorType<float, Al::MPIBackend>::gen_data(count);
-    std::vector<__half> host_data_half(count);
-    for (size_t i = 0; i < count; ++i) {
-      host_data_half[i] = __float2half(host_data[i]);
-    }
-    CUDAVector<__half> data(host_data_half, stream);
-    return data;
-  }
-
-  static std::vector<__half> copy_to_host(const type& v) {
-    return v.copyout();
-  }
-};
 
 #endif  /** AL_HAS_NCCL */
 
