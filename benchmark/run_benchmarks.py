@@ -19,7 +19,7 @@ parser.add_argument('--min-procs', type=int,
 parser.add_argument('--launcher', type=str, default='jsrun',
                     choices=['jsrun', 'srun', 'flux'],
                     help='Which parallel launcher to use')
-parser.add_argument('--benchmark-ops', type=str, default='./benchmark_ops.exe',
+parser.add_argument('--benchmark-ops', type=str, default='./benchmark_ops',
                     help='Path to benchmark_ops binary')
 parser.add_argument('--extra-args', type=str,
                     help='Extra arguments to pass to launcher')
