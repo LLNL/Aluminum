@@ -253,6 +253,39 @@ struct CommWrapper {
 };
 
 /**
+ * Get a CommWrapper for the world.
+ *
+ * This will permute if needed.
+ */
+template <typename Backend>
+CommWrapper<Backend> get_world_wrapper(MPI_Comm world,
+                                       cxxopts::ParseResult& parsed_opts) {
+  // Permute if needed.
+  if (parsed_opts.count("permute")) {
+    int comm_size, comm_rank;
+    MPI_Comm_size(world, &comm_size);
+    MPI_Comm_rank(world, &comm_rank);
+    std::vector<int> permutation = parsed_opts["permute"].as<std::vector<int>>();
+    if (static_cast<size_t>(comm_size) != permutation.size()) {
+      std::cerr << "Invalid --permute, expected " << comm_size << " entries, got "
+                << permutation.size() << std::endl;
+      std::abort();
+    }
+    if (permutation[comm_rank] < 0 || permutation[comm_rank] >= comm_size) {
+      std::cerr << "Rank " << comm_rank
+                << " trying to permute to impossible rank "
+                << permutation[comm_rank] << std::endl;
+      std::abort();
+    }
+    MPI_Comm permuted_world;
+    MPI_Comm_split(world, 1, permutation[comm_rank], &permuted_world);
+    return CommWrapper<Backend>(permuted_world);
+  } else {
+    return CommWrapper<Backend>(world);
+  }
+}
+
+/**
  * Ensure all Aluminum operations on a communicator have completed.
  *
  * For backends that work with compute streams on other devices

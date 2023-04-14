@@ -72,7 +72,7 @@ void run_benchmark(cxxopts::ParseResult& parsed_opts) {
   auto sizes = get_sizes_from_opts(parsed_opts);
 
   StreamManager<Backend>::init(1UL);
-  CommWrapper<Backend> comm_wrapper(MPI_COMM_WORLD);
+  CommWrapper<Backend> comm_wrapper = get_world_wrapper<Backend>(MPI_COMM_WORLD, parsed_opts);  //comm_wrapper(MPI_COMM_WORLD);
   OpProfile<Op, Backend, T> profile(comm_wrapper.comm(), op_options);
   Timer<Backend> timer;
 
@@ -257,6 +257,7 @@ int main(int argc, char** argv) {
     ("save-to-file", "Save results to a file", cxxopts::value<std::string>())
     ("summarize", "Print stats summary over all ranks or a specific rank", cxxopts::value<int>()->default_value("-1"))
     ("no-print-table", "Do not print results table")
+    ("permute", "Permute ranks per this list", cxxopts::value<std::vector<int>>())
     ("help", "Print help");
   auto parsed_opts = options.parse(argc, argv);
 

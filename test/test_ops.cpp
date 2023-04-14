@@ -261,7 +261,8 @@ void run_test(cxxopts::ParseResult& parsed_opts) {
   int num_threads = parsed_opts["threads"].as<int>();
   std::vector<CommWrapper<Backend>> comm_wrappers;
   for (int i = 0; i < std::max(num_threads, 1); ++i) {
-    comm_wrappers.emplace_back(MPI_COMM_WORLD);
+    //comm_wrappers.emplace_back(MPI_COMM_WORLD);
+    comm_wrappers.emplace_back(get_world_wrapper<Backend>(MPI_COMM_WORLD, parsed_opts));
   }
   CommWrapper<Backend>& comm_wrapper = comm_wrappers[0];
 
@@ -428,6 +429,7 @@ int main(int argc, char** argv) {
     ("no-abort-on-hang", "Do not abort if a hang is detected")
     ("hang-on-error", "Hang when an error is detected")
     ("trials", "Number of times to run the test", cxxopts::value<size_t>()->default_value("1"))
+    ("permute", "Permute ranks per this list", cxxopts::value<std::vector<int>>())
     ("help", "Print help");
   auto parsed_opts = options.parse(argc, argv);
 
