@@ -62,10 +62,17 @@ void run_benchmark(cxxopts::ParseResult& parsed_opts) {
     op_options.algos = algorithms[0];
   }
 
+  int send_rank = parsed_opts["send-rank"].as<int>();
+  int recv_rank = parsed_opts["recv-rank"].as<int>();
+  if ((send_rank >= 0 && recv_rank < 0) || (recv_rank >= 0 && send_rank < 0)) {
+    std::cerr << "Must specify both send-rank and recv-rank." << std::endl;
+    std::abort();
+  }
+
   auto sizes = get_sizes_from_opts(parsed_opts);
 
   StreamManager<Backend>::init(1UL);
-  CommWrapper<Backend> comm_wrapper(MPI_COMM_WORLD);
+  CommWrapper<Backend> comm_wrapper = get_world_wrapper<Backend>(MPI_COMM_WORLD, parsed_opts);  //comm_wrapper(MPI_COMM_WORLD);
   OpProfile<Op, Backend, T> profile(comm_wrapper.comm(), op_options);
   Timer<Backend> timer;
 
@@ -75,26 +82,45 @@ void run_benchmark(cxxopts::ParseResult& parsed_opts) {
       std::cerr << "Cannot benchmark point-to-point with a single rank" << std::endl;
       std::abort();
     }
-    // If there is an odd number of ranks, the last one sits out.
-    if (!((comm_wrapper.size() % 2 != 0) &&
-          (comm_wrapper.rank() == comm_wrapper.size() - 1))) {
-      // Even ranks send to rank + 1, odd ranks receive from rank - 1.
-      // If this is not sendrecv, we need to adjust the op.
-      if (comm_wrapper.comm().rank() % 2 == 0) {
-        op_options.src = comm_wrapper.rank() + 1;
-        op_options.dst = comm_wrapper.rank() + 1;
+    // Limit to only specific ranks if requested.
+    if (send_rank > 0 && recv_rank > 0) {
+      if (comm_wrapper.rank() == send_rank) {
+        op_options.src = recv_rank;
+        op_options.dst = recv_rank;
         if (op != AlOperation::sendrecv) {
           op = AlOperation::send;
         }
-      } else {
-        op_options.src = comm_wrapper.rank() - 1;
-        op_options.dst = comm_wrapper.rank() - 1;
+      } else if (comm_wrapper.rank() == recv_rank) {
+        op_options.src = send_rank;
+        op_options.dst = send_rank;
         if (op != AlOperation::sendrecv) {
           op = AlOperation::recv;
         }
+      } else {
+        participates_in_pt2pt = false;
+
       }
     } else {
-      participates_in_pt2pt = false;
+      if (!((comm_wrapper.size() % 2 != 0) &&
+            (comm_wrapper.rank() == comm_wrapper.size() - 1))) {
+        // Even ranks send to rank + 1, odd ranks receive from rank - 1.
+        // If this is not sendrecv, we need to adjust the op.
+        if (comm_wrapper.comm().rank() % 2 == 0) {
+          op_options.src = comm_wrapper.rank() + 1;
+          op_options.dst = comm_wrapper.rank() + 1;
+          if (op != AlOperation::sendrecv) {
+            op = AlOperation::send;
+          }
+        } else {
+          op_options.src = comm_wrapper.rank() - 1;
+          op_options.dst = comm_wrapper.rank() - 1;
+          if (op != AlOperation::sendrecv) {
+            op = AlOperation::recv;
+          }
+        }
+      } else {
+        participates_in_pt2pt = false;
+      }
     }
   }
 
@@ -157,9 +183,9 @@ void run_benchmark(cxxopts::ParseResult& parsed_opts) {
       std::map<typename decltype(summaries)::key_type,
                typename decltype(summaries)::mapped_type>
         sorted_summaries(summaries.begin(), summaries.end());
-      std::cout << "Size Mean Median Stdev Min Max" << std::endl;
+      std::cout << "Size\t\tMean\t\tMedian\t\tStdev\t\tMin\t\tMax" << std::endl;
       for (const auto& p : sorted_summaries) {
-        std::cout << p.first << " " << p.second << std::endl;
+        std::cout << p.first << "\t\t" << p.second << std::endl;
       }
     }
   }
@@ -219,15 +245,19 @@ int main(int argc, char** argv) {
     ("reduction-op", "Reduction operator to use (if needed)", cxxopts::value<std::string>())
     ("algorithm", "Operator algorithm to use", cxxopts::value<std::string>()->default_value(""))
     ("root", "Root of operator (if needed)", cxxopts::value<int>()->default_value("0"))
-    ("size", "Size of message to test (roughly, the size sent to each process)", cxxopts::value<size_t>())
-    ("min-size", "Minimum size of message to test", cxxopts::value<size_t>()->default_value("1"))
-    ("max-size", "Maximum size of message to test", cxxopts::value<size_t>()->default_value("4194304"))
+    ("send-rank", "Set single rank to perform sends", cxxopts::value<int>()->default_value("-1"))
+    ("recv-rank", "Set single rank to perform receives", cxxopts::value<int>()->default_value("-1"))
+    ("size", "Size (in elements) of message to test (roughly, the size sent to each process)", cxxopts::value<size_t>())
+    ("min-size", "Minimum size (in elements) of message to test", cxxopts::value<size_t>()->default_value("1"))
+    ("max-size", "Maximum size (in elements) of message to test", cxxopts::value<size_t>()->default_value("4194304"))
+    ("odd-sizes", "Include odd-sized messages")
     ("datatype", "Message datatype", cxxopts::value<std::string>()->default_value("float"))
     ("num-iters", "Number of benchmark iterations", cxxopts::value<size_t>()->default_value("100"))
     ("num-warmup", "Number of warmup iterations", cxxopts::value<size_t>()->default_value("10"))
     ("save-to-file", "Save results to a file", cxxopts::value<std::string>())
     ("summarize", "Print stats summary over all ranks or a specific rank", cxxopts::value<int>()->default_value("-1"))
     ("no-print-table", "Do not print results table")
+    ("permute", "Permute ranks per this list", cxxopts::value<std::vector<int>>())
     ("help", "Print help");
   auto parsed_opts = options.parse(argc, argv);
 

@@ -79,10 +79,10 @@ struct SummaryStats {
 };
 
 inline std::ostream& operator<<(std::ostream& os, const SummaryStats& summary) {
-  os << summary.mean << " "
-     << summary.median << " "
-     << summary.stdev << " "
-     << summary.min << " "
+  os << summary.mean << "\t"
+     << summary.median << "\t"
+     << summary.stdev << "\t"
+     << summary.min << "\t"
      << summary.max;
   return os;
 }
