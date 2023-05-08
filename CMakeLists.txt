@@ -418,6 +418,9 @@ if (ALUMINUM_ENABLE_ROCM)
       PATH_SUFFIXES lib64/cmake/rccl lib/cmake/rccl
       NO_DEFAULT_PATH)
     find_package(rccl CONFIG REQUIRED)
+
+    find_library(AL_LIB_RT rt)
+
     message(STATUS "Found RCCL: ${rccl_DIR}")
     set(AL_HAS_NCCL TRUE)
   endif ()

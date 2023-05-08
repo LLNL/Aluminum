@@ -110,6 +110,10 @@ if (AL_HAS_ROCM)
     ${ROCM_SMI_LIBRARY}
     ${Roctracer_LIBRARIES})
 
+  if (AL_LIB_RT)
+    target_link_libraries(Al PUBLIC "${AL_LIB_RT}")
+  endif ()
+
   # HIP language files are detected by the ".hip" extension. Since
   # we're upcycling ".cu" files for now, we just set their LANGUAGE to
   # be HIP.
