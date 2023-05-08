@@ -30,7 +30,7 @@
 #include <Al_config.hpp>
 
 #if defined(AL_HAS_ROCM)
-#include <rccl.h>
+#include <rccl/rccl.h>
 #include <hip/hip_runtime.h>
 #elif defined(AL_HAS_CUDA)
 #include <nccl.h>
