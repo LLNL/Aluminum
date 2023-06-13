@@ -196,7 +196,7 @@ set(AL_DESTRUCTIVE_INTERFERENCE_SIZE 128
   CACHE STRING
   "Minimum size in bytes to avoid destructive interference")
 
-set(AL_CUDA_STREAM_POOL_SIZE 5
+set(AL_CUDA_STREAM_POOL_SIZE 1
   CACHE STRING
   "Number of CUDA streams in the default stream pool")
 
