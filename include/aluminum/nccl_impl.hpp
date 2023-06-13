@@ -873,12 +873,14 @@ class NCCLBackend {
                                      AlGpuMemcpyDeviceToDevice, stream));
     }
     AL_CHECK_NCCL(ncclGroupStart());
-    AL_CHECK_NCCL(ncclSend((const void*) tmp_sendbuf, send_count,
-                           internal::nccl::TypeMap<T>(), dest,
-                           comm.m_nccl_comm, stream));
-    AL_CHECK_NCCL(ncclRecv((void*) recvbuf, recv_count,
-                           internal::nccl::TypeMap<T>(), src,
-                           comm.m_nccl_comm, stream));
+    if (send_count > 0UL)
+      AL_CHECK_NCCL(ncclSend((const void*) tmp_sendbuf, send_count,
+                             internal::nccl::TypeMap<T>(), dest,
+                             comm.m_nccl_comm, stream));
+    if (recv_count > 0UL)
+      AL_CHECK_NCCL(ncclRecv((void*) recvbuf, recv_count,
+                             internal::nccl::TypeMap<T>(), src,
+                             comm.m_nccl_comm, stream));
     AL_CHECK_NCCL(ncclGroupEnd());
     if (tmp_sendbuf != sendbuf) {
       internal::mempool.release<internal::MemoryType::CUDA>(tmp_sendbuf);
