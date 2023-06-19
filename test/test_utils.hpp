@@ -399,6 +399,32 @@ inline int get_number_of_gpus() {
 
 #endif  /** AL_HAS_CUDA */
 
+/**
+ * Attempt to identify the global rank from the environment.
+ *
+ * If this fails, optionally abort or return -1.
+ */
+inline int get_global_rank(bool required = true) {
+  char* env = std::getenv("MV2_COMM_WORLD_RANK");
+  if (!env) {
+    env = std::getenv("OMPI_COMM_WORLD_RANK");
+  }
+  if (!env) {
+    env = std::getenv("SLURM_PROCID");
+  }
+  if (!env) {
+    env = std::getenv("FLUX_TASK_RANK");
+  }
+  if (!env) {
+    if (required) {
+      std::cerr << "Cannot determine global rank" << std::endl;
+      std::abort();
+    }
+    return -1;
+  }
+  return std::atoi(env);
+}
+
 /** Attempt to identify the local rank on a node from the environment. */
 inline int get_local_rank() {
   char* env = std::getenv("MV2_COMM_WORLD_LOCAL_RANK");

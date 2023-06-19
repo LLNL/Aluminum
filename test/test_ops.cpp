@@ -405,8 +405,6 @@ struct test_dispatcher {
 };
 
 int main(int argc, char** argv) {
-  test_init_aluminum(argc, argv);
-
   cxxopts::Options options("test_ops", "Compare Aluminum operators with MPI");
   options.add_options()
     ("op", "Operator to test", cxxopts::value<std::string>())
@@ -433,15 +431,17 @@ int main(int argc, char** argv) {
     ("help", "Print help");
   auto parsed_opts = options.parse(argc, argv);
 
+  // Print help before initializing.
   if (parsed_opts.count("help")) {
-    int rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    if (rank == 0) {
+    // Attempt to determine the global rank, but do not fail if we cannot.
+    int rank = get_global_rank(false);  // Returns -1 if not found.
+    if (rank <= 0) {
       std::cout << options.help() << std::endl;
     }
-    test_fini_aluminum();
     std::exit(0);
   }
+
+  test_init_aluminum(argc, argv);
 
   if (parsed_opts.count("hang-rank")) {
     hang_for_debugging(parsed_opts["hang-rank"].as<int>());
