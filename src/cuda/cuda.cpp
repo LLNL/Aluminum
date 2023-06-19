@@ -53,17 +53,24 @@ void init(int&, char**&) {
   // Initialize internal streams.
   stream_pool.allocate(AL_CUDA_STREAM_POOL_SIZE);
   // Check whether stream memory operations are supported.
-  int attr;
+  int attr = 0;
 #if defined AL_HAS_ROCM
   int dev;
   AL_CHECK_CUDA(hipGetDevice(&dev));
   AL_CHECK_CUDA(hipDeviceGetAttribute(
                     &attr, hipDeviceAttributeCanUseStreamWaitValue, dev));
 #elif defined AL_HAS_CUDA
+  // There was an API change to these in CUDA 11.7, and the flag to check
+  // for support changed (to have _V1) in CUDA 12. But as of CUDA 12,
+  // these are enabled by default, so we do not need to check.
+#if CUDA_VERSION >= 12000
+  attr = 1;
+#else
   CUdevice dev;
   AL_CHECK_CUDA_DRV(cuCtxGetDevice(&dev));
   AL_CHECK_CUDA_DRV(cuDeviceGetAttribute(
                       &attr, CU_DEVICE_ATTRIBUTE_CAN_USE_STREAM_MEM_OPS, dev));
+#endif
 #endif
   stream_mem_ops_supported = attr;
   // Preallocate memory for synchronization operations.
