@@ -234,8 +234,6 @@ struct benchmark_dispatcher {
 };
 
 int main(int argc, char** argv) {
-  test_init_aluminum(argc, argv);
-
   cxxopts::Options options("benchmark_ops", "Benchmark Aluminum operations");
   options.add_options()
     ("op", "Operator to benchmark", cxxopts::value<std::string>())
@@ -262,14 +260,14 @@ int main(int argc, char** argv) {
   auto parsed_opts = options.parse(argc, argv);
 
   if (parsed_opts.count("help")) {
-    int rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    if (rank == 0) {
+    int rank = get_global_rank(false);  // Returns -1 if not found.
+    if (rank <= 0) {
       std::cout << options.help() << std::endl;
     }
-    test_fini_aluminum();
     std::exit(0);
   }
+
+  test_init_aluminum(argc, argv);
 
   // Simple validation.
   if (!parsed_opts.count("op")) {
