@@ -32,11 +32,6 @@ foreach(src IN LISTS AL_BENCHMARK_SOURCES AL_GPU_BENCHMARK_SOURCES)
     ${_benchmark_exe_name} SYSTEM PRIVATE
     ${CMAKE_SOURCE_DIR}/third_party/cxxopts/include)
 
-  # Use more caution now that "AL_HAS_CUDA" is overloaded.
-  if (AL_HAS_CUDA AND NOT AL_HAS_ROCM)
-    target_link_libraries(${_benchmark_exe_name} PUBLIC cuda)
-  endif ()
-
   # FIXME: Hopefully this can be removed in a future version of ROCm.
   if (AL_HAS_ROCM AND AL_BUILD_TYPE_UPPER MATCHES "DEBUG")
     target_compile_options(${_benchmark_exe_name} PRIVATE "-O0")

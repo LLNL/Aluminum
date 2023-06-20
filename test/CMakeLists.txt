@@ -55,11 +55,6 @@ foreach(src ${AL_TEST_SOURCES})
     SYSTEM PRIVATE
     ${CMAKE_SOURCE_DIR}/third_party/cxxopts/include)
   target_link_libraries(${_test_exe_name} PRIVATE Al aluminum_test_headers)
-  if (AL_HAS_CUDA AND NOT AL_HAS_ROCM)
-    target_link_libraries(${_test_exe_name} PUBLIC cuda)
-  endif()
-  target_link_libraries(${_test_exe_name} PRIVATE Threads::Threads)
-
   # FIXME: Hopefully this can be removed in a future version of ROCm.
   if (AL_HAS_ROCM AND AL_BUILD_TYPE_UPPER MATCHES "DEBUG")
     target_compile_options(${_test_exe_name} PRIVATE "-O0")
@@ -71,12 +66,9 @@ if (AL_HAS_MPI_CUDA_RMA AND NOT AL_HAS_ROCM)
   target_include_directories(
     test_rma_ring.exe SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/third_party/cxxopts/include)
   target_link_libraries(test_rma_ring.exe PRIVATE Al)
-  target_link_libraries(test_rma_ring.exe PUBLIC cuda)
   add_executable(test_rma_halo_exchange.exe
     test_rma_halo_exchange.cpp ${TEST_HEADERS})
   target_include_directories(
     test_rma_halo_exchange.exe SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/third_party/cxxopts/include)
   target_link_libraries(test_rma_halo_exchange.exe PRIVATE Al)
-  target_link_libraries(test_rma_halo_exchange.exe PUBLIC cuda)
-  target_link_libraries(${_test_exe_name} PRIVATE Threads::Threads)
 endif ()
