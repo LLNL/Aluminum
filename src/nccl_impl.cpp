@@ -56,6 +56,7 @@ NCCLCommunicator::~NCCLCommunicator() {
   // Only destroy resources if the driver is still loaded.
   if (AlGpuGetDevice(&d) == AlGpuSuccess) {
     try {
+      AL_CHECK_NCCL(ncclCommFinalize(m_nccl_comm));
       AL_CHECK_NCCL(ncclCommDestroy(m_nccl_comm));
     } catch (const al_exception& e) {
       std::cerr << "Caught exception in NCCLCommunicator destructor: "

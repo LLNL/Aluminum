@@ -340,7 +340,7 @@ if (ALUMINUM_ENABLE_CUDA)
   #   - CUDA::nvToolsExt
 
   if (ALUMINUM_ENABLE_NCCL)
-    find_package(NCCL 2.10.0 REQUIRED)
+    find_package(NCCL 2.14.0 REQUIRED)
     set(AL_HAS_NCCL TRUE)
   endif ()
 

@@ -18,8 +18,8 @@ The accelerator backends (``NCCL``, ``HostTransfer``) require:
 
 The ``NCCL``/``RCCL`` backend additionally requires:
 
-* For Nvidia GPUs: NCCL 2.10.0 or later
-* For AMD GPUs: RCCL 2.10.0 or later (this is usually bundled with HIP/ROCm installs)
+* For Nvidia GPUs: NCCL 2.14.0 or later
+* For AMD GPUs: RCCL 2.14.0 or later (this is usually bundled with HIP/ROCm installs)
 
 Aluminum uses CMake and an out-of-source build is required.
 A basic build can be done with:
