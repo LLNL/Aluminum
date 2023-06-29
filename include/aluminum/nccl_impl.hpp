@@ -873,11 +873,15 @@ class NCCLBackend {
                                      AlGpuMemcpyDeviceToDevice, stream));
     }
     AL_CHECK_NCCL(ncclGroupStart());
+#if defined(AL_HAS_ROCM)
     if (send_count > 0UL)
+#endif
       AL_CHECK_NCCL(ncclSend((const void*) tmp_sendbuf, send_count,
                              internal::nccl::TypeMap<T>(), dest,
                              comm.m_nccl_comm, stream));
+#if defined(AL_HAS_ROCM)
     if (recv_count > 0UL)
+#endif
       AL_CHECK_NCCL(ncclRecv((void*) recvbuf, recv_count,
                              internal::nccl::TypeMap<T>(), src,
                              comm.m_nccl_comm, stream));
