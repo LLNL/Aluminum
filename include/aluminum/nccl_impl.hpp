@@ -846,18 +846,24 @@ class NCCLBackend {
   template <typename T>
   static void do_send(const T* sendbuf, size_t count, int dest, comm_type& comm,
                       AlGpuStream_t stream) {
-    AL_CHECK_NCCL(ncclSend((const void*) sendbuf, count,
-                           internal::nccl::TypeMap<T>(), dest,
-                           comm.m_nccl_comm, stream));
+#if defined(AL_HAS_ROCM)
+    if (count > 0UL)
+#endif
+      AL_CHECK_NCCL(ncclSend((const void*) sendbuf, count,
+                             internal::nccl::TypeMap<T>(), dest,
+                             comm.m_nccl_comm, stream));
   }
 
   /** Do a NCCL recv. */
   template <typename T>
   static void do_recv(T* recvbuf, size_t count, int src, comm_type& comm,
                       AlGpuStream_t stream) {
-    AL_CHECK_NCCL(ncclRecv((void*) recvbuf, count,
-                           internal::nccl::TypeMap<T>(), src,
-                           comm.m_nccl_comm, stream));
+#if defined(AL_HAS_ROCM)
+    if (count > 0UL)
+#endif
+      AL_CHECK_NCCL(ncclRecv((void*) recvbuf, count,
+                             internal::nccl::TypeMap<T>(), src,
+                             comm.m_nccl_comm, stream));
   }
 
   /** Do a NCCL sendrecv. */
