@@ -413,7 +413,7 @@ if (ALUMINUM_ENABLE_ROCM)
   endif ()
 
   if (ALUMINUM_ENABLE_NCCL)
-    find_package(rccl 2.10.0 CONFIG QUIET
+    find_package(rccl 2.14.0 CONFIG QUIET
       HINTS ${RCCL_DIR} $ENV{RCCL_DIR} ${AL_ROCM_PATH}
       PATH_SUFFIXES lib64/cmake/rccl lib/cmake/rccl
       NO_DEFAULT_PATH)
