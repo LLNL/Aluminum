@@ -299,7 +299,7 @@ void complete_operations(typename Backend::comm_type&) {}
  *
  * If non-negative, hangs that rank; if negative, hangs all ranks.
  */
-void hang_for_debugging(int hang_rank) {
+inline void hang_for_debugging(int hang_rank) {
   int rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   if (hang_rank < 0 || rank == hang_rank) {
@@ -544,8 +544,8 @@ bool check_vector(const std::vector<T> &expected,
  *
  * If odds is true, ensure odd-numbered sizes are generated.
  */
-std::vector<size_t> get_sizes(size_t start_size, size_t max_size,
-                              bool odds = false) {
+inline std::vector<size_t> get_sizes(size_t start_size, size_t max_size,
+                                     bool odds = false) {
   std::vector<size_t> sizes;
   if (start_size == 0) {
     sizes.push_back(0);
@@ -565,7 +565,7 @@ std::vector<size_t> get_sizes(size_t start_size, size_t max_size,
  *
  * Expects the options "size", "min-size", and "max-size".
  */
-std::vector<size_t> get_sizes_from_opts(cxxopts::ParseResult& parsed_opts) {
+inline std::vector<size_t> get_sizes_from_opts(cxxopts::ParseResult& parsed_opts) {
   size_t min_size = parsed_opts["min-size"].as<size_t>();
   size_t max_size = parsed_opts["max-size"].as<size_t>();
   bool odd_sizes = parsed_opts.count("odd-sizes");
@@ -577,7 +577,7 @@ std::vector<size_t> get_sizes_from_opts(cxxopts::ParseResult& parsed_opts) {
 }
 
 /** Return a human-readable string for size. */
-std::string human_readable_size(size_t size_) {
+inline std::string human_readable_size(size_t size_) {
   double size = static_cast<double>(size_);
   if (size < 1024) {
     return std::to_string(size);

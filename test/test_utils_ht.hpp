@@ -28,6 +28,7 @@
 #pragma once
 
 #include "Al.hpp"
+#include "aluminum/traits/traits.hpp"
 
 #include "test_utils.hpp"
 #include "test_utils_mpi.hpp"
@@ -84,107 +85,15 @@ void complete_operations<Al::HostTransferBackend>(
   AL_FORCE_CHECK_GPU_NOSYNC(AlGpuStreamSynchronize(comm.get_stream()));
 }
 
-// Operator support.
-template <> struct IsOpSupported<AlOperation::allgather, Al::HostTransferBackend> : std::true_type {};
-template <> struct IsOpSupported<AlOperation::allgatherv, Al::HostTransferBackend> : std::true_type {};
-template <> struct IsOpSupported<AlOperation::allreduce, Al::HostTransferBackend> : std::true_type {};
-template <> struct IsOpSupported<AlOperation::alltoall, Al::HostTransferBackend> : std::true_type {};
-template <> struct IsOpSupported<AlOperation::alltoallv, Al::HostTransferBackend> : std::true_type {};
-template <> struct IsOpSupported<AlOperation::bcast, Al::HostTransferBackend> : std::true_type {};
-template <> struct IsOpSupported<AlOperation::barrier, Al::HostTransferBackend> : std::true_type {};
-template <> struct IsOpSupported<AlOperation::gather, Al::HostTransferBackend> : std::true_type {};
-template <> struct IsOpSupported<AlOperation::gatherv, Al::HostTransferBackend> : std::true_type {};
-template <> struct IsOpSupported<AlOperation::reduce, Al::HostTransferBackend> : std::true_type {};
-template <> struct IsOpSupported<AlOperation::reduce_scatter, Al::HostTransferBackend> : std::true_type {};
-template <> struct IsOpSupported<AlOperation::reduce_scatterv, Al::HostTransferBackend> : std::true_type {};
-template <> struct IsOpSupported<AlOperation::scatter, Al::HostTransferBackend> : std::true_type {};
-template <> struct IsOpSupported<AlOperation::scatterv, Al::HostTransferBackend> : std::true_type {};
-template <> struct IsOpSupported<AlOperation::send, Al::HostTransferBackend> : std::true_type {};
-template <> struct IsOpSupported<AlOperation::recv, Al::HostTransferBackend> : std::true_type {};
-template <> struct IsOpSupported<AlOperation::sendrecv, Al::HostTransferBackend> : std::true_type {};
-
-// Type support.
-template <> struct IsTypeSupported<Al::HostTransferBackend, char> : std::true_type {};
-template <> struct IsTypeSupported<Al::HostTransferBackend, signed char> : std::true_type {};
-template <> struct IsTypeSupported<Al::HostTransferBackend, unsigned char> : std::true_type {};
-template <> struct IsTypeSupported<Al::HostTransferBackend, short> : std::true_type {};
-template <> struct IsTypeSupported<Al::HostTransferBackend, unsigned short> : std::true_type {};
-template <> struct IsTypeSupported<Al::HostTransferBackend, int> : std::true_type {};
-template <> struct IsTypeSupported<Al::HostTransferBackend, unsigned int> : std::true_type {};
-template <> struct IsTypeSupported<Al::HostTransferBackend, long> : std::true_type {};
-template <> struct IsTypeSupported<Al::HostTransferBackend, unsigned long> : std::true_type {};
-template <> struct IsTypeSupported<Al::HostTransferBackend, long long> : std::true_type {};
-template <> struct IsTypeSupported<Al::HostTransferBackend, unsigned long long> : std::true_type {};
-template <> struct IsTypeSupported<Al::HostTransferBackend, float> : std::true_type {};
-template <> struct IsTypeSupported<Al::HostTransferBackend, double> : std::true_type {};
-template <> struct IsTypeSupported<Al::HostTransferBackend, long double> : std::true_type {};
-#ifdef AL_HAS_HALF
-template <> struct IsTypeSupported<Al::HostTransferBackend, __half> : std::true_type {};
-#endif
-#ifdef AL_HAS_BFLOAT
-template <> struct IsTypeSupported<Al::HostTransferBackend, al_bfloat16> : std::true_type {};
-#endif
-
-// Reduction operator support (all are supported).
-template <Al::ReductionOperator op>
-struct IsReductionOpSupported<Al::HostTransferBackend, op> : std::true_type {};
-
-// Backend name.
-template <> constexpr char AlBackendName<Al::HostTransferBackend>[] = "ht";
-
-// Algorithm types.
-template <> struct OpAlgoType<AlOperation::allgather, Al::HostTransferBackend> {
-  using type = Al::HostTransferBackend::allgather_algo_type;
-};
-template <> struct OpAlgoType<AlOperation::allgatherv, Al::HostTransferBackend> {
-  using type = Al::HostTransferBackend::allgatherv_algo_type;
-};
-template <> struct OpAlgoType<AlOperation::allreduce, Al::HostTransferBackend> {
-  using type = Al::HostTransferBackend::allreduce_algo_type;
-};
-template <> struct OpAlgoType<AlOperation::alltoall, Al::HostTransferBackend> {
-  using type = Al::HostTransferBackend::alltoall_algo_type;
-};
-template <> struct OpAlgoType<AlOperation::alltoallv, Al::HostTransferBackend> {
-  using type = Al::HostTransferBackend::alltoallv_algo_type;
-};
-template <> struct OpAlgoType<AlOperation::barrier, Al::HostTransferBackend> {
-  using type = Al::HostTransferBackend::barrier_algo_type;
-};
-template <> struct OpAlgoType<AlOperation::bcast, Al::HostTransferBackend> {
-  using type = Al::HostTransferBackend::bcast_algo_type;
-};
-template <> struct OpAlgoType<AlOperation::gather, Al::HostTransferBackend> {
-  using type = Al::HostTransferBackend::gather_algo_type;
-};
-template <> struct OpAlgoType<AlOperation::gatherv, Al::HostTransferBackend> {
-  using type = Al::HostTransferBackend::gatherv_algo_type;
-};
-template <> struct OpAlgoType<AlOperation::reduce, Al::HostTransferBackend> {
-  using type = Al::HostTransferBackend::reduce_algo_type;
-};
-template <> struct OpAlgoType<AlOperation::reduce_scatter, Al::HostTransferBackend> {
-  using type = Al::HostTransferBackend::reduce_scatter_algo_type;
-};
-template <> struct OpAlgoType<AlOperation::reduce_scatterv, Al::HostTransferBackend> {
-  using type = Al::HostTransferBackend::reduce_scatterv_algo_type;
-};
-template <> struct OpAlgoType<AlOperation::scatter, Al::HostTransferBackend> {
-  using type = Al::HostTransferBackend::scatter_algo_type;
-};
-template <> struct OpAlgoType<AlOperation::scatterv, Al::HostTransferBackend> {
-  using type = Al::HostTransferBackend::scatterv_algo_type;
-};
-
-// Supported algorithms.
+// Host-transfer allreduce supports two algorithms.
 template <>
-std::vector<std::pair<std::string, typename OpAlgoType<AlOperation::allreduce, Al::HostTransferBackend>::type>> get_supported_algos<AlOperation::allreduce, Al::HostTransferBackend>() {
+std::vector<std::pair<std::string, typename Al::OpAlgoType<Al::AlOperation::allreduce, Al::HostTransferBackend>::type>> get_supported_algos<Al::AlOperation::allreduce, Al::HostTransferBackend>() {
   using algo_type = Al::HostTransferBackend::allreduce_algo_type;
   return {{"automatic", algo_type::automatic},
           {"host_transfer", algo_type::host_transfer}};
 }
 
-// Algorithms.
+// Define default algorithms for each operation.
 template <>
 struct AlgorithmOptions<Al::HostTransferBackend> {
   typename Al::HostTransferBackend::allgather_algo_type allgather_algo =

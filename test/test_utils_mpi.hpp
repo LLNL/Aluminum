@@ -28,103 +28,12 @@
 #pragma once
 
 #include "Al.hpp"
+#include "aluminum/traits/traits.hpp"
 
 #include "test_utils.hpp"
 
 
-// Operator support.
-template <> struct IsOpSupported<AlOperation::allgather, Al::MPIBackend> : std::true_type {};
-template <> struct IsOpSupported<AlOperation::allgatherv, Al::MPIBackend> : std::true_type {};
-template <> struct IsOpSupported<AlOperation::allreduce, Al::MPIBackend> : std::true_type {};
-template <> struct IsOpSupported<AlOperation::alltoall, Al::MPIBackend> : std::true_type {};
-template <> struct IsOpSupported<AlOperation::alltoallv, Al::MPIBackend> : std::true_type {};
-template <> struct IsOpSupported<AlOperation::barrier, Al::MPIBackend> : std::true_type {};
-template <> struct IsOpSupported<AlOperation::bcast, Al::MPIBackend> : std::true_type {};
-template <> struct IsOpSupported<AlOperation::gather, Al::MPIBackend> : std::true_type {};
-template <> struct IsOpSupported<AlOperation::gatherv, Al::MPIBackend> : std::true_type {};
-template <> struct IsOpSupported<AlOperation::reduce, Al::MPIBackend> : std::true_type {};
-template <> struct IsOpSupported<AlOperation::reduce_scatter, Al::MPIBackend> : std::true_type {};
-template <> struct IsOpSupported<AlOperation::reduce_scatterv, Al::MPIBackend> : std::true_type {};
-template <> struct IsOpSupported<AlOperation::scatter, Al::MPIBackend> : std::true_type {};
-template <> struct IsOpSupported<AlOperation::scatterv, Al::MPIBackend> : std::true_type {};
-template <> struct IsOpSupported<AlOperation::send, Al::MPIBackend> : std::true_type {};
-template <> struct IsOpSupported<AlOperation::recv, Al::MPIBackend> : std::true_type {};
-template <> struct IsOpSupported<AlOperation::sendrecv, Al::MPIBackend> : std::true_type {};
-
-// Type support.
-template <> struct IsTypeSupported<Al::MPIBackend, char> : std::true_type {};
-template <> struct IsTypeSupported<Al::MPIBackend, signed char> : std::true_type {};
-template <> struct IsTypeSupported<Al::MPIBackend, unsigned char> : std::true_type {};
-template <> struct IsTypeSupported<Al::MPIBackend, short> : std::true_type {};
-template <> struct IsTypeSupported<Al::MPIBackend, unsigned short> : std::true_type {};
-template <> struct IsTypeSupported<Al::MPIBackend, int> : std::true_type {};
-template <> struct IsTypeSupported<Al::MPIBackend, unsigned int> : std::true_type {};
-template <> struct IsTypeSupported<Al::MPIBackend, long> : std::true_type {};
-template <> struct IsTypeSupported<Al::MPIBackend, unsigned long> : std::true_type {};
-template <> struct IsTypeSupported<Al::MPIBackend, long long> : std::true_type {};
-template <> struct IsTypeSupported<Al::MPIBackend, unsigned long long> : std::true_type {};
-template <> struct IsTypeSupported<Al::MPIBackend, float> : std::true_type {};
-template <> struct IsTypeSupported<Al::MPIBackend, double> : std::true_type {};
-template <> struct IsTypeSupported<Al::MPIBackend, long double> : std::true_type {};
-#ifdef AL_HAS_HALF
-template <> struct IsTypeSupported<Al::MPIBackend, __half> : std::true_type {};
-#endif
-#ifdef AL_HAS_BFLOAT
-template <> struct IsTypeSupported<Al::MPIBackend, al_bfloat16> : std::true_type {};
-#endif
-
-// Reduction operator support (all are supported).
-template <Al::ReductionOperator op>
-struct IsReductionOpSupported<Al::MPIBackend, op> : std::true_type {};
-
-// Backend name.
-template <> constexpr char AlBackendName<Al::MPIBackend>[] = "mpi";
-
-// Algorithm types.
-template <> struct OpAlgoType<AlOperation::allgather, Al::MPIBackend> {
-  using type = Al::MPIBackend::allgather_algo_type;
-};
-template <> struct OpAlgoType<AlOperation::allgatherv, Al::MPIBackend> {
-  using type = Al::MPIBackend::allgatherv_algo_type;
-};
-template <> struct OpAlgoType<AlOperation::allreduce, Al::MPIBackend> {
-  using type = Al::MPIBackend::allreduce_algo_type;
-};
-template <> struct OpAlgoType<AlOperation::alltoall, Al::MPIBackend> {
-  using type = Al::MPIBackend::alltoall_algo_type;
-};
-template <> struct OpAlgoType<AlOperation::alltoallv, Al::MPIBackend> {
-  using type = Al::MPIBackend::alltoallv_algo_type;
-};
-template <> struct OpAlgoType<AlOperation::barrier, Al::MPIBackend> {
-  using type = Al::MPIBackend::barrier_algo_type;
-};
-template <> struct OpAlgoType<AlOperation::bcast, Al::MPIBackend> {
-  using type = Al::MPIBackend::bcast_algo_type;
-};
-template <> struct OpAlgoType<AlOperation::gather, Al::MPIBackend> {
-  using type = Al::MPIBackend::gather_algo_type;
-};
-template <> struct OpAlgoType<AlOperation::gatherv, Al::MPIBackend> {
-  using type = Al::MPIBackend::gatherv_algo_type;
-};
-template <> struct OpAlgoType<AlOperation::reduce, Al::MPIBackend> {
-  using type = Al::MPIBackend::reduce_algo_type;
-};
-template <> struct OpAlgoType<AlOperation::reduce_scatter, Al::MPIBackend> {
-  using type = Al::MPIBackend::reduce_scatter_algo_type;
-};
-template <> struct OpAlgoType<AlOperation::reduce_scatterv, Al::MPIBackend> {
-  using type = Al::MPIBackend::reduce_scatterv_algo_type;
-};
-template <> struct OpAlgoType<AlOperation::scatter, Al::MPIBackend> {
-  using type = Al::MPIBackend::scatter_algo_type;
-};
-template <> struct OpAlgoType<AlOperation::scatterv, Al::MPIBackend> {
-  using type = Al::MPIBackend::scatterv_algo_type;
-};
-
-// Algorithms.
+// Define default algorithms for each operation.
 template <>
 struct AlgorithmOptions<Al::MPIBackend> {
   typename Al::MPIBackend::allgather_algo_type allgather_algo =

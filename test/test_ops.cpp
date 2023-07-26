@@ -192,8 +192,8 @@ struct TestData {
 };
 
 template <typename Backend, typename T,
-          std::enable_if_t<IsTypeSupported<Backend, T>::value, bool> = true>
-void run_test_instance(AlOperation op, OpOptions<Backend> op_options,
+          std::enable_if_t<Al::IsTypeSupported<Backend, T>::value, bool> = true>
+void run_test_instance(Al::AlOperation op, OpOptions<Backend> op_options,
                        CommWrapper<Backend>& comm_wrapper,
                        bool participates_in_pt2pt,
                        int thread_id,
@@ -221,14 +221,14 @@ void run_test_instance(AlOperation op, OpOptions<Backend> op_options,
 }
 
 template <typename Backend, typename T,
-          std::enable_if_t<IsTypeSupported<Backend, T>::value, bool> = true>
+          std::enable_if_t<Al::IsTypeSupported<Backend, T>::value, bool> = true>
 void run_test(cxxopts::ParseResult& parsed_opts) {
   auto op_str = parsed_opts["op"].as<std::string>();
   if (!is_operator_name(op_str)) {
     std::cerr << "Unknown operator " << op_str << std::endl;
     std::abort();
   }
-  AlOperation op = op_str_to_op(op_str);
+  Al::AlOperation op = op_str_to_op(op_str);
   // Check if operator is supported.
   // This is not caught later because there would be no algorithms.
   if (!is_op_supported<Backend>(op)) {
@@ -288,14 +288,14 @@ void run_test(cxxopts::ParseResult& parsed_opts) {
       if (comm_wrapper.rank() % 2 == 0) {
         op_options.src = comm_wrapper.rank() + 1;
         op_options.dst = comm_wrapper.rank() + 1;
-        if (op != AlOperation::sendrecv) {
-          op = AlOperation::send;
+        if (op != Al::AlOperation::sendrecv) {
+          op = Al::AlOperation::send;
         }
       } else {
         op_options.src = comm_wrapper.rank() - 1;
         op_options.dst = comm_wrapper.rank() - 1;
-        if (op != AlOperation::sendrecv) {
-          op = AlOperation::recv;
+        if (op != Al::AlOperation::sendrecv) {
+          op = Al::AlOperation::recv;
         }
       }
     } else {
@@ -380,7 +380,7 @@ void run_test(cxxopts::ParseResult& parsed_opts) {
 }
 
 template <typename Backend, typename T,
-          std::enable_if_t<!IsTypeSupported<Backend, T>::value, bool> = true>
+          std::enable_if_t<!Al::IsTypeSupported<Backend, T>::value, bool> = true>
 void run_test(cxxopts::ParseResult& parsed_opts) {
   std::cerr << "Backend "
             << parsed_opts["backend"].as<std::string>()

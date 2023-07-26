@@ -28,11 +28,12 @@
 #include "Al.hpp"
 #include <iostream>
 #include <cxxopts.hpp>
+#include "aluminum/traits/traits.hpp"
 #include "test_utils.hpp"
 
 
 template <typename Backend, typename T,
-          std::enable_if_t<IsTypeSupported<Backend, T>::value, bool> = true>
+          std::enable_if_t<Al::IsTypeSupported<Backend, T>::value, bool> = true>
 void run_test(cxxopts::ParseResult& parsed_opts) {
   CommWrapper<Backend> comm_wrapper(MPI_COMM_WORLD);
   const int num_peers = parsed_opts["num-peers"].as<int>();
@@ -78,7 +79,7 @@ void run_test(cxxopts::ParseResult& parsed_opts) {
 
     // Start the exchanges.
     for (size_t i = 0; i < peers.size(); ++i) {
-      OpDispatcher<Backend, T> op_runner(AlOperation::sendrecv, peers[i]);
+      OpDispatcher<Backend, T> op_runner(Al::AlOperation::sendrecv, peers[i]);
       op_runner.run(inputs[i], outputs[i], comm_wrapper.comm());
     }
     // Wait for all to complete.
@@ -104,7 +105,7 @@ void run_test(cxxopts::ParseResult& parsed_opts) {
 }
 
 template <typename Backend, typename T,
-          std::enable_if_t<!IsTypeSupported<Backend, T>::value, bool> = true>
+          std::enable_if_t<!Al::IsTypeSupported<Backend, T>::value, bool> = true>
 void run_test(cxxopts::ParseResult& parsed_opts) {
   std::cerr << "Backend "
             << parsed_opts["backend"].as<std::string>()

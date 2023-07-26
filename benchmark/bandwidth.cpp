@@ -188,7 +188,7 @@ private:
  * src sends data, dst receives data. Bandwidth recorded only on dst.
  */
 template <typename Backend, typename T,
-  std::enable_if_t<IsTypeSupported<Backend, T>::value, bool> = true>
+          std::enable_if_t<Al::IsTypeSupported<Backend, T>::value, bool> = true>
 void benchmark_pair(int src, int dst,
                     CommWrapper<Backend>& comm_wrapper,
                     const std::vector<size_t>& sizes,
@@ -206,7 +206,7 @@ void benchmark_pair(int src, int dst,
 
     for (size_t trial = 0; trial < num_warmup + num_iters; ++trial) {
       OpDispatcher<Backend, T> op_runner(
-        (comm_wrapper.rank() == src) ? AlOperation::send : AlOperation::recv,
+        (comm_wrapper.rank() == src) ? Al::AlOperation::send : Al::AlOperation::recv,
         op_options);
       timer.start_timer(comm_wrapper.comm());
       op_runner.run(input, output, comm_wrapper.comm());
@@ -220,10 +220,10 @@ void benchmark_pair(int src, int dst,
 }
 
 template <typename Backend, typename T,
-  std::enable_if_t<IsTypeSupported<Backend, T>::value, bool> = true>
+          std::enable_if_t<Al::IsTypeSupported<Backend, T>::value, bool> = true>
 void run_benchmark(cxxopts::ParseResult& parsed_opts) {
-  if (!IsOpSupported<AlOperation::send, Backend>::value
-      || !IsOpSupported<AlOperation::recv, Backend>::value) {
+  if (!Al::IsOpSupported<Al::AlOperation::send, Backend>::value
+      || !Al::IsOpSupported<Al::AlOperation::recv, Backend>::value) {
     std::cerr << "Backend does not support send or recv" << std::endl;
     std::abort();
   }
@@ -272,7 +272,7 @@ void run_benchmark(cxxopts::ParseResult& parsed_opts) {
 }
 
 template <typename Backend, typename T,
-          std::enable_if_t<!IsTypeSupported<Backend, T>::value, bool> = true>
+          std::enable_if_t<!Al::IsTypeSupported<Backend, T>::value, bool> = true>
 void run_benchmark(cxxopts::ParseResult& parsed_opts) {
   std::cerr << "Backend "
             << parsed_opts["backend"].as<std::string>()

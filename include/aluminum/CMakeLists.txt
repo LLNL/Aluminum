@@ -22,7 +22,7 @@ set_source_path(THIS_DIR_HOST_TRANSFER_HEADERS
   )
 set_source_path(THIS_DIR_NCCL_HEADERS
   nccl_impl.hpp
-  )
+)
 
 add_subdirectory(utils)
 
@@ -46,6 +46,8 @@ endif ()
 if (AL_HAS_NCCL)
   list(APPEND THIS_DIR_HEADERS "${THIS_DIR_NCCL_HEADERS}")
 endif ()
+
+add_subdirectory(traits)
 
 set(ALUMINUM_HEADERS "${HEADERS}" "${THIS_DIR_HEADERS}" PARENT_SCOPE)
 

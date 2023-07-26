@@ -30,15 +30,15 @@
 #include "Al.hpp"
 
 template <typename Backend, typename T>
-class OpRunner<AlOperation::allgather, Backend, T> :
-  public OpRunnerShim<AlOperation::allgather, Backend, T,
-                      OpRunner<AlOperation::allgather, Backend, T>> {
+class OpRunner<Al::AlOperation::allgather, Backend, T> :
+  public OpRunnerShim<Al::AlOperation::allgather, Backend, T,
+                      OpRunner<Al::AlOperation::allgather, Backend, T>> {
 public:
-  using ThisType = OpRunner<AlOperation::allgather, Backend, T>;
-  using OpRunnerShim<AlOperation::allgather, Backend, T, ThisType>::OpRunnerShim;
+  using ThisType = OpRunner<Al::AlOperation::allgather, Backend, T>;
+  using OpRunnerShim<Al::AlOperation::allgather, Backend, T, ThisType>::OpRunnerShim;
 
-  template <AlOperation Op2 = AlOperation::allgather,
-            std::enable_if_t<IsOpSupported<Op2, Backend>::value, bool> = true>
+  template <Al::AlOperation Op2 = Al::AlOperation::allgather,
+            std::enable_if_t<Al::IsOpSupported<Op2, Backend>::value, bool> = true>
   void run_impl(typename VectorType<T, Backend>::type& input,
                 typename VectorType<T, Backend>::type& output,
                 typename Backend::comm_type& comm) {
@@ -83,15 +83,15 @@ public:
 
 
 template <typename Backend, typename T>
-class OpRunner<AlOperation::allgatherv, Backend, T> :
-  public OpRunnerShim<AlOperation::allgatherv, Backend, T,
-                      OpRunner<AlOperation::allgatherv, Backend, T>> {
+class OpRunner<Al::AlOperation::allgatherv, Backend, T> :
+  public OpRunnerShim<Al::AlOperation::allgatherv, Backend, T,
+                      OpRunner<Al::AlOperation::allgatherv, Backend, T>> {
 public:
-  using OpRunnerShim<AlOperation::allgatherv, Backend, T,
-                     OpRunner<AlOperation::allgatherv, Backend, T>>::OpRunnerShim;
+  using OpRunnerShim<Al::AlOperation::allgatherv, Backend, T,
+                     OpRunner<Al::AlOperation::allgatherv, Backend, T>>::OpRunnerShim;
 
-  template <AlOperation Op2 = AlOperation::allgatherv,
-            std::enable_if_t<IsOpSupported<Op2, Backend>::value, bool> = true>
+  template <Al::AlOperation Op2 = Al::AlOperation::allgatherv,
+            std::enable_if_t<Al::IsOpSupported<Op2, Backend>::value, bool> = true>
   void run_impl(typename VectorType<T, Backend>::type& input,
                 typename VectorType<T, Backend>::type& output,
                 typename Backend::comm_type& comm) {
@@ -138,15 +138,15 @@ public:
 
 
 template <typename Backend, typename T>
-class OpRunner<AlOperation::allreduce, Backend, T> :
-  public OpRunnerShim<AlOperation::allreduce, Backend, T,
-                      OpRunner<AlOperation::allreduce, Backend, T>> {
+class OpRunner<Al::AlOperation::allreduce, Backend, T> :
+  public OpRunnerShim<Al::AlOperation::allreduce, Backend, T,
+                      OpRunner<Al::AlOperation::allreduce, Backend, T>> {
 public:
-  using ThisType = OpRunner<AlOperation::allreduce, Backend, T>;
-  using OpRunnerShim<AlOperation::allreduce, Backend, T, ThisType>::OpRunnerShim;
+  using ThisType = OpRunner<Al::AlOperation::allreduce, Backend, T>;
+  using OpRunnerShim<Al::AlOperation::allreduce, Backend, T, ThisType>::OpRunnerShim;
 
-  template <AlOperation Op2 = AlOperation::allreduce,
-            std::enable_if_t<IsOpSupported<Op2, Backend>::value, bool> = true>
+  template <Al::AlOperation Op2 = Al::AlOperation::allreduce,
+            std::enable_if_t<Al::IsOpSupported<Op2, Backend>::value, bool> = true>
   void run_impl(typename VectorType<T, Backend>::type& input,
                 typename VectorType<T, Backend>::type& output,
                 typename Backend::comm_type& comm) {
@@ -189,15 +189,15 @@ public:
 
 
 template <typename Backend, typename T>
-class OpRunner<AlOperation::alltoall, Backend, T> :
-  public OpRunnerShim<AlOperation::alltoall, Backend, T,
-                      OpRunner<AlOperation::alltoall, Backend, T>> {
+class OpRunner<Al::AlOperation::alltoall, Backend, T> :
+  public OpRunnerShim<Al::AlOperation::alltoall, Backend, T,
+                      OpRunner<Al::AlOperation::alltoall, Backend, T>> {
 public:
-  using ThisType = OpRunner<AlOperation::alltoall, Backend, T>;
-  using OpRunnerShim<AlOperation::alltoall, Backend, T, ThisType>::OpRunnerShim;
+  using ThisType = OpRunner<Al::AlOperation::alltoall, Backend, T>;
+  using OpRunnerShim<Al::AlOperation::alltoall, Backend, T, ThisType>::OpRunnerShim;
 
-  template <AlOperation Op2 = AlOperation::alltoall,
-            std::enable_if_t<IsOpSupported<Op2, Backend>::value, bool> = true>
+  template <Al::AlOperation Op2 = Al::AlOperation::alltoall,
+            std::enable_if_t<Al::IsOpSupported<Op2, Backend>::value, bool> = true>
   void run_impl(typename VectorType<T, Backend>::type& input,
                 typename VectorType<T, Backend>::type& output,
                 typename Backend::comm_type& comm) {
@@ -244,15 +244,15 @@ public:
 
 
 template <typename Backend, typename T>
-class OpRunner<AlOperation::alltoallv, Backend, T> :
-  public OpRunnerShim<AlOperation::alltoallv, Backend, T,
-                      OpRunner<AlOperation::alltoallv, Backend, T>> {
+class OpRunner<Al::AlOperation::alltoallv, Backend, T> :
+  public OpRunnerShim<Al::AlOperation::alltoallv, Backend, T,
+                      OpRunner<Al::AlOperation::alltoallv, Backend, T>> {
 public:
-  using ThisType = OpRunner<AlOperation::alltoallv, Backend, T>;
-  using OpRunnerShim<AlOperation::alltoallv, Backend, T, ThisType>::OpRunnerShim;
+  using ThisType = OpRunner<Al::AlOperation::alltoallv, Backend, T>;
+  using OpRunnerShim<Al::AlOperation::alltoallv, Backend, T, ThisType>::OpRunnerShim;
 
-  template <AlOperation Op2 = AlOperation::alltoallv,
-            std::enable_if_t<IsOpSupported<Op2, Backend>::value, bool> = true>
+  template <Al::AlOperation Op2 = Al::AlOperation::alltoallv,
+            std::enable_if_t<Al::IsOpSupported<Op2, Backend>::value, bool> = true>
   void run_impl(typename VectorType<T, Backend>::type& input,
                 typename VectorType<T, Backend>::type& output,
                 typename Backend::comm_type& comm) {
@@ -309,15 +309,15 @@ public:
 
 
 template <typename Backend, typename T>
-class OpRunner<AlOperation::barrier, Backend, T> :
-  public OpRunnerShim<AlOperation::barrier, Backend, T,
-                      OpRunner<AlOperation::barrier, Backend, T>> {
+class OpRunner<Al::AlOperation::barrier, Backend, T> :
+  public OpRunnerShim<Al::AlOperation::barrier, Backend, T,
+                      OpRunner<Al::AlOperation::barrier, Backend, T>> {
 public:
-  using ThisType = OpRunner<AlOperation::barrier, Backend, T>;
-  using OpRunnerShim<AlOperation::barrier, Backend, T, ThisType>::OpRunnerShim;
+  using ThisType = OpRunner<Al::AlOperation::barrier, Backend, T>;
+  using OpRunnerShim<Al::AlOperation::barrier, Backend, T, ThisType>::OpRunnerShim;
 
-  template <AlOperation Op2 = AlOperation::barrier,
-            std::enable_if_t<IsOpSupported<Op2, Backend>::value, bool> = true>
+  template <Al::AlOperation Op2 = Al::AlOperation::barrier,
+            std::enable_if_t<Al::IsOpSupported<Op2, Backend>::value, bool> = true>
   void run_impl(typename VectorType<T, Backend>::type& /*input*/,
                 typename VectorType<T, Backend>::type& /*output*/,
                 typename Backend::comm_type& comm) {
@@ -354,15 +354,15 @@ public:
 
 
 template <typename Backend, typename T>
-class OpRunner<AlOperation::bcast, Backend, T> :
-  public OpRunnerShim<AlOperation::bcast, Backend, T,
-                      OpRunner<AlOperation::bcast, Backend, T>> {
+class OpRunner<Al::AlOperation::bcast, Backend, T> :
+  public OpRunnerShim<Al::AlOperation::bcast, Backend, T,
+                      OpRunner<Al::AlOperation::bcast, Backend, T>> {
 public:
-  using ThisType = OpRunner<AlOperation::bcast, Backend, T>;
-  using OpRunnerShim<AlOperation::bcast, Backend, T, ThisType>::OpRunnerShim;
+  using ThisType = OpRunner<Al::AlOperation::bcast, Backend, T>;
+  using OpRunnerShim<Al::AlOperation::bcast, Backend, T, ThisType>::OpRunnerShim;
 
-  template <AlOperation Op2 = AlOperation::bcast,
-            std::enable_if_t<IsOpSupported<Op2, Backend>::value, bool> = true>
+  template <Al::AlOperation Op2 = Al::AlOperation::bcast,
+            std::enable_if_t<Al::IsOpSupported<Op2, Backend>::value, bool> = true>
   void run_impl(typename VectorType<T, Backend>::type& /*input*/,
                 typename VectorType<T, Backend>::type& output,
                 typename Backend::comm_type& comm) {
@@ -406,15 +406,15 @@ public:
 
 
 template <typename Backend, typename T>
-class OpRunner<AlOperation::gather, Backend, T> :
-  public OpRunnerShim<AlOperation::gather, Backend, T,
-                      OpRunner<AlOperation::gather, Backend, T>> {
+class OpRunner<Al::AlOperation::gather, Backend, T> :
+  public OpRunnerShim<Al::AlOperation::gather, Backend, T,
+                      OpRunner<Al::AlOperation::gather, Backend, T>> {
 public:
-  using ThisType = OpRunner<AlOperation::gather, Backend, T>;
-  using OpRunnerShim<AlOperation::gather, Backend, T, ThisType>::OpRunnerShim;
+  using ThisType = OpRunner<Al::AlOperation::gather, Backend, T>;
+  using OpRunnerShim<Al::AlOperation::gather, Backend, T, ThisType>::OpRunnerShim;
 
-  template <AlOperation Op2 = AlOperation::gather,
-            std::enable_if_t<IsOpSupported<Op2, Backend>::value, bool> = true>
+  template <Al::AlOperation Op2 = Al::AlOperation::gather,
+            std::enable_if_t<Al::IsOpSupported<Op2, Backend>::value, bool> = true>
   void run_impl(typename VectorType<T, Backend>::type& input,
                 typename VectorType<T, Backend>::type& output,
                 typename Backend::comm_type& comm) {
@@ -475,15 +475,15 @@ public:
 
 
 template <typename Backend, typename T>
-class OpRunner<AlOperation::gatherv, Backend, T> :
-  public OpRunnerShim<AlOperation::gatherv, Backend, T,
-                      OpRunner<AlOperation::gatherv, Backend, T>> {
+class OpRunner<Al::AlOperation::gatherv, Backend, T> :
+  public OpRunnerShim<Al::AlOperation::gatherv, Backend, T,
+                      OpRunner<Al::AlOperation::gatherv, Backend, T>> {
 public:
-  using ThisType = OpRunner<AlOperation::gatherv, Backend, T>;
-  using OpRunnerShim<AlOperation::gatherv, Backend, T, ThisType>::OpRunnerShim;
+  using ThisType = OpRunner<Al::AlOperation::gatherv, Backend, T>;
+  using OpRunnerShim<Al::AlOperation::gatherv, Backend, T, ThisType>::OpRunnerShim;
 
-  template <AlOperation Op2 = AlOperation::gatherv,
-            std::enable_if_t<IsOpSupported<Op2, Backend>::value, bool> = true>
+  template <Al::AlOperation Op2 = Al::AlOperation::gatherv,
+            std::enable_if_t<Al::IsOpSupported<Op2, Backend>::value, bool> = true>
   void run_impl(typename VectorType<T, Backend>::type& input,
                 typename VectorType<T, Backend>::type& output,
                 typename Backend::comm_type& comm) {
@@ -546,15 +546,15 @@ public:
 
 
 template <typename Backend, typename T>
-class OpRunner<AlOperation::reduce, Backend, T> :
-  public OpRunnerShim<AlOperation::reduce, Backend, T,
-                      OpRunner<AlOperation::reduce, Backend, T>> {
+class OpRunner<Al::AlOperation::reduce, Backend, T> :
+  public OpRunnerShim<Al::AlOperation::reduce, Backend, T,
+                      OpRunner<Al::AlOperation::reduce, Backend, T>> {
 public:
-  using ThisType = OpRunner<AlOperation::reduce, Backend, T>;
-  using OpRunnerShim<AlOperation::reduce, Backend, T, ThisType>::OpRunnerShim;
+  using ThisType = OpRunner<Al::AlOperation::reduce, Backend, T>;
+  using OpRunnerShim<Al::AlOperation::reduce, Backend, T, ThisType>::OpRunnerShim;
 
-  template <AlOperation Op2 = AlOperation::reduce,
-            std::enable_if_t<IsOpSupported<Op2, Backend>::value, bool> = true>
+  template <Al::AlOperation Op2 = Al::AlOperation::reduce,
+            std::enable_if_t<Al::IsOpSupported<Op2, Backend>::value, bool> = true>
   void run_impl(typename VectorType<T, Backend>::type& input,
                 typename VectorType<T, Backend>::type& output,
                 typename Backend::comm_type& comm) {
@@ -611,15 +611,15 @@ public:
 
 
 template <typename Backend, typename T>
-class OpRunner<AlOperation::reduce_scatter, Backend, T> :
-  public OpRunnerShim<AlOperation::reduce_scatter, Backend, T,
-                      OpRunner<AlOperation::reduce_scatter, Backend, T>> {
+class OpRunner<Al::AlOperation::reduce_scatter, Backend, T> :
+  public OpRunnerShim<Al::AlOperation::reduce_scatter, Backend, T,
+                      OpRunner<Al::AlOperation::reduce_scatter, Backend, T>> {
 public:
-  using ThisType = OpRunner<AlOperation::reduce_scatter, Backend, T>;
-  using OpRunnerShim<AlOperation::reduce_scatter, Backend, T, ThisType>::OpRunnerShim;
+  using ThisType = OpRunner<Al::AlOperation::reduce_scatter, Backend, T>;
+  using OpRunnerShim<Al::AlOperation::reduce_scatter, Backend, T, ThisType>::OpRunnerShim;
 
-  template <AlOperation Op2 = AlOperation::reduce_scatter,
-            std::enable_if_t<IsOpSupported<Op2, Backend>::value, bool> = true>
+  template <Al::AlOperation Op2 = Al::AlOperation::reduce_scatter,
+            std::enable_if_t<Al::IsOpSupported<Op2, Backend>::value, bool> = true>
   void run_impl(typename VectorType<T, Backend>::type& input,
                 typename VectorType<T, Backend>::type& output,
                 typename Backend::comm_type& comm) {
@@ -669,15 +669,15 @@ public:
 
 
 template <typename Backend, typename T>
-class OpRunner<AlOperation::reduce_scatterv, Backend, T> :
-  public OpRunnerShim<AlOperation::reduce_scatterv, Backend, T,
-                      OpRunner<AlOperation::reduce_scatterv, Backend, T>> {
+class OpRunner<Al::AlOperation::reduce_scatterv, Backend, T> :
+  public OpRunnerShim<Al::AlOperation::reduce_scatterv, Backend, T,
+                      OpRunner<Al::AlOperation::reduce_scatterv, Backend, T>> {
 public:
-  using ThisType = OpRunner<AlOperation::reduce_scatterv, Backend, T>;
-  using OpRunnerShim<AlOperation::reduce_scatterv, Backend, T, ThisType>::OpRunnerShim;
+  using ThisType = OpRunner<Al::AlOperation::reduce_scatterv, Backend, T>;
+  using OpRunnerShim<Al::AlOperation::reduce_scatterv, Backend, T, ThisType>::OpRunnerShim;
 
-  template <AlOperation Op2 = AlOperation::reduce_scatterv,
-            std::enable_if_t<IsOpSupported<Op2, Backend>::value, bool> = true>
+  template <Al::AlOperation Op2 = Al::AlOperation::reduce_scatterv,
+            std::enable_if_t<Al::IsOpSupported<Op2, Backend>::value, bool> = true>
   void run_impl(typename VectorType<T, Backend>::type& input,
                 typename VectorType<T, Backend>::type& output,
                 typename Backend::comm_type& comm) {
@@ -729,15 +729,15 @@ public:
 
 
 template <typename Backend, typename T>
-class OpRunner<AlOperation::scatter, Backend, T> :
-  public OpRunnerShim<AlOperation::scatter, Backend, T,
-                      OpRunner<AlOperation::scatter, Backend, T>> {
+class OpRunner<Al::AlOperation::scatter, Backend, T> :
+  public OpRunnerShim<Al::AlOperation::scatter, Backend, T,
+                      OpRunner<Al::AlOperation::scatter, Backend, T>> {
 public:
-  using ThisType = OpRunner<AlOperation::scatter, Backend, T>;
-  using OpRunnerShim<AlOperation::scatter, Backend, T, ThisType>::OpRunnerShim;
+  using ThisType = OpRunner<Al::AlOperation::scatter, Backend, T>;
+  using OpRunnerShim<Al::AlOperation::scatter, Backend, T, ThisType>::OpRunnerShim;
 
-  template <AlOperation Op2 = AlOperation::scatter,
-            std::enable_if_t<IsOpSupported<Op2, Backend>::value, bool> = true>
+  template <Al::AlOperation Op2 = Al::AlOperation::scatter,
+            std::enable_if_t<Al::IsOpSupported<Op2, Backend>::value, bool> = true>
   void run_impl(typename VectorType<T, Backend>::type& input,
                 typename VectorType<T, Backend>::type& output,
                 typename Backend::comm_type& comm) {
@@ -804,15 +804,15 @@ public:
 };
 
 template <typename Backend, typename T>
-class OpRunner<AlOperation::scatterv, Backend, T> :
-  public OpRunnerShim<AlOperation::scatterv, Backend, T,
-                      OpRunner<AlOperation::scatterv, Backend, T>> {
+class OpRunner<Al::AlOperation::scatterv, Backend, T> :
+  public OpRunnerShim<Al::AlOperation::scatterv, Backend, T,
+                      OpRunner<Al::AlOperation::scatterv, Backend, T>> {
 public:
-  using ThisType = OpRunner<AlOperation::scatterv, Backend, T>;
-  using OpRunnerShim<AlOperation::scatterv, Backend, T, ThisType>::OpRunnerShim;
+  using ThisType = OpRunner<Al::AlOperation::scatterv, Backend, T>;
+  using OpRunnerShim<Al::AlOperation::scatterv, Backend, T, ThisType>::OpRunnerShim;
 
-  template <AlOperation Op2 = AlOperation::scatterv,
-            std::enable_if_t<IsOpSupported<Op2, Backend>::value, bool> = true>
+  template <Al::AlOperation Op2 = Al::AlOperation::scatterv,
+            std::enable_if_t<Al::IsOpSupported<Op2, Backend>::value, bool> = true>
   void run_impl(typename VectorType<T, Backend>::type& input,
                 typename VectorType<T, Backend>::type& output,
                 typename Backend::comm_type& comm) {
@@ -884,15 +884,15 @@ public:
 
 
 template <typename Backend, typename T>
-class OpRunner<AlOperation::send, Backend, T> :
-  public OpRunnerShim<AlOperation::send, Backend, T,
-                      OpRunner<AlOperation::send, Backend, T>> {
+class OpRunner<Al::AlOperation::send, Backend, T> :
+  public OpRunnerShim<Al::AlOperation::send, Backend, T,
+                      OpRunner<Al::AlOperation::send, Backend, T>> {
 public:
-  using ThisType = OpRunner<AlOperation::send, Backend, T>;
-  using OpRunnerShim<AlOperation::send, Backend, T, ThisType>::OpRunnerShim;
+  using ThisType = OpRunner<Al::AlOperation::send, Backend, T>;
+  using OpRunnerShim<Al::AlOperation::send, Backend, T, ThisType>::OpRunnerShim;
 
-  template <AlOperation Op2 = AlOperation::send,
-            std::enable_if_t<IsOpSupported<Op2, Backend>::value, bool> = true>
+  template <Al::AlOperation Op2 = Al::AlOperation::send,
+            std::enable_if_t<Al::IsOpSupported<Op2, Backend>::value, bool> = true>
   void run_impl(typename VectorType<T, Backend>::type& input,
                 typename VectorType<T, Backend>::type& /*output*/,
                 typename Backend::comm_type& comm) {
@@ -932,15 +932,15 @@ public:
 
 
 template <typename Backend, typename T>
-class OpRunner<AlOperation::recv, Backend, T> :
-  public OpRunnerShim<AlOperation::recv, Backend, T,
-                      OpRunner<AlOperation::recv, Backend, T>> {
+class OpRunner<Al::AlOperation::recv, Backend, T> :
+  public OpRunnerShim<Al::AlOperation::recv, Backend, T,
+                      OpRunner<Al::AlOperation::recv, Backend, T>> {
 public:
-  using ThisType = OpRunner<AlOperation::recv, Backend, T>;
-  using OpRunnerShim<AlOperation::recv, Backend, T, ThisType>::OpRunnerShim;
+  using ThisType = OpRunner<Al::AlOperation::recv, Backend, T>;
+  using OpRunnerShim<Al::AlOperation::recv, Backend, T, ThisType>::OpRunnerShim;
 
-  template <AlOperation Op2 = AlOperation::recv,
-            std::enable_if_t<IsOpSupported<Op2, Backend>::value, bool> = true>
+  template <Al::AlOperation Op2 = Al::AlOperation::recv,
+            std::enable_if_t<Al::IsOpSupported<Op2, Backend>::value, bool> = true>
   void run_impl(typename VectorType<T, Backend>::type& /*input*/,
                 typename VectorType<T, Backend>::type& output,
                 typename Backend::comm_type& comm) {
@@ -980,15 +980,15 @@ public:
 
 
 template <typename Backend, typename T>
-class OpRunner<AlOperation::sendrecv, Backend, T> :
-  public OpRunnerShim<AlOperation::sendrecv, Backend, T,
-                      OpRunner<AlOperation::sendrecv, Backend, T>> {
+class OpRunner<Al::AlOperation::sendrecv, Backend, T> :
+  public OpRunnerShim<Al::AlOperation::sendrecv, Backend, T,
+                      OpRunner<Al::AlOperation::sendrecv, Backend, T>> {
 public:
-  using ThisType = OpRunner<AlOperation::sendrecv, Backend, T>;
-  using OpRunnerShim<AlOperation::sendrecv, Backend, T, ThisType>::OpRunnerShim;
+  using ThisType = OpRunner<Al::AlOperation::sendrecv, Backend, T>;
+  using OpRunnerShim<Al::AlOperation::sendrecv, Backend, T, ThisType>::OpRunnerShim;
 
-  template <AlOperation Op2 = AlOperation::sendrecv,
-            std::enable_if_t<IsOpSupported<Op2, Backend>::value, bool> = true>
+  template <Al::AlOperation Op2 = Al::AlOperation::sendrecv,
+            std::enable_if_t<Al::IsOpSupported<Op2, Backend>::value, bool> = true>
   void run_impl(typename VectorType<T, Backend>::type& input,
                 typename VectorType<T, Backend>::type& output,
                 typename Backend::comm_type& comm) {

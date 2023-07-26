@@ -89,7 +89,7 @@ inline std::ostream& operator<<(std::ostream& os, const SummaryStats& summary) {
 
 
 /** Collect and output performance results. */
-template <AlOperation Op, typename Backend, typename T>
+template <Al::AlOperation Op, typename Backend, typename T>
 class OpProfile {
 public:
   OpProfile(typename Backend::comm_type& comm_,
@@ -143,9 +143,9 @@ public:
     write_results(f);
   }
 
-  template <AlOperation Op2 = Op,
-            std::enable_if_t<IsCollectiveOp<Op2>::value
-                             && IsOpSupported<Op2, Backend>::value, bool> = true>
+  template <Al::AlOperation Op2 = Op,
+            std::enable_if_t<Al::IsCollectiveOp<Op2>::value
+                             && Al::IsOpSupported<Op2, Backend>::value, bool> = true>
   void write_results(std::ostream& os) {
     // Write times.
     auto gathered_times = gather_results_to_root();
@@ -157,7 +157,7 @@ public:
       const std::string common_start =
         std::string(AlBackendName<Backend>) + " "
         + std::string(typeid(T).name()) + " "
-        + std::string(AlOperationName<Op>) + " "
+        + std::string(Al::AlOperationName<Op>) + " "
         + Al::algorithm_name(getter.get(options.algos)) + " "
         + (options.nonblocking ? "1" : "0") + " "
         + (options.inplace ? "1" : "0") + " "
@@ -181,9 +181,9 @@ public:
     }
   }
 
-  template <AlOperation Op2 = Op,
-            std::enable_if_t<IsPt2PtOp<Op2>::value
-                             && IsOpSupported<Op2, Backend>::value, bool> = true>
+  template <Al::AlOperation Op2 = Op,
+            std::enable_if_t<Al::IsPt2PtOp<Op2>::value
+                             && Al::IsOpSupported<Op2, Backend>::value, bool> = true>
   void write_results(std::ostream& os) {
     // Write times.
     auto gathered_times = gather_results_to_root();
@@ -193,7 +193,7 @@ public:
       const std::string common_start =
         std::string(AlBackendName<Backend>) + " "
         + std::string(typeid(T).name()) + " "
-        + std::string(AlOperationName<Op>) + " "
+        + std::string(Al::AlOperationName<Op>) + " "
         + std::to_string(comm.size()) + " ";
       for (auto&& p : gathered_times) {
         size_t size = p.first;
@@ -213,9 +213,9 @@ public:
     }
   }
 
-  template <AlOperation Op2 = Op,
-            std::enable_if_t<(!IsCollectiveOp<Op2>::value && !IsPt2PtOp<Op2>::value)
-                             || !IsOpSupported<Op2, Backend>::value, bool> = true>
+  template <Al::AlOperation Op2 = Op,
+            std::enable_if_t<(!Al::IsCollectiveOp<Op2>::value && !Al::IsPt2PtOp<Op2>::value)
+                             || !Al::IsOpSupported<Op2, Backend>::value, bool> = true>
   void write_results(std::ostream& os) {
     os << "Unsupported operation" << std::endl;
   }
