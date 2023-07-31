@@ -594,8 +594,7 @@ inline std::string human_readable_size(size_t size_) {
   return std::to_string(size) + " G";
 }
 
-// Pull in relevant headers for simplicity.
-#include "op_dispatcher.hpp"
+// Pull in utilities for supported backends.
 #include "test_utils_mpi.hpp"
 #ifdef AL_HAS_NCCL
 #include "test_utils_nccl.hpp"

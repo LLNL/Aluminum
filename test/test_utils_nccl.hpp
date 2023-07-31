@@ -84,36 +84,3 @@ void complete_operations<Al::NCCLBackend>(
   typename Al::NCCLBackend::comm_type& comm) {
   AL_FORCE_CHECK_GPU_NOSYNC(AlGpuStreamSynchronize(comm.get_stream()));
 }
-
-// Define the default algorithms for each operation.
-template <>
-struct AlgorithmOptions<Al::NCCLBackend> {
-  typename Al::NCCLBackend::allgather_algo_type allgather_algo =
-    Al::NCCLBackend::allgather_algo_type::automatic;
-  typename Al::NCCLBackend::allgatherv_algo_type allgatherv_algo =
-    Al::NCCLBackend::allgatherv_algo_type::automatic;
-  typename Al::NCCLBackend::allreduce_algo_type allreduce_algo =
-    Al::NCCLBackend::allreduce_algo_type::automatic;
-  typename Al::NCCLBackend::alltoall_algo_type alltoall_algo =
-    Al::NCCLBackend::alltoall_algo_type::automatic;
-  typename Al::NCCLBackend::alltoallv_algo_type alltoallv_algo =
-    Al::NCCLBackend::alltoallv_algo_type::automatic;
-  typename Al::NCCLBackend::barrier_algo_type barrier_algo =
-    Al::NCCLBackend::barrier_algo_type::automatic;
-  typename Al::NCCLBackend::bcast_algo_type bcast_algo =
-    Al::NCCLBackend::bcast_algo_type::automatic;
-  typename Al::NCCLBackend::gather_algo_type gather_algo =
-    Al::NCCLBackend::gather_algo_type::automatic;
-  typename Al::NCCLBackend::gatherv_algo_type gatherv_algo =
-    Al::NCCLBackend::gatherv_algo_type::automatic;
-  typename Al::NCCLBackend::reduce_algo_type reduce_algo =
-    Al::NCCLBackend::reduce_algo_type::automatic;
-  typename Al::NCCLBackend::reduce_scatter_algo_type reduce_scatter_algo =
-    Al::NCCLBackend::reduce_scatter_algo_type::automatic;
-  typename Al::NCCLBackend::reduce_scatterv_algo_type reduce_scatterv_algo =
-    Al::NCCLBackend::reduce_scatterv_algo_type::automatic;
-  typename Al::NCCLBackend::scatter_algo_type scatter_algo =
-    Al::NCCLBackend::scatter_algo_type::automatic;
-  typename Al::NCCLBackend::scatterv_algo_type scatterv_algo =
-    Al::NCCLBackend::scatterv_algo_type::automatic;
-};

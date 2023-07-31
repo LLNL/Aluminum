@@ -26,6 +26,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "benchmark_utils.hpp"
+#include "op_dispatcher.hpp"
 #include <map>
 #include <cxxopts.hpp>
 

@@ -31,6 +31,7 @@
 #include <thread>
 #include <cxxopts.hpp>
 #include "test_utils.hpp"
+#include "op_dispatcher.hpp"
 #include "hang_watchdog.hpp"
 
 

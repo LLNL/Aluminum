@@ -37,7 +37,7 @@
 #include <type_traits>
 #include <cstdlib>
 #include "aluminum/traits/traits.hpp"
-#include "test_utils.hpp"
+#include "algo_support.hpp"
 
 
 /** Return true if str is a valid operator. */
@@ -109,16 +109,6 @@ template <> struct IsTypeSupportedByMPI<__half> : std::true_type {};
 #ifdef AL_HAS_BFLOAT
 template <> struct IsTypeSupportedByMPI<al_bfloat16> : std::true_type {};
 #endif
-
-// Algorithms and string name supported by a particular backend/operator.
-template <Al::AlOperation Op, typename Backend>
-std::vector<std::pair<std::string, typename Al::OpAlgoType<Op, Backend>::type>> get_supported_algos() {
-  return {{"automatic", Al::OpAlgoType<Op, Backend>::type::automatic}};
-}
-
-// Backend names.
-template <typename Backend> constexpr char AlBackendName[] = "unknown";
-
 
 /** Helper to call a functor with the right op as a template parameter. */
 template <typename F>
@@ -303,9 +293,6 @@ struct supports_algos_functor {
 bool op_supports_algos(Al::AlOperation op) {
   return call_op_functor(op, supports_algos_functor());
 }
-
-/** Contains algorithms for all supported operations. */
-template <typename Backend> struct AlgorithmOptions {};
 
 /** Helpers to set an algorithm for a particular op. */
 template <Al::AlOperation Op, typename Backend> struct AlgoAccessor {};

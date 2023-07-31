@@ -30,7 +30,9 @@
 #include "Al.hpp"
 #include <unordered_map>
 #include <fstream>
+#include "aluminum/traits/traits.hpp"
 #include "test_utils.hpp"
+#include "op_dispatcher.hpp"
 
 
 /** Handle timing for a particular backend. */
@@ -155,7 +157,7 @@ public:
          << " Root CommSize Size CommRank Time\n";
       AlgoAccessor<Op, Backend> getter;
       const std::string common_start =
-        std::string(AlBackendName<Backend>) + " "
+        std::string(Al::AlBackendName<Backend>) + " "
         + std::string(typeid(T).name()) + " "
         + std::string(Al::AlOperationName<Op>) + " "
         + Al::algorithm_name(getter.get(options.algos)) + " "
@@ -191,7 +193,7 @@ public:
       // Header.
       os << "Backend Type Operation CommSize Size CommRank Time\n";
       const std::string common_start =
-        std::string(AlBackendName<Backend>) + " "
+        std::string(Al::AlBackendName<Backend>) + " "
         + std::string(typeid(T).name()) + " "
         + std::string(Al::AlOperationName<Op>) + " "
         + std::to_string(comm.size()) + " ";

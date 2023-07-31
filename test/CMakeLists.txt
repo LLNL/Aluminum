@@ -1,4 +1,5 @@
 set_source_path(TEST_BASE_HDRS
+  algo_support.hpp
   test_utils.hpp
   test_utils_mpi.hpp
   op_dispatcher.hpp

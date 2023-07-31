@@ -28,6 +28,7 @@
 #include "benchmark_utils.hpp"
 #include <iomanip>
 #include <cxxopts.hpp>
+#include "op_dispatcher.hpp"
 
 
 struct BandwidthResults {
@@ -80,7 +81,7 @@ public:
     // Print header.
     os << "Backend Type Src Dst Size Time\n";
     const std::string common_start =
-      std::string(AlBackendName<Backend>) + " "
+      std::string(Al::AlBackendName<Backend>) + " "
       + std::string(typeid(T).name()) + " ";
     for (size_t i = 0; i < gathered_results.srcs.size(); ++i) {
       os << common_start

@@ -30,6 +30,7 @@
 #include <cxxopts.hpp>
 #include "aluminum/traits/traits.hpp"
 #include "test_utils.hpp"
+#include "op_dispatcher.hpp"
 
 
 template <typename Backend, typename T,
