@@ -71,7 +71,7 @@ std::vector<int> gather_vector_sizes(int count,
 }
 
 template <typename Backend, typename T,
-          std::enable_if_t<IsTypeSupportedByMPI<T>::value, bool> = true>
+          std::enable_if_t<Al::IsTypeSupportedByMPI<T>::value, bool> = true>
 void do_mpi_gather(const T* input, T* output, size_t count,
                    std::vector<int> counts,  // Only significant at root.
                    typename Backend::comm_type& comm) {
@@ -83,7 +83,7 @@ void do_mpi_gather(const T* input, T* output, size_t count,
               0, comm.get_comm());
 }
 template <typename Backend, typename T,
-          std::enable_if_t<!IsTypeSupportedByMPI<T>::value, bool> = true>
+          std::enable_if_t<!Al::IsTypeSupportedByMPI<T>::value, bool> = true>
 void do_mpi_gather(const T* input, T* output, size_t count,
                    std::vector<int> counts,  // Only significant at root.
                    typename Backend::comm_type& comm) {

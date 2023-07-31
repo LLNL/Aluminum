@@ -38,6 +38,7 @@
 #include <cstdlib>
 #include "aluminum/traits/traits.hpp"
 #include "algo_support.hpp"
+#include "op_runner.hpp"
 
 
 /** Return true if str is a valid operator. */
@@ -86,29 +87,6 @@ Al::ReductionOperator get_reduction_op(const std::string redop_str) {
   }
   return i->second;
 }
-
-// Traits for MPI type support.
-template <typename T> struct IsTypeSupportedByMPI : std::false_type {};
-template <> struct IsTypeSupportedByMPI<char> : std::true_type {};
-template <> struct IsTypeSupportedByMPI<signed char> : std::true_type {};
-template <> struct IsTypeSupportedByMPI<unsigned char> : std::true_type {};
-template <> struct IsTypeSupportedByMPI<short> : std::true_type {};
-template <> struct IsTypeSupportedByMPI<unsigned short> : std::true_type {};
-template <> struct IsTypeSupportedByMPI<int> : std::true_type {};
-template <> struct IsTypeSupportedByMPI<unsigned int> : std::true_type {};
-template <> struct IsTypeSupportedByMPI<long> : std::true_type {};
-template <> struct IsTypeSupportedByMPI<unsigned long> : std::true_type {};
-template <> struct IsTypeSupportedByMPI<long long> : std::true_type {};
-template <> struct IsTypeSupportedByMPI<unsigned long long> : std::true_type {};
-template <> struct IsTypeSupportedByMPI<float> : std::true_type {};
-template <> struct IsTypeSupportedByMPI<double> : std::true_type {};
-template <> struct IsTypeSupportedByMPI<long double> : std::true_type {};
-#ifdef AL_HAS_HALF
-template <> struct IsTypeSupportedByMPI<__half> : std::true_type {};
-#endif
-#ifdef AL_HAS_BFLOAT
-template <> struct IsTypeSupportedByMPI<al_bfloat16> : std::true_type {};
-#endif
 
 /** Helper to call a functor with the right op as a template parameter. */
 template <typename F>
@@ -479,148 +457,6 @@ std::vector<AlgorithmOptions<Backend>> get_algorithms(
   }
   return call_op_functor(op, get_algorithms_functor<Backend>(algo));
 }
-
-/** Pass options that may be used by an operator. */
-template <typename Backend>
-struct OpOptions {
-  bool inplace = false;
-  bool nonblocking = false;
-  int root = 0;
-  int src = -1;
-  int dst = -1;
-  std::vector<size_t> send_counts = {};
-  std::vector<size_t> send_displs = {};
-  std::vector<size_t> recv_counts = {};
-  std::vector<size_t> recv_displs = {};
-  Al::ReductionOperator reduction_op = Al::ReductionOperator::sum;
-  typename Backend::req_type req = Backend::null_req;
-  AlgorithmOptions<Backend> algos;
-};
-
-/** Abstract base class for running an operator. */
-template <typename Backend, typename T, typename Child>
-class OpRunnerBase {
-public:
-  OpRunnerBase(OpOptions<Backend> &options_) :
-    options(options_) {}
-  ~OpRunnerBase() {}
-
-  const OpOptions<Backend>& get_options() const { return options; }
-  OpOptions<Backend>& get_options() { return options; }
-  std::string get_name() const {
-    return static_cast<const Child*>(this)->get_name_impl();
-  };
-
-  void run(typename VectorType<T, Backend>::type& input,
-           typename VectorType<T, Backend>::type& output,
-           typename Backend::comm_type& comm) {
-    static_cast<Child*>(this)->run_impl_int(input, output, comm);
-  }
-  void run_mpi(std::vector<T>& input,
-               std::vector<T>& output,
-               typename Backend::comm_type& comm) {
-    static_cast<Child*>(this)->run_mpi_impl_int(input, output, comm);
-  }
-
-  size_t get_input_size(size_t base_size,
-                        typename Backend::comm_type& comm) {
-    return static_cast<Child*>(this)->get_input_size_int_impl(base_size, comm);
-  }
-  size_t get_output_size(size_t base_size,
-                         typename Backend::comm_type& comm) {
-    return static_cast<Child*>(this)->get_output_size_int_impl(base_size, comm);
-  }
-
-protected:
-  void inplace_nb_dispatch(std::function<void()> nip_b,
-                           std::function<void()> ip_b,
-                           std::function<void()> nip_nb,
-                           std::function<void()> ip_nb) {
-    if (get_options().inplace) {
-      if (get_options().nonblocking) {
-        ip_nb();
-      } else {
-        ip_b();
-      }
-    } else {
-      if (get_options().nonblocking) {
-        nip_nb();
-      } else {
-        nip_b();
-      }
-    }
-  }
-
-  void* buf_or_inplace(T* buf) {
-    return get_options().inplace ? MPI_IN_PLACE : buf;
-  }
-
-private:
-  OpOptions<Backend>& options;
-};
-
-/**
- * Intermediate ABC providing some common functions.
- */
-template <Al::AlOperation Op, typename Backend, typename T, typename Child>
-class OpRunnerShim : public OpRunnerBase<Backend, T, OpRunnerShim<Op, Backend, T, Child>> {
-public:
-  using OpRunnerBase<Backend, T, OpRunnerShim<Op, Backend, T, Child>>::OpRunnerBase;
-
-  std::string get_name_impl() const { return Al::AlOperationName<Op>; }
-
-  template <Al::AlOperation Op2 = Op,
-            std::enable_if_t<Al::IsOpSupported<Op2, Backend>::value, bool> = true>
-  void run_impl_int(typename VectorType<T, Backend>::type& input,
-                    typename VectorType<T, Backend>::type& output,
-                    typename Backend::comm_type& comm) {
-    static_cast<Child*>(this)->run_impl(input, output, comm);
-  }
-  template <Al::AlOperation Op2 = Op,
-            std::enable_if_t<!Al::IsOpSupported<Op2, Backend>::value, bool> = true>
-  void run_impl_int(typename VectorType<T, Backend>::type&,
-                    typename VectorType<T, Backend>::type&,
-                    typename Backend::comm_type&) {
-    std::cerr << Al::AlOperationName<Op> << " not supported by backend" << std::endl;
-    std::abort();
-  }
-
-  template <typename T2 = T,
-            std::enable_if_t<IsTypeSupportedByMPI<T2>::value, bool> = true>
-  void run_mpi_impl_int(std::vector<T>& input,
-                        std::vector<T>& output,
-                        typename Backend::comm_type& comm) {
-    static_cast<Child*>(this)->run_mpi_impl(input, output, comm);
-  }
-  template <typename T2 = T,
-            std::enable_if_t<!IsTypeSupportedByMPI<T2>::value, bool> = true>
-  void run_mpi_impl_int(std::vector<T>&, std::vector<T>&,
-                        typename Backend::comm_type&) {
-    std::cerr << "Type not supported by MPI" << std::endl;
-    std::abort();
-  }
-
-  size_t get_input_size_int_impl(size_t base_size,
-                                 typename Backend::comm_type& comm) {
-    return static_cast<Child*>(this)->get_input_size_impl(base_size, comm);
-  }
-  size_t get_output_size_int_impl(size_t base_size,
-                                  typename Backend::comm_type& comm) {
-    return static_cast<Child*>(this)->get_output_size_impl(base_size, comm);
-  }
-
-};
-
-/**
- * Main OpRunner class, handles calls to Aluminum/MPI for an operator.
- *
- * Should be specialized for specific operators.
- */
-template <Al::AlOperation Op, typename Backend, typename T>
-class OpRunner : public OpRunnerShim<Op, Backend, T, OpRunner<Op, Backend, T>> {};
-
-#include "op_runner_impl.hpp"
-
 
 /**
  * Run an operator for a backend.

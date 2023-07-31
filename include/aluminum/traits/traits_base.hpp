@@ -35,6 +35,7 @@
 #include <type_traits>
 
 #include "aluminum/base.hpp"
+#include "aluminum/datatypes.hpp"
 
 namespace Al {
 
@@ -178,5 +179,33 @@ template <AlOperation Op, typename Backend> struct OpAlgoType {};
   template <> struct OpAlgoType<AlOperation::op, backend> { \
     using type = backend::op##_algo_type;                   \
   }
+
+/**
+ * Define types supported by MPI.
+ *
+ * Note these are separate from the types the Aluminum MPI backend
+ * supports and refer to those supported specifically by MPI itself.
+ */
+template <typename T> struct IsTypeSupportedByMPI : std::false_type {};
+template <> struct IsTypeSupportedByMPI<char> : std::true_type {};
+template <> struct IsTypeSupportedByMPI<signed char> : std::true_type {};
+template <> struct IsTypeSupportedByMPI<unsigned char> : std::true_type {};
+template <> struct IsTypeSupportedByMPI<short> : std::true_type {};
+template <> struct IsTypeSupportedByMPI<unsigned short> : std::true_type {};
+template <> struct IsTypeSupportedByMPI<int> : std::true_type {};
+template <> struct IsTypeSupportedByMPI<unsigned int> : std::true_type {};
+template <> struct IsTypeSupportedByMPI<long> : std::true_type {};
+template <> struct IsTypeSupportedByMPI<unsigned long> : std::true_type {};
+template <> struct IsTypeSupportedByMPI<long long> : std::true_type {};
+template <> struct IsTypeSupportedByMPI<unsigned long long> : std::true_type {};
+template <> struct IsTypeSupportedByMPI<float> : std::true_type {};
+template <> struct IsTypeSupportedByMPI<double> : std::true_type {};
+template <> struct IsTypeSupportedByMPI<long double> : std::true_type {};
+#ifdef AL_HAS_HALF
+template <> struct IsTypeSupportedByMPI<__half> : std::true_type {};
+#endif
+#ifdef AL_HAS_BFLOAT
+template <> struct IsTypeSupportedByMPI<al_bfloat16> : std::true_type {};
+#endif
 
 }  // namespace Al
