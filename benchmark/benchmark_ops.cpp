@@ -26,18 +26,19 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "benchmark_utils.hpp"
+#include "op_dispatcher.hpp"
 #include <map>
 #include <cxxopts.hpp>
 
 
-template <AlOperation Op, typename Backend, typename T,
-          std::enable_if_t<IsTypeSupported<Backend, T>::value, bool> = true>
+template <Al::AlOperation Op, typename Backend, typename T,
+          std::enable_if_t<Al::IsTypeSupported<Backend, T>::value, bool> = true>
 void run_benchmark(cxxopts::ParseResult& parsed_opts) {
-  if (!IsOpSupported<Op, Backend>::value) {
-    std::cerr << "Backend does not support operator " << AlOperationName<Op> << std::endl;
+  if (!Al::IsOpSupported<Op, Backend>::value) {
+    std::cerr << "Backend does not support operator " << Al::AlOperationName<Op> << std::endl;
     std::abort();
   }
-  AlOperation op = Op;
+  Al::AlOperation op = Op;
   // Set up options.
   OpOptions<Backend> op_options;
   if (parsed_opts.count("inplace")) {
@@ -52,7 +53,7 @@ void run_benchmark(cxxopts::ParseResult& parsed_opts) {
   }
   op_options.root = parsed_opts["root"].as<int>();
   // TODO: Support multiple algorithms -- needs support in OpProfile.
-  if (OpSupportsAlgos<Op>::value) {
+  if (Al::OpSupportsAlgos<Op>::value) {
     auto algorithms = get_algorithms<Backend>(
       op, parsed_opts["algorithm"].as<std::string>());
     if (algorithms.size() != 1) {
@@ -77,7 +78,7 @@ void run_benchmark(cxxopts::ParseResult& parsed_opts) {
   Timer<Backend> timer;
 
   bool participates_in_pt2pt = true;
-  if (IsPt2PtOp<Op>::value) {
+  if (Al::IsPt2PtOp<Op>::value) {
     if (comm_wrapper.size() == 1) {
       std::cerr << "Cannot benchmark point-to-point with a single rank" << std::endl;
       std::abort();
@@ -87,14 +88,14 @@ void run_benchmark(cxxopts::ParseResult& parsed_opts) {
       if (comm_wrapper.rank() == send_rank) {
         op_options.src = recv_rank;
         op_options.dst = recv_rank;
-        if (op != AlOperation::sendrecv) {
-          op = AlOperation::send;
+        if (op != Al::AlOperation::sendrecv) {
+          op = Al::AlOperation::send;
         }
       } else if (comm_wrapper.rank() == recv_rank) {
         op_options.src = send_rank;
         op_options.dst = send_rank;
-        if (op != AlOperation::sendrecv) {
-          op = AlOperation::recv;
+        if (op != Al::AlOperation::sendrecv) {
+          op = Al::AlOperation::recv;
         }
       } else {
         participates_in_pt2pt = false;
@@ -108,14 +109,14 @@ void run_benchmark(cxxopts::ParseResult& parsed_opts) {
         if (comm_wrapper.comm().rank() % 2 == 0) {
           op_options.src = comm_wrapper.rank() + 1;
           op_options.dst = comm_wrapper.rank() + 1;
-          if (op != AlOperation::sendrecv) {
-            op = AlOperation::send;
+          if (op != Al::AlOperation::sendrecv) {
+            op = Al::AlOperation::send;
           }
         } else {
           op_options.src = comm_wrapper.rank() - 1;
           op_options.dst = comm_wrapper.rank() - 1;
-          if (op != AlOperation::sendrecv) {
-            op = AlOperation::recv;
+          if (op != Al::AlOperation::sendrecv) {
+            op = Al::AlOperation::recv;
           }
         }
       } else {
@@ -128,7 +129,7 @@ void run_benchmark(cxxopts::ParseResult& parsed_opts) {
   size_t num_warmup = parsed_opts["num-warmup"].as<size_t>();
 
   for (const auto& size : sizes) {
-    if (IsVectorOp<Op>::value) {
+    if (Al::IsVectorOp<Op>::value) {
       op_options.send_counts = std::vector<size_t>(comm_wrapper.size(), size);
       op_options.send_displs = Al::excl_prefix_sum(op_options.send_counts);
       op_options.recv_counts = op_options.send_counts;
@@ -152,7 +153,7 @@ void run_benchmark(cxxopts::ParseResult& parsed_opts) {
     typename VectorType<T, Backend>::type output =
       VectorType<T, Backend>::gen_data(out_size);
 
-    if (!IsPt2PtOp<Op>::value || participates_in_pt2pt) {
+    if (!Al::IsPt2PtOp<Op>::value || participates_in_pt2pt) {
       for (size_t trial = 0; trial < num_warmup + num_iters; ++trial) {
         MPI_Barrier(MPI_COMM_WORLD);
         timer.start_timer(comm_wrapper.comm());
@@ -165,7 +166,7 @@ void run_benchmark(cxxopts::ParseResult& parsed_opts) {
           profile.add_result(size, t);
         }
       }
-    } else if (IsPt2PtOp<Op>::value && !participates_in_pt2pt) {
+    } else if (Al::IsPt2PtOp<Op>::value && !participates_in_pt2pt) {
       // These ranks still need to participate in the barriers.
       for (size_t trial = 0; trial < num_warmup + num_iters; ++trial) {
         MPI_Barrier(MPI_COMM_WORLD);
@@ -199,8 +200,8 @@ void run_benchmark(cxxopts::ParseResult& parsed_opts) {
   StreamManager<Backend>::finalize();
 }
 
-template <AlOperation Op, typename Backend, typename T,
-          std::enable_if_t<!IsTypeSupported<Backend, T>::value, bool> = true>
+template <Al::AlOperation Op, typename Backend, typename T,
+          std::enable_if_t<!Al::IsTypeSupported<Backend, T>::value, bool> = true>
 void run_benchmark(cxxopts::ParseResult& parsed_opts) {
   std::cerr << "Backend "
             << parsed_opts["backend"].as<std::string>()
@@ -214,7 +215,7 @@ struct benchmark_op_functor {
   cxxopts::ParseResult& parsed_opts;
   benchmark_op_functor(cxxopts::ParseResult& parsed_opts_) :
     parsed_opts(parsed_opts_) {}
-  template <AlOperation Op>
+  template <Al::AlOperation Op>
   void operator()() {
     run_benchmark<Op, Backend, T>(parsed_opts);
   }
@@ -228,7 +229,7 @@ struct benchmark_dispatcher {
       std::cerr << "Unknown operator " << op_str << std::endl;
       std::abort();
     }
-    AlOperation op = op_str_to_op(op_str);
+    Al::AlOperation op = op_str_to_op(op_str);
     call_op_functor(op, benchmark_op_functor<Backend, T>(parsed_opts));
   }
 };

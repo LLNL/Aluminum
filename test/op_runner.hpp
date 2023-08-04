@@ -28,17 +28,161 @@
 #pragma once
 
 #include "Al.hpp"
+#include "aluminum/traits/traits.hpp"
+#include "algo_support.hpp"
+#include "test_utils.hpp"
+
+/** Pass options that may be used by an operator. */
+template <typename Backend>
+struct OpOptions {
+  bool inplace = false;
+  bool nonblocking = false;
+  int root = 0;
+  int src = -1;
+  int dst = -1;
+  std::vector<size_t> send_counts = {};
+  std::vector<size_t> send_displs = {};
+  std::vector<size_t> recv_counts = {};
+  std::vector<size_t> recv_displs = {};
+  Al::ReductionOperator reduction_op = Al::ReductionOperator::sum;
+  typename Backend::req_type req = Backend::null_req;
+  AlgorithmOptions<Backend> algos;
+};
+
+/** Abstract base class for running an operator. */
+template <typename Backend, typename T, typename Child>
+class OpRunnerBase {
+public:
+  OpRunnerBase(OpOptions<Backend> &options_) :
+    options(options_) {}
+  ~OpRunnerBase() {}
+
+  const OpOptions<Backend>& get_options() const { return options; }
+  OpOptions<Backend>& get_options() { return options; }
+  std::string get_name() const {
+    return static_cast<const Child*>(this)->get_name_impl();
+  };
+
+  void run(typename VectorType<T, Backend>::type& input,
+           typename VectorType<T, Backend>::type& output,
+           typename Backend::comm_type& comm) {
+    static_cast<Child*>(this)->run_impl_int(input, output, comm);
+  }
+  void run_mpi(std::vector<T>& input,
+               std::vector<T>& output,
+               typename Backend::comm_type& comm) {
+    static_cast<Child*>(this)->run_mpi_impl_int(input, output, comm);
+  }
+
+  size_t get_input_size(size_t base_size,
+                        typename Backend::comm_type& comm) {
+    return static_cast<Child*>(this)->get_input_size_int_impl(base_size, comm);
+  }
+  size_t get_output_size(size_t base_size,
+                         typename Backend::comm_type& comm) {
+    return static_cast<Child*>(this)->get_output_size_int_impl(base_size, comm);
+  }
+
+protected:
+  void inplace_nb_dispatch(std::function<void()> nip_b,
+                           std::function<void()> ip_b,
+                           std::function<void()> nip_nb,
+                           std::function<void()> ip_nb) {
+    if (get_options().inplace) {
+      if (get_options().nonblocking) {
+        ip_nb();
+      } else {
+        ip_b();
+      }
+    } else {
+      if (get_options().nonblocking) {
+        nip_nb();
+      } else {
+        nip_b();
+      }
+    }
+  }
+
+  void* buf_or_inplace(T* buf) {
+    return get_options().inplace ? MPI_IN_PLACE : buf;
+  }
+
+private:
+  OpOptions<Backend>& options;
+};
+
+/**
+ * Intermediate ABC providing some common functions.
+ */
+template <Al::AlOperation Op, typename Backend, typename T, typename Child>
+class OpRunnerShim : public OpRunnerBase<Backend, T, OpRunnerShim<Op, Backend, T, Child>> {
+public:
+  using OpRunnerBase<Backend, T, OpRunnerShim<Op, Backend, T, Child>>::OpRunnerBase;
+
+  std::string get_name_impl() const { return Al::AlOperationName<Op>; }
+
+  template <Al::AlOperation Op2 = Op,
+            std::enable_if_t<Al::IsOpSupported<Op2, Backend>::value, bool> = true>
+  void run_impl_int(typename VectorType<T, Backend>::type& input,
+                    typename VectorType<T, Backend>::type& output,
+                    typename Backend::comm_type& comm) {
+    static_cast<Child*>(this)->run_impl(input, output, comm);
+  }
+  template <Al::AlOperation Op2 = Op,
+            std::enable_if_t<!Al::IsOpSupported<Op2, Backend>::value, bool> = true>
+  void run_impl_int(typename VectorType<T, Backend>::type&,
+                    typename VectorType<T, Backend>::type&,
+                    typename Backend::comm_type&) {
+    std::cerr << Al::AlOperationName<Op> << " not supported by backend" << std::endl;
+    std::abort();
+  }
+
+  template <typename T2 = T,
+            std::enable_if_t<Al::IsTypeSupportedByMPI<T2>::value, bool> = true>
+  void run_mpi_impl_int(std::vector<T>& input,
+                        std::vector<T>& output,
+                        typename Backend::comm_type& comm) {
+    static_cast<Child*>(this)->run_mpi_impl(input, output, comm);
+  }
+  template <typename T2 = T,
+            std::enable_if_t<!Al::IsTypeSupportedByMPI<T2>::value, bool> = true>
+  void run_mpi_impl_int(std::vector<T>&, std::vector<T>&,
+                        typename Backend::comm_type&) {
+    std::cerr << "Type not supported by MPI" << std::endl;
+    std::abort();
+  }
+
+  size_t get_input_size_int_impl(size_t base_size,
+                                 typename Backend::comm_type& comm) {
+    return static_cast<Child*>(this)->get_input_size_impl(base_size, comm);
+  }
+  size_t get_output_size_int_impl(size_t base_size,
+                                  typename Backend::comm_type& comm) {
+    return static_cast<Child*>(this)->get_output_size_impl(base_size, comm);
+  }
+
+};
+
+/**
+ * Main OpRunner class, handles calls to Aluminum/MPI for an operator.
+ *
+ * Should be specialized for specific operators.
+ */
+template <Al::AlOperation Op, typename Backend, typename T>
+class OpRunner : public OpRunnerShim<Op, Backend, T, OpRunner<Op, Backend, T>> {};
+
+// Specific implementations are below:
 
 template <typename Backend, typename T>
-class OpRunner<AlOperation::allgather, Backend, T> :
-  public OpRunnerShim<AlOperation::allgather, Backend, T,
-                      OpRunner<AlOperation::allgather, Backend, T>> {
+class OpRunner<Al::AlOperation::allgather, Backend, T> :
+  public OpRunnerShim<Al::AlOperation::allgather, Backend, T,
+                      OpRunner<Al::AlOperation::allgather, Backend, T>> {
 public:
-  using ThisType = OpRunner<AlOperation::allgather, Backend, T>;
-  using OpRunnerShim<AlOperation::allgather, Backend, T, ThisType>::OpRunnerShim;
+  using ThisType = OpRunner<Al::AlOperation::allgather, Backend, T>;
+  using OpRunnerShim<Al::AlOperation::allgather, Backend, T, ThisType>::OpRunnerShim;
 
-  template <AlOperation Op2 = AlOperation::allgather,
-            std::enable_if_t<IsOpSupported<Op2, Backend>::value, bool> = true>
+  template <Al::AlOperation Op2 = Al::AlOperation::allgather,
+            std::enable_if_t<Al::IsOpSupported<Op2, Backend>::value, bool> = true>
   void run_impl(typename VectorType<T, Backend>::type& input,
                 typename VectorType<T, Backend>::type& output,
                 typename Backend::comm_type& comm) {
@@ -55,7 +199,7 @@ public:
   }
 
   template <typename T2 = T,
-            std::enable_if_t<IsTypeSupportedByMPI<T2>::value, bool> = true>
+            std::enable_if_t<Al::IsTypeSupportedByMPI<T2>::value, bool> = true>
   void run_mpi_impl(std::vector<T>& input,
                     std::vector<T>& output,
                     typename Backend::comm_type& comm) {
@@ -83,15 +227,15 @@ public:
 
 
 template <typename Backend, typename T>
-class OpRunner<AlOperation::allgatherv, Backend, T> :
-  public OpRunnerShim<AlOperation::allgatherv, Backend, T,
-                      OpRunner<AlOperation::allgatherv, Backend, T>> {
+class OpRunner<Al::AlOperation::allgatherv, Backend, T> :
+  public OpRunnerShim<Al::AlOperation::allgatherv, Backend, T,
+                      OpRunner<Al::AlOperation::allgatherv, Backend, T>> {
 public:
-  using OpRunnerShim<AlOperation::allgatherv, Backend, T,
-                     OpRunner<AlOperation::allgatherv, Backend, T>>::OpRunnerShim;
+  using OpRunnerShim<Al::AlOperation::allgatherv, Backend, T,
+                     OpRunner<Al::AlOperation::allgatherv, Backend, T>>::OpRunnerShim;
 
-  template <AlOperation Op2 = AlOperation::allgatherv,
-            std::enable_if_t<IsOpSupported<Op2, Backend>::value, bool> = true>
+  template <Al::AlOperation Op2 = Al::AlOperation::allgatherv,
+            std::enable_if_t<Al::IsOpSupported<Op2, Backend>::value, bool> = true>
   void run_impl(typename VectorType<T, Backend>::type& input,
                 typename VectorType<T, Backend>::type& output,
                 typename Backend::comm_type& comm) {
@@ -107,7 +251,7 @@ public:
   }
 
   template <typename T2 = T,
-            std::enable_if_t<IsTypeSupportedByMPI<T2>::value, bool> = true>
+            std::enable_if_t<Al::IsTypeSupportedByMPI<T2>::value, bool> = true>
   void run_mpi_impl(std::vector<T>& input,
                     std::vector<T>& output,
                     typename Backend::comm_type& comm) {
@@ -138,15 +282,15 @@ public:
 
 
 template <typename Backend, typename T>
-class OpRunner<AlOperation::allreduce, Backend, T> :
-  public OpRunnerShim<AlOperation::allreduce, Backend, T,
-                      OpRunner<AlOperation::allreduce, Backend, T>> {
+class OpRunner<Al::AlOperation::allreduce, Backend, T> :
+  public OpRunnerShim<Al::AlOperation::allreduce, Backend, T,
+                      OpRunner<Al::AlOperation::allreduce, Backend, T>> {
 public:
-  using ThisType = OpRunner<AlOperation::allreduce, Backend, T>;
-  using OpRunnerShim<AlOperation::allreduce, Backend, T, ThisType>::OpRunnerShim;
+  using ThisType = OpRunner<Al::AlOperation::allreduce, Backend, T>;
+  using OpRunnerShim<Al::AlOperation::allreduce, Backend, T, ThisType>::OpRunnerShim;
 
-  template <AlOperation Op2 = AlOperation::allreduce,
-            std::enable_if_t<IsOpSupported<Op2, Backend>::value, bool> = true>
+  template <Al::AlOperation Op2 = Al::AlOperation::allreduce,
+            std::enable_if_t<Al::IsOpSupported<Op2, Backend>::value, bool> = true>
   void run_impl(typename VectorType<T, Backend>::type& input,
                 typename VectorType<T, Backend>::type& output,
                 typename Backend::comm_type& comm) {
@@ -161,7 +305,7 @@ public:
   }
 
   template <typename T2 = T,
-            std::enable_if_t<IsTypeSupportedByMPI<T2>::value, bool> = true>
+            std::enable_if_t<Al::IsTypeSupportedByMPI<T2>::value, bool> = true>
   void run_mpi_impl(std::vector<T>& input,
                     std::vector<T>& output,
                     typename Backend::comm_type& comm) {
@@ -189,15 +333,15 @@ public:
 
 
 template <typename Backend, typename T>
-class OpRunner<AlOperation::alltoall, Backend, T> :
-  public OpRunnerShim<AlOperation::alltoall, Backend, T,
-                      OpRunner<AlOperation::alltoall, Backend, T>> {
+class OpRunner<Al::AlOperation::alltoall, Backend, T> :
+  public OpRunnerShim<Al::AlOperation::alltoall, Backend, T,
+                      OpRunner<Al::AlOperation::alltoall, Backend, T>> {
 public:
-  using ThisType = OpRunner<AlOperation::alltoall, Backend, T>;
-  using OpRunnerShim<AlOperation::alltoall, Backend, T, ThisType>::OpRunnerShim;
+  using ThisType = OpRunner<Al::AlOperation::alltoall, Backend, T>;
+  using OpRunnerShim<Al::AlOperation::alltoall, Backend, T, ThisType>::OpRunnerShim;
 
-  template <AlOperation Op2 = AlOperation::alltoall,
-            std::enable_if_t<IsOpSupported<Op2, Backend>::value, bool> = true>
+  template <Al::AlOperation Op2 = Al::AlOperation::alltoall,
+            std::enable_if_t<Al::IsOpSupported<Op2, Backend>::value, bool> = true>
   void run_impl(typename VectorType<T, Backend>::type& input,
                 typename VectorType<T, Backend>::type& output,
                 typename Backend::comm_type& comm) {
@@ -214,7 +358,7 @@ public:
   }
 
   template <typename T2 = T,
-            std::enable_if_t<IsTypeSupportedByMPI<T2>::value, bool> = true>
+            std::enable_if_t<Al::IsTypeSupportedByMPI<T2>::value, bool> = true>
   void run_mpi_impl(std::vector<T>& input,
                     std::vector<T>& output,
                     typename Backend::comm_type& comm) {
@@ -244,15 +388,15 @@ public:
 
 
 template <typename Backend, typename T>
-class OpRunner<AlOperation::alltoallv, Backend, T> :
-  public OpRunnerShim<AlOperation::alltoallv, Backend, T,
-                      OpRunner<AlOperation::alltoallv, Backend, T>> {
+class OpRunner<Al::AlOperation::alltoallv, Backend, T> :
+  public OpRunnerShim<Al::AlOperation::alltoallv, Backend, T,
+                      OpRunner<Al::AlOperation::alltoallv, Backend, T>> {
 public:
-  using ThisType = OpRunner<AlOperation::alltoallv, Backend, T>;
-  using OpRunnerShim<AlOperation::alltoallv, Backend, T, ThisType>::OpRunnerShim;
+  using ThisType = OpRunner<Al::AlOperation::alltoallv, Backend, T>;
+  using OpRunnerShim<Al::AlOperation::alltoallv, Backend, T, ThisType>::OpRunnerShim;
 
-  template <AlOperation Op2 = AlOperation::alltoallv,
-            std::enable_if_t<IsOpSupported<Op2, Backend>::value, bool> = true>
+  template <Al::AlOperation Op2 = Al::AlOperation::alltoallv,
+            std::enable_if_t<Al::IsOpSupported<Op2, Backend>::value, bool> = true>
   void run_impl(typename VectorType<T, Backend>::type& input,
                 typename VectorType<T, Backend>::type& output,
                 typename Backend::comm_type& comm) {
@@ -270,7 +414,7 @@ public:
   }
 
   template <typename T2 = T,
-            std::enable_if_t<IsTypeSupportedByMPI<T2>::value, bool> = true>
+            std::enable_if_t<Al::IsTypeSupportedByMPI<T2>::value, bool> = true>
   void run_mpi_impl(std::vector<T>& input,
                     std::vector<T>& output,
                     typename Backend::comm_type& comm) {
@@ -309,15 +453,15 @@ public:
 
 
 template <typename Backend, typename T>
-class OpRunner<AlOperation::barrier, Backend, T> :
-  public OpRunnerShim<AlOperation::barrier, Backend, T,
-                      OpRunner<AlOperation::barrier, Backend, T>> {
+class OpRunner<Al::AlOperation::barrier, Backend, T> :
+  public OpRunnerShim<Al::AlOperation::barrier, Backend, T,
+                      OpRunner<Al::AlOperation::barrier, Backend, T>> {
 public:
-  using ThisType = OpRunner<AlOperation::barrier, Backend, T>;
-  using OpRunnerShim<AlOperation::barrier, Backend, T, ThisType>::OpRunnerShim;
+  using ThisType = OpRunner<Al::AlOperation::barrier, Backend, T>;
+  using OpRunnerShim<Al::AlOperation::barrier, Backend, T, ThisType>::OpRunnerShim;
 
-  template <AlOperation Op2 = AlOperation::barrier,
-            std::enable_if_t<IsOpSupported<Op2, Backend>::value, bool> = true>
+  template <Al::AlOperation Op2 = Al::AlOperation::barrier,
+            std::enable_if_t<Al::IsOpSupported<Op2, Backend>::value, bool> = true>
   void run_impl(typename VectorType<T, Backend>::type& /*input*/,
                 typename VectorType<T, Backend>::type& /*output*/,
                 typename Backend::comm_type& comm) {
@@ -335,7 +479,7 @@ public:
   }
 
   template <typename T2 = T,
-            std::enable_if_t<IsTypeSupportedByMPI<T2>::value, bool> = true>
+            std::enable_if_t<Al::IsTypeSupportedByMPI<T2>::value, bool> = true>
   void run_mpi_impl(std::vector<T>& /*input*/,
                     std::vector<T>& /*output*/,
                     typename Backend::comm_type& comm) {
@@ -354,15 +498,15 @@ public:
 
 
 template <typename Backend, typename T>
-class OpRunner<AlOperation::bcast, Backend, T> :
-  public OpRunnerShim<AlOperation::bcast, Backend, T,
-                      OpRunner<AlOperation::bcast, Backend, T>> {
+class OpRunner<Al::AlOperation::bcast, Backend, T> :
+  public OpRunnerShim<Al::AlOperation::bcast, Backend, T,
+                      OpRunner<Al::AlOperation::bcast, Backend, T>> {
 public:
-  using ThisType = OpRunner<AlOperation::bcast, Backend, T>;
-  using OpRunnerShim<AlOperation::bcast, Backend, T, ThisType>::OpRunnerShim;
+  using ThisType = OpRunner<Al::AlOperation::bcast, Backend, T>;
+  using OpRunnerShim<Al::AlOperation::bcast, Backend, T, ThisType>::OpRunnerShim;
 
-  template <AlOperation Op2 = AlOperation::bcast,
-            std::enable_if_t<IsOpSupported<Op2, Backend>::value, bool> = true>
+  template <Al::AlOperation Op2 = Al::AlOperation::bcast,
+            std::enable_if_t<Al::IsOpSupported<Op2, Backend>::value, bool> = true>
   void run_impl(typename VectorType<T, Backend>::type& /*input*/,
                 typename VectorType<T, Backend>::type& output,
                 typename Backend::comm_type& comm) {
@@ -381,7 +525,7 @@ public:
   }
 
   template <typename T2 = T,
-            std::enable_if_t<IsTypeSupportedByMPI<T2>::value, bool> = true>
+            std::enable_if_t<Al::IsTypeSupportedByMPI<T2>::value, bool> = true>
   void run_mpi_impl(std::vector<T>& /*input*/,
                     std::vector<T>& output,
                     typename Backend::comm_type& comm) {
@@ -406,15 +550,15 @@ public:
 
 
 template <typename Backend, typename T>
-class OpRunner<AlOperation::gather, Backend, T> :
-  public OpRunnerShim<AlOperation::gather, Backend, T,
-                      OpRunner<AlOperation::gather, Backend, T>> {
+class OpRunner<Al::AlOperation::gather, Backend, T> :
+  public OpRunnerShim<Al::AlOperation::gather, Backend, T,
+                      OpRunner<Al::AlOperation::gather, Backend, T>> {
 public:
-  using ThisType = OpRunner<AlOperation::gather, Backend, T>;
-  using OpRunnerShim<AlOperation::gather, Backend, T, ThisType>::OpRunnerShim;
+  using ThisType = OpRunner<Al::AlOperation::gather, Backend, T>;
+  using OpRunnerShim<Al::AlOperation::gather, Backend, T, ThisType>::OpRunnerShim;
 
-  template <AlOperation Op2 = AlOperation::gather,
-            std::enable_if_t<IsOpSupported<Op2, Backend>::value, bool> = true>
+  template <Al::AlOperation Op2 = Al::AlOperation::gather,
+            std::enable_if_t<Al::IsOpSupported<Op2, Backend>::value, bool> = true>
   void run_impl(typename VectorType<T, Backend>::type& input,
                 typename VectorType<T, Backend>::type& output,
                 typename Backend::comm_type& comm) {
@@ -432,7 +576,7 @@ public:
   }
 
   template <typename T2 = T,
-            std::enable_if_t<IsTypeSupportedByMPI<T2>::value, bool> = true>
+            std::enable_if_t<Al::IsTypeSupportedByMPI<T2>::value, bool> = true>
   void run_mpi_impl(std::vector<T>& input,
                     std::vector<T>& output,
                     typename Backend::comm_type& comm) {
@@ -475,15 +619,15 @@ public:
 
 
 template <typename Backend, typename T>
-class OpRunner<AlOperation::gatherv, Backend, T> :
-  public OpRunnerShim<AlOperation::gatherv, Backend, T,
-                      OpRunner<AlOperation::gatherv, Backend, T>> {
+class OpRunner<Al::AlOperation::gatherv, Backend, T> :
+  public OpRunnerShim<Al::AlOperation::gatherv, Backend, T,
+                      OpRunner<Al::AlOperation::gatherv, Backend, T>> {
 public:
-  using ThisType = OpRunner<AlOperation::gatherv, Backend, T>;
-  using OpRunnerShim<AlOperation::gatherv, Backend, T, ThisType>::OpRunnerShim;
+  using ThisType = OpRunner<Al::AlOperation::gatherv, Backend, T>;
+  using OpRunnerShim<Al::AlOperation::gatherv, Backend, T, ThisType>::OpRunnerShim;
 
-  template <AlOperation Op2 = AlOperation::gatherv,
-            std::enable_if_t<IsOpSupported<Op2, Backend>::value, bool> = true>
+  template <Al::AlOperation Op2 = Al::AlOperation::gatherv,
+            std::enable_if_t<Al::IsOpSupported<Op2, Backend>::value, bool> = true>
   void run_impl(typename VectorType<T, Backend>::type& input,
                 typename VectorType<T, Backend>::type& output,
                 typename Backend::comm_type& comm) {
@@ -500,7 +644,7 @@ public:
   }
 
   template <typename T2 = T,
-            std::enable_if_t<IsTypeSupportedByMPI<T2>::value, bool> = true>
+            std::enable_if_t<Al::IsTypeSupportedByMPI<T2>::value, bool> = true>
   void run_mpi_impl(std::vector<T>& input,
                     std::vector<T>& output,
                     typename Backend::comm_type& comm) {
@@ -546,15 +690,15 @@ public:
 
 
 template <typename Backend, typename T>
-class OpRunner<AlOperation::reduce, Backend, T> :
-  public OpRunnerShim<AlOperation::reduce, Backend, T,
-                      OpRunner<AlOperation::reduce, Backend, T>> {
+class OpRunner<Al::AlOperation::reduce, Backend, T> :
+  public OpRunnerShim<Al::AlOperation::reduce, Backend, T,
+                      OpRunner<Al::AlOperation::reduce, Backend, T>> {
 public:
-  using ThisType = OpRunner<AlOperation::reduce, Backend, T>;
-  using OpRunnerShim<AlOperation::reduce, Backend, T, ThisType>::OpRunnerShim;
+  using ThisType = OpRunner<Al::AlOperation::reduce, Backend, T>;
+  using OpRunnerShim<Al::AlOperation::reduce, Backend, T, ThisType>::OpRunnerShim;
 
-  template <AlOperation Op2 = AlOperation::reduce,
-            std::enable_if_t<IsOpSupported<Op2, Backend>::value, bool> = true>
+  template <Al::AlOperation Op2 = Al::AlOperation::reduce,
+            std::enable_if_t<Al::IsOpSupported<Op2, Backend>::value, bool> = true>
   void run_impl(typename VectorType<T, Backend>::type& input,
                 typename VectorType<T, Backend>::type& output,
                 typename Backend::comm_type& comm) {
@@ -570,7 +714,7 @@ public:
   }
 
   template <typename T2 = T,
-            std::enable_if_t<IsTypeSupportedByMPI<T2>::value, bool> = true>
+            std::enable_if_t<Al::IsTypeSupportedByMPI<T2>::value, bool> = true>
   void run_mpi_impl(std::vector<T>& input,
                     std::vector<T>& output,
                     typename Backend::comm_type& comm) {
@@ -611,15 +755,15 @@ public:
 
 
 template <typename Backend, typename T>
-class OpRunner<AlOperation::reduce_scatter, Backend, T> :
-  public OpRunnerShim<AlOperation::reduce_scatter, Backend, T,
-                      OpRunner<AlOperation::reduce_scatter, Backend, T>> {
+class OpRunner<Al::AlOperation::reduce_scatter, Backend, T> :
+  public OpRunnerShim<Al::AlOperation::reduce_scatter, Backend, T,
+                      OpRunner<Al::AlOperation::reduce_scatter, Backend, T>> {
 public:
-  using ThisType = OpRunner<AlOperation::reduce_scatter, Backend, T>;
-  using OpRunnerShim<AlOperation::reduce_scatter, Backend, T, ThisType>::OpRunnerShim;
+  using ThisType = OpRunner<Al::AlOperation::reduce_scatter, Backend, T>;
+  using OpRunnerShim<Al::AlOperation::reduce_scatter, Backend, T, ThisType>::OpRunnerShim;
 
-  template <AlOperation Op2 = AlOperation::reduce_scatter,
-            std::enable_if_t<IsOpSupported<Op2, Backend>::value, bool> = true>
+  template <Al::AlOperation Op2 = Al::AlOperation::reduce_scatter,
+            std::enable_if_t<Al::IsOpSupported<Op2, Backend>::value, bool> = true>
   void run_impl(typename VectorType<T, Backend>::type& input,
                 typename VectorType<T, Backend>::type& output,
                 typename Backend::comm_type& comm) {
@@ -637,7 +781,7 @@ public:
   }
 
   template <typename T2 = T,
-            std::enable_if_t<IsTypeSupportedByMPI<T2>::value, bool> = true>
+            std::enable_if_t<Al::IsTypeSupportedByMPI<T2>::value, bool> = true>
   void run_mpi_impl(std::vector<T>& input,
                     std::vector<T>& output,
                     typename Backend::comm_type& comm) {
@@ -669,15 +813,15 @@ public:
 
 
 template <typename Backend, typename T>
-class OpRunner<AlOperation::reduce_scatterv, Backend, T> :
-  public OpRunnerShim<AlOperation::reduce_scatterv, Backend, T,
-                      OpRunner<AlOperation::reduce_scatterv, Backend, T>> {
+class OpRunner<Al::AlOperation::reduce_scatterv, Backend, T> :
+  public OpRunnerShim<Al::AlOperation::reduce_scatterv, Backend, T,
+                      OpRunner<Al::AlOperation::reduce_scatterv, Backend, T>> {
 public:
-  using ThisType = OpRunner<AlOperation::reduce_scatterv, Backend, T>;
-  using OpRunnerShim<AlOperation::reduce_scatterv, Backend, T, ThisType>::OpRunnerShim;
+  using ThisType = OpRunner<Al::AlOperation::reduce_scatterv, Backend, T>;
+  using OpRunnerShim<Al::AlOperation::reduce_scatterv, Backend, T, ThisType>::OpRunnerShim;
 
-  template <AlOperation Op2 = AlOperation::reduce_scatterv,
-            std::enable_if_t<IsOpSupported<Op2, Backend>::value, bool> = true>
+  template <Al::AlOperation Op2 = Al::AlOperation::reduce_scatterv,
+            std::enable_if_t<Al::IsOpSupported<Op2, Backend>::value, bool> = true>
   void run_impl(typename VectorType<T, Backend>::type& input,
                 typename VectorType<T, Backend>::type& output,
                 typename Backend::comm_type& comm) {
@@ -693,7 +837,7 @@ public:
   }
 
   template <typename T2 = T,
-            std::enable_if_t<IsTypeSupportedByMPI<T2>::value, bool> = true>
+            std::enable_if_t<Al::IsTypeSupportedByMPI<T2>::value, bool> = true>
   void run_mpi_impl(std::vector<T>& input,
                     std::vector<T>& output,
                     typename Backend::comm_type& comm) {
@@ -729,15 +873,15 @@ public:
 
 
 template <typename Backend, typename T>
-class OpRunner<AlOperation::scatter, Backend, T> :
-  public OpRunnerShim<AlOperation::scatter, Backend, T,
-                      OpRunner<AlOperation::scatter, Backend, T>> {
+class OpRunner<Al::AlOperation::scatter, Backend, T> :
+  public OpRunnerShim<Al::AlOperation::scatter, Backend, T,
+                      OpRunner<Al::AlOperation::scatter, Backend, T>> {
 public:
-  using ThisType = OpRunner<AlOperation::scatter, Backend, T>;
-  using OpRunnerShim<AlOperation::scatter, Backend, T, ThisType>::OpRunnerShim;
+  using ThisType = OpRunner<Al::AlOperation::scatter, Backend, T>;
+  using OpRunnerShim<Al::AlOperation::scatter, Backend, T, ThisType>::OpRunnerShim;
 
-  template <AlOperation Op2 = AlOperation::scatter,
-            std::enable_if_t<IsOpSupported<Op2, Backend>::value, bool> = true>
+  template <Al::AlOperation Op2 = Al::AlOperation::scatter,
+            std::enable_if_t<Al::IsOpSupported<Op2, Backend>::value, bool> = true>
   void run_impl(typename VectorType<T, Backend>::type& input,
                 typename VectorType<T, Backend>::type& output,
                 typename Backend::comm_type& comm) {
@@ -755,7 +899,7 @@ public:
   }
 
   template <typename T2 = T,
-            std::enable_if_t<IsTypeSupportedByMPI<T2>::value, bool> = true>
+            std::enable_if_t<Al::IsTypeSupportedByMPI<T2>::value, bool> = true>
   void run_mpi_impl(std::vector<T>& input,
                     std::vector<T>& output,
                     typename Backend::comm_type& comm) {
@@ -804,15 +948,15 @@ public:
 };
 
 template <typename Backend, typename T>
-class OpRunner<AlOperation::scatterv, Backend, T> :
-  public OpRunnerShim<AlOperation::scatterv, Backend, T,
-                      OpRunner<AlOperation::scatterv, Backend, T>> {
+class OpRunner<Al::AlOperation::scatterv, Backend, T> :
+  public OpRunnerShim<Al::AlOperation::scatterv, Backend, T,
+                      OpRunner<Al::AlOperation::scatterv, Backend, T>> {
 public:
-  using ThisType = OpRunner<AlOperation::scatterv, Backend, T>;
-  using OpRunnerShim<AlOperation::scatterv, Backend, T, ThisType>::OpRunnerShim;
+  using ThisType = OpRunner<Al::AlOperation::scatterv, Backend, T>;
+  using OpRunnerShim<Al::AlOperation::scatterv, Backend, T, ThisType>::OpRunnerShim;
 
-  template <AlOperation Op2 = AlOperation::scatterv,
-            std::enable_if_t<IsOpSupported<Op2, Backend>::value, bool> = true>
+  template <Al::AlOperation Op2 = Al::AlOperation::scatterv,
+            std::enable_if_t<Al::IsOpSupported<Op2, Backend>::value, bool> = true>
   void run_impl(typename VectorType<T, Backend>::type& input,
                 typename VectorType<T, Backend>::type& output,
                 typename Backend::comm_type& comm) {
@@ -829,7 +973,7 @@ public:
   }
 
   template <typename T2 = T,
-            std::enable_if_t<IsTypeSupportedByMPI<T2>::value, bool> = true>
+            std::enable_if_t<Al::IsTypeSupportedByMPI<T2>::value, bool> = true>
   void run_mpi_impl(std::vector<T>& input,
                     std::vector<T>& output,
                     typename Backend::comm_type& comm) {
@@ -884,15 +1028,15 @@ public:
 
 
 template <typename Backend, typename T>
-class OpRunner<AlOperation::send, Backend, T> :
-  public OpRunnerShim<AlOperation::send, Backend, T,
-                      OpRunner<AlOperation::send, Backend, T>> {
+class OpRunner<Al::AlOperation::send, Backend, T> :
+  public OpRunnerShim<Al::AlOperation::send, Backend, T,
+                      OpRunner<Al::AlOperation::send, Backend, T>> {
 public:
-  using ThisType = OpRunner<AlOperation::send, Backend, T>;
-  using OpRunnerShim<AlOperation::send, Backend, T, ThisType>::OpRunnerShim;
+  using ThisType = OpRunner<Al::AlOperation::send, Backend, T>;
+  using OpRunnerShim<Al::AlOperation::send, Backend, T, ThisType>::OpRunnerShim;
 
-  template <AlOperation Op2 = AlOperation::send,
-            std::enable_if_t<IsOpSupported<Op2, Backend>::value, bool> = true>
+  template <Al::AlOperation Op2 = Al::AlOperation::send,
+            std::enable_if_t<Al::IsOpSupported<Op2, Backend>::value, bool> = true>
   void run_impl(typename VectorType<T, Backend>::type& input,
                 typename VectorType<T, Backend>::type& /*output*/,
                 typename Backend::comm_type& comm) {
@@ -910,7 +1054,7 @@ public:
   }
 
   template <typename T2 = T,
-            std::enable_if_t<IsTypeSupportedByMPI<T2>::value, bool> = true>
+            std::enable_if_t<Al::IsTypeSupportedByMPI<T2>::value, bool> = true>
   void run_mpi_impl(std::vector<T>& input,
                     std::vector<T>& /*output*/,
                     typename Backend::comm_type& comm) {
@@ -932,15 +1076,15 @@ public:
 
 
 template <typename Backend, typename T>
-class OpRunner<AlOperation::recv, Backend, T> :
-  public OpRunnerShim<AlOperation::recv, Backend, T,
-                      OpRunner<AlOperation::recv, Backend, T>> {
+class OpRunner<Al::AlOperation::recv, Backend, T> :
+  public OpRunnerShim<Al::AlOperation::recv, Backend, T,
+                      OpRunner<Al::AlOperation::recv, Backend, T>> {
 public:
-  using ThisType = OpRunner<AlOperation::recv, Backend, T>;
-  using OpRunnerShim<AlOperation::recv, Backend, T, ThisType>::OpRunnerShim;
+  using ThisType = OpRunner<Al::AlOperation::recv, Backend, T>;
+  using OpRunnerShim<Al::AlOperation::recv, Backend, T, ThisType>::OpRunnerShim;
 
-  template <AlOperation Op2 = AlOperation::recv,
-            std::enable_if_t<IsOpSupported<Op2, Backend>::value, bool> = true>
+  template <Al::AlOperation Op2 = Al::AlOperation::recv,
+            std::enable_if_t<Al::IsOpSupported<Op2, Backend>::value, bool> = true>
   void run_impl(typename VectorType<T, Backend>::type& /*input*/,
                 typename VectorType<T, Backend>::type& output,
                 typename Backend::comm_type& comm) {
@@ -958,7 +1102,7 @@ public:
   }
 
   template <typename T2 = T,
-            std::enable_if_t<IsTypeSupportedByMPI<T2>::value, bool> = true>
+            std::enable_if_t<Al::IsTypeSupportedByMPI<T2>::value, bool> = true>
   void run_mpi_impl(std::vector<T>& /*input*/,
                     std::vector<T>& output,
                     typename Backend::comm_type& comm) {
@@ -980,15 +1124,15 @@ public:
 
 
 template <typename Backend, typename T>
-class OpRunner<AlOperation::sendrecv, Backend, T> :
-  public OpRunnerShim<AlOperation::sendrecv, Backend, T,
-                      OpRunner<AlOperation::sendrecv, Backend, T>> {
+class OpRunner<Al::AlOperation::sendrecv, Backend, T> :
+  public OpRunnerShim<Al::AlOperation::sendrecv, Backend, T,
+                      OpRunner<Al::AlOperation::sendrecv, Backend, T>> {
 public:
-  using ThisType = OpRunner<AlOperation::sendrecv, Backend, T>;
-  using OpRunnerShim<AlOperation::sendrecv, Backend, T, ThisType>::OpRunnerShim;
+  using ThisType = OpRunner<Al::AlOperation::sendrecv, Backend, T>;
+  using OpRunnerShim<Al::AlOperation::sendrecv, Backend, T, ThisType>::OpRunnerShim;
 
-  template <AlOperation Op2 = AlOperation::sendrecv,
-            std::enable_if_t<IsOpSupported<Op2, Backend>::value, bool> = true>
+  template <Al::AlOperation Op2 = Al::AlOperation::sendrecv,
+            std::enable_if_t<Al::IsOpSupported<Op2, Backend>::value, bool> = true>
   void run_impl(typename VectorType<T, Backend>::type& input,
                 typename VectorType<T, Backend>::type& output,
                 typename Backend::comm_type& comm) {
@@ -1003,7 +1147,7 @@ public:
   }
 
   template <typename T2 = T,
-            std::enable_if_t<IsTypeSupportedByMPI<T2>::value, bool> = true>
+            std::enable_if_t<Al::IsTypeSupportedByMPI<T2>::value, bool> = true>
   void run_mpi_impl(std::vector<T>& input,
                     std::vector<T>& output,
                     typename Backend::comm_type& comm) {

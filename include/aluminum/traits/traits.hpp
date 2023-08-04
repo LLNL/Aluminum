@@ -25,4 +25,20 @@
 // permissions and limitations under the license.
 ////////////////////////////////////////////////////////////////////////////////
 
+/**
+ * @file
+ * Compile-time traits describing Aluminum communication options.
+ */
+
 #pragma once
+
+#include <Al_config.hpp>
+
+#include "aluminum/traits/mpi_traits.hpp"
+
+#ifdef AL_HAS_NCCL
+#include "aluminum/traits/nccl_traits.hpp"
+#endif
+#ifdef AL_HAS_HOST_TRANSFER
+#include "aluminum/traits/ht_traits.hpp"
+#endif

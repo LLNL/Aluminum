@@ -28,9 +28,10 @@
 #pragma once
 
 #include <memory>
-#include "Al.hpp"
+#include <Al_config.hpp>
 #include "aluminum/mpi_comm_and_stream_wrapper.hpp"
 #include "aluminum/mpi/communicator.hpp"
+#include "aluminum/mpi/utils.hpp"
 
 namespace Al {
 namespace internal {
