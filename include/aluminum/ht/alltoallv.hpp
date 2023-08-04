@@ -64,16 +64,16 @@ public:
       // If doing an in-place operation, transfer directly to host_recvbuf.
       for (size_t i = 0; i < recv_counts_.size(); ++i) {
         AL_CHECK_CUDA(AlGpuMemcpyAsync(host_recvbuf + recv_displs_[i],
-                                      recvbuf + recv_displs_[i],
-                                      sizeof(T)*recv_counts_[i],
-                                      AlGpuMemcpyDeviceToHost, stream_));
+                                       recvbuf + recv_displs_[i],
+                                       sizeof(T)*recv_counts_[i],
+                                       AlGpuMemcpyDeviceToHost, stream_));
       }
     } else {
       for (size_t i = 0; i < send_counts_.size(); ++i) {
         AL_CHECK_CUDA(AlGpuMemcpyAsync(host_sendbuf + send_displs_[i],
-                                      sendbuf + send_displs_[i],
-                                      sizeof(T)*send_counts_[i],
-                                      AlGpuMemcpyDeviceToHost, stream_));
+                                       sendbuf + send_displs_[i],
+                                       sizeof(T)*send_counts_[i],
+                                       AlGpuMemcpyDeviceToHost, stream_));
       }
     }
     start_event.record(stream_);
@@ -84,9 +84,9 @@ public:
     // Transfer completed buffer back to device.
     for (size_t i = 0; i < recv_counts_.size(); ++i) {
       AL_CHECK_CUDA(AlGpuMemcpyAsync(recvbuf + recv_displs_[i],
-                                    host_recvbuf + recv_displs_[i],
-                                    sizeof(T)*recv_counts_[i],
-                                    AlGpuMemcpyDeviceToHost, stream_));
+                                     host_recvbuf + recv_displs_[i],
+                                     sizeof(T)*recv_counts_[i],
+                                     AlGpuMemcpyHostToDevice, stream_));
     }
     end_event.record(stream_);
   }
