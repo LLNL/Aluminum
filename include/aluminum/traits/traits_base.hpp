@@ -57,7 +57,8 @@ enum class AlOperation {
   scatterv,
   send,
   recv,
-  sendrecv
+  sendrecv,
+  multisendrecv
 };
 
 /** Give a textual name for each operation. */
@@ -79,6 +80,7 @@ template <> constexpr char AlOperationName<AlOperation::scatterv>[] = "scatterv"
 template <> constexpr char AlOperationName<AlOperation::send>[] = "send";
 template <> constexpr char AlOperationName<AlOperation::recv>[] = "recv";
 template <> constexpr char AlOperationName<AlOperation::sendrecv>[] = "sendrecv";
+template <> constexpr char AlOperationName<AlOperation::multisendrecv>[] = "multisendrecv";
 
 /** Give a textual name for each backend. */
 template <typename Backend> constexpr char AlBackendName[] = "unknown";

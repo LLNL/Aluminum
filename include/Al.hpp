@@ -1404,7 +1404,7 @@ void NonblockingScatterv(
 /**
  * Send a point-to-point message.
  *
- * See \verbatim :embed:rst:inline :ref:`Send and Recv <send-and-recv>`. \endverbatim
+ * See \verbatim embed:rst:inline :ref:`Send and Recv <send-and-recv>`. \endverbatim
  *
  * @param[in] sendbuf Buffer containing the local data to send.
  * @param[in] count Length of \p sendbuf in elements of type `T`.
@@ -1439,7 +1439,7 @@ void NonblockingSend(const T* sendbuf, size_t count, int dest,
 /**
  * Receive a point-to-point message.
  *
- * See \verbatim :embed:rst:inline :ref:`Send and Recv <send-and-recv>`. \endverbatim
+ * See \verbatim embed:rst:inline :ref:`Send and Recv <send-and-recv>`. \endverbatim
  *
  * @param[out] recvbuf Buffer to receive the sent data.
  * @param[in] count Length of \p recvbuf in elements of type `T`.
@@ -1474,7 +1474,7 @@ void NonblockingRecv(T* recvbuf, size_t count, int src,
 /**
  * Perform a simultaneous Send() and Recv().
  *
- * See \verbatim :embed:rst:inline :ref:`SendRecv <sendrecv>`. \endverbatim
+ * See \verbatim embed:rst:inline :ref:`SendRecv <sendrecv>`. \endverbatim
  *
  * @param[in] sendbuf Buffer containing the local data to send.
  * @param[in] send_count Length of \p sendbuf in elements of type `T`.
@@ -1497,7 +1497,7 @@ void SendRecv(const T* sendbuf, size_t send_count, int dest,
 /**
  * Perform an \verbatim embed:rst:inline :ref:`in-place <comm-inplace>` \endverbatim SendRecv().
  *
- * @param[in,out] buffer Input and output buffer initially contaiuning the
+ * @param[in,out] buffer Input and output buffer initially containing the
  * local data to send. Will be replaced with the received data.
  * @param[in] count Length of data to send and receive. \p buffer should
  * be `count` elements.
@@ -1522,8 +1522,8 @@ void SendRecv(T* buffer, size_t count, int dest, int src,
  * @param[out] recvbuf Buffer to receive the sent data.
  * @param[in] recv_count Length of \p recvbuf in elements of type `T`.
  * @param[in] src Rank in comm to receive from.
- * @param[out] req Request object for the asynchronous operation.
  * @param[in] comm Communicator to send/recv within.
+ * @param[out] req Request object for the asynchronous operation.
  */
 template <typename Backend, typename T>
 void NonblockingSendRecv(const T* sendbuf, size_t send_count, int dest,
@@ -1548,8 +1548,8 @@ void NonblockingSendRecv(const T* sendbuf, size_t send_count, int dest,
  * be `count` elements.
  * @param[in] dest Rank in comm to send to.
  * @param[in] src Rank in comm to receive from.
- * @param[out] req Request object for the asynchronous operation.
  * @param[in] comm Communicator to send/recv within.
+ * @param[out] req Request object for the asynchronous operation.
  */
 template <typename Backend, typename T>
 void NonblockingSendRecv(T* buffer, size_t count, int dest, int src,
@@ -1558,6 +1558,116 @@ void NonblockingSendRecv(T* buffer, size_t count, int dest, int src,
   internal::trace::record_op<Backend, T>("nonblocking-sendrecv", comm,
                                          buffer, count, dest, src);
   Backend::template NonblockingSendRecv<T>(buffer, count, dest, src, comm, req);
+}
+
+/**
+ * Perform an arbitrary sequence of Send() and Recv() operations.
+ *
+ * See \verbatim embed:rst:inline :ref:`MultiSendRecv <multisendrecv>`. \endverbatim
+ *
+ * @param[in] send_buffers Vector of buffers containing the local data to send.
+ * @param[in] send_counts Vector of the lengths of each buffer in
+ * \p send_buffers in elements of type `T`.
+ * @param[in] dests Vector of the destination rank to send each buffer to.
+ * @param[out] recv_buffers Vector of buffers to receive data in.
+ * @param[in] recv_counts Vector of the lengths of each buffer in
+ * \p recv_buffers in elements of type `T`.
+ * @param[in] srcs Vector of the ranks to receive from.
+ * @param[in] comm Communicator to send/recv within.
+ */
+template <typename Backend, typename T>
+void MultiSendRecv(std::vector<const T*> send_buffers,
+                   std::vector<size_t> send_counts,
+                   std::vector<int> dests,
+                   std::vector<T*> recv_buffers,
+                   std::vector<size_t> recv_counts,
+                   std::vector<int> srcs,
+                   typename Backend::comm_type& comm) {
+  internal::trace::record_op<Backend, T>("multisendrecv", comm,
+                                         send_buffers, send_counts, dests,
+                                         recv_buffers, recv_counts, srcs);
+  Backend::template MultiSendRecv<T>(send_buffers, send_counts, dests,
+                                     recv_buffers, recv_counts, srcs,
+                                     comm);
+}
+
+/**
+ * Perform an \verbatim embed:rst:inline :ref:`in-place <comm-inplace>` \endverbatim MultiSendRecv().
+ *
+ * @param[in, out] buffers Vector of input and output buffers initially
+ * containing the local data to send. Will be replaced with the received
+ * data.
+ * @param[in] counts Vector of the lengths of data to send and receive.
+ * @param[in] dests Vector of the destination rank to send each buffer to.
+ * @param[in] srcs Vector of the ranks to receive from.
+ * @param[in] comm Communicator to send/recv within.
+ */
+template <typename Backend, typename T>
+void MultiSendRecv(std::vector<T*> buffers,
+                   std::vector<size_t> counts,
+                   std::vector<int> dests,
+                   std::vector<int> srcs,
+                   typename Backend::comm_type& comm) {
+  internal::trace::record_op<Backend, T>("multisendrecv", comm,
+                                         buffers, counts, dests, srcs);
+  Backend::template MultiSendRecv<T>(buffers, counts, dests, srcs, comm);
+}
+
+/**
+ * Perform a \verbatim embed:rst:inline :ref:`non-blocking <comm-nonblocking>` \endverbatim MultiSendRecv().
+ *
+ * @param[in] send_buffers Vector of buffers containing the local data to send.
+ * @param[in] send_counts Vector of the lengths of each buffer in
+ * \p send_buffers in elements of type `T`.
+ * @param[in] dests Vector of the destination rank to send each buffer to.
+ * @param[out] recv_buffers Vector of buffers to receive data in.
+ * @param[in] recv_counts Vector of the lengths of each buffer in
+ * \p recv_buffers in elements of type `T`.
+ * @param[in] srcs Vector of the ranks to receive from.
+ * @param[in] comm Communicator to send/recv within.
+ * @param[out] req Request object for the asynchronous operation.
+ */
+template <typename Backend, typename T>
+void NonblockingMultiSendRecv(std::vector<const T*> send_buffers,
+                              std::vector<size_t> send_counts,
+                              std::vector<int> dests,
+                              std::vector<T*> recv_buffers,
+                              std::vector<size_t> recv_counts,
+                              std::vector<int> srcs,
+                              typename Backend::comm_type& comm,
+                              typename Backend::req_type& req) {
+  internal::trace::record_op<Backend, T>("nonblocking-multisendrecv", comm,
+                                         send_buffers, send_counts, dests,
+                                         recv_buffers, recv_counts, srcs);
+  Backend::template NonblockingMultiSendRecv<T>(send_buffers, send_counts, dests,
+                                                recv_buffers, recv_counts, srcs,
+                                                comm, req);
+}
+
+/**
+ * Perform a \verbatim embed:rst:inline :ref:`non-blocking <comm-nonblocking>` \endverbatim
+ * \verbatim embed:rst:inline :ref:`in-place <comm-inplace>` \endverbatim MultiSendRecv().
+ *
+ * @param[in, out] buffers Vector of input and output buffers initially
+ * containing the local data to send. Will be replaced with the received
+ * data.
+ * @param[in] counts Vector of the lengths of data to send and receive.
+ * @param[in] dests Vector of the destination rank to send each buffer to.
+ * @param[in] srcs Vector of the ranks to receive from.
+ * @param[in] comm Communicator to send/recv within.
+ * @param[out] req Request object for the asynchronous operation.
+ */
+template <typename Backend, typename T>
+void NonblockingMultiSendRecv(std::vector<T*> buffers,
+                              std::vector<size_t> counts,
+                              std::vector<int> dests,
+                              std::vector<int> srcs,
+                              typename Backend::comm_type& comm,
+                              typename Backend::req_type& req) {
+  internal::trace::record_op<Backend, T>("nonblocking-multisendrecv", comm,
+                                         buffers, counts, dests, srcs);
+  Backend::template NonblockingMultiSendRecv<T>(buffers, counts, dests, srcs,
+                                                comm, req);
 }
 
 /**

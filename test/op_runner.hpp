@@ -39,7 +39,9 @@ struct OpOptions {
   bool nonblocking = false;
   int root = 0;
   int src = -1;
+  std::vector<int> srcs = {};
   int dst = -1;
+  std::vector<int> dests = {};
   std::vector<size_t> send_counts = {};
   std::vector<size_t> send_displs = {};
   std::vector<size_t> recv_counts = {};
@@ -447,7 +449,7 @@ public:
   size_t get_output_size_impl(size_t /*base_size*/,
                               typename Backend::comm_type& /*comm*/) {
     return std::accumulate(this->get_options().send_counts.begin(),
-                             this->get_options().send_counts.end(), size_t{0});
+                           this->get_options().send_counts.end(), size_t{0});
   }
 };
 
@@ -1175,5 +1177,101 @@ public:
   size_t get_output_size_impl(size_t base_size,
                               typename Backend::comm_type& /*comm*/) {
     return base_size;
+  }
+};
+
+template <typename Backend, typename T>
+class OpRunner<Al::AlOperation::multisendrecv, Backend, T> :
+  public OpRunnerShim<Al::AlOperation::multisendrecv, Backend, T,
+                      OpRunner<Al::AlOperation::multisendrecv, Backend, T>> {
+public:
+  using ThisType = OpRunner<Al::AlOperation::multisendrecv, Backend, T>;
+  using OpRunnerShim<Al::AlOperation::multisendrecv, Backend, T,
+                     ThisType>::OpRunnerShim;
+
+  // Note: For simplicity, this uses the send counts to compute the
+  // offsets in the input/output buffers.
+
+  template <Al::AlOperation Op2 = Al::AlOperation::multisendrecv,
+            std::enable_if_t<Al::IsOpSupported<Op2, Backend>::value, bool> = true>
+  void run_impl(typename VectorType<T, Backend>::type& input,
+                typename VectorType<T, Backend>::type& output,
+                typename Backend::comm_type& comm) {
+    auto srcs = this->get_options().srcs;
+    auto dests = this->get_options().dests;
+    auto send_counts = this->get_options().send_counts;
+    auto recv_counts = this->get_options().recv_counts;
+    std::vector<const T*> send_buffers(this->get_options().inplace ? 0 : dests.size());
+    std::vector<T*> recv_buffers(srcs.size());
+    T* recv_buf = output.data();
+    for (size_t i = 0; i < recv_buffers.size(); ++i) {
+      recv_buffers[i] = recv_buf;
+      recv_buf += recv_counts[i];
+    }
+    if (!this->get_options().inplace) {
+      T* send_buf = input.data();
+      for (size_t i = 0; i < send_buffers.size(); ++i) {
+        send_buffers[i] = send_buf;
+        send_buf += send_counts[i];
+      }
+    }
+    typename Backend::req_type& req = this->get_options().req;
+    this->inplace_nb_dispatch(
+      [&]() { Al::MultiSendRecv<Backend>(send_buffers, send_counts, dests, recv_buffers, recv_counts, srcs, comm); },
+      [&]() { Al::MultiSendRecv<Backend>(recv_buffers, recv_counts, dests, srcs, comm); },
+      [&]() { Al::NonblockingMultiSendRecv<Backend>(send_buffers, send_counts, dests, recv_buffers, recv_counts, srcs, comm, req); },
+      [&]() { Al::NonblockingMultiSendRecv<Backend>(recv_buffers, recv_counts, dests, srcs, comm, req); });
+  }
+
+  template <typename T2 = T,
+            std::enable_if_t<Al::IsTypeSupportedByMPI<T2>::value, bool> = true>
+  void run_mpi_impl(std::vector<T>& input, std::vector<T>& output,
+                    typename Backend::comm_type& comm) {
+    auto srcs = this->get_options().srcs;
+    auto dests = this->get_options().dests;
+    if (srcs.empty() && dests.empty()) {
+      return;
+    }
+    std::vector<int> send_counts =
+      Al::internal::mpi::intify_size_t_vector(this->get_options().send_counts);
+    std::vector<int> recv_counts =
+        Al::internal::mpi::intify_size_t_vector(this->get_options().recv_counts);
+    std::vector<MPI_Request> reqs(srcs.size() + dests.size());
+    T* recv_buf = output.data();
+    T* send_buf = nullptr;
+    std::vector<T> tmp_buf;
+    if (this->get_options().inplace) {
+      tmp_buf = output;
+      send_buf = tmp_buf.data();
+    } else {
+      send_buf = input.data();
+    }
+    for (size_t i = 0; i < srcs.size(); ++i) {
+      MPI_Irecv(recv_buf, recv_counts[i], Al::internal::mpi::TypeMap<T>(),
+                srcs[i], 0, comm.get_comm(), &reqs[i]);
+      recv_buf += recv_counts[i];
+    }
+    for (size_t i = 0; i < dests.size(); ++i) {
+      MPI_Isend(send_buf, send_counts[i], Al::internal::mpi::TypeMap<T>(),
+                dests[i], 0, comm.get_comm(), &reqs[i + srcs.size()]);
+      send_buf += send_counts[i];
+    }
+    MPI_Waitall(reqs.size(), reqs.data(), MPI_STATUSES_IGNORE);
+  }
+
+  size_t get_input_size_impl(size_t /*base_size*/,
+                             typename Backend::comm_type& /*comm*/) {
+    if (this->get_options().inplace) {
+      return 0;
+    } else {
+      return std::accumulate(this->get_options().send_counts.begin(),
+                             this->get_options().send_counts.end(), size_t{0});
+    }
+  }
+
+  size_t get_output_size_impl(size_t /*base_size*/,
+                              typename Backend::comm_type& /*comm*/) {
+    return std::accumulate(this->get_options().send_counts.begin(),
+                           this->get_options().send_counts.end(), size_t{0});
   }
 };

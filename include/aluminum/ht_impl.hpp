@@ -56,6 +56,7 @@
 #include "aluminum/ht/bcast.hpp"
 #include "aluminum/ht/gather.hpp"
 #include "aluminum/ht/gatherv.hpp"
+#include "aluminum/ht/multisendrecv.hpp"
 #include "aluminum/ht/reduce.hpp"
 #include "aluminum/ht/reduce_scatter.hpp"
 #include "aluminum/ht/reduce_scatterv.hpp"
@@ -250,6 +251,53 @@ class HostTransferBackend {
                                   comm_type& comm, req_type& req) {
     // The way we copy buffers means this is safe.
     NonblockingSendRecv(buf, count, dest, buf, count, src, comm, req);
+  }
+
+  template <typename T>
+  static void MultiSendRecv(std::vector<const T*> send_buffers,
+                            std::vector<size_t> send_counts,
+                            std::vector<int> dests,
+                            std::vector<T*> recv_buffers,
+                            std::vector<size_t> recv_counts,
+                            std::vector<int> srcs, comm_type& comm) {
+    do_multisendrecv(send_buffers, send_counts, dests,
+                     recv_buffers, recv_counts, srcs,
+                     comm, comm.get_stream());
+  }
+
+  template <typename T>
+  static void MultiSendRecv(std::vector<T*> buffers,
+                            std::vector<size_t> counts, std::vector<int> dests,
+                            std::vector<int> srcs, comm_type& comm) {
+    do_inplace_multisendrecv(buffers, counts, dests, srcs, comm, comm.get_stream());
+  }
+
+  template <typename T>
+  static void NonblockingMultiSendRecv(std::vector<const T*> send_buffers,
+                                       std::vector<size_t> send_counts,
+                                       std::vector<int> dests,
+                                       std::vector<T*> recv_buffers,
+                                       std::vector<size_t> recv_counts,
+                                       std::vector<int> srcs, comm_type& comm,
+                                       req_type& req) {
+    AlGpuStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
+    sync_internal_stream_with_comm(internal_stream, comm);
+    do_multisendrecv(send_buffers, send_counts, dests,
+                     recv_buffers, recv_counts, srcs,
+                     comm, internal_stream);
+    setup_completion_event(internal_stream, comm, req);
+  }
+
+  template <typename T>
+  static void NonblockingMultiSendRecv(std::vector<T*> buffers,
+                                       std::vector<size_t> counts,
+                                       std::vector<int> dests,
+                                       std::vector<int> srcs, comm_type& comm,
+                                       req_type& req) {
+    AlGpuStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
+    sync_internal_stream_with_comm(internal_stream, comm);
+    do_inplace_multisendrecv(buffers, counts, dests, srcs, comm, internal_stream);
+    setup_completion_event(internal_stream, comm, req);
   }
 
   template <typename T>
@@ -860,6 +908,37 @@ class HostTransferBackend {
     internal::ht::SendRecvAlState<T>* state =
       new internal::ht::SendRecvAlState<T>(
         sendbuf, send_count, dest, recvbuf, recv_count, src, comm, stream);
+    internal::get_progress_engine()->enqueue(state);
+  }
+
+  template <typename T>
+  static void do_multisendrecv(
+    std::vector<const T*> send_buffers,
+    std::vector<size_t> send_counts,
+    std::vector<int> dests,
+    std::vector<T*> recv_buffers,
+    std::vector<size_t> recv_counts,
+    std::vector<int> srcs,
+    comm_type& comm,
+    AlGpuStream_t stream) {
+    internal::ht::MultiSendRecvAlState<T>* state =
+      new internal::ht::MultiSendRecvAlState<T>(
+        send_buffers, send_counts, dests, recv_buffers, recv_counts, srcs,
+        comm, stream);
+    internal::get_progress_engine()->enqueue(state);
+  }
+
+  template <typename T>
+  static void do_inplace_multisendrecv(
+    std::vector<T*> buffers,
+    std::vector<size_t> counts,
+    std::vector<int> dests,
+    std::vector<int> srcs,
+    comm_type& comm,
+    AlGpuStream_t stream) {
+    internal::ht::MultiSendRecvAlState<T>* state =
+      new internal::ht::MultiSendRecvAlState<T>(
+        buffers, counts, dests, srcs, comm, stream);
     internal::get_progress_engine()->enqueue(state);
   }
 

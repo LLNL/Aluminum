@@ -61,6 +61,7 @@ bool is_operator_name(const std::string str) {
     "send",
     "recv",
     "sendrecv",
+    "multisendrecv"
   };
   return ops.find(str) != ops.end();
 }
@@ -126,6 +127,8 @@ auto call_op_functor(Al::AlOperation op, F functor) {
     return functor.template operator()<Al::AlOperation::recv>();
   case Al::AlOperation::sendrecv:
     return functor.template operator()<Al::AlOperation::sendrecv>();
+  case Al::AlOperation::multisendrecv:
+    return functor.template operator()<Al::AlOperation::multisendrecv>();
   default:
     std::cerr << "Unknown AlOperation" << std::endl;
     std::abort();
@@ -152,6 +155,7 @@ Al::AlOperation op_str_to_op(const std::string op_str) {
     {"send", Al::AlOperation::send},
     {"recv", Al::AlOperation::recv},
     {"sendrecv", Al::AlOperation::sendrecv},
+    {"multisendrecv", Al::AlOperation::multisendrecv}
   };
   auto i = lookup.find(op_str);
   if (i == lookup.end()) {

@@ -36,6 +36,9 @@ namespace mpi {
 
 int get_max_tag();
 
+// Define the tag that point-to-point operations will use.
+constexpr int pt2pt_tag = 2;
+
 // Forward-declare.
 class MPICommunicator;
 

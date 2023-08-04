@@ -87,10 +87,12 @@ Send and Receive
 
 These are the most basic communication operations, and need to be paired: one process sends data and the other process receives the data.
 
-There are some subtleties here that one should be aware of.
-Unlike MPI, Aluminum does not support tagged messages.
-You should properly order your sends and receives, so that you start your sends and receives in the same order.
-Finally, note that sends may (but are not guaranteed) to complete *before* the data has been sent or before it has been received (it is, however, safe to read or modify a send buffer after the send has completed).
+There are some subtleties here that one should be aware of:
+
+* Unlike MPI, Aluminum does not support tagged messages.
+* Also unlike MPI, a receive will only match a send with the exact same ``count`` (whereas MPI treats the receive count as an upper bound).
+* You should properly order your sends and receives, so that you start your sends and receives in the same order.
+* Finally, note that sends may (but are not guaranteed) to complete *before* the data has been sent or before it has been received (it is, however, safe to read or modify a send buffer after the send has completed).
 
 There are no special in-place versions of send or receive, as they only have one buffer argument.
 
@@ -115,6 +117,20 @@ There is an in-place version of ``SendRecv`` (this is similar to ``MPI_Sendrecv_
 
 * :cpp:func:`Al::SendRecv()`
 * :cpp:func:`Al::NonblockingSendRecv()`
+
+.. _multisendrecv
+
+MultiSendRecv
+^^^^^^^^^^^^^
+
+This implements an arbitrary sequence of ``Send`` and ``Recv`` operations as a single operation.
+This is similar to an ``Alltoall`` collective, but does not require that all ranks in a communicator participate.
+Likewise, unlike a sequence of ``SendRecv`` operations, this does not require all ranks to both send and receive; i.e., there may be asymmetric communication.
+
+There is an in-place version of ``MultiSendRecv``, which differs slightly from a regular ``MultiSendRecv``: It functions exactly like a sequence of in-place ``SendRecv`` operations.
+
+* :cpp:func:`Al::MultiSendRecv()`
+* :cpp:func:`Al::NonblockingMultiSendRecv()`
 
 Collective Operations
 ---------------------

@@ -36,8 +36,6 @@ namespace Al {
 namespace internal {
 namespace ht {
 
-constexpr int pt2pt_tag = 2;
-
 /** GPU point-to-point send operation. */
 template <typename T>
 class SendAlState : public AlState {

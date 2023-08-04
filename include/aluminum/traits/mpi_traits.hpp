@@ -35,6 +35,7 @@
 #include "aluminum/traits/traits_base.hpp"
 #include "aluminum/datatypes.hpp"
 #include "aluminum/mpi_impl.hpp"
+#include "traits_base.hpp"
 
 namespace Al {
 
@@ -58,6 +59,7 @@ template <> struct IsOpSupported<AlOperation::scatterv, MPIBackend> : std::true_
 template <> struct IsOpSupported<AlOperation::send, MPIBackend> : std::true_type {};
 template <> struct IsOpSupported<AlOperation::recv, MPIBackend> : std::true_type {};
 template <> struct IsOpSupported<AlOperation::sendrecv, MPIBackend> : std::true_type {};
+template <> struct IsOpSupported<AlOperation::multisendrecv, MPIBackend> : std::true_type {};
 
 // Define the types MPI supports.
 template <> struct IsTypeSupported<MPIBackend, char> : std::true_type {};

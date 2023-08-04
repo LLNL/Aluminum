@@ -10,6 +10,7 @@ set_source_path(THIS_DIR_HEADERS
   communicator.hpp
   gather.hpp
   gatherv.hpp
+  multisendrecv.hpp
   reduce.hpp
   reduce_scatter.hpp
   reduce_scatterv.hpp

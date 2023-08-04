@@ -277,7 +277,7 @@ void run_test(cxxopts::ParseResult& parsed_opts) {
 
   bool participates_in_pt2pt = true;
   if (is_pt2pt_op(op)) {
-    if (comm_wrapper.comm().size() == 1) {
+    if (comm_wrapper.size() == 1) {
       std::cerr << "Cannot test point-to-point with a single rank" << std::endl;
       std::abort();
     }
@@ -303,6 +303,18 @@ void run_test(cxxopts::ParseResult& parsed_opts) {
       participates_in_pt2pt = false;
     }
   }
+  if (op == Al::AlOperation::multisendrecv) {
+    // Send to and receive from every other rank.
+    op_options.srcs = std::vector<int>(comm_wrapper.size() - 1);
+    op_options.dests = std::vector<int>(comm_wrapper.size() - 1);
+    for (int i = 0, rank = 0; rank < comm_wrapper.size(); ++rank) {
+      if (rank != comm_wrapper.rank()) {
+        op_options.srcs[i] = rank;
+        op_options.dests[i] = rank;
+        ++i;
+      }
+    }
+  }
   // One hang watchdog for all threads.
   HangWatchdog watchdog(parsed_opts["hang-timeout"].as<size_t>(),
                         parsed_opts.count("no-abort-on-hang") ? false : true);
@@ -311,10 +323,15 @@ void run_test(cxxopts::ParseResult& parsed_opts) {
     // Set up counts and displacements for vector operations.
     // TODO: Generalize to support more complex counts/displacements.
     if (is_vector_op(op)) {
-      op_options.send_counts = std::vector<size_t>(comm_wrapper.comm().size(), size);
+      op_options.send_counts = std::vector<size_t>(comm_wrapper.size(), size);
       op_options.send_displs = Al::excl_prefix_sum(op_options.send_counts);
       op_options.recv_counts = op_options.send_counts;
       op_options.recv_displs = op_options.send_displs;
+    }
+    if (op == Al::AlOperation::multisendrecv) {
+      // Set up to be similar to vector operations.
+      op_options.send_counts = std::vector<size_t>(comm_wrapper.size() - 1, size);
+      op_options.recv_counts = op_options.send_counts;
     }
 
     for (auto&& algo_opt : algorithms) {
