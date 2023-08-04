@@ -184,7 +184,10 @@ template <AlOperation Op, typename Backend> struct OpAlgoType {};
  * Define types supported by MPI.
  *
  * Note these are separate from the types the Aluminum MPI backend
- * supports and refer to those supported specifically by MPI itself.
+ * supports and refer to those supported specifically by MPI itself or
+ * by MPI plus extensions provided by Aluminum using native extension
+ * means (specifically the way Aluminum adds support for half and
+ * bfloat using custom reduction operations).
  */
 template <typename T> struct IsTypeSupportedByMPI : std::false_type {};
 template <> struct IsTypeSupportedByMPI<char> : std::true_type {};
