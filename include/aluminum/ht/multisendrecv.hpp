@@ -56,8 +56,8 @@ public:
     host_recv_buffers(recv_buffers.size(), nullptr),
     send_counts(mpi::intify_size_t_vector(send_counts_)),
     recv_counts(mpi::intify_size_t_vector(recv_counts_)),
-    dests(dests_),
-    srcs(srcs_),
+    dests(std::move(dests_)),
+    srcs(std::move(srcs_)),
     comm(comm_.get_comm()) {
     size_t total_send_size = std::accumulate(
       send_counts_.begin(), send_counts_.end(), size_t{0});
@@ -110,8 +110,8 @@ public:
     host_recv_buffers(buffers.size(), nullptr),
     send_counts(mpi::intify_size_t_vector(counts)),
     recv_counts(send_counts),
-    dests(dests_),
-    srcs(srcs_),
+    dests(std::move(dests_)),
+    srcs(std::move(srcs_)),
     comm(comm_.get_comm()) {
     size_t total_size = std::accumulate(
       counts.begin(), counts.end(), size_t{0});

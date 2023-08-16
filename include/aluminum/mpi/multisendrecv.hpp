@@ -107,12 +107,12 @@ public:
                        MPICommunicator& comm_,
                        AlMPIReq req_) :
     MPIState(req_),
-    send_buffers(send_buffers_),
+    send_buffers(std::move(send_buffers_)),
     send_counts(intify_size_t_vector(send_counts_)),
-    dests(dests_),
-    recv_buffers(recv_buffers_),
+    dests(std::move(dests_)),
+    recv_buffers(std::move(recv_buffers_)),
     recv_counts(intify_size_t_vector(recv_counts_)),
-    srcs(srcs_),
+    srcs(std::move(srcs_)),
     comm(comm_.get_comm()),
     mpi_reqs(send_buffers.size() + recv_buffers.size())
   {}
@@ -127,10 +127,10 @@ public:
     MPIState(req_),
     send_buffers(buffers.size(), nullptr),
     send_counts(intify_size_t_vector(counts)),
-    dests(dests_),
-    recv_buffers(buffers),
+    dests(std::move(dests_)),
+    recv_buffers(std::move(buffers)),
     recv_counts(intify_size_t_vector(counts)),
-    srcs(srcs_),
+    srcs(std::move(srcs_)),
     comm(comm_.get_comm()),
     mpi_reqs(send_buffers.size() + recv_buffers.size()) {
     // Allocate space and set up pointers but do not copy.
