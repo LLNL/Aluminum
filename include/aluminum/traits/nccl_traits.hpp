@@ -34,6 +34,7 @@
 
 #include "aluminum/traits/traits_base.hpp"
 #include "aluminum/nccl_impl.hpp"
+#include "traits_base.hpp"
 
 namespace Al {
 
@@ -57,6 +58,7 @@ template <> struct IsOpSupported<AlOperation::scatterv, NCCLBackend> : std::true
 template <> struct IsOpSupported<AlOperation::send, NCCLBackend> : std::true_type {};
 template <> struct IsOpSupported<AlOperation::recv, NCCLBackend> : std::true_type {};
 template <> struct IsOpSupported<AlOperation::sendrecv, NCCLBackend> : std::true_type {};
+template <> struct IsOpSupported<AlOperation::multisendrecv, NCCLBackend> : std::true_type {};
 
 // Define the types NCCL supports.
 template <> struct IsTypeSupported<NCCLBackend, char> : std::true_type {};

@@ -37,6 +37,9 @@ namespace Al {
 namespace internal {
 namespace ht {
 
+// Define the tag that point-to-point operations will use.
+constexpr int pt2pt_tag = 2;
+
 /** Communicator for host-transfer operations. */
 class HostTransferCommunicator: public MPICommAndStreamWrapper<AlGpuStream_t> {
  public:

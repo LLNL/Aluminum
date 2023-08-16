@@ -86,19 +86,20 @@ vector_coll_ops = [OpDesc('allgatherv'),
 pt2pt_ops = [OpDesc('send', inplace=False, min_procs=2),
              OpDesc('recv', inplace=False, min_procs=2),
              OpDesc('sendrecv', inplace=False, min_procs=2)]
+other_ops = [OpDesc('multisendrecv')]
 
 # Full set of cases.
 test_cases = {
     'mpi': {
-        'ops': coll_ops + vector_coll_ops + pt2pt_ops,
+        'ops': coll_ops + vector_coll_ops + pt2pt_ops + other_ops,
         'datatypes': mpi_datatypes
     },
     'nccl': {
-        'ops': coll_ops + vector_coll_ops + pt2pt_ops,
+        'ops': coll_ops + vector_coll_ops + pt2pt_ops + other_ops,
         'datatypes': nccl_datatypes
     },
     'ht': {
-        'ops': coll_ops + vector_coll_ops + pt2pt_ops,
+        'ops': coll_ops + vector_coll_ops + pt2pt_ops + other_ops,
         'datatypes': mpi_datatypes
     },
 }

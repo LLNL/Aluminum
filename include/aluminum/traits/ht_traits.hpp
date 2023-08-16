@@ -58,6 +58,7 @@ template <> struct IsOpSupported<AlOperation::scatterv, HostTransferBackend> : s
 template <> struct IsOpSupported<AlOperation::send, HostTransferBackend> : std::true_type {};
 template <> struct IsOpSupported<AlOperation::recv, HostTransferBackend> : std::true_type {};
 template <> struct IsOpSupported<AlOperation::sendrecv, HostTransferBackend> : std::true_type {};
+template <> struct IsOpSupported<AlOperation::multisendrecv, HostTransferBackend> : std::true_type {};
 
 // Define the types host-transfer supports.
 template <> struct IsTypeSupported<HostTransferBackend, char> : std::true_type {};

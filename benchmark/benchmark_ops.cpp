@@ -124,6 +124,18 @@ void run_benchmark(cxxopts::ParseResult& parsed_opts) {
       }
     }
   }
+  if (Op == Al::AlOperation::multisendrecv) {
+    // Send to and receive from every other rank.
+    op_options.srcs = std::vector<int>(comm_wrapper.size() - 1);
+    op_options.dests = std::vector<int>(comm_wrapper.size() - 1);
+    for (int i = 0, rank = 0; rank < comm_wrapper.size(); ++rank) {
+      if (rank != comm_wrapper.rank()) {
+        op_options.srcs[i] = rank;
+        op_options.dests[i] = rank;
+        ++i;
+      }
+    }
+  }
 
   size_t num_iters = parsed_opts["num-iters"].as<size_t>();
   size_t num_warmup = parsed_opts["num-warmup"].as<size_t>();
@@ -134,6 +146,11 @@ void run_benchmark(cxxopts::ParseResult& parsed_opts) {
       op_options.send_displs = Al::excl_prefix_sum(op_options.send_counts);
       op_options.recv_counts = op_options.send_counts;
       op_options.recv_displs = op_options.send_displs;
+    }
+    if (Op == Al::AlOperation::multisendrecv) {
+      // Set up to be similar to vector operations.
+      op_options.send_counts = std::vector<size_t>(comm_wrapper.size() - 1, size);
+      op_options.recv_counts = op_options.send_counts;
     }
 
     OpDispatcher<Backend, T> op_runner(op, op_options);

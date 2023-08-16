@@ -40,8 +40,6 @@ namespace Al {
 namespace internal {
 namespace mpi {
 
-constexpr int pt2pt_tag = 2;
-
 template <typename T>
 void passthrough_send(const T* sendbuf, size_t count, int dest,
                       MPICommunicator& comm) {

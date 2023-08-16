@@ -50,12 +50,15 @@
 #include "aluminum/mpi/bcast.hpp"
 #include "aluminum/mpi/gather.hpp"
 #include "aluminum/mpi/gatherv.hpp"
+#include "aluminum/mpi/multisendrecv.hpp"
 #include "aluminum/mpi/reduce.hpp"
 #include "aluminum/mpi/reduce_scatter.hpp"
 #include "aluminum/mpi/reduce_scatterv.hpp"
 #include "aluminum/mpi/scatter.hpp"
 #include "aluminum/mpi/scatterv.hpp"
 #include "aluminum/mpi/pt2pt.hpp"
+#include "mpi/multisendrecv.hpp"
+#include "mpi/utils.hpp"
 
 namespace Al {
 namespace internal {
@@ -257,6 +260,69 @@ class MPIBackend {
                                   comm_type& comm, req_type& req) {
     NonblockingSendRecv(internal::IN_PLACE<T>(), count, dest, buf, count, src,
                         comm, req);
+  }
+
+  template <typename T>
+  static void MultiSendRecv(std::vector<const T*> send_buffers,
+                            std::vector<size_t> send_counts,
+                            std::vector<int> dests,
+                            std::vector<T*> recv_buffers,
+                            std::vector<size_t> recv_counts,
+                            std::vector<int> srcs, comm_type& comm) {
+    for (size_t i = 0; i < send_counts.size(); ++i) {
+      internal::mpi::assert_count_fits_mpi(send_counts[i]);
+    }
+    for (size_t i = 0; i < recv_counts.size(); ++i) {
+      internal::mpi::assert_count_fits_mpi(recv_counts[i]);
+    }
+    handle_serialized(internal::mpi::passthrough_multisendrecv<T>,
+                      internal::mpi::passthrough_nb_multisendrecv<T>,
+                      send_buffers, send_counts, dests,
+                      recv_buffers, recv_counts, srcs, comm);
+  }
+
+  template <typename T>
+  static void MultiSendRecv(std::vector<T*> buffers,
+                            std::vector<size_t> counts, std::vector<int> dests,
+                            std::vector<int> srcs, comm_type& comm) {
+    for (size_t i = 0; i < counts.size(); ++i) {
+      internal::mpi::assert_count_fits_mpi(counts[i]);
+    }
+    handle_serialized(internal::mpi::passthrough_inplace_multisendrecv<T>,
+                      internal::mpi::passthrough_nb_inplace_multisendrecv<T>,
+                      buffers, counts, dests, srcs, comm);
+  }
+
+  template <typename T>
+  static void NonblockingMultiSendRecv(std::vector<const T*> send_buffers,
+                                       std::vector<size_t> send_counts,
+                                       std::vector<int> dests,
+                                       std::vector<T*> recv_buffers,
+                                       std::vector<size_t> recv_counts,
+                                       std::vector<int> srcs, comm_type& comm,
+                                       req_type& req) {
+    for (size_t i = 0; i < send_counts.size(); ++i) {
+      internal::mpi::assert_count_fits_mpi(send_counts[i]);
+    }
+    for (size_t i = 0; i < recv_counts.size(); ++i) {
+      internal::mpi::assert_count_fits_mpi(recv_counts[i]);
+    }
+    internal::mpi::passthrough_nb_multisendrecv(
+        send_buffers, send_counts, dests, recv_buffers, recv_counts, srcs,
+        comm, req);
+  }
+
+  template <typename T>
+  static void NonblockingMultiSendRecv(std::vector<T*> buffers,
+                                       std::vector<size_t> counts,
+                                       std::vector<int> dests,
+                                       std::vector<int> srcs, comm_type& comm,
+                                       req_type& req) {
+    for (size_t i = 0; i < counts.size(); ++i) {
+      internal::mpi::assert_count_fits_mpi(counts[i]);
+    }
+    internal::mpi::passthrough_nb_inplace_multisendrecv(
+      buffers, counts, dests, srcs, comm, req);
   }
 
   template <typename T>

@@ -376,6 +376,60 @@ class NCCLBackend {
                         comm, req);
   }
 
+  template <typename T>
+  static void MultiSendRecv(std::vector<const T*> send_buffers,
+                            std::vector<size_t> send_counts,
+                            std::vector<int> dests,
+                            std::vector<T*> recv_buffers,
+                            std::vector<size_t> recv_counts,
+                            std::vector<int> srcs,
+                            comm_type& comm) {
+    do_multisendrecv(send_buffers, send_counts, dests,
+                     recv_buffers, recv_counts, srcs,
+                     comm, comm.get_stream());
+  }
+
+  template <typename T>
+  static void MultiSendRecv(std::vector<T*> buffers,
+                            std::vector<size_t> counts,
+                            std::vector<int> dests,
+                            std::vector<int> srcs,
+                            comm_type& comm) {
+    do_inplace_multisendrecv(buffers, counts, dests, srcs,
+                             comm, comm.get_stream());
+  }
+
+  template <typename T>
+  static void NonblockingMultiSendRecv(std::vector<const T*> send_buffers,
+                                       std::vector<size_t> send_counts,
+                                       std::vector<int> dests,
+                                       std::vector<T*> recv_buffers,
+                                       std::vector<size_t> recv_counts,
+                                       std::vector<int> srcs,
+                                       comm_type& comm,
+                                       req_type& req) {
+    AlGpuStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
+    sync_internal_stream_with_comm(internal_stream, comm);
+    do_multisendrecv(send_buffers, send_counts, dests,
+                     recv_buffers, recv_counts, srcs,
+                     comm, internal_stream);
+    setup_completion_event(internal_stream, comm, req);
+  }
+
+  template <typename T>
+  static void NonblockingMultiSendRecv(std::vector<T*> buffers,
+                                       std::vector<size_t> counts,
+                                       std::vector<int> dests,
+                                       std::vector<int> srcs,
+                                       comm_type& comm,
+                                       req_type& req) {
+    AlGpuStream_t internal_stream = internal::cuda::stream_pool.get_high_priority_stream();
+    sync_internal_stream_with_comm(internal_stream, comm);
+    do_inplace_multisendrecv(buffers, counts, dests, srcs,
+                             comm, internal_stream);
+    setup_completion_event(internal_stream, comm, req);
+  }
+
   static void Barrier(comm_type& comm, barrier_algo_type) {
     do_barrier(comm, comm.get_stream());
   }
@@ -895,6 +949,69 @@ class NCCLBackend {
     if (tmp_sendbuf != sendbuf) {
       internal::mempool.release<internal::MemoryType::CUDA>(tmp_sendbuf);
     }
+  }
+
+  /** Do a NCCL multi-sendrecv. */
+  template <typename T>
+  static void do_multisendrecv(std::vector<const T*> send_buffers,
+                               std::vector<size_t> send_counts,
+                               std::vector<int> dests,
+                               std::vector<T*> recv_buffers,
+                               std::vector<size_t> recv_counts,
+                               std::vector<int> srcs,
+                               comm_type& comm, AlGpuStream_t stream) {
+    internal::nccl::safe_nccl_group<1>(
+      0, send_buffers.size() + recv_buffers.size(),
+      [&](int index_) {
+        size_t index = (size_t) index_;  // Safe, always nonnegative.
+        // Determine whether we're doing sends or receives.
+        if (index < send_buffers.size()) {
+          AL_CHECK_NCCL(ncclSend((const void*) send_buffers[index],
+                                 send_counts[index],
+                                 internal::nccl::TypeMap<T>(),
+                                 dests[index],
+                                 comm.m_nccl_comm,
+                                 stream));
+        } else {
+          index -= send_buffers.size();
+          AL_CHECK_NCCL(ncclRecv((void*) recv_buffers[index],
+                                 recv_counts[index],
+                                 internal::nccl::TypeMap<T>(),
+                                 srcs[index],
+                                 comm.m_nccl_comm,
+                                 stream));
+        }
+      });
+  }
+
+  /** Do an in-place NCCL multi-sendrecv. */
+  template <typename T>
+  static void do_inplace_multisendrecv(std::vector<T*> buffers,
+                                       std::vector<size_t> counts,
+                                       std::vector<int> dests,
+                                       std::vector<int> srcs,
+                                       comm_type& comm, AlGpuStream_t stream) {
+    // Set up a temporary buffer to send from, since we receive to the original.
+    size_t sendbuf_len = std::accumulate(counts.begin(), counts.end(), size_t{0});
+    T* tmp_sendbuf = internal::mempool.allocate<internal::MemoryType::CUDA, T>(
+      sendbuf_len, stream);
+    std::vector<const T*> tmp_sendbufs(counts.size());
+    for (size_t i = 0, offset = 0; i < counts.size(); ++i, offset += counts[i]) {
+      AL_CHECK_CUDA(AlGpuMemcpyAsync((void*) (tmp_sendbuf + offset),
+                                     (const void*) buffers[i],
+                                     counts[i]*sizeof(T),
+                                     AlGpuMemcpyDeviceToDevice, stream));
+    }
+    internal::nccl::safe_nccl_group<2>(
+      0, buffers.size(),
+      [&](int index) {
+        AL_CHECK_NCCL(ncclSend((const void*) tmp_sendbufs[index], counts[index],
+                               internal::nccl::TypeMap<T>(), dests[index],
+                               comm.m_nccl_comm, stream));
+        AL_CHECK_NCCL(ncclRecv((void*) buffers[index], counts[index],
+                               internal::nccl::TypeMap<T>(), srcs[index],
+                               comm.m_nccl_comm, stream));
+      });
   }
 
   /** Do a NCCL barrier. */
