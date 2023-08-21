@@ -155,7 +155,10 @@ void init(int& argc, char**& argv, MPI_Comm world_comm) {
   MPI_Initialized(&flag);
   if (!flag) {
     int provided;
-    MPI_Init_thread(&argc, &argv, required, &provided);
+    int result = MPI_Init_thread(&argc, &argv, required, &provided);
+    if (result != MPI_SUCCESS) {
+      throw_al_exception("MPI initialization failed");
+    }
     if (provided < required) {
       throw_al_exception("Insufficient MPI thread support");
     }
@@ -168,6 +171,13 @@ void init(int& argc, char**& argv, MPI_Comm world_comm) {
       throw_al_exception(
         "MPI already initialized with insufficient thread support");
     }
+  }
+  // Some MPI implementations may return MPI_SUCCESS despite initialization
+  // failing. This second check is a weak attempt to double-check whether
+  // initialization actually worked.
+  MPI_Initialized(&flag);
+  if (!flag) {
+    throw_al_exception("Failed to initialize MPI");
   }
   // Get the upper bound for tags; this is always set in MPI_COMM_WORLD.
   // This explicitly uses MPI_COMM_WORLD rather than world_comm because of this.
