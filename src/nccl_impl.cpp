@@ -71,7 +71,7 @@ namespace nccl {
 
 void init(int&, char**&) {
   AL_CHECK_CUDA(AlGpuEventCreateWithFlags(&NCCLBackend::sync_event,
-                                         AlGpuEventDisableTiming));
+                                          AlGpuNoTimingEventFlags));
 }
 
 void finalize() {

@@ -72,9 +72,22 @@
 #if defined AL_HAS_ROCM
 #define AlGpuFreeHost hipHostFree
 #define AlGpuMallocHost hipHostMalloc
+
+#include <hip/hip_version.h>
+#if HIP_VERSION < 50600000
+#define AlGpuDefaultEventFlags hipEventDefault
+#define AlGpuNoTimingEventFlags hipEventDisableTiming
+#else
+#define AlGpuDefaultEventFlags hipEventDisableSystemFence
+#define AlGpuNoTimingEventFlags hipEventDisableTiming | hipEventDisableSystemFence
+#endif
+
 #elif defined AL_HAS_CUDA
 #define AlGpuFreeHost cudaFreeHost
 #define AlGpuMallocHost cudaMallocHost
+
+#define AlGpuDefaultEventFlags cudaEventDefault
+#define AlGpuNoTimingEventFlags cudaEventDisableTiming
 #endif
 #endif // defined AL_GPU_RUNTIME_PREFIX
 

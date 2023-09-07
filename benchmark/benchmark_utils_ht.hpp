@@ -34,8 +34,8 @@
 template <>
 struct Timer<Al::HostTransferBackend> {
   Timer() {
-    AL_FORCE_CHECK_GPU(AlGpuEventCreate(&start_event));
-    AL_FORCE_CHECK_GPU(AlGpuEventCreate(&end_event));
+    AL_FORCE_CHECK_GPU(AlGpuEventCreateWithFlags(&start_event, AlGpuDefaultEventFlags));
+    AL_FORCE_CHECK_GPU(AlGpuEventCreateWithFlags(&end_event, AlGpuDefaultEventFlags));
   }
 
   ~Timer() noexcept(false) {

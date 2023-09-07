@@ -45,7 +45,7 @@ struct CUDAEventAllocator {
     AlGpuEvent_t event;
     AL_CHECK_CUDA(
       AlGpuEventCreateWithFlags(&event,
-                                      AlGpuEventDisableTiming));
+                                AlGpuNoTimingEventFlags));
     return event;
   }
 
