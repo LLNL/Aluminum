@@ -22,7 +22,7 @@ class CudaEvent : public Event {
 public:
   CudaEvent() {
     AL_CHECK_CUDA(
-      AlGpuEventCreateWithFlags(&event, AlGpuEventDisableTiming));
+      AlGpuEventCreateWithFlags(&event, AlGpuNoTimingEventFlags));
   }
   ~CudaEvent() {
     AL_IGNORE_NODISCARD(AlGpuEventDestroy(event));

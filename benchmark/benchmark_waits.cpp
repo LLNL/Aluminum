@@ -70,7 +70,7 @@ public:
 
 void do_benchmark(AlGpuStream_t stream, Wait& wait) {
   AlGpuEvent_t e;
-  AL_CHECK_CUDA(AlGpuEventCreateWithFlags(&e, AlGpuEventDisableTiming));
+  AL_CHECK_CUDA(AlGpuEventCreateWithFlags(&e, AlGpuNoTimingEventFlags));
   std::vector<double> times, launch_times;
   for (int i = 0; i < 100000; ++i) {
     double launch_start = Al::get_time();

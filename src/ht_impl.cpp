@@ -37,7 +37,7 @@ namespace ht {
 
 void init(int&, char**&) {
   AL_CHECK_CUDA(AlGpuEventCreateWithFlags(&HostTransferBackend::sync_event,
-                                         AlGpuEventDisableTiming));
+                                          AlGpuNoTimingEventFlags));
 }
 
 void finalize() {
