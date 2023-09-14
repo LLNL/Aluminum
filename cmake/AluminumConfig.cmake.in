@@ -14,6 +14,7 @@ set(_AL_KNOWN_COMPONENTS
   HOST_TRANSFER
   MPI_CUDA)
 
+set(AL_HAS_CALIPER @AL_HAS_CALIPER@)
 set(AL_HAS_CUDA @AL_HAS_CUDA@)
 set(AL_HAS_ROCM @AL_HAS_ROCM@)
 set(AL_HAS_MPI_CUDA @AL_HAS_MPI_CUDA@)
@@ -27,6 +28,10 @@ find_package(MPI 3.0 REQUIRED COMPONENTS CXX)
 
 find_dependency(HWLOC)
 find_dependency(Threads)
+
+if (AL_HAS_CALIPER)
+  find_dependency(caliper)
+endif ()
 
 if (AL_HAS_ROCM)
   # The API for Aluminum does not require that HIP language support
