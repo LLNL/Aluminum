@@ -14,10 +14,8 @@
 #cmakedefine AL_HAS_ROCM
 
 #if defined AL_HAS_CALIPER
-#define AL_CALI_MARK_FUNCTION CALI_CXX_MARK_FUNCTION
 #define AL_CALI_MARK_SCOPE(name) CALI_CXX_MARK_SCOPE(name)
 #else
-#define AL_CALI_MARK_FUNCTION ((void) 0)
 #define AL_CALI_MARK_SCOPE(...) ((void) 0)
 #endif
 
