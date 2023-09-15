@@ -44,6 +44,11 @@
 #include "aluminum/base.hpp"
 #include "aluminum/trace.hpp"
 
+#if defined AL_HAS_CALIPER
+#include <caliper/cali.h>
+#include <caliper/cali_macros.h>
+#endif
+
 namespace Al {
 
 /**
@@ -114,6 +119,7 @@ void Allreduce(const T* sendbuf, T* recvbuf, size_t count,
                ReductionOperator op, typename Backend::comm_type& comm,
                typename Backend::allreduce_algo_type algo =
                Backend::allreduce_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:Allreduce");
   internal::trace::record_op<Backend, T>("allreduce", comm, sendbuf, recvbuf,
                                          count);
   Backend::template Allreduce<T>(sendbuf, recvbuf, count, op, comm, algo);
@@ -135,6 +141,7 @@ void Allreduce(T* buffer, size_t count,
                ReductionOperator op, typename Backend::comm_type& comm,
                typename Backend::allreduce_algo_type algo =
                Backend::allreduce_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:Allreduce");
   internal::trace::record_op<Backend, T>("allreduce", comm, buffer, count);
   Backend::template Allreduce<T>(buffer, count, op, comm, algo);
 }
@@ -158,6 +165,7 @@ void NonblockingAllreduce(
   typename Backend::req_type& req,
   typename Backend::allreduce_algo_type algo =
   Backend::allreduce_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:NonblockingAllreduce");
   internal::trace::record_op<Backend, T>("nonblocking-allreduce", comm, sendbuf,
                                          recvbuf, count);
   Backend::template NonblockingAllreduce<T>(sendbuf, recvbuf, count, op,
@@ -185,6 +193,7 @@ void NonblockingAllreduce(
   typename Backend::req_type& req,
   typename Backend::allreduce_algo_type algo =
   Backend::allreduce_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:NonblockingAllreduce");
   internal::trace::record_op<Backend, T>("nonblocking-allreduce", comm,
                                          buffer, count);
   Backend::template NonblockingAllreduce<T>(buffer, count, op,
@@ -209,6 +218,7 @@ void Reduce(const T* sendbuf, T* recvbuf, size_t count,
             ReductionOperator op, int root, typename Backend::comm_type& comm,
             typename Backend::reduce_algo_type algo =
             Backend::reduce_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:Reduce");
   internal::trace::record_op<Backend, T>("reduce", comm, sendbuf, recvbuf,
                                          count, root);
   Backend::template Reduce<T>(sendbuf, recvbuf, count, op, root, comm, algo);
@@ -231,6 +241,7 @@ void Reduce(T* buffer, size_t count,
             ReductionOperator op, int root, typename Backend::comm_type& comm,
             typename Backend::reduce_algo_type algo =
             Backend::reduce_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:Reduce");
   internal::trace::record_op<Backend, T>("reduce", comm, buffer, count, root);
   Backend::template Reduce<T>(buffer, count, op, root, comm, algo);
 }
@@ -256,6 +267,7 @@ void NonblockingReduce(
   typename Backend::req_type& req,
   typename Backend::reduce_algo_type algo =
   Backend::reduce_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:NonblockingReduce");
   internal::trace::record_op<Backend, T>("nonblocking-reduce", comm, sendbuf,
                                          recvbuf, count, root);
   Backend::template NonblockingReduce<T>(sendbuf, recvbuf, count, op, root, comm, req, algo);
@@ -284,6 +296,7 @@ void NonblockingReduce(
   typename Backend::req_type& req,
   typename Backend::reduce_algo_type algo =
   Backend::reduce_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:NonblockingReduce");
   internal::trace::record_op<Backend, T>("nonblocking-reduce", comm, buffer,
                                          count, root);
   Backend::template NonblockingReduce<T>(buffer, count, op, root, comm, req, algo);
@@ -308,6 +321,7 @@ void Reduce_scatter(
   ReductionOperator op, typename Backend::comm_type& comm,
   typename Backend::reduce_scatter_algo_type algo =
   Backend::reduce_scatter_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:Reduce_scatter");
   internal::trace::record_op<Backend, T>("reduce_scatter", comm, sendbuf,
                                          recvbuf, count);
   Backend::template Reduce_scatter<T>(sendbuf, recvbuf, count, op, comm, algo);
@@ -332,6 +346,7 @@ void Reduce_scatter(
   ReductionOperator op, typename Backend::comm_type& comm,
   typename Backend::reduce_scatter_algo_type algo =
   Backend::reduce_scatter_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:Reduce_scatter");
   internal::trace::record_op<Backend, T>("reduce_scatter", comm, buffer, count);
   Backend::template Reduce_scatter<T>(buffer, count, op, comm, algo);
 }
@@ -356,6 +371,7 @@ void NonblockingReduce_scatter(
   typename Backend::req_type& req,
   typename Backend::reduce_scatter_algo_type algo =
   Backend::reduce_scatter_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:NonblockingReduce_scatter");
   internal::trace::record_op<Backend, T>("nonblocking-reduce_scatter", comm,
                                          sendbuf, recvbuf, count);
   Backend::template NonblockingReduce_scatter<T>(
@@ -385,6 +401,7 @@ void NonblockingReduce_scatter(
   typename Backend::req_type& req,
   typename Backend::reduce_scatter_algo_type algo =
   Backend::reduce_scatter_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:NonblockingReduce_scatter");
   internal::trace::record_op<Backend, T>("nonblocking-reduce_scatter", comm,
                                          buffer, count);
   Backend::template NonblockingReduce_scatter<T>(buffer, count, op, comm, req, algo);
@@ -408,6 +425,7 @@ void Reduce_scatterv(
   ReductionOperator op, typename Backend::comm_type& comm,
   typename Backend::reduce_scatterv_algo_type algo =
   Backend::reduce_scatterv_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:Reduce_scatterv");
   internal::trace::record_op<Backend, T>(
     "reduce_scatterv", comm, sendbuf, recvbuf, counts);
   Backend::template Reduce_scatterv<T>(sendbuf, recvbuf, counts,
@@ -432,6 +450,7 @@ void Reduce_scatterv(
   ReductionOperator op, typename Backend::comm_type& comm,
   typename Backend::reduce_scatterv_algo_type algo =
   Backend::reduce_scatterv_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:Reduce_scatterv");
   internal::trace::record_op<Backend, T>(
     "reduce_scatterv", comm, buffer, counts);
   Backend::template Reduce_scatterv<T>(buffer, counts,
@@ -457,6 +476,7 @@ void NonblockingReduce_scatterv(
   typename Backend::req_type& req,
   typename Backend::reduce_scatterv_algo_type algo =
   Backend::reduce_scatterv_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:NonblockingReduce_scatterv");
   internal::trace::record_op<Backend, T>(
     "nonblocking-reduce_scatterv", comm, sendbuf, recvbuf, counts);
   Backend::template NonblockingReduce_scatterv<T>(
@@ -484,6 +504,7 @@ void NonblockingReduce_scatterv(
   typename Backend::req_type& req,
   typename Backend::reduce_scatterv_algo_type algo =
   Backend::reduce_scatterv_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:NonblockingReduce_scatterv");
   internal::trace::record_op<Backend, T>(
     "nonblocking-reduce_scatterv", comm, buffer, counts);
   Backend::template NonblockingReduce_scatterv<T>(
@@ -507,6 +528,7 @@ void Allgather(const T* sendbuf, T* recvbuf, size_t count,
                typename Backend::comm_type& comm,
                typename Backend::allgather_algo_type algo =
                Backend::allgather_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:Allgather");
   internal::trace::record_op<Backend, T>("allgather", comm, sendbuf, recvbuf,
                                          count);
   Backend::template Allgather<T>(sendbuf, recvbuf, count, comm, algo);
@@ -527,6 +549,7 @@ void Allgather(T* buffer, size_t count,
                typename Backend::comm_type& comm,
                typename Backend::allgather_algo_type algo =
                Backend::allgather_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:Allgather");
   internal::trace::record_op<Backend, T>("allgather", comm, buffer, count);
   Backend::template Allgather<T>(buffer, count, comm, algo);
 }
@@ -549,6 +572,7 @@ void NonblockingAllgather(
   typename Backend::req_type& req,
   typename Backend::allgather_algo_type algo =
   Backend::allgather_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:NonblockingAllgather");
   internal::trace::record_op<Backend, T>("nonblocking-allgather", comm,
                                          sendbuf, recvbuf, count);
   Backend::template NonblockingAllgather<T>(sendbuf, recvbuf, count, comm, req, algo);
@@ -573,6 +597,7 @@ void NonblockingAllgather(
   typename Backend::req_type& req,
   typename Backend::allgather_algo_type algo =
   Backend::allgather_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:NonblockingAllgather");
   internal::trace::record_op<Backend, T>("nonblocking-allgather", comm,
                                          buffer, count);
   Backend::template NonblockingAllgather<T>(buffer, count, comm, req, algo);
@@ -596,6 +621,7 @@ void Allgatherv(const T* sendbuf, T* recvbuf,
                 typename Backend::comm_type& comm,
                 typename Backend::allgatherv_algo_type algo =
                 Backend::allgatherv_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:Allgatherv");
   internal::trace::record_op<Backend, T>("allgatherv", comm, sendbuf, recvbuf,
                                          counts, displs);
   Backend::template Allgatherv<T>(sendbuf, recvbuf, counts, displs, comm, algo);
@@ -619,6 +645,7 @@ void Allgatherv(T* buffer,
                 typename Backend::comm_type& comm,
                 typename Backend::allgatherv_algo_type algo =
                 Backend::allgatherv_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:Allgatherv");
   internal::trace::record_op<Backend, T>("allgatherv", comm, buffer,
                                          counts, displs);
   Backend::template Allgatherv<T>(buffer, counts, displs, comm, algo);
@@ -644,6 +671,7 @@ void NonblockingAllgatherv(const T* sendbuf, T* recvbuf,
                            typename Backend::req_type& req,
                            typename Backend::allgatherv_algo_type algo =
                            Backend::allgatherv_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:NonblockingAllgatherv");
   internal::trace::record_op<Backend, T>("nonblocking-allgatherv", comm,
                                          sendbuf, recvbuf, counts, displs);
   Backend::template NonblockingAllgatherv<T>(sendbuf, recvbuf, counts, displs, comm, req, algo);
@@ -670,6 +698,7 @@ void NonblockingAllgatherv(T* buffer,
                            typename Backend::req_type& req,
                            typename Backend::allgatherv_algo_type algo =
                            Backend::allgatherv_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:NonblockingAllgatherv");
   internal::trace::record_op<Backend, T>("nonblocking-allgatherv", comm,
                                          buffer, counts, displs);
   Backend::template NonblockingAllgatherv<T>(buffer, counts, displs, comm, req, algo);
@@ -687,6 +716,7 @@ template <typename Backend>
 void Barrier(typename Backend::comm_type& comm,
              typename Backend::barrier_algo_type algo =
              Backend::barrier_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:Barrier");
   internal::trace::record_op<Backend, void>("barrier", comm);
   Backend::Barrier(comm, algo);
 }
@@ -703,6 +733,7 @@ void NonblockingBarrier(typename Backend::comm_type& comm,
                         typename Backend::req_type& req,
                         typename Backend::barrier_algo_type algo =
                         Backend::barrier_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:NonblockingBarrier");
   internal::trace::record_op<Backend, void>("nonblocking-barrier", comm);
   Backend::NonblockingBarrier(comm, req, algo);
 }
@@ -728,6 +759,7 @@ void Bcast(T* buffer,
            typename Backend::comm_type& comm,
            typename Backend::bcast_algo_type algo =
            Backend::bcast_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:Bcast");
   internal::trace::record_op<Backend, T>("bcast", comm, buffer, count, root);
   Backend::template Bcast<T>(buffer, count, root, comm, algo);
 }
@@ -754,6 +786,7 @@ void NonblockingBcast(
   typename Backend::req_type& req,
   typename Backend::bcast_algo_type algo =
   Backend::bcast_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:NonblockingBcast");
   internal::trace::record_op<Backend, T>("nonblocking-bcast", comm, buffer,
                                          count, root);
   Backend::template NonblockingBcast<T>(buffer, count, root, comm, req, algo);
@@ -777,6 +810,7 @@ void Alltoall(
   typename Backend::comm_type& comm,
   typename Backend::alltoall_algo_type algo =
   Backend::alltoall_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:Alltoall");
   internal::trace::record_op<Backend, T>("alltoall", comm, sendbuf, recvbuf,
                                          count);
   Backend::template Alltoall<T>(sendbuf, recvbuf, count, comm, algo);
@@ -797,6 +831,7 @@ void Alltoall(
   T* buffer, size_t count, typename Backend::comm_type& comm,
   typename Backend::alltoall_algo_type algo =
   Backend::alltoall_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:Alltoall");
   internal::trace::record_op<Backend, T>("alltoall", comm, buffer, count);
   Backend::template Alltoall<T>(buffer, count, comm, algo);
 }
@@ -819,6 +854,7 @@ void NonblockingAlltoall(
   typename Backend::req_type& req,
   typename Backend::alltoall_algo_type algo =
   Backend::alltoall_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:NonblockingAlltoall");
   internal::trace::record_op<Backend, T>("nonblocking-alltoall", comm, sendbuf,
                                          recvbuf, count);
   Backend::template NonblockingAlltoall<T>(sendbuf, recvbuf, count,
@@ -843,6 +879,7 @@ void NonblockingAlltoall(
   typename Backend::req_type& req,
   typename Backend::alltoall_algo_type algo =
   Backend::alltoall_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:NonblockingAlltoall");
   internal::trace::record_op<Backend, T>("nonblocking-alltoall", comm, buffer,
                                          count);
   Backend::template NonblockingAlltoall<T>(buffer, count, comm, req, algo);
@@ -872,6 +909,7 @@ void Alltoallv(
   typename Backend::comm_type& comm,
   typename Backend::alltoallv_algo_type algo =
   Backend::alltoallv_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:Alltoallv");
   internal::trace::record_op<Backend, T>(
     "alltoallv", comm,
     sendbuf, send_counts, send_displs,
@@ -901,6 +939,7 @@ void Alltoallv(
   typename Backend::comm_type& comm,
   typename Backend::alltoallv_algo_type algo =
   Backend::alltoallv_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:Alltoallv");
   internal::trace::record_op<Backend, T>(
     "alltoallv", comm, buffer, counts, displs);
   Backend::template Alltoallv<T>(buffer, counts, displs, comm, algo);
@@ -932,6 +971,7 @@ void NonblockingAlltoallv(
   typename Backend::req_type& req,
   typename Backend::alltoallv_algo_type algo =
   Backend::alltoallv_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:NonblockingAlltoallv");
   internal::trace::record_op<Backend, T>(
     "nonblocking-alltoallv", comm,
     sendbuf, send_counts, send_displs,
@@ -965,6 +1005,7 @@ void NonblockingAlltoallv(
   typename Backend::req_type& req,
   typename Backend::alltoallv_algo_type algo =
   Backend::alltoallv_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:NonblockingAlltoallv");
   internal::trace::record_op<Backend, T>(
     "nonblocking-alltoallv", comm, buffer, counts, displs);
   Backend::template NonblockingAlltoallv<T>(buffer, counts, displs, comm,
@@ -991,6 +1032,7 @@ void Gather(
   typename Backend::comm_type& comm,
   typename Backend::gather_algo_type algo =
   Backend::gather_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:Gather");
   internal::trace::record_op<Backend, T>("gather", comm, sendbuf, recvbuf,
                                          count, root);
   Backend::template Gather<T>(sendbuf, recvbuf, count, root, comm, algo);
@@ -1015,6 +1057,7 @@ void Gather(
   T* buffer, size_t count, int root, typename Backend::comm_type& comm,
   typename Backend::gather_algo_type algo =
   Backend::gather_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:Gather");
   internal::trace::record_op<Backend, T>("gather", comm, buffer, count, root);
   Backend::template Gather<T>(buffer, count, root, comm, algo);
 }
@@ -1039,6 +1082,7 @@ void NonblockingGather(
   typename Backend::req_type& req,
   typename Backend::gather_algo_type algo =
   Backend::gather_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:NonblockingGather");
   internal::trace::record_op<Backend, T>("nonblocking-gather", comm, sendbuf,
                                          recvbuf, count, root);
   Backend::template NonblockingGather<T>(sendbuf, recvbuf, count, root,
@@ -1067,6 +1111,7 @@ void NonblockingGather(
   typename Backend::req_type& req,
   typename Backend::gather_algo_type algo =
   Backend::gather_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:NonblockingGather");
   internal::trace::record_op<Backend, T>("nonblocking-gather", comm, buffer,
                                          count, root);
   Backend::template NonblockingGather<T>(buffer, count, root, comm, req, algo);
@@ -1091,6 +1136,7 @@ void Gatherv(
   typename Backend::comm_type& comm,
   typename Backend::gatherv_algo_type algo =
   Backend::gatherv_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:Gatherv");
   internal::trace::record_op<Backend, T>("gatherv", comm, sendbuf, recvbuf,
                                          counts, displs, root);
   Backend::template Gatherv<T>(sendbuf, recvbuf, counts, displs, root, comm, algo);
@@ -1117,6 +1163,7 @@ void Gatherv(
   typename Backend::comm_type& comm,
   typename Backend::gatherv_algo_type algo =
   Backend::gatherv_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:Gatherv");
   internal::trace::record_op<Backend, T>("gatherv", comm, buffer,
                                          counts, displs, root);
   Backend::template Gatherv<T>(buffer, counts, displs, root, comm, algo);
@@ -1143,6 +1190,7 @@ void NonblockingGatherv(
   typename Backend::req_type& req,
   typename Backend::gatherv_algo_type algo =
   Backend::gatherv_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:NonblockingGatherv");
   internal::trace::record_op<Backend, T>("nonblocking-gatherv",
                                          comm, sendbuf, recvbuf,
                                          counts, displs, root);
@@ -1174,6 +1222,7 @@ void NonblockingGatherv(
   typename Backend::req_type& req,
   typename Backend::gatherv_algo_type algo =
   Backend::gatherv_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:NonblockingGatherv");
   internal::trace::record_op<Backend, T>("nonblocking-gatherv",
                                          comm, buffer,
                                          counts, displs, root);
@@ -1202,6 +1251,7 @@ void Scatter(
   typename Backend::comm_type& comm,
   typename Backend::scatter_algo_type algo =
   Backend::scatter_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:Scatter");
   internal::trace::record_op<Backend, T>("scatter", comm, sendbuf, recvbuf,
                                          count, root);
   Backend::template Scatter<T>(sendbuf, recvbuf, count, root, comm, algo);
@@ -1226,6 +1276,7 @@ void Scatter(
   T* buffer, size_t count, int root, typename Backend::comm_type& comm,
   typename Backend::scatter_algo_type algo =
   Backend::scatter_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:Scatter");
   internal::trace::record_op<Backend, T>("scatter", comm, buffer, count, root);
   Backend::template Scatter<T>(buffer, count, root, comm, algo);
 }
@@ -1251,6 +1302,7 @@ void NonblockingScatter(
   typename Backend::req_type& req,
   typename Backend::scatter_algo_type algo =
   Backend::scatter_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:NonblockingScatter");
   internal::trace::record_op<Backend, T>("nonblocking-scatter", comm, sendbuf,
                                          recvbuf, count, root);
   Backend::template NonblockingScatter<T>(sendbuf, recvbuf, count, root,
@@ -1279,6 +1331,7 @@ void NonblockingScatter(
   typename Backend::req_type& req,
   typename Backend::scatter_algo_type algo =
   Backend::scatter_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:NonblockingScatter");
   internal::trace::record_op<Backend, T>("nonblocking-scatter", comm, buffer,
                                          count, root);
   Backend::template NonblockingScatter<T>(buffer, count, root, comm, req, algo);
@@ -1305,6 +1358,7 @@ void Scatterv(
   typename Backend::comm_type& comm,
   typename Backend::scatterv_algo_type algo =
   Backend::scatterv_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:Scatterv");
   internal::trace::record_op<Backend, T>("scatterv", comm,
                                          sendbuf, recvbuf,
                                          counts, displs, root);
@@ -1334,6 +1388,7 @@ void Scatterv(
   typename Backend::comm_type& comm,
   typename Backend::scatterv_algo_type algo =
   Backend::scatterv_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:Scatterv");
   internal::trace::record_op<Backend, T>("scatterv", comm,
                                          buffer, counts, displs, root);
   Backend::template Scatterv<T>(buffer, counts, displs, root,
@@ -1363,6 +1418,7 @@ void NonblockingScatterv(
   typename Backend::req_type& req,
   typename Backend::scatterv_algo_type algo =
   Backend::scatterv_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:NonblockingScatterv");
   internal::trace::record_op<Backend, T>("nonblocking-scatterv", comm,
                                          sendbuf, recvbuf,
                                          counts, displs, root);
@@ -1395,6 +1451,7 @@ void NonblockingScatterv(
   typename Backend::req_type& req,
   typename Backend::scatterv_algo_type algo =
   Backend::scatterv_algo_type::automatic) {
+  AL_CALI_MARK_SCOPE("aluminum:NonblockingScatterv");
   internal::trace::record_op<Backend, T>("nonblocking-scatterv", comm,
                                          buffer, counts, displs, root);
   Backend::template NonblockingScatterv<T>(
@@ -1414,6 +1471,7 @@ void NonblockingScatterv(
 template <typename Backend, typename T>
 void Send(const T* sendbuf, size_t count, int dest,
           typename Backend::comm_type& comm) {
+  AL_CALI_MARK_SCOPE("aluminum:Send");
   internal::trace::record_op<Backend, T>("send", comm, sendbuf, count, dest);
   Backend::template Send<T>(sendbuf, count, dest, comm);
 }
@@ -1431,6 +1489,7 @@ template <typename Backend, typename T>
 void NonblockingSend(const T* sendbuf, size_t count, int dest,
                      typename Backend::comm_type& comm,
                      typename Backend::req_type& req) {
+  AL_CALI_MARK_SCOPE("aluminum:NonblockingSend");
   internal::trace::record_op<Backend, T>("nonblocking-send", comm, sendbuf,
                                          count, dest);
   Backend::template NonblockingSend<T>(sendbuf, count, dest, comm, req);
@@ -1449,6 +1508,7 @@ void NonblockingSend(const T* sendbuf, size_t count, int dest,
 template <typename Backend, typename T>
 void Recv(T* recvbuf, size_t count, int src,
           typename Backend::comm_type& comm) {
+  AL_CALI_MARK_SCOPE("aluminum:Recv");
   internal::trace::record_op<Backend, T>("recv", comm, recvbuf, count, src);
   Backend::template Recv<T>(recvbuf, count, src, comm);
 }
@@ -1466,6 +1526,7 @@ template <typename Backend, typename T>
 void NonblockingRecv(T* recvbuf, size_t count, int src,
                      typename Backend::comm_type& comm,
                      typename Backend::req_type& req) {
+  AL_CALI_MARK_SCOPE("aluminum:NonblockingRecv");
   internal::trace::record_op<Backend, T>("nonblocking-recv", comm, recvbuf,
                                          count, src);
   Backend::template NonblockingRecv<T>(recvbuf, count, src, comm, req);
@@ -1488,6 +1549,7 @@ template <typename Backend, typename T>
 void SendRecv(const T* sendbuf, size_t send_count, int dest,
               T* recvbuf, size_t recv_count, int src,
               typename Backend::comm_type& comm) {
+  AL_CALI_MARK_SCOPE("aluminum:SendRecv");
   internal::trace::record_op<Backend, T>("sendrecv", comm, sendbuf, send_count,
                                          dest, recvbuf, recv_count, src);
   Backend::template SendRecv<T>(sendbuf, send_count, dest,
@@ -1508,6 +1570,7 @@ void SendRecv(const T* sendbuf, size_t send_count, int dest,
 template <typename Backend, typename T>
 void SendRecv(T* buffer, size_t count, int dest, int src,
               typename Backend::comm_type& comm) {
+  AL_CALI_MARK_SCOPE("aluminum:SendRecv");
   internal::trace::record_op<Backend, T>("sendrecv", comm, buffer, count,
                                          dest, src);
   Backend::template SendRecv<T>(buffer, count, dest, src, comm);
@@ -1530,6 +1593,7 @@ void NonblockingSendRecv(const T* sendbuf, size_t send_count, int dest,
                          T* recvbuf, size_t recv_count, int src,
                          typename Backend::comm_type& comm,
                          typename Backend::req_type& req) {
+  AL_CALI_MARK_SCOPE("aluminum:NonblockingSendRecv");
   internal::trace::record_op<Backend, T>("nonblocking-sendrecv", comm,
                                          sendbuf, send_count, dest,
                                          recvbuf, recv_count, src);
@@ -1555,6 +1619,7 @@ template <typename Backend, typename T>
 void NonblockingSendRecv(T* buffer, size_t count, int dest, int src,
                          typename Backend::comm_type& comm,
                          typename Backend::req_type& req) {
+  AL_CALI_MARK_SCOPE("aluminum:NonblockingSendRecv");
   internal::trace::record_op<Backend, T>("nonblocking-sendrecv", comm,
                                          buffer, count, dest, src);
   Backend::template NonblockingSendRecv<T>(buffer, count, dest, src, comm, req);
@@ -1583,6 +1648,7 @@ void MultiSendRecv(std::vector<const T*> send_buffers,
                    std::vector<size_t> recv_counts,
                    std::vector<int> srcs,
                    typename Backend::comm_type& comm) {
+  AL_CALI_MARK_SCOPE("aluminum:MultiSendRecv");
   internal::trace::record_op<Backend, T>("multisendrecv", comm,
                                          send_buffers, send_counts, dests,
                                          recv_buffers, recv_counts, srcs);
@@ -1608,6 +1674,7 @@ void MultiSendRecv(std::vector<T*> buffers,
                    std::vector<int> dests,
                    std::vector<int> srcs,
                    typename Backend::comm_type& comm) {
+  AL_CALI_MARK_SCOPE("aluminum:MultiSendRecv");
   internal::trace::record_op<Backend, T>("multisendrecv", comm,
                                          buffers, counts, dests, srcs);
   Backend::template MultiSendRecv<T>(buffers, counts, dests, srcs, comm);
@@ -1636,6 +1703,7 @@ void NonblockingMultiSendRecv(std::vector<const T*> send_buffers,
                               std::vector<int> srcs,
                               typename Backend::comm_type& comm,
                               typename Backend::req_type& req) {
+  AL_CALI_MARK_SCOPE("aluminum:NonblockingMultiSendRecv");
   internal::trace::record_op<Backend, T>("nonblocking-multisendrecv", comm,
                                          send_buffers, send_counts, dests,
                                          recv_buffers, recv_counts, srcs);
@@ -1664,6 +1732,7 @@ void NonblockingMultiSendRecv(std::vector<T*> buffers,
                               std::vector<int> srcs,
                               typename Backend::comm_type& comm,
                               typename Backend::req_type& req) {
+  AL_CALI_MARK_SCOPE("aluminum:NonblockingMultiSendRecv");
   internal::trace::record_op<Backend, T>("nonblocking-multisendrecv", comm,
                                          buffers, counts, dests, srcs);
   Backend::template NonblockingMultiSendRecv<T>(buffers, counts, dests, srcs,

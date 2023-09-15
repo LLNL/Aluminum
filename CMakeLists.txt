@@ -273,6 +273,11 @@ find_package(MPI 3.0 REQUIRED COMPONENTS CXX)
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
+if (ALUMINUM_ENABLE_CALIPER)
+  find_package(caliper REQUIRED)
+  set(AL_HAS_CALIPER ON)
+endif ()
+
 # Fix the imported target
 
 # FIXME (trb): We should split the library into language-specific

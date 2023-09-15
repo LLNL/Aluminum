@@ -53,6 +53,7 @@ target_include_directories(Al PUBLIC
   $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 target_link_libraries(Al PUBLIC
+  $<$<BOOL:${AL_HAS_CALIPER}>:caliper>
   HWLOC::hwloc
   MPI::MPI_CXX
   Threads::Threads)

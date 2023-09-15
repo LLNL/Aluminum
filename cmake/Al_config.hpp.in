@@ -6,11 +6,18 @@
 #define AL_VERSION "@ALUMINUM_VERSION@"
 #define AL_GIT_VERSION "@ALUMINUM_GIT_VERSION@"
 
+#cmakedefine AL_HAS_CALIPER
 #cmakedefine AL_HAS_CUDA
 #cmakedefine AL_HAS_MPI_CUDA
 #cmakedefine AL_HAS_HOST_TRANSFER
 #cmakedefine AL_HAS_NCCL
 #cmakedefine AL_HAS_ROCM
+
+#if defined AL_HAS_CALIPER
+#define AL_CALI_MARK_SCOPE(name) CALI_CXX_MARK_SCOPE(name)
+#else
+#define AL_CALI_MARK_SCOPE(...) ((void) 0)
+#endif
 
 #if defined AL_HAS_ROCM
 #define AL_GPU_RUNTIME_PREFIX hip
