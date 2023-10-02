@@ -136,6 +136,9 @@ option(ALUMINUM_ENABLE_TRACE
 option(ALUMINUM_MPI_SERIALIZE
   "Serialize MPI operations."
   OFF)
+option(ALUMINUM_DISABLE_BACKGROUND_STREAMS
+  "Never use background streams for non-blocking operations"
+  OFF)
 
 option(ALUMINUM_ENABLE_TESTS
   "Build tests."
@@ -233,6 +236,9 @@ if (ALUMINUM_ENABLE_TRACE)
 endif ()
 if (ALUMINUM_MPI_SERIALIZE)
   set(AL_MPI_SERIALIZE ON)
+endif ()
+if (ALUMINUM_DISABLE_BACKGROUND_STREAMS)
+  set(AL_DISABLE_BACKGROUND_STREAMS ON)
 endif ()
 if (ALUMINUM_ENABLE_TESTS)
   set(AL_ENABLE_TESTS ON)
