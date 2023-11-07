@@ -123,6 +123,12 @@ if (AL_HAS_ROCM)
   set_source_files_properties(${AL_HIP_SOURCES}
     PROPERTIES LANGUAGE HIP)
 
+  # amdclang++ requires a little extra help here.
+  set_target_properties(Al
+    PROPERTIES
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED TRUE)
+
 elseif (AL_HAS_CUDA)
   target_link_libraries(Al PUBLIC
     CUDA::cudart
