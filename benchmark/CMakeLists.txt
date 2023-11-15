@@ -30,7 +30,7 @@ foreach(src IN LISTS AL_BENCHMARK_SOURCES AL_GPU_BENCHMARK_SOURCES)
     PRIVATE Al aluminum_test_headers)
   target_include_directories(
     ${_benchmark_exe_name} SYSTEM PRIVATE
-    ${CMAKE_SOURCE_DIR}/third_party/cxxopts/include)
+    ${PROJECT_SOURCE_DIR}/third_party/cxxopts/include)
 
   # FIXME: Hopefully this can be removed in a future version of ROCm.
   if (AL_HAS_ROCM AND AL_BUILD_TYPE_UPPER MATCHES "DEBUG")
