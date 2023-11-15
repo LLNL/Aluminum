@@ -54,7 +54,7 @@ foreach(src ${AL_TEST_SOURCES})
   add_executable(${_test_exe_name} ${src})
   target_include_directories(${_test_exe_name}
     SYSTEM PRIVATE
-    ${CMAKE_SOURCE_DIR}/third_party/cxxopts/include)
+    ${PROJECT_SOURCE_DIR}/third_party/cxxopts/include)
   target_link_libraries(${_test_exe_name} PRIVATE Al aluminum_test_headers)
   # FIXME: Hopefully this can be removed in a future version of ROCm.
   if (AL_HAS_ROCM AND AL_BUILD_TYPE_UPPER MATCHES "DEBUG")
@@ -65,11 +65,11 @@ endforeach()
 if (AL_HAS_MPI_CUDA_RMA AND NOT AL_HAS_ROCM)
   add_executable(test_rma_ring.exe test_rma_ring.cpp ${TEST_HEADERS})
   target_include_directories(
-    test_rma_ring.exe SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/third_party/cxxopts/include)
+    test_rma_ring.exe SYSTEM PRIVATE ${PROJECT_SOURCE_DIR}/third_party/cxxopts/include)
   target_link_libraries(test_rma_ring.exe PRIVATE Al)
   add_executable(test_rma_halo_exchange.exe
     test_rma_halo_exchange.cpp ${TEST_HEADERS})
   target_include_directories(
-    test_rma_halo_exchange.exe SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/third_party/cxxopts/include)
+    test_rma_halo_exchange.exe SYSTEM PRIVATE ${PROJECT_SOURCE_DIR}/third_party/cxxopts/include)
   target_link_libraries(test_rma_halo_exchange.exe PRIVATE Al)
 endif ()

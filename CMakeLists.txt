@@ -10,28 +10,27 @@ set(ALUMINUM_VERSION
   "${ALUMINUM_VERSION_MAJOR}.${ALUMINUM_VERSION_MINOR}.${ALUMINUM_VERSION_PATCH}")
 
 # Gather Git information if available.
-find_program(__GIT_EXECUTABLE git)
-mark_as_advanced(__GIT_EXECUTABLE)
-if (__GIT_EXECUTABLE)
+find_package(Git)
+if (GIT_EXECUTABLE)
   execute_process(
-    COMMAND ${__GIT_EXECUTABLE} rev-parse --is-inside-source-tree
-    WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+    COMMAND ${GIT_EXECUTABLE} rev-parse --is-inside-source-tree
+    WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
     OUTPUT_VARIABLE __BUILDING_FROM_GIT_SOURCES
     OUTPUT_STRIP_TRAILING_WHITESPACE)
 
   if (__BUILDING_FROM_GIT_SOURCES)
     execute_process(
-      COMMAND ${__GIT_EXECUTABLE} rev-parse --show-toplevel
-      WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+      COMMAND ${GIT_EXECUTABLE} rev-parse --show-toplevel
+      WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
       OUTPUT_VARIABLE __GIT_TOPLEVEL_DIR
       OUTPUT_STRIP_TRAILING_WHITESPACE)
     execute_process(
-      COMMAND ${__GIT_EXECUTABLE} rev-parse --git-dir
+      COMMAND ${GIT_EXECUTABLE} rev-parse --git-dir
       WORKING_DIRECTORY "${__GIT_TOPLEVEL_DIR}"
       OUTPUT_VARIABLE __GIT_GIT_DIR
       OUTPUT_STRIP_TRAILING_WHITESPACE)
     execute_process(
-      COMMAND ${__GIT_EXECUTABLE} --git-dir "${__GIT_GIT_DIR}" describe
+      COMMAND ${GIT_EXECUTABLE} --git-dir "${__GIT_GIT_DIR}" describe
       --abbrev=7 --always --dirty --tags
       WORKING_DIRECTORY "${__GIT_TOPLEVEL_DIR}"
       OUTPUT_VARIABLE __GIT_DESCRIBE_VERSION
@@ -48,13 +47,13 @@ endif ()
 project(ALUMINUM VERSION ${ALUMINUM_VERSION} LANGUAGES CXX)
 # Not "CUDA" just yet since that's only one possible device paradigm.
 
-if (${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_BINARY_DIR})
+if (${PROJECT_SOURCE_DIR} STREQUAL ${CMAKE_BINARY_DIR})
   message(FATAL_ERROR "In-source builds are prohibited. "
     "Create a new directory and build there.")
 endif ()
 
 include(GNUInstallDirs)
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
+list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 
 # Options
 
@@ -475,11 +474,11 @@ if (AL_HAS_NVPROF)
   set(AL_HAS_PROF ON)
 endif ()
 configure_file(
-  "${CMAKE_SOURCE_DIR}/cmake/Al_config.hpp.in"
+  "${PROJECT_SOURCE_DIR}/cmake/Al_config.hpp.in"
   "${CMAKE_BINARY_DIR}/Al_config.hpp" @ONLY)
 
 configure_file(
-  "${CMAKE_SOURCE_DIR}/cmake/tuning_params.hpp.in"
+  "${PROJECT_SOURCE_DIR}/cmake/tuning_params.hpp.in"
   "${CMAKE_BINARY_DIR}/aluminum/tuning_params.hpp" @ONLY)
 
 # Macro for setting full paths to source files.
@@ -494,7 +493,7 @@ endmacro()
 add_subdirectory(include/aluminum)
 
 # Add in the master header
-list(APPEND ALUMINUM_HEADERS "${CMAKE_SOURCE_DIR}/include/Al.hpp")
+list(APPEND ALUMINUM_HEADERS "${PROJECT_SOURCE_DIR}/include/Al.hpp")
 
 # Add the library targets
 add_subdirectory(src)
@@ -522,10 +521,10 @@ write_basic_package_version_file(
   "${CMAKE_BINARY_DIR}/AluminumConfigVersion.cmake" VERSION
   ${ALUMINUM_VERSION} COMPATIBILITY SameMajorVersion )
 
-set(INCLUDE_INSTALL_DIRS ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/src)
+set(INCLUDE_INSTALL_DIRS ${PROJECT_SOURCE_DIR}/include ${PROJECT_SOURCE_DIR}/src)
 set(LIB_INSTALL_DIR src)
 set(CMAKE_INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR})
-set(CMAKE_MODULE_LOCATION "${CMAKE_SOURCE_DIR}/cmake")
+set(CMAKE_MODULE_LOCATION "${PROJECT_SOURCE_DIR}/cmake")
 set(REAL_CMAKE_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}")
 set(CMAKE_INSTALL_PREFIX "${CMAKE_CURRENT_BINARY_DIR}")
 configure_package_config_file(cmake/AluminumConfig.cmake.in

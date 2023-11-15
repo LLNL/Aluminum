@@ -42,7 +42,7 @@ add_library(Al
   "${ALUMINUM_CUDA_SOURCES}"
   "${ALUMINUM_HEADERS}")
 target_include_directories(Al PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>)
+  $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
 
 set_target_properties(Al
   PROPERTIES
@@ -141,11 +141,11 @@ endif (AL_HAS_ROCM)
 
 # Header installation.
 install(
-  DIRECTORY ${CMAKE_SOURCE_DIR}/include/aluminum
+  DIRECTORY ${PROJECT_SOURCE_DIR}/include/aluminum
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
   FILES_MATCHING PATTERN "*.hpp")
 install(
-  FILES ${CMAKE_SOURCE_DIR}/include/Al.hpp
+  FILES ${PROJECT_SOURCE_DIR}/include/Al.hpp
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
 install(TARGETS Al
