@@ -97,10 +97,6 @@
 
 #if defined(AL_HAS_ROCM) && defined(AL_HAS_HALF)
 
-inline std::ostream& operator<<(std::ostream& os, __half const& x) {
-  return os << static_cast<float>(x);
-}
-
 inline bool operator<(__half const& lhs, __half const& rhs) {
   return static_cast<float>(lhs) < static_cast<float>(rhs);
 }
@@ -123,7 +119,21 @@ inline __half operator-(__half const& lhs, __half const& rhs) {
   return static_cast<float>(lhs) - static_cast<float>(rhs);
 }
 
-#endif // defined(AL_HAS_ROCM) && defined(AL_HAS_NCCL)
+#endif // defined(AL_HAS_ROCM) && defined(AL_HAS_HALF)
+
+// Provide explicit overloads for printing these types, as we cannot
+// rely on implicit conversion, except that ROCm defines this operator
+// for bfloat.
+#ifdef AL_HAS_HALF
+inline std::ostream& operator<<(std::ostream& os, __half const& x) {
+  return os << static_cast<float>(x);
+}
+#endif
+#if defined(AL_HAS_BFLOAT) && !defined(AL_HAS_ROCM)
+inline std::ostream& operator<<(std::ostream& os, al_bfloat16 const& x) {
+  return os << static_cast<float>(x);
+}
+#endif
 
 // It turns out that, per the C++ standard, std::uniform_int_distribution
 // is only defined for a subset of integer types, and using an unsupported
