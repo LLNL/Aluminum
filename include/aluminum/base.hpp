@@ -28,6 +28,8 @@
 #pragma once
 
 #include <exception>
+#include <iostream>
+#include <sstream>
 #include <string>
 
 /** HOST_NAME_MAX is a linux only define */
@@ -66,7 +68,36 @@ private:
   /** Constructed error message. */
   std::string err;
 };
-#define throw_al_exception(s) throw Al::al_exception(s, __FILE__, __LINE__)
+
+/**
+ * Construct a single string from concatenating all arguments.
+ *
+ * Arguments must support operator<<.
+ */
+template <typename... Args>
+std::string build_string(Args&&... args) {
+  std::ostringstream oss;
+  (oss << ... << args);
+  return oss.str();
+}
+
+/** Throw an Aluminum excpetion. */
+#define throw_al_exception(...) \
+  throw Al::al_exception(Al::build_string(__VA_ARGS__), __FILE__, __LINE__)
+
+/**
+ * Output an error and then terminate Aluminum.
+ *
+ * This is primarily useful for handling errors in destructors.
+ */
+#define terminate_al(...)                       \
+  do {                                          \
+    std::cerr << __FILE__ << ":"                \
+              << __LINE__ << " - "              \
+              << Al::build_string(__VA_ARGS__)  \
+              << std::endl;                     \
+    std::terminate();                           \
+  } while (0)
 
 /** Predefined reduction operations. */
 enum class ReductionOperator {
