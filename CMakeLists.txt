@@ -119,6 +119,9 @@ option(ALUMINUM_ENABLE_DEBUG
 option(ALUMINUM_ENABLE_DEBUG_HANG_CHECK
   "Enable hang checking."
   OFF)
+option(ALUMINUM_ENABLE_SIGNAL_HANDLER
+  "Enable Aluminum's bad signal handler (you may suffer)"
+  ON)
 option(ALUMINUM_ENABLE_NVPROF
   "Enable profiling via nvprof/NVTX."
   OFF)
@@ -229,6 +232,9 @@ if (ALUMINUM_ENABLE_DEBUG)
 endif ()
 if (ALUMINUM_ENABLE_DEBUG_HANG_CHECK)
   set(AL_DEBUG_HANG_CHECK ON)
+endif ()
+if (ALUMINUM_ENABLE_SIGNAL_HANDLER)
+  set(AL_SIGNAL_HANDLER ON)
 endif ()
 if (ALUMINUM_ENABLE_STREAM_MEM_OPS)
   set(AL_USE_STREAM_MEM_OPS ON)
