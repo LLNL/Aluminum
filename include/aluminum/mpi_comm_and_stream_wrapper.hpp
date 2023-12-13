@@ -28,6 +28,7 @@
 #pragma once
 
 #include <Al_config.hpp>
+#include "aluminum/base.hpp"
 
 #include <mpi.h>
 

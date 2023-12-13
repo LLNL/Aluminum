@@ -42,6 +42,7 @@
 
 #include <Al_config.hpp>
 #include "aluminum/base.hpp"
+#include "aluminum/debug_helpers.hpp"
 #include "aluminum/trace.hpp"
 
 #if defined AL_HAS_CALIPER
@@ -115,10 +116,13 @@ bool Initialized();
  * @param[in] algo Request a particular allreduce algorithm.
  */
 template <typename Backend, typename T>
-void Allreduce(const T* sendbuf, T* recvbuf, size_t count,
-               ReductionOperator op, typename Backend::comm_type& comm,
+void Allreduce(const T* sendbuf, T* recvbuf, size_t count, ReductionOperator op,
+               typename Backend::comm_type& comm,
                typename Backend::allreduce_algo_type algo =
-               Backend::allreduce_algo_type::automatic) {
+                   Backend::allreduce_algo_type::automatic) {
+  debug::check_buffer(sendbuf, count);
+  debug::check_buffer(recvbuf, count);
+  debug::check_overlap(sendbuf, count, recvbuf, count);
   AL_CALI_MARK_SCOPE("aluminum:Allreduce");
   internal::trace::record_op<Backend, T>("allreduce", comm, sendbuf, recvbuf,
                                          count);
@@ -137,10 +141,11 @@ void Allreduce(const T* sendbuf, T* recvbuf, size_t count,
  * @param algo Request a particular allreduce algorithm.
  */
 template <typename Backend, typename T>
-void Allreduce(T* buffer, size_t count,
-               ReductionOperator op, typename Backend::comm_type& comm,
+void Allreduce(T* buffer, size_t count, ReductionOperator op,
+               typename Backend::comm_type& comm,
                typename Backend::allreduce_algo_type algo =
-               Backend::allreduce_algo_type::automatic) {
+                   Backend::allreduce_algo_type::automatic) {
+  debug::check_buffer(buffer, count);
   AL_CALI_MARK_SCOPE("aluminum:Allreduce");
   internal::trace::record_op<Backend, T>("allreduce", comm, buffer, count);
   Backend::template Allreduce<T>(buffer, count, op, comm, algo);
@@ -158,13 +163,15 @@ void Allreduce(T* buffer, size_t count,
  * @param[in] algo Request a particular allreduce algorithm.
  */
 template <typename Backend, typename T>
-void NonblockingAllreduce(
-  const T* sendbuf, T* recvbuf, size_t count,
-  ReductionOperator op,
-  typename Backend::comm_type& comm,
-  typename Backend::req_type& req,
-  typename Backend::allreduce_algo_type algo =
-  Backend::allreduce_algo_type::automatic) {
+void NonblockingAllreduce(const T* sendbuf, T* recvbuf, size_t count,
+                          ReductionOperator op,
+                          typename Backend::comm_type& comm,
+                          typename Backend::req_type& req,
+                          typename Backend::allreduce_algo_type algo =
+                              Backend::allreduce_algo_type::automatic) {
+  debug::check_buffer(sendbuf, count);
+  debug::check_buffer(recvbuf, count);
+  debug::check_overlap(sendbuf, count, recvbuf, count);
   AL_CALI_MARK_SCOPE("aluminum:NonblockingAllreduce");
   internal::trace::record_op<Backend, T>("nonblocking-allreduce", comm, sendbuf,
                                          recvbuf, count);
@@ -186,13 +193,12 @@ void NonblockingAllreduce(
  * @param algo Request a particular allreduce algorithm.
  */
 template <typename Backend, typename T>
-void NonblockingAllreduce(
-  T* buffer, size_t count,
-  ReductionOperator op,
-  typename Backend::comm_type& comm,
-  typename Backend::req_type& req,
-  typename Backend::allreduce_algo_type algo =
-  Backend::allreduce_algo_type::automatic) {
+void NonblockingAllreduce(T* buffer, size_t count, ReductionOperator op,
+                          typename Backend::comm_type& comm,
+                          typename Backend::req_type& req,
+                          typename Backend::allreduce_algo_type algo =
+                              Backend::allreduce_algo_type::automatic) {
+  debug::check_buffer(buffer, count);
   AL_CALI_MARK_SCOPE("aluminum:NonblockingAllreduce");
   internal::trace::record_op<Backend, T>("nonblocking-allreduce", comm,
                                          buffer, count);
@@ -214,10 +220,13 @@ void NonblockingAllreduce(
  * @param[in] algo Request a particular reduction algorithm.
  */
 template <typename Backend, typename T>
-void Reduce(const T* sendbuf, T* recvbuf, size_t count,
-            ReductionOperator op, int root, typename Backend::comm_type& comm,
+void Reduce(const T* sendbuf, T* recvbuf, size_t count, ReductionOperator op,
+            int root, typename Backend::comm_type& comm,
             typename Backend::reduce_algo_type algo =
-            Backend::reduce_algo_type::automatic) {
+                Backend::reduce_algo_type::automatic) {
+  debug::check_buffer(sendbuf, count);
+  debug::check_rank<Backend>(root, comm);
+  debug::check_buffer_root<Backend>(recvbuf, count, root, comm);
   AL_CALI_MARK_SCOPE("aluminum:Reduce");
   internal::trace::record_op<Backend, T>("reduce", comm, sendbuf, recvbuf,
                                          count, root);
@@ -237,10 +246,12 @@ void Reduce(const T* sendbuf, T* recvbuf, size_t count,
  * @param[in] algo Request a particular reduction algorithm.
  */
 template <typename Backend, typename T>
-void Reduce(T* buffer, size_t count,
-            ReductionOperator op, int root, typename Backend::comm_type& comm,
+void Reduce(T* buffer, size_t count, ReductionOperator op, int root,
+            typename Backend::comm_type& comm,
             typename Backend::reduce_algo_type algo =
-            Backend::reduce_algo_type::automatic) {
+                Backend::reduce_algo_type::automatic) {
+  debug::check_buffer(buffer, count);
+  debug::check_rank<Backend>(root, comm);
   AL_CALI_MARK_SCOPE("aluminum:Reduce");
   internal::trace::record_op<Backend, T>("reduce", comm, buffer, count, root);
   Backend::template Reduce<T>(buffer, count, op, root, comm, algo);
@@ -259,14 +270,15 @@ void Reduce(T* buffer, size_t count,
  * @param[in] algo Request a particular reduction algorithm.
  */
 template <typename Backend, typename T>
-void NonblockingReduce(
-  const T* sendbuf, T* recvbuf, size_t count,
-  ReductionOperator op,
-  int root,
-  typename Backend::comm_type& comm,
-  typename Backend::req_type& req,
-  typename Backend::reduce_algo_type algo =
-  Backend::reduce_algo_type::automatic) {
+void NonblockingReduce(const T* sendbuf, T* recvbuf, size_t count,
+                       ReductionOperator op, int root,
+                       typename Backend::comm_type& comm,
+                       typename Backend::req_type& req,
+                       typename Backend::reduce_algo_type algo =
+                           Backend::reduce_algo_type::automatic) {
+  debug::check_buffer(sendbuf, count);
+  debug::check_rank<Backend>(root, comm);
+  debug::check_buffer_root<Backend>(recvbuf, count, root, comm);
   AL_CALI_MARK_SCOPE("aluminum:NonblockingReduce");
   internal::trace::record_op<Backend, T>("nonblocking-reduce", comm, sendbuf,
                                          recvbuf, count, root);
@@ -288,14 +300,13 @@ void NonblockingReduce(
  * @param[in] algo Request a particular reduction algorithm.
  */
 template <typename Backend, typename T>
-void NonblockingReduce(
-  T* buffer, size_t count,
-  ReductionOperator op,
-  int root,
-  typename Backend::comm_type& comm,
-  typename Backend::req_type& req,
-  typename Backend::reduce_algo_type algo =
-  Backend::reduce_algo_type::automatic) {
+void NonblockingReduce(T* buffer, size_t count, ReductionOperator op, int root,
+                       typename Backend::comm_type& comm,
+                       typename Backend::req_type& req,
+                       typename Backend::reduce_algo_type algo =
+                           Backend::reduce_algo_type::automatic) {
+  debug::check_buffer(buffer, count);
+  debug::check_rank<Backend>(root, comm);
   AL_CALI_MARK_SCOPE("aluminum:NonblockingReduce");
   internal::trace::record_op<Backend, T>("nonblocking-reduce", comm, buffer,
                                          count, root);
@@ -316,11 +327,13 @@ void NonblockingReduce(
  * @param[in] algo Request a particular reduce-scatter algorithm.
  */
 template <typename Backend, typename T>
-void Reduce_scatter(
-  const T* sendbuf, T* recvbuf, size_t count,
-  ReductionOperator op, typename Backend::comm_type& comm,
-  typename Backend::reduce_scatter_algo_type algo =
-  Backend::reduce_scatter_algo_type::automatic) {
+void Reduce_scatter(const T* sendbuf, T* recvbuf, size_t count,
+                    ReductionOperator op, typename Backend::comm_type& comm,
+                    typename Backend::reduce_scatter_algo_type algo =
+                        Backend::reduce_scatter_algo_type::automatic) {
+  debug::check_buffer(sendbuf, count * comm.size());
+  debug::check_buffer(recvbuf, count);
+  debug::check_overlap(sendbuf, count * comm.size(), recvbuf, count);
   AL_CALI_MARK_SCOPE("aluminum:Reduce_scatter");
   internal::trace::record_op<Backend, T>("reduce_scatter", comm, sendbuf,
                                          recvbuf, count);
@@ -341,11 +354,11 @@ void Reduce_scatter(
  * @param[in] algo Request a particular reduce-scatter algorithm.
  */
 template <typename Backend, typename T>
-void Reduce_scatter(
-  T* buffer, size_t count,
-  ReductionOperator op, typename Backend::comm_type& comm,
-  typename Backend::reduce_scatter_algo_type algo =
-  Backend::reduce_scatter_algo_type::automatic) {
+void Reduce_scatter(T* buffer, size_t count, ReductionOperator op,
+                    typename Backend::comm_type& comm,
+                    typename Backend::reduce_scatter_algo_type algo =
+                        Backend::reduce_scatter_algo_type::automatic) {
+  debug::check_buffer(buffer, count * comm.size());
   AL_CALI_MARK_SCOPE("aluminum:Reduce_scatter");
   internal::trace::record_op<Backend, T>("reduce_scatter", comm, buffer, count);
   Backend::template Reduce_scatter<T>(buffer, count, op, comm, algo);
@@ -365,12 +378,13 @@ void Reduce_scatter(
  */
 template <typename Backend, typename T>
 void NonblockingReduce_scatter(
-  const T* sendbuf, T* recvbuf, size_t count,
-  ReductionOperator op,
-  typename Backend::comm_type& comm,
-  typename Backend::req_type& req,
-  typename Backend::reduce_scatter_algo_type algo =
-  Backend::reduce_scatter_algo_type::automatic) {
+    const T* sendbuf, T* recvbuf, size_t count, ReductionOperator op,
+    typename Backend::comm_type& comm, typename Backend::req_type& req,
+    typename Backend::reduce_scatter_algo_type algo =
+        Backend::reduce_scatter_algo_type::automatic) {
+  debug::check_buffer(sendbuf, count * comm.size());
+  debug::check_buffer(recvbuf, count);
+  debug::check_overlap(sendbuf, count * comm.size(), recvbuf, count);
   AL_CALI_MARK_SCOPE("aluminum:NonblockingReduce_scatter");
   internal::trace::record_op<Backend, T>("nonblocking-reduce_scatter", comm,
                                          sendbuf, recvbuf, count);
@@ -395,12 +409,11 @@ void NonblockingReduce_scatter(
  */
 template <typename Backend, typename T>
 void NonblockingReduce_scatter(
-  T* buffer, size_t count,
-  ReductionOperator op,
-  typename Backend::comm_type& comm,
-  typename Backend::req_type& req,
-  typename Backend::reduce_scatter_algo_type algo =
-  Backend::reduce_scatter_algo_type::automatic) {
+    T* buffer, size_t count, ReductionOperator op,
+    typename Backend::comm_type& comm, typename Backend::req_type& req,
+    typename Backend::reduce_scatter_algo_type algo =
+        Backend::reduce_scatter_algo_type::automatic) {
+  debug::check_buffer(buffer, count * comm.size());
   AL_CALI_MARK_SCOPE("aluminum:NonblockingReduce_scatter");
   internal::trace::record_op<Backend, T>("nonblocking-reduce_scatter", comm,
                                          buffer, count);
@@ -420,11 +433,15 @@ void NonblockingReduce_scatter(
  * @param[in] algo Request a particular reduce-scatterv algorithm.
  */
 template <typename Backend, typename T>
-void Reduce_scatterv(
-  const T* sendbuf, T* recvbuf, std::vector<size_t> counts,
-  ReductionOperator op, typename Backend::comm_type& comm,
-  typename Backend::reduce_scatterv_algo_type algo =
-  Backend::reduce_scatterv_algo_type::automatic) {
+void Reduce_scatterv(const T* sendbuf, T* recvbuf, std::vector<size_t> counts,
+                     ReductionOperator op, typename Backend::comm_type& comm,
+                     typename Backend::reduce_scatterv_algo_type algo =
+                         Backend::reduce_scatterv_algo_type::automatic) {
+  debug::check_buffer(sendbuf, debug::sum(counts));
+  debug::check_vector_is_comm_sized<Backend>(counts, comm);
+  debug::check_buffer(recvbuf, debug::get_rank_entry<Backend>(counts, comm));
+  debug::check_overlap(sendbuf, debug::sum(counts), recvbuf,
+                       debug::get_rank_entry<Backend>(counts, comm));
   AL_CALI_MARK_SCOPE("aluminum:Reduce_scatterv");
   internal::trace::record_op<Backend, T>(
     "reduce_scatterv", comm, sendbuf, recvbuf, counts);
@@ -445,11 +462,12 @@ void Reduce_scatterv(
  * @param[in] algo Request a particular reduce-scatterv algorithm.
  */
 template <typename Backend, typename T>
-void Reduce_scatterv(
-  T* buffer, std::vector<size_t> counts,
-  ReductionOperator op, typename Backend::comm_type& comm,
-  typename Backend::reduce_scatterv_algo_type algo =
-  Backend::reduce_scatterv_algo_type::automatic) {
+void Reduce_scatterv(T* buffer, std::vector<size_t> counts,
+                     ReductionOperator op, typename Backend::comm_type& comm,
+                     typename Backend::reduce_scatterv_algo_type algo =
+                         Backend::reduce_scatterv_algo_type::automatic) {
+  debug::check_buffer(buffer, debug::sum(counts));
+  debug::check_vector_is_comm_sized<Backend>(counts, comm);
   AL_CALI_MARK_SCOPE("aluminum:Reduce_scatterv");
   internal::trace::record_op<Backend, T>(
     "reduce_scatterv", comm, buffer, counts);
@@ -471,11 +489,16 @@ void Reduce_scatterv(
  */
 template <typename Backend, typename T>
 void NonblockingReduce_scatterv(
-  const T* sendbuf, T* recvbuf, std::vector<size_t> counts,
-  ReductionOperator op, typename Backend::comm_type& comm,
-  typename Backend::req_type& req,
-  typename Backend::reduce_scatterv_algo_type algo =
-  Backend::reduce_scatterv_algo_type::automatic) {
+    const T* sendbuf, T* recvbuf, std::vector<size_t> counts,
+    ReductionOperator op, typename Backend::comm_type& comm,
+    typename Backend::req_type& req,
+    typename Backend::reduce_scatterv_algo_type algo =
+        Backend::reduce_scatterv_algo_type::automatic) {
+  debug::check_buffer(sendbuf, debug::sum(counts));
+  debug::check_vector_is_comm_sized<Backend>(counts, comm);
+  debug::check_buffer(recvbuf, debug::get_rank_entry<Backend>(counts, comm));
+  debug::check_overlap(sendbuf, debug::sum(counts), recvbuf,
+                       debug::get_rank_entry<Backend>(counts, comm));
   AL_CALI_MARK_SCOPE("aluminum:NonblockingReduce_scatterv");
   internal::trace::record_op<Backend, T>(
     "nonblocking-reduce_scatterv", comm, sendbuf, recvbuf, counts);
@@ -499,11 +522,12 @@ void NonblockingReduce_scatterv(
  */
 template <typename Backend, typename T>
 void NonblockingReduce_scatterv(
-  T* buffer, std::vector<size_t> counts,
-  ReductionOperator op, typename Backend::comm_type& comm,
-  typename Backend::req_type& req,
-  typename Backend::reduce_scatterv_algo_type algo =
-  Backend::reduce_scatterv_algo_type::automatic) {
+    T* buffer, std::vector<size_t> counts, ReductionOperator op,
+    typename Backend::comm_type& comm, typename Backend::req_type& req,
+    typename Backend::reduce_scatterv_algo_type algo =
+        Backend::reduce_scatterv_algo_type::automatic) {
+  debug::check_buffer(buffer, debug::sum(counts));
+  debug::check_vector_is_comm_sized<Backend>(counts, comm);
   AL_CALI_MARK_SCOPE("aluminum:NonblockingReduce_scatterv");
   internal::trace::record_op<Backend, T>(
     "nonblocking-reduce_scatterv", comm, buffer, counts);
@@ -527,7 +551,10 @@ template <typename Backend, typename T>
 void Allgather(const T* sendbuf, T* recvbuf, size_t count,
                typename Backend::comm_type& comm,
                typename Backend::allgather_algo_type algo =
-               Backend::allgather_algo_type::automatic) {
+                   Backend::allgather_algo_type::automatic) {
+  debug::check_buffer(sendbuf, count);
+  debug::check_buffer(recvbuf, count * comm.size());
+  debug::check_overlap(sendbuf, count, recvbuf, count * comm.size());
   AL_CALI_MARK_SCOPE("aluminum:Allgather");
   internal::trace::record_op<Backend, T>("allgather", comm, sendbuf, recvbuf,
                                          count);
@@ -545,10 +572,10 @@ void Allgather(const T* sendbuf, T* recvbuf, size_t count,
  * @param[in] algo Request a particular allgather algorithm.
  */
 template <typename Backend, typename T>
-void Allgather(T* buffer, size_t count,
-               typename Backend::comm_type& comm,
+void Allgather(T* buffer, size_t count, typename Backend::comm_type& comm,
                typename Backend::allgather_algo_type algo =
-               Backend::allgather_algo_type::automatic) {
+                   Backend::allgather_algo_type::automatic) {
+  debug::check_buffer(buffer, count * comm.size());
   AL_CALI_MARK_SCOPE("aluminum:Allgather");
   internal::trace::record_op<Backend, T>("allgather", comm, buffer, count);
   Backend::template Allgather<T>(buffer, count, comm, algo);
@@ -566,12 +593,14 @@ void Allgather(T* buffer, size_t count,
  * @param[in] algo Request a particular allgather algorithm.
  */
 template <typename Backend, typename T>
-void NonblockingAllgather(
-  const T* sendbuf, T* recvbuf, size_t count,
-  typename Backend::comm_type& comm,
-  typename Backend::req_type& req,
-  typename Backend::allgather_algo_type algo =
-  Backend::allgather_algo_type::automatic) {
+void NonblockingAllgather(const T* sendbuf, T* recvbuf, size_t count,
+                          typename Backend::comm_type& comm,
+                          typename Backend::req_type& req,
+                          typename Backend::allgather_algo_type algo =
+                              Backend::allgather_algo_type::automatic) {
+  debug::check_buffer(sendbuf, count);
+  debug::check_buffer(recvbuf, count * comm.size());
+  debug::check_overlap(sendbuf, count, recvbuf, count * comm.size());
   AL_CALI_MARK_SCOPE("aluminum:NonblockingAllgather");
   internal::trace::record_op<Backend, T>("nonblocking-allgather", comm,
                                          sendbuf, recvbuf, count);
@@ -591,12 +620,12 @@ void NonblockingAllgather(
  * @param[in] algo Request a particular allgather algorithm.
  */
 template <typename Backend, typename T>
-void NonblockingAllgather(
-  T* buffer, size_t count,
-  typename Backend::comm_type& comm,
-  typename Backend::req_type& req,
-  typename Backend::allgather_algo_type algo =
-  Backend::allgather_algo_type::automatic) {
+void NonblockingAllgather(T* buffer, size_t count,
+                          typename Backend::comm_type& comm,
+                          typename Backend::req_type& req,
+                          typename Backend::allgather_algo_type algo =
+                              Backend::allgather_algo_type::automatic) {
+  debug::check_buffer(buffer, count * comm.size());
   AL_CALI_MARK_SCOPE("aluminum:NonblockingAllgather");
   internal::trace::record_op<Backend, T>("nonblocking-allgather", comm,
                                          buffer, count);
@@ -615,12 +644,14 @@ void NonblockingAllgather(
  * @param[in] algo Request a particular allgatherv algorithm.
  */
 template <typename Backend, typename T>
-void Allgatherv(const T* sendbuf, T* recvbuf,
-                std::vector<size_t> counts,
-                std::vector<size_t> displs,
-                typename Backend::comm_type& comm,
+void Allgatherv(const T* sendbuf, T* recvbuf, std::vector<size_t> counts,
+                std::vector<size_t> displs, typename Backend::comm_type& comm,
                 typename Backend::allgatherv_algo_type algo =
-                Backend::allgatherv_algo_type::automatic) {
+                    Backend::allgatherv_algo_type::automatic) {
+  debug::check_vector_is_comm_sized<Backend>(counts, comm);
+  debug::check_buffer(sendbuf, debug::get_rank_entry<Backend>(counts, comm));
+  debug::check_buffer(recvbuf, debug::sum(counts));
+  debug::check_vector_is_comm_sized<Backend>(displs, comm);
   AL_CALI_MARK_SCOPE("aluminum:Allgatherv");
   internal::trace::record_op<Backend, T>("allgatherv", comm, sendbuf, recvbuf,
                                          counts, displs);
@@ -639,12 +670,12 @@ void Allgatherv(const T* sendbuf, T* recvbuf,
  * @param[in] algo Request a particular allgatherv algorithm.
  */
 template <typename Backend, typename T>
-void Allgatherv(T* buffer,
-                std::vector<size_t> counts,
-                std::vector<size_t> displs,
-                typename Backend::comm_type& comm,
+void Allgatherv(T* buffer, std::vector<size_t> counts,
+                std::vector<size_t> displs, typename Backend::comm_type& comm,
                 typename Backend::allgatherv_algo_type algo =
-                Backend::allgatherv_algo_type::automatic) {
+                    Backend::allgatherv_algo_type::automatic) {
+  debug::check_vector_is_comm_sized<Backend>(counts, comm);
+  debug::check_buffer(buffer, debug::sum(counts));
   AL_CALI_MARK_SCOPE("aluminum:Allgatherv");
   internal::trace::record_op<Backend, T>("allgatherv", comm, buffer,
                                          counts, displs);
@@ -670,7 +701,11 @@ void NonblockingAllgatherv(const T* sendbuf, T* recvbuf,
                            typename Backend::comm_type& comm,
                            typename Backend::req_type& req,
                            typename Backend::allgatherv_algo_type algo =
-                           Backend::allgatherv_algo_type::automatic) {
+                               Backend::allgatherv_algo_type::automatic) {
+  debug::check_vector_is_comm_sized<Backend>(counts, comm);
+  debug::check_buffer(sendbuf, debug::get_rank_entry<Backend>(counts, comm));
+  debug::check_buffer(recvbuf, debug::sum(counts));
+  debug::check_vector_is_comm_sized<Backend>(displs, comm);
   AL_CALI_MARK_SCOPE("aluminum:NonblockingAllgatherv");
   internal::trace::record_op<Backend, T>("nonblocking-allgatherv", comm,
                                          sendbuf, recvbuf, counts, displs);
@@ -691,13 +726,14 @@ void NonblockingAllgatherv(const T* sendbuf, T* recvbuf,
  * @param[in] algo Request a particular allgatherv algorithm.
  */
 template <typename Backend, typename T>
-void NonblockingAllgatherv(T* buffer,
-                           std::vector<size_t> counts,
+void NonblockingAllgatherv(T* buffer, std::vector<size_t> counts,
                            std::vector<size_t> displs,
                            typename Backend::comm_type& comm,
                            typename Backend::req_type& req,
                            typename Backend::allgatherv_algo_type algo =
-                           Backend::allgatherv_algo_type::automatic) {
+                               Backend::allgatherv_algo_type::automatic) {
+  debug::check_vector_is_comm_sized<Backend>(counts, comm);
+  debug::check_buffer(buffer, debug::sum(counts));
   AL_CALI_MARK_SCOPE("aluminum:NonblockingAllgatherv");
   internal::trace::record_op<Backend, T>("nonblocking-allgatherv", comm,
                                          buffer, counts, displs);
@@ -753,12 +789,11 @@ void NonblockingBarrier(typename Backend::comm_type& comm,
  * @param[in] algo Request a particular broadcast algorithm.
  */
 template <typename Backend, typename T>
-void Bcast(T* buffer,
-           size_t count,
-           int root,
-           typename Backend::comm_type& comm,
+void Bcast(T* buffer, size_t count, int root, typename Backend::comm_type& comm,
            typename Backend::bcast_algo_type algo =
-           Backend::bcast_algo_type::automatic) {
+               Backend::bcast_algo_type::automatic) {
+  debug::check_buffer(buffer, count);
+  debug::check_rank<Backend>(root, comm);
   AL_CALI_MARK_SCOPE("aluminum:Bcast");
   internal::trace::record_op<Backend, T>("bcast", comm, buffer, count, root);
   Backend::template Bcast<T>(buffer, count, root, comm, algo);
@@ -778,14 +813,13 @@ void Bcast(T* buffer,
  * @param[in] algo Request a particular broadcast algorithm.
  */
 template <typename Backend, typename T>
-void NonblockingBcast(
-  T* buffer,
-  size_t count,
-  int root,
-  typename Backend::comm_type& comm,
-  typename Backend::req_type& req,
-  typename Backend::bcast_algo_type algo =
-  Backend::bcast_algo_type::automatic) {
+void NonblockingBcast(T* buffer, size_t count, int root,
+                      typename Backend::comm_type& comm,
+                      typename Backend::req_type& req,
+                      typename Backend::bcast_algo_type algo =
+                          Backend::bcast_algo_type::automatic) {
+  debug::check_buffer(buffer, count);
+  debug::check_rank<Backend>(root, comm);
   AL_CALI_MARK_SCOPE("aluminum:NonblockingBcast");
   internal::trace::record_op<Backend, T>("nonblocking-bcast", comm, buffer,
                                          count, root);
@@ -805,11 +839,13 @@ void NonblockingBcast(
  * @param[in] algo Request a particular all-to-all algorithm.
  */
 template <typename Backend, typename T>
-void Alltoall(
-  const T* sendbuf, T* recvbuf, size_t count,
-  typename Backend::comm_type& comm,
-  typename Backend::alltoall_algo_type algo =
-  Backend::alltoall_algo_type::automatic) {
+void Alltoall(const T* sendbuf, T* recvbuf, size_t count,
+              typename Backend::comm_type& comm,
+              typename Backend::alltoall_algo_type algo =
+                  Backend::alltoall_algo_type::automatic) {
+  debug::check_buffer(sendbuf, count);
+  debug::check_buffer(recvbuf, count * comm.size());
+  debug::check_overlap(sendbuf, count, recvbuf, count * comm.size());
   AL_CALI_MARK_SCOPE("aluminum:Alltoall");
   internal::trace::record_op<Backend, T>("alltoall", comm, sendbuf, recvbuf,
                                          count);
@@ -827,10 +863,10 @@ void Alltoall(
  * @param[in] algo Request a particular all-to-all algorithm.
  */
 template <typename Backend, typename T>
-void Alltoall(
-  T* buffer, size_t count, typename Backend::comm_type& comm,
-  typename Backend::alltoall_algo_type algo =
-  Backend::alltoall_algo_type::automatic) {
+void Alltoall(T* buffer, size_t count, typename Backend::comm_type& comm,
+              typename Backend::alltoall_algo_type algo =
+                  Backend::alltoall_algo_type::automatic) {
+  debug::check_buffer(buffer, count * comm.size());
   AL_CALI_MARK_SCOPE("aluminum:Alltoall");
   internal::trace::record_op<Backend, T>("alltoall", comm, buffer, count);
   Backend::template Alltoall<T>(buffer, count, comm, algo);
@@ -848,12 +884,14 @@ void Alltoall(
  * @param[in] algo Request a particular all-to-all algorithm.
  */
 template <typename Backend, typename T>
-void NonblockingAlltoall(
-  const T* sendbuf, T* recvbuf, size_t count,
-  typename Backend::comm_type& comm,
-  typename Backend::req_type& req,
-  typename Backend::alltoall_algo_type algo =
-  Backend::alltoall_algo_type::automatic) {
+void NonblockingAlltoall(const T* sendbuf, T* recvbuf, size_t count,
+                         typename Backend::comm_type& comm,
+                         typename Backend::req_type& req,
+                         typename Backend::alltoall_algo_type algo =
+                             Backend::alltoall_algo_type::automatic) {
+  debug::check_buffer(sendbuf, count);
+  debug::check_buffer(recvbuf, count * comm.size());
+  debug::check_overlap(sendbuf, count, recvbuf, count * comm.size());
   AL_CALI_MARK_SCOPE("aluminum:NonblockingAlltoall");
   internal::trace::record_op<Backend, T>("nonblocking-alltoall", comm, sendbuf,
                                          recvbuf, count);
@@ -874,11 +912,12 @@ void NonblockingAlltoall(
  * @param[in] algo Request a particular all-to-all algorithm.
  */
 template <typename Backend, typename T>
-void NonblockingAlltoall(
-  T* buffer, size_t count, typename Backend::comm_type& comm,
-  typename Backend::req_type& req,
-  typename Backend::alltoall_algo_type algo =
-  Backend::alltoall_algo_type::automatic) {
+void NonblockingAlltoall(T* buffer, size_t count,
+                         typename Backend::comm_type& comm,
+                         typename Backend::req_type& req,
+                         typename Backend::alltoall_algo_type algo =
+                             Backend::alltoall_algo_type::automatic) {
+  debug::check_buffer(buffer, count * comm.size());
   AL_CALI_MARK_SCOPE("aluminum:NonblockingAlltoall");
   internal::trace::record_op<Backend, T>("nonblocking-alltoall", comm, buffer,
                                          count);
@@ -901,14 +940,18 @@ void NonblockingAlltoall(
  * @param[in] algo Request a particular vector all-to-all algorithm.
  */
 template <typename Backend, typename T>
-void Alltoallv(
-  const T* sendbuf,
-  std::vector<size_t> send_counts, std::vector<size_t> send_displs,
-  T* recvbuf,
-  std::vector<size_t> recv_counts, std::vector<size_t> recv_displs,
-  typename Backend::comm_type& comm,
-  typename Backend::alltoallv_algo_type algo =
-  Backend::alltoallv_algo_type::automatic) {
+void Alltoallv(const T* sendbuf, std::vector<size_t> send_counts,
+               std::vector<size_t> send_displs, T* recvbuf,
+               std::vector<size_t> recv_counts, std::vector<size_t> recv_displs,
+               typename Backend::comm_type& comm,
+               typename Backend::alltoallv_algo_type algo =
+                   Backend::alltoallv_algo_type::automatic) {
+  debug::check_vector_is_comm_sized<Backend>(send_counts, comm);
+  debug::check_vector_is_comm_sized<Backend>(send_displs, comm);
+  debug::check_buffer(sendbuf, debug::sum(send_counts));
+  debug::check_vector_is_comm_sized<Backend>(recv_counts, comm);
+  debug::check_vector_is_comm_sized<Backend>(recv_displs, comm);
+  debug::check_buffer(recvbuf, debug::sum(recv_counts));
   AL_CALI_MARK_SCOPE("aluminum:Alltoallv");
   internal::trace::record_op<Backend, T>(
     "alltoallv", comm,
@@ -933,12 +976,13 @@ void Alltoallv(
  * @param[in] algo Request a particular vector all-to-all algorithm.
  */
 template <typename Backend, typename T>
-void Alltoallv(
-  T* buffer,
-  std::vector<size_t> counts, std::vector<size_t> displs,
-  typename Backend::comm_type& comm,
-  typename Backend::alltoallv_algo_type algo =
-  Backend::alltoallv_algo_type::automatic) {
+void Alltoallv(T* buffer, std::vector<size_t> counts,
+               std::vector<size_t> displs, typename Backend::comm_type& comm,
+               typename Backend::alltoallv_algo_type algo =
+                   Backend::alltoallv_algo_type::automatic) {
+  debug::check_vector_is_comm_sized<Backend>(counts, comm);
+  debug::check_vector_is_comm_sized<Backend>(displs, comm);
+  debug::check_buffer(buffer, debug::sum(counts));
   AL_CALI_MARK_SCOPE("aluminum:Alltoallv");
   internal::trace::record_op<Backend, T>(
     "alltoallv", comm, buffer, counts, displs);
@@ -962,15 +1006,20 @@ void Alltoallv(
  * @param[in] algo Request a particular vector all-to-all algorithm.
  */
 template <typename Backend, typename T>
-void NonblockingAlltoallv(
-  const T* sendbuf,
-  std::vector<size_t> send_counts, std::vector<size_t> send_displs,
-  T* recvbuf,
-  std::vector<size_t> recv_counts, std::vector<size_t> recv_displs,
-  typename Backend::comm_type& comm,
-  typename Backend::req_type& req,
-  typename Backend::alltoallv_algo_type algo =
-  Backend::alltoallv_algo_type::automatic) {
+void NonblockingAlltoallv(const T* sendbuf, std::vector<size_t> send_counts,
+                          std::vector<size_t> send_displs, T* recvbuf,
+                          std::vector<size_t> recv_counts,
+                          std::vector<size_t> recv_displs,
+                          typename Backend::comm_type& comm,
+                          typename Backend::req_type& req,
+                          typename Backend::alltoallv_algo_type algo =
+                              Backend::alltoallv_algo_type::automatic) {
+  debug::check_vector_is_comm_sized<Backend>(send_counts, comm);
+  debug::check_vector_is_comm_sized<Backend>(send_displs, comm);
+  debug::check_buffer(sendbuf, debug::sum(send_counts));
+  debug::check_vector_is_comm_sized<Backend>(recv_counts, comm);
+  debug::check_vector_is_comm_sized<Backend>(recv_displs, comm);
+  debug::check_buffer(recvbuf, debug::sum(recv_counts));
   AL_CALI_MARK_SCOPE("aluminum:NonblockingAlltoallv");
   internal::trace::record_op<Backend, T>(
     "nonblocking-alltoallv", comm,
@@ -998,13 +1047,15 @@ void NonblockingAlltoallv(
  * @param[in] algo Request a particular vector all-to-all algorithm.
  */
 template <typename Backend, typename T>
-void NonblockingAlltoallv(
-  T* buffer,
-  std::vector<size_t> counts, std::vector<size_t> displs,
-  typename Backend::comm_type& comm,
-  typename Backend::req_type& req,
-  typename Backend::alltoallv_algo_type algo =
-  Backend::alltoallv_algo_type::automatic) {
+void NonblockingAlltoallv(T* buffer, std::vector<size_t> counts,
+                          std::vector<size_t> displs,
+                          typename Backend::comm_type& comm,
+                          typename Backend::req_type& req,
+                          typename Backend::alltoallv_algo_type algo =
+                              Backend::alltoallv_algo_type::automatic) {
+  debug::check_vector_is_comm_sized<Backend>(counts, comm);
+  debug::check_vector_is_comm_sized<Backend>(displs, comm);
+  debug::check_buffer(buffer, debug::sum(counts));
   AL_CALI_MARK_SCOPE("aluminum:NonblockingAlltoallv");
   internal::trace::record_op<Backend, T>(
     "nonblocking-alltoallv", comm, buffer, counts, displs);
@@ -1027,11 +1078,13 @@ void NonblockingAlltoallv(
  * @param[in] algo Request a particular gather algorithm.
  */
 template <typename Backend, typename T>
-void Gather(
-  const T* sendbuf, T* recvbuf, size_t count, int root,
-  typename Backend::comm_type& comm,
-  typename Backend::gather_algo_type algo =
-  Backend::gather_algo_type::automatic) {
+void Gather(const T* sendbuf, T* recvbuf, size_t count, int root,
+            typename Backend::comm_type& comm,
+            typename Backend::gather_algo_type algo =
+                Backend::gather_algo_type::automatic) {
+  debug::check_buffer(sendbuf, count);
+  debug::check_rank<Backend>(root, comm);
+  debug::check_buffer_root<Backend>(recvbuf, count, root, comm);
   AL_CALI_MARK_SCOPE("aluminum:Gather");
   internal::trace::record_op<Backend, T>("gather", comm, sendbuf, recvbuf,
                                          count, root);
@@ -1053,10 +1106,12 @@ void Gather(
  * @param[in] algo Request a particular gather algorithm.
  */
 template <typename Backend, typename T>
-void Gather(
-  T* buffer, size_t count, int root, typename Backend::comm_type& comm,
-  typename Backend::gather_algo_type algo =
-  Backend::gather_algo_type::automatic) {
+void Gather(T* buffer, size_t count, int root,
+            typename Backend::comm_type& comm,
+            typename Backend::gather_algo_type algo =
+                Backend::gather_algo_type::automatic) {
+  debug::check_buffer(buffer, count);
+  debug::check_rank<Backend>(root, comm);
   AL_CALI_MARK_SCOPE("aluminum:Gather");
   internal::trace::record_op<Backend, T>("gather", comm, buffer, count, root);
   Backend::template Gather<T>(buffer, count, root, comm, algo);
@@ -1076,12 +1131,14 @@ void Gather(
  * @param[in] algo Request a particular gather algorithm.
  */
 template <typename Backend, typename T>
-void NonblockingGather(
-  const T* sendbuf, T* recvbuf, size_t count, int root,
-  typename Backend::comm_type& comm,
-  typename Backend::req_type& req,
-  typename Backend::gather_algo_type algo =
-  Backend::gather_algo_type::automatic) {
+void NonblockingGather(const T* sendbuf, T* recvbuf, size_t count, int root,
+                       typename Backend::comm_type& comm,
+                       typename Backend::req_type& req,
+                       typename Backend::gather_algo_type algo =
+                           Backend::gather_algo_type::automatic) {
+  debug::check_buffer(sendbuf, count);
+  debug::check_rank<Backend>(root, comm);
+  debug::check_buffer_root<Backend>(recvbuf, count, root, comm);
   AL_CALI_MARK_SCOPE("aluminum:NonblockingGather");
   internal::trace::record_op<Backend, T>("nonblocking-gather", comm, sendbuf,
                                          recvbuf, count, root);
@@ -1106,11 +1163,13 @@ void NonblockingGather(
  * @param[in] algo Request a particular gather algorithm.
  */
 template <typename Backend, typename T>
-void NonblockingGather(
-  T* buffer, size_t count, int root, typename Backend::comm_type& comm,
-  typename Backend::req_type& req,
-  typename Backend::gather_algo_type algo =
-  Backend::gather_algo_type::automatic) {
+void NonblockingGather(T* buffer, size_t count, int root,
+                       typename Backend::comm_type& comm,
+                       typename Backend::req_type& req,
+                       typename Backend::gather_algo_type algo =
+                           Backend::gather_algo_type::automatic) {
+  debug::check_buffer(buffer, count);
+  debug::check_rank<Backend>(root, comm);
   AL_CALI_MARK_SCOPE("aluminum:NonblockingGather");
   internal::trace::record_op<Backend, T>("nonblocking-gather", comm, buffer,
                                          count, root);
@@ -1130,12 +1189,16 @@ void NonblockingGather(
  * @param[in] algo Request a particular vector gather algorithm.
  */
 template <typename Backend, typename T>
-void Gatherv(
-  const T* sendbuf, T* recvbuf,
-  std::vector<size_t> counts, std::vector<size_t> displs, int root,
-  typename Backend::comm_type& comm,
-  typename Backend::gatherv_algo_type algo =
-  Backend::gatherv_algo_type::automatic) {
+void Gatherv(const T* sendbuf, T* recvbuf, std::vector<size_t> counts,
+             std::vector<size_t> displs, int root,
+             typename Backend::comm_type& comm,
+             typename Backend::gatherv_algo_type algo =
+                 Backend::gatherv_algo_type::automatic) {
+  debug::check_vector_is_comm_sized<Backend>(counts, comm);
+  debug::check_vector_is_comm_sized<Backend>(displs, comm);
+  debug::check_buffer(sendbuf, debug::get_rank_entry<Backend>(counts, comm));
+  debug::check_rank<Backend>(root, comm);
+  debug::check_buffer_root<Backend>(recvbuf, debug::sum(counts), root, comm);
   AL_CALI_MARK_SCOPE("aluminum:Gatherv");
   internal::trace::record_op<Backend, T>("gatherv", comm, sendbuf, recvbuf,
                                          counts, displs, root);
@@ -1145,7 +1208,7 @@ void Gatherv(
 /**
  * Perform a \verbatim embed:rst:inline :ref:`in-place <comm-inplace>` \endverbatim Gatherv().
  *
- * @param[in,out] buffer Inout and output buffer initially containing the
+ * @param[in,out] buffer Input and output buffer initially containing the
  * local slice of data. On the root, its slice must be in the location
  * corresponding to its rank position. On non-roots, the entire buffer
  * is the slice. Will be replaced with the gathered vector on the root.
@@ -1157,12 +1220,14 @@ void Gatherv(
  * @param[in] algo Request a particular vector gather algorithm.
  */
 template <typename Backend, typename T>
-void Gatherv(
-  T* buffer,
-  std::vector<size_t> counts, std::vector<size_t> displs, int root,
-  typename Backend::comm_type& comm,
-  typename Backend::gatherv_algo_type algo =
-  Backend::gatherv_algo_type::automatic) {
+void Gatherv(T* buffer, std::vector<size_t> counts, std::vector<size_t> displs,
+             int root, typename Backend::comm_type& comm,
+             typename Backend::gatherv_algo_type algo =
+                 Backend::gatherv_algo_type::automatic) {
+  debug::check_vector_is_comm_sized<Backend>(counts, comm);
+  debug::check_vector_is_comm_sized<Backend>(displs, comm);
+  debug::check_buffer(buffer, debug::get_rank_entry<Backend>(counts, comm));
+  debug::check_rank<Backend>(root, comm);
   AL_CALI_MARK_SCOPE("aluminum:Gatherv");
   internal::trace::record_op<Backend, T>("gatherv", comm, buffer,
                                          counts, displs, root);
@@ -1183,13 +1248,17 @@ void Gatherv(
  * @param[in] algo Request a particular vector gather algorithm.
  */
 template <typename Backend, typename T>
-void NonblockingGatherv(
-  const T* sendbuf, T* recvbuf,
-  std::vector<size_t> counts, std::vector<size_t> displs, int root,
-  typename Backend::comm_type& comm,
-  typename Backend::req_type& req,
-  typename Backend::gatherv_algo_type algo =
-  Backend::gatherv_algo_type::automatic) {
+void NonblockingGatherv(const T* sendbuf, T* recvbuf,
+                        std::vector<size_t> counts, std::vector<size_t> displs,
+                        int root, typename Backend::comm_type& comm,
+                        typename Backend::req_type& req,
+                        typename Backend::gatherv_algo_type algo =
+                            Backend::gatherv_algo_type::automatic) {
+  debug::check_vector_is_comm_sized<Backend>(counts, comm);
+  debug::check_vector_is_comm_sized<Backend>(displs, comm);
+  debug::check_buffer(sendbuf, debug::get_rank_entry<Backend>(counts, comm));
+  debug::check_rank<Backend>(root, comm);
+  debug::check_buffer_root<Backend>(recvbuf, debug::sum(counts), root, comm);
   AL_CALI_MARK_SCOPE("aluminum:NonblockingGatherv");
   internal::trace::record_op<Backend, T>("nonblocking-gatherv",
                                          comm, sendbuf, recvbuf,
@@ -1215,13 +1284,16 @@ void NonblockingGatherv(
  * @param[in] algo Request a particular vector gather algorithm.
  */
 template <typename Backend, typename T>
-void NonblockingGatherv(
-  T* buffer,
-  std::vector<size_t> counts, std::vector<size_t> displs, int root,
-  typename Backend::comm_type& comm,
-  typename Backend::req_type& req,
-  typename Backend::gatherv_algo_type algo =
-  Backend::gatherv_algo_type::automatic) {
+void NonblockingGatherv(T* buffer, std::vector<size_t> counts,
+                        std::vector<size_t> displs, int root,
+                        typename Backend::comm_type& comm,
+                        typename Backend::req_type& req,
+                        typename Backend::gatherv_algo_type algo =
+                            Backend::gatherv_algo_type::automatic) {
+  debug::check_vector_is_comm_sized<Backend>(counts, comm);
+  debug::check_vector_is_comm_sized<Backend>(displs, comm);
+  debug::check_buffer(buffer, debug::get_rank_entry<Backend>(counts, comm));
+  debug::check_rank<Backend>(root, comm);
   AL_CALI_MARK_SCOPE("aluminum:NonblockingGatherv");
   internal::trace::record_op<Backend, T>("nonblocking-gatherv",
                                          comm, buffer,
@@ -1246,11 +1318,13 @@ void NonblockingGatherv(
  * @param[in] algo Request a particular scatter algorithm.
  */
 template <typename Backend, typename T>
-void Scatter(
-  const T* sendbuf, T* recvbuf, size_t count, int root,
-  typename Backend::comm_type& comm,
-  typename Backend::scatter_algo_type algo =
-  Backend::scatter_algo_type::automatic) {
+void Scatter(const T* sendbuf, T* recvbuf, size_t count, int root,
+             typename Backend::comm_type& comm,
+             typename Backend::scatter_algo_type algo =
+                 Backend::scatter_algo_type::automatic) {
+  debug::check_rank<Backend>(root, comm);
+  debug::check_buffer_root<Backend>(sendbuf, count * comm.size(), root, comm);
+  debug::check_buffer(recvbuf, count);
   AL_CALI_MARK_SCOPE("aluminum:Scatter");
   internal::trace::record_op<Backend, T>("scatter", comm, sendbuf, recvbuf,
                                          count, root);
@@ -1272,10 +1346,12 @@ void Scatter(
  * @param[in] algo Request a particular scatter algorithm.
  */
 template <typename Backend, typename T>
-void Scatter(
-  T* buffer, size_t count, int root, typename Backend::comm_type& comm,
-  typename Backend::scatter_algo_type algo =
-  Backend::scatter_algo_type::automatic) {
+void Scatter(T* buffer, size_t count, int root,
+             typename Backend::comm_type& comm,
+             typename Backend::scatter_algo_type algo =
+                 Backend::scatter_algo_type::automatic) {
+  debug::check_rank<Backend>(root, comm);
+  debug::check_buffer(buffer, count * comm.size());
   AL_CALI_MARK_SCOPE("aluminum:Scatter");
   internal::trace::record_op<Backend, T>("scatter", comm, buffer, count, root);
   Backend::template Scatter<T>(buffer, count, root, comm, algo);
@@ -1296,12 +1372,14 @@ void Scatter(
  * @param[in] algo Request a particular scatter algorithm.
  */
 template <typename Backend, typename T>
-void NonblockingScatter(
-  const T* sendbuf, T* recvbuf, size_t count, int root,
-  typename Backend::comm_type& comm,
-  typename Backend::req_type& req,
-  typename Backend::scatter_algo_type algo =
-  Backend::scatter_algo_type::automatic) {
+void NonblockingScatter(const T* sendbuf, T* recvbuf, size_t count, int root,
+                        typename Backend::comm_type& comm,
+                        typename Backend::req_type& req,
+                        typename Backend::scatter_algo_type algo =
+                            Backend::scatter_algo_type::automatic) {
+  debug::check_rank<Backend>(root, comm);
+  debug::check_buffer_root<Backend>(sendbuf, count * comm.size(), root, comm);
+  debug::check_buffer(recvbuf, count);
   AL_CALI_MARK_SCOPE("aluminum:NonblockingScatter");
   internal::trace::record_op<Backend, T>("nonblocking-scatter", comm, sendbuf,
                                          recvbuf, count, root);
@@ -1326,11 +1404,13 @@ void NonblockingScatter(
  * @param[in] algo Request a particular scatter algorithm.
  */
 template <typename Backend, typename T>
-void NonblockingScatter(
-  T* buffer, size_t count, int root, typename Backend::comm_type& comm,
-  typename Backend::req_type& req,
-  typename Backend::scatter_algo_type algo =
-  Backend::scatter_algo_type::automatic) {
+void NonblockingScatter(T* buffer, size_t count, int root,
+                        typename Backend::comm_type& comm,
+                        typename Backend::req_type& req,
+                        typename Backend::scatter_algo_type algo =
+                            Backend::scatter_algo_type::automatic) {
+  debug::check_rank<Backend>(root, comm);
+  debug::check_buffer(buffer, count * comm.size());
   AL_CALI_MARK_SCOPE("aluminum:NonblockingScatter");
   internal::trace::record_op<Backend, T>("nonblocking-scatter", comm, buffer,
                                          count, root);
@@ -1352,12 +1432,16 @@ void NonblockingScatter(
  * @param[in] algo Request a particular vector scatter algorithm.
  */
 template <typename Backend, typename T>
-void Scatterv(
-  const T* sendbuf, T* recvbuf,
-  std::vector<size_t> counts, std::vector<size_t> displs, int root,
-  typename Backend::comm_type& comm,
-  typename Backend::scatterv_algo_type algo =
-  Backend::scatterv_algo_type::automatic) {
+void Scatterv(const T* sendbuf, T* recvbuf, std::vector<size_t> counts,
+              std::vector<size_t> displs, int root,
+              typename Backend::comm_type& comm,
+              typename Backend::scatterv_algo_type algo =
+                  Backend::scatterv_algo_type::automatic) {
+  debug::check_rank<Backend>(root, comm);
+  debug::check_vector_is_comm_sized<Backend>(counts, comm);
+  debug::check_vector_is_comm_sized<Backend>(displs, comm);
+  debug::check_buffer_root<Backend>(sendbuf, debug::sum(counts), root, comm);
+  debug::check_buffer(recvbuf, debug::get_rank_entry<Backend>(counts, comm));
   AL_CALI_MARK_SCOPE("aluminum:Scatterv");
   internal::trace::record_op<Backend, T>("scatterv", comm,
                                          sendbuf, recvbuf,
@@ -1382,12 +1466,14 @@ void Scatterv(
  * @param[in] algo Request a particular vector scatter algorithm.
  */
 template <typename Backend, typename T>
-void Scatterv(
-  T* buffer,
-  std::vector<size_t> counts, std::vector<size_t> displs, int root,
-  typename Backend::comm_type& comm,
-  typename Backend::scatterv_algo_type algo =
-  Backend::scatterv_algo_type::automatic) {
+void Scatterv(T* buffer, std::vector<size_t> counts, std::vector<size_t> displs,
+              int root, typename Backend::comm_type& comm,
+              typename Backend::scatterv_algo_type algo =
+                  Backend::scatterv_algo_type::automatic) {
+  debug::check_rank<Backend>(root, comm);
+  debug::check_vector_is_comm_sized<Backend>(counts, comm);
+  debug::check_vector_is_comm_sized<Backend>(displs, comm);
+  debug::check_buffer(buffer, debug::get_rank_entry<Backend>(counts, comm));
   AL_CALI_MARK_SCOPE("aluminum:Scatterv");
   internal::trace::record_op<Backend, T>("scatterv", comm,
                                          buffer, counts, displs, root);
@@ -1411,13 +1497,17 @@ void Scatterv(
  * @param[in] algo Request a particular vector scatter algorithm.
  */
 template <typename Backend, typename T>
-void NonblockingScatterv(
-  const T* sendbuf, T* recvbuf,
-  std::vector<size_t> counts, std::vector<size_t> displs, int root,
-  typename Backend::comm_type& comm,
-  typename Backend::req_type& req,
-  typename Backend::scatterv_algo_type algo =
-  Backend::scatterv_algo_type::automatic) {
+void NonblockingScatterv(const T* sendbuf, T* recvbuf,
+                         std::vector<size_t> counts, std::vector<size_t> displs,
+                         int root, typename Backend::comm_type& comm,
+                         typename Backend::req_type& req,
+                         typename Backend::scatterv_algo_type algo =
+                             Backend::scatterv_algo_type::automatic) {
+  debug::check_rank<Backend>(root, comm);
+  debug::check_vector_is_comm_sized<Backend>(counts, comm);
+  debug::check_vector_is_comm_sized<Backend>(displs, comm);
+  debug::check_buffer_root<Backend>(sendbuf, debug::sum(counts), root, comm);
+  debug::check_buffer(recvbuf, debug::get_rank_entry<Backend>(counts, comm));
   AL_CALI_MARK_SCOPE("aluminum:NonblockingScatterv");
   internal::trace::record_op<Backend, T>("nonblocking-scatterv", comm,
                                          sendbuf, recvbuf,
@@ -1444,13 +1534,16 @@ void NonblockingScatterv(
  * @param[in] algo Request a particular vector scatter algorithm.
  */
 template <typename Backend, typename T>
-void NonblockingScatterv(
-  T* buffer,
-  std::vector<size_t> counts, std::vector<size_t> displs, int root,
-  typename Backend::comm_type& comm,
-  typename Backend::req_type& req,
-  typename Backend::scatterv_algo_type algo =
-  Backend::scatterv_algo_type::automatic) {
+void NonblockingScatterv(T* buffer, std::vector<size_t> counts,
+                         std::vector<size_t> displs, int root,
+                         typename Backend::comm_type& comm,
+                         typename Backend::req_type& req,
+                         typename Backend::scatterv_algo_type algo =
+                             Backend::scatterv_algo_type::automatic) {
+  debug::check_rank<Backend>(root, comm);
+  debug::check_vector_is_comm_sized<Backend>(counts, comm);
+  debug::check_vector_is_comm_sized<Backend>(displs, comm);
+  debug::check_buffer(buffer, debug::get_rank_entry<Backend>(counts, comm));
   AL_CALI_MARK_SCOPE("aluminum:NonblockingScatterv");
   internal::trace::record_op<Backend, T>("nonblocking-scatterv", comm,
                                          buffer, counts, displs, root);
@@ -1471,6 +1564,8 @@ void NonblockingScatterv(
 template <typename Backend, typename T>
 void Send(const T* sendbuf, size_t count, int dest,
           typename Backend::comm_type& comm) {
+  debug::check_buffer(sendbuf, count);
+  debug::check_rank<Backend>(dest, comm);
   AL_CALI_MARK_SCOPE("aluminum:Send");
   internal::trace::record_op<Backend, T>("send", comm, sendbuf, count, dest);
   Backend::template Send<T>(sendbuf, count, dest, comm);
@@ -1489,6 +1584,8 @@ template <typename Backend, typename T>
 void NonblockingSend(const T* sendbuf, size_t count, int dest,
                      typename Backend::comm_type& comm,
                      typename Backend::req_type& req) {
+  debug::check_buffer(sendbuf, count);
+  debug::check_rank<Backend>(dest, comm);
   AL_CALI_MARK_SCOPE("aluminum:NonblockingSend");
   internal::trace::record_op<Backend, T>("nonblocking-send", comm, sendbuf,
                                          count, dest);
@@ -1508,6 +1605,8 @@ void NonblockingSend(const T* sendbuf, size_t count, int dest,
 template <typename Backend, typename T>
 void Recv(T* recvbuf, size_t count, int src,
           typename Backend::comm_type& comm) {
+  debug::check_buffer(recvbuf, count);
+  debug::check_rank<Backend>(src, comm);
   AL_CALI_MARK_SCOPE("aluminum:Recv");
   internal::trace::record_op<Backend, T>("recv", comm, recvbuf, count, src);
   Backend::template Recv<T>(recvbuf, count, src, comm);
@@ -1526,6 +1625,8 @@ template <typename Backend, typename T>
 void NonblockingRecv(T* recvbuf, size_t count, int src,
                      typename Backend::comm_type& comm,
                      typename Backend::req_type& req) {
+  debug::check_buffer(recvbuf, count);
+  debug::check_rank<Backend>(src, comm);
   AL_CALI_MARK_SCOPE("aluminum:NonblockingRecv");
   internal::trace::record_op<Backend, T>("nonblocking-recv", comm, recvbuf,
                                          count, src);
@@ -1546,9 +1647,13 @@ void NonblockingRecv(T* recvbuf, size_t count, int src,
  * @param[in] comm Communicator to send/recv within.
  */
 template <typename Backend, typename T>
-void SendRecv(const T* sendbuf, size_t send_count, int dest,
-              T* recvbuf, size_t recv_count, int src,
-              typename Backend::comm_type& comm) {
+void SendRecv(const T* sendbuf, size_t send_count, int dest, T* recvbuf,
+              size_t recv_count, int src, typename Backend::comm_type& comm) {
+  debug::check_buffer(sendbuf, send_count);
+  debug::check_buffer(recvbuf, recv_count);
+  debug::check_overlap(sendbuf, send_count, recvbuf, recv_count);
+  debug::check_rank<Backend>(dest, comm);
+  debug::check_rank<Backend>(src, comm);
   AL_CALI_MARK_SCOPE("aluminum:SendRecv");
   internal::trace::record_op<Backend, T>("sendrecv", comm, sendbuf, send_count,
                                          dest, recvbuf, recv_count, src);
@@ -1570,6 +1675,9 @@ void SendRecv(const T* sendbuf, size_t send_count, int dest,
 template <typename Backend, typename T>
 void SendRecv(T* buffer, size_t count, int dest, int src,
               typename Backend::comm_type& comm) {
+  debug::check_buffer(buffer, count);
+  debug::check_rank<Backend>(dest, comm);
+  debug::check_rank<Backend>(src, comm);
   AL_CALI_MARK_SCOPE("aluminum:SendRecv");
   internal::trace::record_op<Backend, T>("sendrecv", comm, buffer, count,
                                          dest, src);
@@ -1593,6 +1701,10 @@ void NonblockingSendRecv(const T* sendbuf, size_t send_count, int dest,
                          T* recvbuf, size_t recv_count, int src,
                          typename Backend::comm_type& comm,
                          typename Backend::req_type& req) {
+  debug::check_buffer(sendbuf, send_count);
+  debug::check_buffer(recvbuf, recv_count);
+  debug::check_rank<Backend>(dest, comm);
+  debug::check_rank<Backend>(src, comm);
   AL_CALI_MARK_SCOPE("aluminum:NonblockingSendRecv");
   internal::trace::record_op<Backend, T>("nonblocking-sendrecv", comm,
                                          sendbuf, send_count, dest,
@@ -1619,6 +1731,9 @@ template <typename Backend, typename T>
 void NonblockingSendRecv(T* buffer, size_t count, int dest, int src,
                          typename Backend::comm_type& comm,
                          typename Backend::req_type& req) {
+  debug::check_buffer(buffer, count);
+  debug::check_rank<Backend>(dest, comm);
+  debug::check_rank<Backend>(src, comm);
   AL_CALI_MARK_SCOPE("aluminum:NonblockingSendRecv");
   internal::trace::record_op<Backend, T>("nonblocking-sendrecv", comm,
                                          buffer, count, dest, src);
@@ -1642,12 +1757,12 @@ void NonblockingSendRecv(T* buffer, size_t count, int dest, int src,
  */
 template <typename Backend, typename T>
 void MultiSendRecv(std::vector<const T*> send_buffers,
-                   std::vector<size_t> send_counts,
-                   std::vector<int> dests,
+                   std::vector<size_t> send_counts, std::vector<int> dests,
                    std::vector<T*> recv_buffers,
-                   std::vector<size_t> recv_counts,
-                   std::vector<int> srcs,
+                   std::vector<size_t> recv_counts, std::vector<int> srcs,
                    typename Backend::comm_type& comm) {
+  debug::check_multisendrecv<Backend>(send_buffers, send_counts, dests,
+                                      recv_buffers, recv_counts, srcs, comm);
   AL_CALI_MARK_SCOPE("aluminum:MultiSendRecv");
   internal::trace::record_op<Backend, T>("multisendrecv", comm,
                                          send_buffers, send_counts, dests,
@@ -1669,11 +1784,10 @@ void MultiSendRecv(std::vector<const T*> send_buffers,
  * @param[in] comm Communicator to send/recv within.
  */
 template <typename Backend, typename T>
-void MultiSendRecv(std::vector<T*> buffers,
-                   std::vector<size_t> counts,
-                   std::vector<int> dests,
-                   std::vector<int> srcs,
+void MultiSendRecv(std::vector<T*> buffers, std::vector<size_t> counts,
+                   std::vector<int> dests, std::vector<int> srcs,
                    typename Backend::comm_type& comm) {
+  debug::check_inplace_multisendrecv<Backend>(buffers, counts, dests, srcs, comm);
   AL_CALI_MARK_SCOPE("aluminum:MultiSendRecv");
   internal::trace::record_op<Backend, T>("multisendrecv", comm,
                                          buffers, counts, dests, srcs);
@@ -1695,14 +1809,13 @@ void MultiSendRecv(std::vector<T*> buffers,
  * @param[out] req Request object for the asynchronous operation.
  */
 template <typename Backend, typename T>
-void NonblockingMultiSendRecv(std::vector<const T*> send_buffers,
-                              std::vector<size_t> send_counts,
-                              std::vector<int> dests,
-                              std::vector<T*> recv_buffers,
-                              std::vector<size_t> recv_counts,
-                              std::vector<int> srcs,
-                              typename Backend::comm_type& comm,
-                              typename Backend::req_type& req) {
+void NonblockingMultiSendRecv(
+    std::vector<const T*> send_buffers, std::vector<size_t> send_counts,
+    std::vector<int> dests, std::vector<T*> recv_buffers,
+    std::vector<size_t> recv_counts, std::vector<int> srcs,
+    typename Backend::comm_type& comm, typename Backend::req_type& req) {
+  debug::check_multisendrecv<Backend>(send_buffers, send_counts, dests,
+                                      recv_buffers, recv_counts, srcs, comm);
   AL_CALI_MARK_SCOPE("aluminum:NonblockingMultiSendRecv");
   internal::trace::record_op<Backend, T>("nonblocking-multisendrecv", comm,
                                          send_buffers, send_counts, dests,
@@ -1728,10 +1841,10 @@ void NonblockingMultiSendRecv(std::vector<const T*> send_buffers,
 template <typename Backend, typename T>
 void NonblockingMultiSendRecv(std::vector<T*> buffers,
                               std::vector<size_t> counts,
-                              std::vector<int> dests,
-                              std::vector<int> srcs,
+                              std::vector<int> dests, std::vector<int> srcs,
                               typename Backend::comm_type& comm,
                               typename Backend::req_type& req) {
+  debug::check_inplace_multisendrecv<Backend>(buffers, counts, dests, srcs, comm);
   AL_CALI_MARK_SCOPE("aluminum:NonblockingMultiSendRecv");
   internal::trace::record_op<Backend, T>("nonblocking-multisendrecv", comm,
                                          buffers, counts, dests, srcs);
