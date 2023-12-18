@@ -144,8 +144,9 @@ void Initialize(int& argc, char**& argv, MPI_Comm world_comm) {
 #endif
 
 #ifdef AL_SIGNAL_HANDLER
-  // Set AL_DISABLE_SIGNAL_HANDLER to disable it.
-  if (std::getenv("AL_DISABLE_SIGNAL_HANDLER") == nullptr) {
+  // Set AL_DISABLE_SIGNAL_HANDLER to a non-zero value to disable it.
+  if (const char* env = std::getenv("AL_DISABLE_SIGNAL_HANDLER");
+      env == nullptr || std::string(env) == "0") {
     // Add signal handlers.
     const std::vector<int> handled_signals = {SIGILL, SIGABRT, SIGFPE,
                                               SIGBUS, SIGSEGV};

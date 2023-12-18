@@ -51,11 +51,10 @@ NCCLCommunicator::NCCLCommunicator(MPI_Comm comm_, AlGpuStream_t stream_) :
 }
 
 NCCLCommunicator::~NCCLCommunicator() {
-#ifdef AL_DEBUG
   if (m_nccl_comm == nullptr) {
     terminate_al("Attempting to destruct a null NCCLCommunicator");
   }
-#endif
+
   int d;
   // Only destroy resources if the driver is still loaded.
   if (AlGpuGetDevice(&d) == AlGpuSuccess) {

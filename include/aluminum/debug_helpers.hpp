@@ -98,7 +98,7 @@ void check_buffer_root(const T* buf, size_t size, int root,
   #ifdef AL_DEBUG
   if (comm.rank() == root) {
     if (size > 0 && buf == nullptr) {
-      throw_al_exception("Null buffer on nonroot");
+      throw_al_exception("Null buffer on root");
     }
   }
 #else  // AL_DEBUG

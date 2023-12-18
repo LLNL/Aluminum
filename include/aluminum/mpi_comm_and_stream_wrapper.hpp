@@ -50,11 +50,10 @@ public:
   MPICommAndStreamWrapper(MPI_Comm comm_, Stream stream_) :
     stream(stream_)
   {
-#ifdef AL_DEBUG
     if (comm_ == MPI_COMM_NULL) {
       throw_al_exception("Cannot create a communicator with MPI_COMM_NULL");
     }
-#endif
+
     // Duplicate the communicator to avoid interference.
     MPI_Comm_dup(comm_, &comm);
     MPI_Comm_rank(comm, &rank_in_comm);
@@ -75,11 +74,10 @@ public:
 
   /** Destroy the underlying MPI_Comm. */
   ~MPICommAndStreamWrapper() {
-#ifdef AL_DEBUG
     if (comm == MPI_COMM_NULL || local_comm == MPI_COMM_NULL) {
       terminate_al("Attempting to destruct with null MPI communicators");
     }
-#endif
+
     int finalized;
     MPI_Finalized(&finalized);
     if (!finalized) {
