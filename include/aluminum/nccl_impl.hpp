@@ -123,7 +123,7 @@ class NCCLCommunicator : public internal::MPICommAndStreamWrapper<AlGpuStream_t>
 
  private:
   /** Raw NCCL communicator. */
-  ncclComm_t m_nccl_comm;
+  ncclComm_t m_nccl_comm = nullptr;
 };
 
 namespace internal {

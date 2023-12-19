@@ -44,7 +44,7 @@ struct HostMemoryAllocator {
   void* allocate(size_t bytes) {
     void* ptr = std::malloc(bytes);
 #ifdef AL_DEBUG
-    if (ptr == nullptr) {
+    if (ptr == nullptr && bytes > 0) {
       throw_al_exception("Failed to allocate memory");
     }
 #endif

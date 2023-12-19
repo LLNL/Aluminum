@@ -102,8 +102,10 @@
 #cmakedefine AL_HAS_MPI_CUDA_RMA
 #endif
 
+/** Enable various sanity checks, generally light-weight. */
 #cmakedefine AL_DEBUG
 #cmakedefine AL_DEBUG_HANG_CHECK
+#cmakedefine AL_SIGNAL_HANDLER
 
 #cmakedefine AL_HAS_PROF
 #cmakedefine AL_HAS_NVPROF

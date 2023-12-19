@@ -53,6 +53,7 @@ bool is_initialized = false;
 // Progress engine.
 internal::ProgressEngine* progress_engine = nullptr;
 
+#ifdef AL_SIGNAL_HANDLER
 // Custom signal handler for debugging.
 void handle_signal(int signal) {
   // Technically, these are unsafe to call from a signal handler.
@@ -110,6 +111,7 @@ void handle_signal(int signal) {
   internal::trace::write_trace_to_file();
 #endif
 }
+#endif  // AL_SIGNAL_HANDLER
 
 }
 
@@ -141,16 +143,22 @@ void Initialize(int& argc, char**& argv, MPI_Comm world_comm) {
   internal::ht::init(argc, argv);
 #endif
 
-  // Add signal handlers.
-  const std::vector<int> handled_signals = {SIGILL, SIGABRT, SIGFPE,
-                                            SIGBUS, SIGSEGV};
-  static struct sigaction sa;
-  sa.sa_handler = &handle_signal;
-  sa.sa_flags = SA_RESTART;
-  sigfillset(&sa.sa_mask);
-  for (const auto& sig : handled_signals) {
-    sigaction(sig, &sa, nullptr);
+#ifdef AL_SIGNAL_HANDLER
+  // Set AL_DISABLE_SIGNAL_HANDLER to a non-zero value to disable it.
+  if (const char* env = std::getenv("AL_DISABLE_SIGNAL_HANDLER");
+      env == nullptr || std::string(env) == "0") {
+    // Add signal handlers.
+    const std::vector<int> handled_signals = {SIGILL, SIGABRT, SIGFPE,
+                                              SIGBUS, SIGSEGV};
+    static struct sigaction sa;
+    sa.sa_handler = &handle_signal;
+    sa.sa_flags = SA_RESTART;
+    sigfillset(&sa.sa_mask);
+    for (const auto& sig : handled_signals) {
+      sigaction(sig, &sa, nullptr);
+    }
   }
+#endif  // AL_SIGNAL_HANDLER
 }
 
 void Finalize() {

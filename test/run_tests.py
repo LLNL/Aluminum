@@ -5,6 +5,8 @@ import subprocess
 from collections import namedtuple
 import math
 import os.path
+import sys
+import time
 
 
 parser = argparse.ArgumentParser(
@@ -41,6 +43,8 @@ parser.add_argument('--threads', type=int, default=None,
                     help='Number of threads to test with')
 parser.add_argument('--no-abort-on-hang', default=None, action='store_true',
                     help='Do not abort when a hang is detected')
+parser.add_argument('--max-fails', type=int, default=10,
+                    help='Max number of fails before giving up')
 
 
 # Default time spent waiting before declaring the process hung (in seconds)
@@ -236,8 +240,10 @@ def run_test(args, num_procs, backend, operator, datatype, inplace,
         test_cmd += ['--root', str(root)]
         test_desc += f' root:{root}'
     r = run_subprocess(launcher_cmd + test_cmd, timeout=(2*hang_timeout))
+    success = False
     if r.returncode == 0:
         print('[Pass] ' + test_desc, flush=True)
+        success = True
     else:
         print('[Fail] ' + test_desc, flush=True)
         if isinstance(r.args, str):
@@ -249,10 +255,15 @@ def run_test(args, num_procs, backend, operator, datatype, inplace,
         if r.stderr:
             print(r.stderr, flush=True)
     clear_processes(args)
+    return success
 
 
 def run_all_tests(args):
     """Run the full test suite."""
+    max_fails = args.max_fails
+    if max_fails < 0:
+        max_fails = None
+    cur_fails = 0
     procs = [2**x for x in range(
         int(math.log2(args.num_nodes * args.procs_per_node)) + 1)]
     if args.min_procs:
@@ -293,8 +304,19 @@ def run_all_tests(args):
                             if num_procs > 1 and opdesc.root:
                                 root_cases += [1]
                             for root in root_cases:
-                                run_test(args, num_procs, backend, opdesc.op,
-                                         datatype, inplace, nonblocking, root)
+                                success = run_test(args, num_procs, backend,
+                                                   opdesc.op, datatype, inplace,
+                                                   nonblocking, root)
+                                if not success:
+                                    cur_fails += 1
+                                    if (max_fails is not None
+                                        and cur_fails >= max_fails):
+                                        print(f'{cur_fails} failures, giving up',
+                                              flush=True)
+                                        sys.exit()
+                                # Sleep briefly after each test to avoid
+                                # DoS'ing the cluster manager.
+                                time.sleep(1)
 
 
 if __name__ == '__main__':

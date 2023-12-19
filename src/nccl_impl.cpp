@@ -29,7 +29,6 @@
 #include "aluminum/mpi/communicator.hpp"
 
 #include <exception>
-#include <iostream>
 
 namespace Al {
 
@@ -52,6 +51,10 @@ NCCLCommunicator::NCCLCommunicator(MPI_Comm comm_, AlGpuStream_t stream_) :
 }
 
 NCCLCommunicator::~NCCLCommunicator() {
+  if (m_nccl_comm == nullptr) {
+    terminate_al("Attempting to destruct a null NCCLCommunicator");
+  }
+
   int d;
   // Only destroy resources if the driver is still loaded.
   if (AlGpuGetDevice(&d) == AlGpuSuccess) {
@@ -59,10 +62,10 @@ NCCLCommunicator::~NCCLCommunicator() {
       AL_CHECK_NCCL(ncclCommFinalize(m_nccl_comm));
       AL_CHECK_NCCL(ncclCommDestroy(m_nccl_comm));
     } catch (const al_exception& e) {
-      std::cerr << "Caught exception in NCCLCommunicator destructor: "
-                << e.what() << std::endl;
-      std::terminate();
+      terminate_al("Caught exception in NCCLCommunicator destructor: ",
+                   e.what());
     }
+    m_nccl_comm = nullptr;
   }
 }
 
