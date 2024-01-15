@@ -47,7 +47,7 @@ class HostTransferCommunicator: public MPICommAndStreamWrapper<AlGpuStream_t> {
   HostTransferCommunicator()
     : HostTransferCommunicator(mpi::get_world_comm().get_comm(), 0) {}
   /** Use a particular MPI communicator and stream. */
-  HostTransferCommunicator(MPI_Comm comm_, AlGpuStream_t stream_)
+  HostTransferCommunicator(MPI_Comm comm_, AlGpuStream_t stream_ = 0)
     : MPICommAndStreamWrapper(comm_, stream_) {}
   /** Cannot copy this. */
   HostTransferCommunicator(const HostTransferCommunicator& other) = delete;
