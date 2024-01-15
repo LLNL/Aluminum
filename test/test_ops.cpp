@@ -407,9 +407,29 @@ void run_test(cxxopts::ParseResult& parsed_opts) {
   std::abort();
 }
 
+template <typename Backend>
+void run_comm_init_test(cxxopts::ParseResult& parsed_opts) {
+  HangWatchdog watchdog(parsed_opts["hang-timeout"].as<size_t>(),
+                        parsed_opts.count("no-abort-on-hang") ? false : true);
+  watchdog.start("Communicator initialization");
+  auto comm = std::make_unique<typename Backend::comm_type>(MPI_COMM_WORLD);
+  MPI_Barrier(MPI_COMM_WORLD);
+  watchdog.finish();
+
+  watchdog.start("Communicator destruction");
+  comm.reset();
+  MPI_Barrier(MPI_COMM_WORLD);
+  watchdog.finish();
+}
+
 struct test_dispatcher {
   template <typename Backend, typename T>
   void operator()(cxxopts::ParseResult& parsed_opts) {
+    // If testing communicator initialization, skip everything else.
+    if (parsed_opts["op"].as<std::string>() == "comm") {
+      run_comm_init_test<Backend>(parsed_opts);
+      return;
+    }
     // Initialize the stream manager if necessary.
     // Initialized here so we do it exactly once.
     // Ensure there is one stream for every thread.
