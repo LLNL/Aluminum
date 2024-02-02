@@ -38,7 +38,7 @@
 
 namespace Al {
 
-template <> constexpr char AlBackendName<NCCLBackend>[] = "nccl";
+template <> inline constexpr char AlBackendName<NCCLBackend>[] = "nccl";
 
 // Define the supported NCCL operators.
 template <> struct IsOpSupported<AlOperation::allgather, NCCLBackend> : std::true_type {};
