@@ -38,7 +38,7 @@
 
 namespace Al {
 
-template <> constexpr char AlBackendName<HostTransferBackend>[] = "ht";
+template <> inline constexpr char AlBackendName<HostTransferBackend>[] = "ht";
 
 // Define the supported host-transfer operators.
 template <> struct IsOpSupported<AlOperation::allgather, HostTransferBackend> : std::true_type {};

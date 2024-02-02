@@ -39,7 +39,7 @@
 
 namespace Al {
 
-template <> constexpr char AlBackendName<MPIBackend>[] = "mpi";
+template <> inline constexpr char AlBackendName<MPIBackend>[] = "mpi";
 
 // Define the supported MPI operators.
 template <> struct IsOpSupported<AlOperation::allgather, MPIBackend> : std::true_type {};

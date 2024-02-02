@@ -63,24 +63,24 @@ enum class AlOperation {
 
 /** Give a textual name for each operation. */
 template <AlOperation Op> constexpr char AlOperationName[] = "unknown";
-template <> constexpr char AlOperationName<AlOperation::allgather>[] = "allgather";
-template <> constexpr char AlOperationName<AlOperation::allgatherv>[] = "allgatherv";
-template <> constexpr char AlOperationName<AlOperation::allreduce>[] = "allreduce";
-template <> constexpr char AlOperationName<AlOperation::alltoall>[] = "alltoall";
-template <> constexpr char AlOperationName<AlOperation::alltoallv>[] = "alltoallv";
-template <> constexpr char AlOperationName<AlOperation::barrier>[] = "barrier";
-template <> constexpr char AlOperationName<AlOperation::bcast>[] = "bcast";
-template <> constexpr char AlOperationName<AlOperation::gather>[] = "gather";
-template <> constexpr char AlOperationName<AlOperation::gatherv>[] = "gatherv";
-template <> constexpr char AlOperationName<AlOperation::reduce>[] = "reduce";
-template <> constexpr char AlOperationName<AlOperation::reduce_scatter>[] = "reduce_scatter";
-template <> constexpr char AlOperationName<AlOperation::reduce_scatterv>[] = "reduce_scatterv";
-template <> constexpr char AlOperationName<AlOperation::scatter>[] = "scatter";
-template <> constexpr char AlOperationName<AlOperation::scatterv>[] = "scatterv";
-template <> constexpr char AlOperationName<AlOperation::send>[] = "send";
-template <> constexpr char AlOperationName<AlOperation::recv>[] = "recv";
-template <> constexpr char AlOperationName<AlOperation::sendrecv>[] = "sendrecv";
-template <> constexpr char AlOperationName<AlOperation::multisendrecv>[] = "multisendrecv";
+template <> inline constexpr char AlOperationName<AlOperation::allgather>[] = "allgather";
+template <> inline constexpr char AlOperationName<AlOperation::allgatherv>[] = "allgatherv";
+template <> inline constexpr char AlOperationName<AlOperation::allreduce>[] = "allreduce";
+template <> inline constexpr char AlOperationName<AlOperation::alltoall>[] = "alltoall";
+template <> inline constexpr char AlOperationName<AlOperation::alltoallv>[] = "alltoallv";
+template <> inline constexpr char AlOperationName<AlOperation::barrier>[] = "barrier";
+template <> inline constexpr char AlOperationName<AlOperation::bcast>[] = "bcast";
+template <> inline constexpr char AlOperationName<AlOperation::gather>[] = "gather";
+template <> inline constexpr char AlOperationName<AlOperation::gatherv>[] = "gatherv";
+template <> inline constexpr char AlOperationName<AlOperation::reduce>[] = "reduce";
+template <> inline constexpr char AlOperationName<AlOperation::reduce_scatter>[] = "reduce_scatter";
+template <> inline constexpr char AlOperationName<AlOperation::reduce_scatterv>[] = "reduce_scatterv";
+template <> inline constexpr char AlOperationName<AlOperation::scatter>[] = "scatter";
+template <> inline constexpr char AlOperationName<AlOperation::scatterv>[] = "scatterv";
+template <> inline constexpr char AlOperationName<AlOperation::send>[] = "send";
+template <> inline constexpr char AlOperationName<AlOperation::recv>[] = "recv";
+template <> inline constexpr char AlOperationName<AlOperation::sendrecv>[] = "sendrecv";
+template <> inline constexpr char AlOperationName<AlOperation::multisendrecv>[] = "multisendrecv";
 
 /** Give a textual name for each backend. */
 template <typename Backend> constexpr char AlBackendName[] = "unknown";
