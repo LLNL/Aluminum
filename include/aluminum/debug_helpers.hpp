@@ -184,6 +184,7 @@ AccT sum(const std::vector<T>& v) {
 #ifdef AL_DEBUG
   return std::accumulate(v.cbegin(), v.cend(), AccT{0});
 #else  // AL_DEBUG
+  (void) v;
   return AccT{0};
 #endif  // AL_DEBUG
 }
