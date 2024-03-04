@@ -841,6 +841,17 @@ class HostTransferBackend {
     NonblockingScatterv<T>(buffer, buffer, counts, displs, root, comm, req, algo);
   }
 
+  template <typename T>
+  static void RegisterMemory(T*, size_t, comm_type&) {
+    // Registration is not supported with host-transfer, but we don't
+    // want this to fail to compile.
+  }
+
+  template <typename T>
+  static void UnregisterMemory(T*, comm_type&) {
+    // Registration is not supported with host-transfer.
+  }
+
   static std::string Name() { return "HostTransferBackend"; }
 
  private:

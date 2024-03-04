@@ -926,6 +926,17 @@ class MPIBackend {
       internal::IN_PLACE<T>(), buffer, counts, displs, root, comm, req, algo);
   }
 
+  template <typename T>
+  static void RegisterMemory(T*, size_t, comm_type&) {
+    // Registration is not supported with MPI, but we don't want this
+    // to fail to compile.
+  }
+
+  template <typename T>
+  static void UnregisterMemory(T*, comm_type&) {
+    // Registration is not supported with MPI.
+  }
+
   static std::string Name() { return "MPIBackend"; }
 
 private:

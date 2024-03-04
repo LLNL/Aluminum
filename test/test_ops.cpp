@@ -255,6 +255,9 @@ void run_test(cxxopts::ParseResult& parsed_opts) {
   if (!op_supports_algos(op)) {
     algorithms.emplace_back();
   }
+  if (parsed_opts.count("register")) {
+    op_options.register_memory = true;
+  }
 
   auto sizes = get_sizes_from_opts(parsed_opts);
 
@@ -354,6 +357,14 @@ void run_test(cxxopts::ParseResult& parsed_opts) {
       }
       for (int i = 0; i < num; ++i) {
         data.emplace_back(in_size, out_size, comm_wrappers[i]);
+        if (op_options.register_memory) {
+          Al::RegisterMemory<Backend>(data[i].input.data(),
+                                      data[i].input.size(),
+                                      comm_wrappers[i].comm());
+          Al::RegisterMemory<Backend>(data[i].output.data(),
+                                      data[i].output.size(),
+                                      comm_wrappers[i].comm());
+        }
       }
       watchdog.start(std::string("Al size=") + std::to_string(size));
       if (num_threads > 0) {
@@ -391,6 +402,15 @@ void run_test(cxxopts::ParseResult& parsed_opts) {
                       parsed_opts.count("hang-on-error"),
                       parsed_opts["max-dump-size"].as<size_t>(),
                       comm_wrappers[i], i);
+      }
+
+      if (op_options.register_memory) {
+        for (int i = 0; i < num; ++i) {
+          Al::UnregisterMemory<Backend>(
+            data[i].input.data(), comm_wrappers[i].comm());
+          Al::UnregisterMemory<Backend>(
+            data[i].output.data(), comm_wrappers[i].comm());
+        }
       }
       MPI_Barrier(MPI_COMM_WORLD);
     }
@@ -466,6 +486,7 @@ int main(int argc, char** argv) {
     ("hang-on-error", "Hang when an error is detected")
     ("trials", "Number of times to run the test", cxxopts::value<size_t>()->default_value("1"))
     ("permute", "Permute ranks per this list", cxxopts::value<std::vector<int>>())
+    ("register", "Register memory before using it")
     ("help", "Print help");
   auto parsed_opts = options.parse(argc, argv);
 

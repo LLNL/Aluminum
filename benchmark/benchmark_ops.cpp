@@ -62,6 +62,9 @@ void run_benchmark(cxxopts::ParseResult& parsed_opts) {
     }
     op_options.algos = algorithms[0];
   }
+  if (parsed_opts.count("register")) {
+    op_options.register_memory = true;
+  }
 
   int send_rank = parsed_opts["send-rank"].as<int>();
   int recv_rank = parsed_opts["recv-rank"].as<int>();
@@ -170,6 +173,13 @@ void run_benchmark(cxxopts::ParseResult& parsed_opts) {
     typename VectorType<T, Backend>::type output =
       VectorType<T, Backend>::gen_data(out_size);
 
+    if (op_options.register_memory) {
+      Al::RegisterMemory<Backend>(
+        input.data(), input.size(), comm_wrapper.comm());
+      Al::RegisterMemory<Backend>(
+        output.data(), output.size(), comm_wrapper.comm());
+    }
+
     if (!Al::IsPt2PtOp<Op>::value || participates_in_pt2pt) {
       for (size_t trial = 0; trial < num_warmup + num_iters; ++trial) {
         MPI_Barrier(MPI_COMM_WORLD);
@@ -188,6 +198,11 @@ void run_benchmark(cxxopts::ParseResult& parsed_opts) {
       for (size_t trial = 0; trial < num_warmup + num_iters; ++trial) {
         MPI_Barrier(MPI_COMM_WORLD);
       }
+    }
+
+    if (op_options.register_memory) {
+      Al::UnregisterMemory<Backend>(input.data(), comm_wrapper.comm());
+      Al::UnregisterMemory<Backend>(output.data(), comm_wrapper.comm());
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
@@ -274,6 +289,7 @@ int main(int argc, char** argv) {
     ("summarize", "Print stats summary over all ranks or a specific rank", cxxopts::value<int>()->default_value("-1"))
     ("no-print-table", "Do not print results table")
     ("permute", "Permute ranks per this list", cxxopts::value<std::vector<int>>())
+    ("register", "Register memory before using it")
     ("help", "Print help");
   auto parsed_opts = options.parse(argc, argv);
 
