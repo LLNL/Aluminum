@@ -80,6 +80,11 @@
 #define AL_CHECK_NCCL(nccl_call) AL_FORCE_CHECK_NCCL_NOSYNC(nccl_call)
 #endif
 
+// Whether NCCL user buffer registration is supported.
+#if (NCCL_MAJOR >= 2) && (NCCL_MINOR >= 19)
+#define AL_HAS_NCCL_USER_BUFFER_REGISTATION
+#endif
+
 namespace Al {
 
 enum class NCCLCollectiveAlgorithm {
@@ -120,6 +125,9 @@ class NCCLCommunicator : public internal::MPICommAndStreamWrapper<AlGpuStream_t>
   NCCLCommunicator copy(AlGpuStream_t stream = 0) {
     return NCCLCommunicator(get_comm(), stream);
   }
+
+  /** Return the raw internal NCCL communicator handle. */
+  ncclComm_t get_nccl_comm() const { return m_nccl_comm; }
 
  private:
   /** Raw NCCL communicator. */
@@ -259,6 +267,12 @@ void safe_nccl_group(size_t start, size_t limit,
     AL_CHECK_NCCL(ncclGroupEnd());
   }
 }
+
+/** Internal helper for registering memory with NCCL. */
+void register_memory(void* buf, size_t size, NCCLCommunicator& comm);
+
+/** Internal helper for unregistering memory with NCCL. */
+void unregister_memory(void* buf, NCCLCommunicator& comm);
 
 }  // namespace nccl
 }  // namespace internal
@@ -848,6 +862,16 @@ class NCCLBackend {
                                   int root, comm_type& comm, req_type& req,
                                   scatterv_algo_type algo) {
     NonblockingScatterv(internal::IN_PLACE<T>(), buffer, counts, displs, root, comm, req, algo);
+  }
+
+  template <typename T>
+  static void RegisterMemory(T* buf, size_t count, comm_type& comm) {
+    internal::nccl::register_memory((void*) buf, count*sizeof(T), comm);
+  }
+
+  template <typename T>
+  static void UnregisterMemory(T* buf, comm_type& comm) {
+    internal::nccl::unregister_memory((void*) buf, comm);
   }
 
   static std::string Name() { return "NCCLBackend"; }

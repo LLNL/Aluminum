@@ -1882,6 +1882,37 @@ bool Test(typename Backend::req_type& req);
 template <typename Backend>
 void Wait(typename Backend::req_type& req);
 
+/**
+ * Register memory with a communicator.
+ *
+ * For certain backends and situations, this may improve the
+ * performance of subsequent communication operations.
+ *
+ * @param[in] buf Buffer to register.
+ * @param[in] count Length of \p buffer in elements of type `T`.
+ * @param[in] comm Communicator to register the buffer with.
+ */
+template <typename Backend, typename T>
+void RegisterMemory(T* buf, size_t count, typename Backend::comm_type& comm) {
+  internal::trace::record_op<Backend, T>("register", comm, buf, count);
+  Backend::template RegisterMemory<T>(buf, count, comm);
+}
+
+/**
+ * Unregister memory with a communicator.
+ *
+ * The memory should have previously been registered with
+ * RegisterMemory.
+ *
+ * @param[in] buf Buffer to unregister.
+ * @param[in] comm Communicator to unregister the buffer from.
+ */
+template <typename Backend, typename T>
+void UnregisterMemory(T* buf, typename Backend::comm_type& comm) {
+  internal::trace::record_op<Backend, T>("unregister", comm, buf);
+  Backend::template UnregisterMemory<T>(buf, comm);
+}
+
 namespace ext {
 
 #ifdef AL_HAS_MPI_CUDA_RMA

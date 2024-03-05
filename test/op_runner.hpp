@@ -49,6 +49,7 @@ struct OpOptions {
   Al::ReductionOperator reduction_op = Al::ReductionOperator::sum;
   typename Backend::req_type req = Backend::null_req;
   AlgorithmOptions<Backend> algos;
+  bool register_memory = false;
 };
 
 /** Abstract base class for running an operator. */
