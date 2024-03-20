@@ -251,7 +251,6 @@ ProgressEngine::ProgressEngine() {
   AL_CHECK_CUDA(AlGpuGetDevice(&device));
   cur_device = device;
 #endif
-  bind_init();
 }
 
 ProgressEngine::~ProgressEngine() {}
@@ -434,6 +433,7 @@ void ProgressEngine::bind_init() {
 }
 
 void ProgressEngine::bind() {
+  bind_init();
   if (core_to_bind < 0) {
     std::cerr << mpi::get_world_comm().rank()
               << ": progress engine binding not initialized"
