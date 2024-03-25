@@ -38,6 +38,7 @@ if (AL_HAS_ROCM)
   # be enabled; it only requires the host/device libraries be found.
   find_dependency(hip)
   find_dependency(hipcub)
+  find_dependency(rocm_smi)
 
   set(AL_ROCM_PATH "@AL_ROCM_PATH@")
 

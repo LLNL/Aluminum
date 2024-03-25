@@ -101,8 +101,6 @@ if (AL_HAS_ROCM)
   # END FIXME BLOCK
   ##############################
 
-  target_include_directories(Al PRIVATE
-    $<BUILD_INTERFACE:${ROCM_SMI_INCLUDE_DIR}>)
   target_link_libraries(Al PUBLIC
     hip::host
     hip::hipcub
