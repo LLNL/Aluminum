@@ -29,6 +29,8 @@
 
 #include "Al.hpp"
 
+#include <unistd.h>
+
 #include <iostream>
 #include <vector>
 #include <limits>
@@ -351,7 +353,10 @@ inline void hang_for_debugging(int hang_rank) {
     if (hang_rank < 0 && rank == 0) {
       std::cout << "Hanging all ranks" << std::endl;
     } else if (rank == hang_rank) {
-      std::cout << "Hanging rank " << rank << std::endl;
+      char hostname[HOST_NAME_MAX];
+      gethostname(hostname, HOST_NAME_MAX);
+      std::cout << "Hanging rank " << rank << " (hostname " << hostname
+                << ", pid " << getpid() << ")" << std::endl;
     }
     volatile bool hang = true;
     while (hang) {}
