@@ -269,7 +269,7 @@ void ProgressEngine::run() {
   doing_start_flag = true;
 #endif
   thread = std::thread(&ProgressEngine::engine, this);
-  profiling::name_thread(thread.native_handle(), "al-progress");
+  profiling::name_thread(thread.native_handle(), "AlProgress");
   startup_cv.wait(lock, [this] {return started_flag.load() ;});
 }
 
