@@ -456,10 +456,7 @@ if (ALUMINUM_ENABLE_ROCM)
   find_package(hipcub CONFIG REQUIRED)
 
   # (trb 01/03/2022): This is needed for HWLOC stuff to work correctly.
-  find_path(ROCM_SMI_INCLUDE_DIR rocm_smi/rocm_smi.h REQUIRED
-    HINTS ${AL_ROCM_PATH}/rocm_smi/include)
-  find_library(ROCM_SMI_LIBRARY rocm_smi64 REQUIRED
-    HINTS ${AL_ROCM_PATH}/rocm_smi/lib)
+  find_package(rocm_smi CONFIG REQUIRED)
 
   if (ALUMINUM_ENABLE_ROCTRACER)
     find_package(Roctracer MODULE COMPONENTS roctx)
