@@ -29,6 +29,8 @@
 #include "aluminum/nccl_impl.hpp"
 #include "aluminum/mpi/communicator.hpp"
 
+#include <stdlib.h>
+
 #include <exception>
 #include <mutex>
 #include <unordered_map>
@@ -76,6 +78,10 @@ namespace internal {
 namespace nccl {
 
 void init(int&, char**&) {
+  // To help debugging, set this environment variable for NCCL when it
+  // is not otherwise set, to get more helpful thread names.
+  setenv("NCCL_SET_THREAD_NAME", "1", 0);
+
   AL_CHECK_CUDA(AlGpuEventCreateWithFlags(&NCCLBackend::sync_event,
                                           AlGpuNoTimingEventFlags));
 }
