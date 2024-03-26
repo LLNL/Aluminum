@@ -96,7 +96,10 @@
 #define AlGpuDefaultEventFlags cudaEventDefault
 #define AlGpuNoTimingEventFlags cudaEventDisableTiming
 #endif
-#endif // defined AL_GPU_RUNTIME_PREFIX
+#endif  // defined AL_GPU_RUNTIME_PREFIX
+
+/* Do not change this (POSIX requires it be 16). Includes trailing null. */
+#define AL_MAX_THREAD_NAME_LEN 16
 
 #ifdef AL_HAS_MPI_CUDA
 #cmakedefine AL_HAS_MPI_CUDA_RMA

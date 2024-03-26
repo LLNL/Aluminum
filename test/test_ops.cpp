@@ -26,10 +26,15 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "Al.hpp"
+
 #include <iostream>
 #include <sstream>
 #include <thread>
+
 #include <cxxopts.hpp>
+
+#include "aluminum/profiling.hpp"
+
 #include "test_utils.hpp"
 #include "op_dispatcher.hpp"
 #include "hang_watchdog.hpp"
@@ -197,18 +202,16 @@ template <typename Backend, typename T,
 void run_test_instance(Al::AlOperation op, OpOptions<Backend> op_options,
                        CommWrapper<Backend>& comm_wrapper,
                        bool participates_in_pt2pt,
-                       int thread_id,
-                       int device_id,
+                       [[maybe_unused]] int thread_id,
+                       [[maybe_unused]] int device_id,
                        TestData<Backend, T>& data) {
   // Set CUDA device if needed.
 #ifdef AL_HAS_CUDA
   if (thread_id >= 0) {
     AL_CHECK_CUDA(AlGpuSetDevice(device_id));
   }
-#else
-  (void) thread_id;
-  (void) device_id;
 #endif
+
   OpDispatcher<Backend, T> op_runner(op, op_options);
 
   MPI_Barrier(comm_wrapper.comm().get_comm());
@@ -371,10 +374,12 @@ void run_test(cxxopts::ParseResult& parsed_opts) {
         std::vector<std::thread> threads;
         for (int i = 0; i < num_threads; ++i) {
           threads.emplace_back(
-              std::thread(&run_test_instance<Backend, T>,
-                          op, op_options, std::ref(comm_wrappers[i]),
-                          participates_in_pt2pt, i, device_id,
-                          std::ref(data[i])));
+              std::thread(&run_test_instance<Backend, T>, op, op_options,
+                          std::ref(comm_wrappers[i]), participates_in_pt2pt, i,
+                          device_id, std::ref(data[i])));
+          Al::internal::profiling::name_thread(
+              threads.back().native_handle(),
+              std::string("TestThread") + std::to_string(i));
         }
         for (int i = 0; i < num_threads; ++i) {
           threads[i].join();

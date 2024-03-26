@@ -27,6 +27,8 @@
 
 #pragma once
 
+#include <pthread.h>
+
 #include <iostream>
 #include <thread>
 #include <mutex>
@@ -44,6 +46,9 @@ public:
   HangWatchdog(size_t timeout_ = 60, bool do_abort_ = true) :
     timeout(timeout_), do_abort(do_abort_) {
     watchdog = std::thread(&HangWatchdog::run, this);
+#ifdef _GNU_SOURCE
+    pthread_setname_np(watchdog.native_handle(), "HangWatchdog");
+#endif
   }
 
   ~HangWatchdog() {

@@ -29,6 +29,8 @@
 
 #include <Al_config.hpp>
 
+#include <pthread.h>
+
 #ifdef AL_HAS_NVPROF
 #include <nvToolsExtCuda.h>
 #include <nvToolsExtCudaRt.h>
@@ -38,12 +40,15 @@ namespace Al {
 namespace internal {
 namespace profiling {
 
-void name_thread(std::thread::native_handle_type handle, std::string name) {
+void name_thread([[maybe_unused]] std::thread::native_handle_type handle,
+                 [[maybe_unused]] std::string name) {
 #ifdef AL_HAS_NVPROF
   nvtxNameOsThreadA(handle, name.c_str());
-#else
-  (void) handle;
-  (void) name;
+#endif
+#ifdef _GNU_SOURCE
+  // Subtract 1 to account for the terminating null.
+  std::string name_resized = name.substr(0, AL_MAX_THREAD_NAME_LEN - 1);
+  pthread_setname_np(handle, name_resized.c_str());
 #endif
 }
 
