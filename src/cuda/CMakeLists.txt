@@ -1,5 +1,6 @@
 set_source_path(THIS_DIR_CUDA_CXX_SOURCES
   cuda.cpp
+  device_mempool_shim.cpp
   gpu_status_flag.cpp
   gpu_wait.cpp
   streams.cpp

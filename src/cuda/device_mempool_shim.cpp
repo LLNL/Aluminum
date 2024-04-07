@@ -25,58 +25,37 @@
 // permissions and limitations under the license.
 ////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include <Al_config.hpp>
-
-#include "aluminum/utils/caching_allocator.hpp"
-#include "aluminum/cuda/cuda.hpp"
 #include "aluminum/cuda/device_mempool_shim.hpp"
+
+#if defined AL_HAS_ROCM
+#include <hipcub/hipcub.hpp>
+#elif defined AL_HAS_CUDA
+#include <cub/util_allocator.cuh>
+#endif
 
 
 namespace Al {
 namespace internal {
 
-/** Allocator for pinned host memory. */
-struct CUDAPinnedMemoryAllocator {
-  void* allocate(size_t bytes) {
-    void* ptr;
-    AL_CHECK_CUDA(AlGpuMallocHost(&ptr, bytes));
-    return ptr;
-  }
+DeviceMempoolShim::DeviceMempoolShim(unsigned int bin_growth) {
+  cub_pool = std::make_unique<AL_CUB_NS::CachingDeviceAllocator>(bin_growth);
+}
 
-  void deallocate(void* ptr) {
-    AL_CHECK_CUDA(AlGpuFreeHost(ptr));
-  }
-};
+// This must be defined here, as the CachingDeviceAllocator is incomplete
+// in the header and unique_ptr cannot define its deleter.
+DeviceMempoolShim::~DeviceMempoolShim() = default;
 
-/** Specialized caching allocator for CUDA using CUB. */
-template <>
-class CachingAllocator<MemoryType::CUDA, void, void> {
-public:
-  CachingAllocator() : cub_pool(2u) {}
+void DeviceMempoolShim::allocate(void** ptr, size_t size, AlGpuStream_t stream) {
+  AL_CHECK_CUDA(cub_pool->DeviceAllocate(ptr, size, stream));
+}
 
-  ~CachingAllocator() {
-    clear();
-  }
+void DeviceMempoolShim::release(void* ptr) {
+  AL_CHECK_CUDA(cub_pool->DeviceFree(ptr));
+}
 
-  template <typename T>
-  T* allocate(size_t size, AlGpuStream_t stream) {
-    T* mem;
-    cub_pool.allocate(reinterpret_cast<void**>(&mem), sizeof(T)*size, stream);
-    return mem;
-  }
-
-  template <typename T>
-  void release(T* ptr) {
-    cub_pool.release(ptr);
-  }
-
-  void clear() { cub_pool.clear(); }
-
-private:
-  DeviceMempoolShim cub_pool;
-};
+void DeviceMempoolShim::clear() {
+  AL_IGNORE_NODISCARD(cub_pool->FreeAllCached());
+}
 
 }  // namespace internal
 }  // namespace Al

@@ -29,53 +29,36 @@
 
 #include <Al_config.hpp>
 
-#include "aluminum/utils/caching_allocator.hpp"
-#include "aluminum/cuda/cuda.hpp"
-#include "aluminum/cuda/device_mempool_shim.hpp"
+#include <memory>
 
+#include "aluminum/cuda/cuda.hpp"
+
+// We forward-declare CUB here so we can define a pointer to the class.
+#if defined AL_HAS_ROCM
+#define AL_CUB_NS hipcub
+#elif defined AL_HAS_CUDA
+#define AL_CUB_NS cub
+#endif
+namespace AL_CUB_NS {
+class CachingDeviceAllocator;
+}
 
 namespace Al {
 namespace internal {
 
-/** Allocator for pinned host memory. */
-struct CUDAPinnedMemoryAllocator {
-  void* allocate(size_t bytes) {
-    void* ptr;
-    AL_CHECK_CUDA(AlGpuMallocHost(&ptr, bytes));
-    return ptr;
-  }
-
-  void deallocate(void* ptr) {
-    AL_CHECK_CUDA(AlGpuFreeHost(ptr));
-  }
-};
-
-/** Specialized caching allocator for CUDA using CUB. */
-template <>
-class CachingAllocator<MemoryType::CUDA, void, void> {
+/**
+ * This is a shim around (Hip)CUB to prevent it needing to be visible
+ * to external users of LBANN.
+ */
+class DeviceMempoolShim {
 public:
-  CachingAllocator() : cub_pool(2u) {}
-
-  ~CachingAllocator() {
-    clear();
-  }
-
-  template <typename T>
-  T* allocate(size_t size, AlGpuStream_t stream) {
-    T* mem;
-    cub_pool.allocate(reinterpret_cast<void**>(&mem), sizeof(T)*size, stream);
-    return mem;
-  }
-
-  template <typename T>
-  void release(T* ptr) {
-    cub_pool.release(ptr);
-  }
-
-  void clear() { cub_pool.clear(); }
-
+  DeviceMempoolShim(unsigned int bin_growth);
+  ~DeviceMempoolShim();
+  void allocate(void** ptr, size_t size, AlGpuStream_t stream);
+  void release(void* ptr);
+  void clear();
 private:
-  DeviceMempoolShim cub_pool;
+  std::unique_ptr<AL_CUB_NS::CachingDeviceAllocator> cub_pool;
 };
 
 }  // namespace internal
