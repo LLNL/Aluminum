@@ -43,15 +43,16 @@ void passthrough_scatterv(const T* sendbuf, T* recvbuf,
                           std::vector<size_t> displs,
                           int root,
                           MPICommunicator& comm) {
-  std::vector<int> counts_ = intify_size_t_vector(counts);
-  std::vector<int> displs_ = intify_size_t_vector(displs);
+  auto counts_ = countify_size_t_vector(counts);
+  auto displs_ = displify_size_t_vector(displs);
   if (sendbuf == IN_PLACE<T>() && comm.rank() == root) {
     sendbuf = recvbuf;
     recvbuf = IN_PLACE<T>();
   }
-  MPI_Scatterv(sendbuf, counts_.data(), displs_.data(), TypeMap<T>(),
-               buf_or_inplace(recvbuf), counts[comm.rank()], TypeMap<T>(),
-               root, comm.get_comm());
+  AL_MPI_LARGE_COUNT_CALL(MPI_Scatterv)(
+    sendbuf, counts_.data(), displs_.data(), TypeMap<T>(),
+    buf_or_inplace(recvbuf), counts[comm.rank()], TypeMap<T>(),
+    root, comm.get_comm());
 }
 
 template <typename T>
@@ -64,8 +65,8 @@ public:
                   MPICommunicator& comm_, AlMPIReq req_) :
     MPIState(req_),
     sendbuf(sendbuf_), recvbuf(recvbuf_),
-    counts(intify_size_t_vector(counts_)),
-    displs(intify_size_t_vector(displs_)),
+    counts(countify_size_t_vector(counts_)),
+    displs(displify_size_t_vector(displs_)),
     root(root_),
     comm(comm_.get_comm()), rank(comm_.rank()) {}
 
@@ -79,16 +80,17 @@ protected:
       sendbuf = recvbuf;
       recvbuf = IN_PLACE<T>();
     }
-    MPI_Iscatterv(sendbuf, counts.data(), displs.data(), TypeMap<T>(),
-                  buf_or_inplace(recvbuf), counts[rank], TypeMap<T>(),
-                  root, comm, get_mpi_req());
+    AL_MPI_LARGE_COUNT_CALL(MPI_Iscatterv)(
+      sendbuf, counts.data(), displs.data(), TypeMap<T>(),
+      buf_or_inplace(recvbuf), counts[rank], TypeMap<T>(),
+      root, comm, get_mpi_req());
   }
 
 private:
   const T* sendbuf;
   T* recvbuf;
-  std::vector<int> counts;
-  std::vector<int> displs;
+  Al_mpi_count_vector_t counts;
+  Al_mpi_displ_vector_t displs;
   int root;
   MPI_Comm comm;
   int rank;

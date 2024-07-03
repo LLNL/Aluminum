@@ -42,12 +42,12 @@ class ReduceScattervAlState : public HostTransferCollectiveSignalAtEndState {
 public:
   ReduceScattervAlState(const T* sendbuf, T* recvbuf,
                         std::vector<size_t> counts_,
-                       ReductionOperator op_, HostTransferCommunicator& comm_,
-                       AlGpuStream_t stream_) :
+                        ReductionOperator op_, HostTransferCommunicator& comm_,
+                        AlGpuStream_t stream_) :
     HostTransferCollectiveSignalAtEndState(stream_),
     total_size(std::accumulate(counts_.begin(), counts_.end(), size_t{0})),
     host_mem(mempool.allocate<MemoryType::CUDA_PINNED_HOST, T>(total_size)),
-    counts(mpi::intify_size_t_vector(counts_)),
+    counts(mpi::countify_size_t_vector(counts_)),
     op(mpi::ReductionOperator2MPI_Op<T>(op_)),
     comm(comm_.get_comm()) {
     // Transfer data from device to host.
@@ -73,14 +73,15 @@ public:
 
 protected:
   void start_mpi_op() override {
-    MPI_Ireduce_scatter(MPI_IN_PLACE, host_mem, counts.data(),
-                        mpi::TypeMap<T>(), op, comm, get_mpi_req());
+    AL_MPI_LARGE_COUNT_CALL(MPI_Ireduce_scatter)(
+      MPI_IN_PLACE, host_mem, counts.data(),
+      mpi::TypeMap<T>(), op, comm, get_mpi_req());
   }
 
 private:
   size_t total_size;
   T* host_mem;
-  std::vector<int> counts;
+  mpi::Al_mpi_count_vector_t counts;
   MPI_Op op;
   MPI_Comm comm;
 };

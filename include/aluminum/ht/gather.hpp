@@ -78,13 +78,15 @@ public:
 protected:
   void start_mpi_op() override {
     if (is_root) {
-      MPI_Igather(MPI_IN_PLACE, count, mpi::TypeMap<T>(),
-                  host_mem, count, mpi::TypeMap<T>(),
-                  root, comm, get_mpi_req());
+      AL_MPI_LARGE_COUNT_CALL(MPI_Igather)(
+        MPI_IN_PLACE, count, mpi::TypeMap<T>(),
+        host_mem, count, mpi::TypeMap<T>(),
+        root, comm, get_mpi_req());
     } else {
-      MPI_Igather(host_mem, count, mpi::TypeMap<T>(),
-                  host_mem, count, mpi::TypeMap<T>(),
-                  root, comm, get_mpi_req());
+      AL_MPI_LARGE_COUNT_CALL(MPI_Igather)(
+        host_mem, count, mpi::TypeMap<T>(),
+        host_mem, count, mpi::TypeMap<T>(),
+        root, comm, get_mpi_req());
     }
   }
 

@@ -51,10 +51,10 @@ public:
                  nullptr :
                  mempool.allocate<MemoryType::CUDA_PINNED_HOST, T>(send_displs_.back() + send_counts_.back())),
     host_recvbuf(mempool.allocate<MemoryType::CUDA_PINNED_HOST, T>(recv_displs_.back() + recv_counts_.back())),
-    send_counts(mpi::intify_size_t_vector(send_counts_)),
-    send_displs(mpi::intify_size_t_vector(send_displs_)),
-    recv_counts(mpi::intify_size_t_vector(recv_counts_)),
-    recv_displs(mpi::intify_size_t_vector(recv_displs_)),
+    send_counts(mpi::countify_size_t_vector(send_counts_)),
+    send_displs(mpi::displify_size_t_vector(send_displs_)),
+    recv_counts(mpi::countify_size_t_vector(recv_counts_)),
+    recv_displs(mpi::displify_size_t_vector(recv_displs_)),
     comm(comm_.get_comm()) {
     // Transfer data from device to host.
     // We need to distinguish the inplace case in case the sendbuf is
@@ -102,21 +102,22 @@ public:
 
 protected:
   void start_mpi_op() override {
-    MPI_Ialltoallv(inplace ? MPI_IN_PLACE : host_sendbuf,
-                   send_counts.data(), send_displs.data(), mpi::TypeMap<T>(),
-                   host_recvbuf,
-                   recv_counts.data(), recv_displs.data(), mpi::TypeMap<T>(),
-                   comm, get_mpi_req());
+    AL_MPI_LARGE_COUNT_CALL(MPI_Ialltoallv)(
+      inplace ? MPI_IN_PLACE : host_sendbuf,
+      send_counts.data(), send_displs.data(), mpi::TypeMap<T>(),
+      host_recvbuf,
+      recv_counts.data(), recv_displs.data(), mpi::TypeMap<T>(),
+      comm, get_mpi_req());
   }
 
 private:
   bool inplace;
   T* host_sendbuf = nullptr;
   T* host_recvbuf = nullptr;
-  std::vector<int> send_counts;
-  std::vector<int> send_displs;
-  std::vector<int> recv_counts;
-  std::vector<int> recv_displs;
+  mpi::Al_mpi_count_vector_t send_counts;
+  mpi::Al_mpi_displ_vector_t send_displs;
+  mpi::Al_mpi_count_vector_t recv_counts;
+  mpi::Al_mpi_displ_vector_t recv_displs;
   MPI_Comm comm;
 };
 

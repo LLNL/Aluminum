@@ -39,7 +39,8 @@ namespace mpi {
 template <typename T>
 void passthrough_bcast(T* buf, size_t count, int root,
                        MPICommunicator& comm) {
-  MPI_Bcast(buf, count, TypeMap<T>(), root, comm.get_comm());
+  AL_MPI_LARGE_COUNT_CALL(MPI_Bcast)(
+    buf, count, TypeMap<T>(), root, comm.get_comm());
 }
 
 template <typename T>
@@ -57,7 +58,8 @@ public:
 
 protected:
   void start_mpi_op() override {
-    MPI_Ibcast(buf, count, TypeMap<T>(), root, comm, get_mpi_req());
+    AL_MPI_LARGE_COUNT_CALL(MPI_Ibcast)(
+      buf, count, TypeMap<T>(), root, comm, get_mpi_req());
   }
 
 private:

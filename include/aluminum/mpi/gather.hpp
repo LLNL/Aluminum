@@ -43,8 +43,9 @@ void passthrough_gather(const T* sendbuf, T* recvbuf, size_t count, int root,
   if (sendbuf == IN_PLACE<T>() && comm.rank() != root) {
     sendbuf = recvbuf;
   }
-  MPI_Gather(buf_or_inplace(sendbuf), count, TypeMap<T>(),
-             recvbuf, count, TypeMap<T>(), root, comm.get_comm());
+  AL_MPI_LARGE_COUNT_CALL(MPI_Gather)(
+    buf_or_inplace(sendbuf), count, TypeMap<T>(),
+    recvbuf, count, TypeMap<T>(), root, comm.get_comm());
 }
 
 template <typename T>
@@ -65,8 +66,9 @@ protected:
     if (sendbuf == IN_PLACE<T>() && rank != root) {
       sendbuf = recvbuf;
     }
-    MPI_Igather(buf_or_inplace(sendbuf), count, TypeMap<T>(),
-                recvbuf, count, TypeMap<T>(), root, comm, get_mpi_req());
+    AL_MPI_LARGE_COUNT_CALL(MPI_Igather)(
+      buf_or_inplace(sendbuf), count, TypeMap<T>(),
+      recvbuf, count, TypeMap<T>(), root, comm, get_mpi_req());
   }
 
 private:

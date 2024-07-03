@@ -44,9 +44,10 @@ void passthrough_scatter(const T* sendbuf, T* recvbuf, size_t count, int root,
     sendbuf = recvbuf;
     recvbuf = IN_PLACE<T>();
   }
-  MPI_Scatter(sendbuf, count, TypeMap<T>(),
-              buf_or_inplace(recvbuf), count, TypeMap<T>(),
-              root, comm.get_comm());
+  AL_MPI_LARGE_COUNT_CALL(MPI_Scatter)(
+    sendbuf, count, TypeMap<T>(),
+    buf_or_inplace(recvbuf), count, TypeMap<T>(),
+    root, comm.get_comm());
 }
 
 template <typename T>
@@ -64,13 +65,14 @@ public:
 
 protected:
   void start_mpi_op() override {
-        if (sendbuf == IN_PLACE<T>() && rank == root) {
+    if (sendbuf == IN_PLACE<T>() && rank == root) {
       sendbuf = recvbuf;
       recvbuf = IN_PLACE<T>();
     }
-    MPI_Iscatter(sendbuf, count, TypeMap<T>(),
-                 buf_or_inplace(recvbuf), count, TypeMap<T>(),
-                 root, comm, get_mpi_req());
+    AL_MPI_LARGE_COUNT_CALL(MPI_Iscatter)(
+      sendbuf, count, TypeMap<T>(),
+      buf_or_inplace(recvbuf), count, TypeMap<T>(),
+      root, comm, get_mpi_req());
   }
 
 private:

@@ -80,19 +80,46 @@ const void* buf_or_inplace(const T* buf) {
   return buf == IN_PLACE<T>() ? MPI_IN_PLACE : buf;
 }
 
+// Vector types for handling MPI counts and displacements.
+// In the public Aluminum API, these are std::vector<size_t>.
+// However, MPI uses either arrays of ints (standard calls) or arrays
+// of MPI_Count (counts) or MPI_Aint (displacements), where MPI_Count
+// and MPI_Aint are not necessarily the same type (large-count calls).
+// These let us duck-type around this.
+
+#ifdef AL_HAS_LARGE_COUNT_MPI
+using Al_mpi_count_t = MPI_Count;
+using Al_mpi_displ_t = MPI_Aint;
+#else
+using Al_mpi_count_t = int;
+using Al_mpi_displ_t = int;
+#endif
+using Al_mpi_count_vector_t = std::vector<Al_mpi_count_t>;
+using Al_mpi_displ_vector_t = std::vector<Al_mpi_displ_t>;
+
 /**
- * Convert a vector of size_ts to a vector of ints.
- *
- * This is used since MPI requires arrays of ints, which are a different size
- * than size_t.
+ * Convert a vector of size_ts to a vector of MPI counts.
  */
-inline std::vector<int> intify_size_t_vector(const std::vector<size_t> v) {
-  return std::vector<int>(v.begin(), v.end());
+inline Al_mpi_count_vector_t
+countify_size_t_vector(const std::vector<size_t>& v) {
+  return Al_mpi_count_vector_t(v.begin(), v.end());
+}
+
+/**
+ * Convert a vector of size_ts to a vector of MPI displacements.
+ */
+inline Al_mpi_displ_vector_t
+displify_size_t_vector(const std::vector<size_t>& v) {
+  return Al_mpi_displ_vector_t(v.begin(), v.end());
 }
 
 /** True if count elements can be sent by MPI. */
-inline bool check_count_fits_mpi(size_t count) {
+inline bool check_count_fits_mpi([[maybe_unused]] size_t count) {
+#ifdef AL_HAS_LARGE_COUNT_MPI
+  return true;
+#else
   return count <= static_cast<size_t>(std::numeric_limits<int>::max());
+#endif
 }
 /** Throw an exception if count elements cannot be sent by MPI. */
 inline void assert_count_fits_mpi(size_t count) {
@@ -100,6 +127,17 @@ inline void assert_count_fits_mpi(size_t count) {
     throw_al_exception("Message count too large for MPI");
   }
 }
+
+/**
+ * Call either a regular MPI function or the large-count version
+ * depending on whether MPI supports the latter. This assumes that
+ * the caller has the count argument in an appropriate type.
+ */
+#ifdef AL_HAS_LARGE_COUNT_MPI
+#define AL_MPI_LARGE_COUNT_CALL(mpi_func) mpi_func##_c
+#else
+#define AL_MPI_LARGE_COUNT_CALL(mpi_func) mpi_func
+#endif
 
 #ifdef AL_HAS_HALF
 /** Sum operator for half. */

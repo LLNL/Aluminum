@@ -88,6 +88,9 @@ int main(int, char**) {
 #ifdef AL_HAS_BFLOAT
   std::cout << " bfloat";
 #endif
+#ifdef AL_HAS_LARGE_COUNT_MPI
+  std::cout << " mpi-large-count";
+#endif
   std::cout << std::endl;
   return 0;
 }

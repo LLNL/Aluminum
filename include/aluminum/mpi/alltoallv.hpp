@@ -44,15 +44,16 @@ void passthrough_alltoallv(const T* sendbuf,
                            std::vector<size_t> recv_counts,
                            std::vector<size_t> recv_displs,
                            MPICommunicator& comm) {
-  std::vector<int> send_counts_ = intify_size_t_vector(send_counts);
-  std::vector<int> send_displs_ = intify_size_t_vector(send_displs);
-  std::vector<int> recv_counts_ = intify_size_t_vector(recv_counts);
-  std::vector<int> recv_displs_ = intify_size_t_vector(recv_displs);
-  MPI_Alltoallv(buf_or_inplace(sendbuf),
-                send_counts_.data(), send_displs_.data(), TypeMap<T>(),
-                recvbuf,
-                recv_counts_.data(), recv_displs_.data(), TypeMap<T>(),
-                comm.get_comm());
+  auto send_counts_ = countify_size_t_vector(send_counts);
+  auto send_displs_ = displify_size_t_vector(send_displs);
+  auto recv_counts_ = countify_size_t_vector(recv_counts);
+  auto recv_displs_ = displify_size_t_vector(recv_displs);
+  AL_MPI_LARGE_COUNT_CALL(MPI_Alltoallv)(
+    buf_or_inplace(sendbuf),
+    send_counts_.data(), send_displs_.data(), TypeMap<T>(),
+    recvbuf,
+    recv_counts_.data(), recv_displs_.data(), TypeMap<T>(),
+    comm.get_comm());
 }
 
 template <typename T>
@@ -67,11 +68,11 @@ public:
                    MPICommunicator& comm_, AlMPIReq req_) :
     MPIState(req_),
     sendbuf(sendbuf_),
-    send_counts(intify_size_t_vector(send_counts_)),
-    send_displs(intify_size_t_vector(send_displs_)),
+    send_counts(countify_size_t_vector(send_counts_)),
+    send_displs(displify_size_t_vector(send_displs_)),
     recvbuf(recvbuf_),
-    recv_counts(intify_size_t_vector(recv_counts_)),
-    recv_displs(intify_size_t_vector(recv_displs_)),
+    recv_counts(countify_size_t_vector(recv_counts_)),
+    recv_displs(displify_size_t_vector(recv_displs_)),
     comm(comm_.get_comm()) {}
 
   ~AlltoallvAlState() override {}
@@ -80,20 +81,21 @@ public:
 
 protected:
   void start_mpi_op() override {
-    MPI_Ialltoallv(buf_or_inplace(sendbuf),
-                   send_counts.data(), send_displs.data(), TypeMap<T>(),
-                   recvbuf,
-                   recv_counts.data(), recv_displs.data(), TypeMap<T>(),
-                   comm, get_mpi_req());
+    AL_MPI_LARGE_COUNT_CALL(MPI_Ialltoallv)(
+      buf_or_inplace(sendbuf),
+      send_counts.data(), send_displs.data(), TypeMap<T>(),
+      recvbuf,
+      recv_counts.data(), recv_displs.data(), TypeMap<T>(),
+      comm, get_mpi_req());
   }
 
 private:
   const T* sendbuf;
-  std::vector<int> send_counts;
-  std::vector<int> send_displs;
+  Al_mpi_count_vector_t send_counts;
+  Al_mpi_displ_vector_t send_displs;
   T* recvbuf;
-  std::vector<int> recv_counts;
-  std::vector<int> recv_displs;
+  Al_mpi_count_vector_t recv_counts;
+  Al_mpi_displ_vector_t recv_displs;
   MPI_Comm comm;
 };
 

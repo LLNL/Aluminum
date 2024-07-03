@@ -54,8 +54,8 @@ public:
     inplace(false),
     host_send_buffers(send_buffers.size(), nullptr),
     host_recv_buffers(recv_buffers.size(), nullptr),
-    send_counts(mpi::intify_size_t_vector(send_counts_)),
-    recv_counts(mpi::intify_size_t_vector(recv_counts_)),
+    send_counts(send_counts_),
+    recv_counts(recv_counts_),
     dests(std::move(dests_)),
     srcs(std::move(srcs_)),
     comm(comm_.get_comm()) {
@@ -108,7 +108,7 @@ public:
     inplace(true),
     host_send_buffers(buffers.size(), nullptr),
     host_recv_buffers(buffers.size(), nullptr),
-    send_counts(mpi::intify_size_t_vector(counts)),
+    send_counts(counts),
     recv_counts(send_counts),
     dests(std::move(dests_)),
     srcs(std::move(srcs_)),
@@ -166,12 +166,14 @@ protected:
   void start_mpi_op() override {
     reqs.resize(host_send_buffers.size() + host_recv_buffers.size());
     for (size_t i = 0; i < host_recv_buffers.size(); ++i) {
-      MPI_Irecv(host_recv_buffers[i], recv_counts[i], mpi::TypeMap<T>(),
-                srcs[i], pt2pt_tag, comm, &reqs[i]);
+      AL_MPI_LARGE_COUNT_CALL(MPI_Irecv)(
+        host_recv_buffers[i], recv_counts[i], mpi::TypeMap<T>(),
+        srcs[i], pt2pt_tag, comm, &reqs[i]);
     }
     for (size_t i = 0; i < host_send_buffers.size(); ++i) {
-      MPI_Isend(host_send_buffers[i], send_counts[i], mpi::TypeMap<T>(),
-                dests[i], pt2pt_tag, comm, &reqs[host_recv_buffers.size() + i]);
+      AL_MPI_LARGE_COUNT_CALL(MPI_Isend)(
+        host_send_buffers[i], send_counts[i], mpi::TypeMap<T>(),
+        dests[i], pt2pt_tag, comm, &reqs[host_recv_buffers.size() + i]);
     }
   }
 
@@ -187,8 +189,8 @@ private:
   T* host_recvbuf = nullptr;
   std::vector<T*> host_send_buffers;
   std::vector<T*> host_recv_buffers;
-  std::vector<int> send_counts;
-  std::vector<int> recv_counts;
+  std::vector<size_t> send_counts;
+  std::vector<size_t> recv_counts;
   std::vector<int> dests;
   std::vector<int> srcs;
   MPI_Comm comm;

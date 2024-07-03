@@ -292,6 +292,13 @@ endif ()
 # Dependencies
 
 find_package(MPI 3.0 REQUIRED COMPONENTS CXX)
+if (MPI_CXX_VERSION VERSION_GREATER_EQUAL 4.0)
+  message(STATUS "MPI version >= 4.0, enabling large-count MPI support")
+  set(AL_HAS_LARGE_COUNT_MPI ON)
+else ()
+  message(STATUS "MPI version < 4.0, disabling large-count MPI support")
+  set(AL_HAS_LARGE_COUNT_MPI OFF)
+endif ()
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 

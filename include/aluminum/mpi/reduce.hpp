@@ -43,8 +43,9 @@ void passthrough_reduce(const T* sendbuf, T* recvbuf, size_t count,
   if (sendbuf == IN_PLACE<T>() && comm.rank() != root) {
     sendbuf = recvbuf;
   }
-  MPI_Reduce(buf_or_inplace(sendbuf), recvbuf, count, TypeMap<T>(),
-             ReductionOperator2MPI_Op<T>(op), root, comm.get_comm());
+  AL_MPI_LARGE_COUNT_CALL(MPI_Reduce)(
+    buf_or_inplace(sendbuf), recvbuf, count, TypeMap<T>(),
+    ReductionOperator2MPI_Op<T>(op), root, comm.get_comm());
 }
 
 template <typename T>
@@ -66,8 +67,9 @@ protected:
     if (sendbuf == IN_PLACE<T>() && rank != root) {
       sendbuf = recvbuf;
     }
-    MPI_Ireduce(buf_or_inplace(sendbuf), recvbuf, count, TypeMap<T>(),
-                op, root, comm, get_mpi_req());
+    AL_MPI_LARGE_COUNT_CALL(MPI_Ireduce)(
+      buf_or_inplace(sendbuf), recvbuf, count, TypeMap<T>(),
+      op, root, comm, get_mpi_req());
   }
 
 private:

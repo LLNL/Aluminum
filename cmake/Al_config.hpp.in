@@ -124,3 +124,6 @@
 #cmakedefine AL_DISABLE_BACKGROUND_STREAMS
 
 #cmakedefine AL_USE_HWLOC
+
+/** Whether we built with an MPI that supports large counts. */
+#cmakedefine AL_HAS_LARGE_COUNT_MPI

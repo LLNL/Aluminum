@@ -46,25 +46,25 @@ namespace mpi {
 
 template <typename T>
 void passthrough_multisendrecv(std::vector<const T*> send_buffers,
-                               std::vector<size_t> send_counts_,
+                               std::vector<size_t> send_counts,
                                std::vector<int> dests,
                                std::vector<T*> recv_buffers,
-                               std::vector<size_t> recv_counts_,
+                               std::vector<size_t> recv_counts,
                                std::vector<int> srcs,
                                MPICommunicator& comm) {
   if (send_buffers.empty() && recv_buffers.empty()) {
     return;
   }
-  std::vector<int> send_counts = intify_size_t_vector(send_counts_);
-  std::vector<int> recv_counts = intify_size_t_vector(recv_counts_);
   std::vector<MPI_Request> reqs(send_buffers.size() + recv_buffers.size());
   for (size_t i = 0; i < recv_buffers.size(); ++i) {
-    MPI_Irecv(recv_buffers[i], recv_counts[i], TypeMap<T>(), srcs[i],
-              pt2pt_tag, comm.get_comm(), &reqs[i]);
+    AL_MPI_LARGE_COUNT_CALL(MPI_Irecv)(
+      recv_buffers[i], recv_counts[i], TypeMap<T>(), srcs[i],
+      pt2pt_tag, comm.get_comm(), &reqs[i]);
   }
   for (size_t i = 0; i < send_buffers.size(); ++i) {
-    MPI_Isend(send_buffers[i], send_counts[i], TypeMap<T>(), dests[i],
-              pt2pt_tag, comm.get_comm(), &reqs[recv_buffers.size() + i]);
+    AL_MPI_LARGE_COUNT_CALL(MPI_Isend)(
+      send_buffers[i], send_counts[i], TypeMap<T>(), dests[i],
+      pt2pt_tag, comm.get_comm(), &reqs[recv_buffers.size() + i]);
   }
   MPI_Waitall(reqs.size(), reqs.data(), MPI_STATUSES_IGNORE);
 }
@@ -111,10 +111,10 @@ public:
                        AlMPIReq req_) :
     MPIState(req_),
     send_buffers(std::move(send_buffers_)),
-    send_counts(intify_size_t_vector(send_counts_)),
+    send_counts(send_counts_),
     dests(std::move(dests_)),
     recv_buffers(std::move(recv_buffers_)),
-    recv_counts(intify_size_t_vector(recv_counts_)),
+    recv_counts(recv_counts_),
     srcs(std::move(srcs_)),
     comm(comm_.get_comm()),
     mpi_reqs(send_buffers.size() + recv_buffers.size())
@@ -129,10 +129,10 @@ public:
                        AlMPIReq req_) :
     MPIState(req_),
     send_buffers(buffers.size(), nullptr),
-    send_counts(intify_size_t_vector(counts)),
+    send_counts(counts),
     dests(std::move(dests_)),
     recv_buffers(std::move(buffers)),
-    recv_counts(intify_size_t_vector(counts)),
+    recv_counts(counts),
     srcs(std::move(srcs_)),
     comm(comm_.get_comm()),
     mpi_reqs(send_buffers.size() + recv_buffers.size()) {
@@ -172,12 +172,14 @@ protected:
       }
     }
     for (size_t i = 0; i < recv_buffers.size(); ++i) {
-      MPI_Irecv(recv_buffers[i], recv_counts[i], TypeMap<T>(), srcs[i],
-                pt2pt_tag, comm, &mpi_reqs[i]);
+      AL_MPI_LARGE_COUNT_CALL(MPI_Irecv)(
+        recv_buffers[i], recv_counts[i], TypeMap<T>(), srcs[i],
+        pt2pt_tag, comm, &mpi_reqs[i]);
     }
     for (size_t i = 0; i < send_buffers.size(); ++i) {
-      MPI_Isend(send_buffers[i], send_counts[i], TypeMap<T>(), dests[i],
-                pt2pt_tag, comm, &mpi_reqs[recv_buffers.size() + i]);
+      AL_MPI_LARGE_COUNT_CALL(MPI_Isend)(
+        send_buffers[i], send_counts[i], TypeMap<T>(), dests[i],
+        pt2pt_tag, comm, &mpi_reqs[recv_buffers.size() + i]);
     }
   }
 
@@ -189,10 +191,10 @@ protected:
 
 private:
   std::vector<const T*> send_buffers;
-  std::vector<int> send_counts;
+  std::vector<size_t> send_counts;
   std::vector<int> dests;
   std::vector<T*> recv_buffers;
-  std::vector<int> recv_counts;
+  std::vector<size_t> recv_counts;
   std::vector<int> srcs;
   MPI_Comm comm;
   std::vector<MPI_Request> mpi_reqs;

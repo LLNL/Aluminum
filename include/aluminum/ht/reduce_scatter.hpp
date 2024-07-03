@@ -68,8 +68,9 @@ public:
 
 protected:
   void start_mpi_op() override {
-    MPI_Ireduce_scatter_block(MPI_IN_PLACE, host_mem, count,
-                              mpi::TypeMap<T>(), op, comm, get_mpi_req());
+    AL_MPI_LARGE_COUNT_CALL(MPI_Ireduce_scatter_block)(
+      MPI_IN_PLACE, host_mem, count,
+      mpi::TypeMap<T>(), op, comm, get_mpi_req());
   }
 
 private:

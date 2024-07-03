@@ -73,8 +73,9 @@ class AllreduceAlState : public HostTransferCollectiveSignalAtEndState {
 
  protected:
   void start_mpi_op() override {
-    MPI_Iallreduce(MPI_IN_PLACE, host_mem, count, mpi::TypeMap<T>(),
-                   op, comm, get_mpi_req());
+    AL_MPI_LARGE_COUNT_CALL(MPI_Iallreduce)(
+      MPI_IN_PLACE, host_mem, count, mpi::TypeMap<T>(),
+      op, comm, get_mpi_req());
   }
 
  private:

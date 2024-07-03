@@ -75,8 +75,9 @@ public:
 
 protected:
   void start_mpi_op() override {
-    MPI_Iallgather(MPI_IN_PLACE, count, mpi::TypeMap<T>(),
-                   host_mem, count, mpi::TypeMap<T>(), comm, get_mpi_req());
+    AL_MPI_LARGE_COUNT_CALL(MPI_Iallgather)(
+      MPI_IN_PLACE, count, mpi::TypeMap<T>(),
+      host_mem, count, mpi::TypeMap<T>(), comm, get_mpi_req());
   }
 
 private:
