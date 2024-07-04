@@ -54,9 +54,11 @@ target_include_directories(Al PUBLIC
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 target_link_libraries(Al PUBLIC
   $<$<BOOL:${AL_HAS_CALIPER}>:caliper>
-  HWLOC::hwloc
   MPI::MPI_CXX
   Threads::Threads)
+if (AL_USE_HWLOC)
+  target_link_libraries(Al PUBLIC HWLOC::hwloc)
+endif ()
 
 if (AL_HAS_ROCM)
   set(HIP_CLANG_ROOT "${AL_ROCM_PATH}/llvm")

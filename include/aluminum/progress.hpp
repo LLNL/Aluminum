@@ -142,12 +142,18 @@ class ProgressEngine {
   std::unordered_map<void*, std::array<std::vector<AlState*>, AL_PE_NUM_PIPELINE_STAGES>> run_queues;
   /** Number of currently-active bounded-length operations. */
   size_t num_bounded = 0;
+
+#ifdef AL_USE_HWLOC
   /** Core to bind the progress engine to. */
   int core_to_bind = -1;
+#endif
+
 #ifdef AL_HAS_CUDA
   /** Used to pass the original CUDA device to the progress engine thread. */
   std::atomic<int> cur_device;
 #endif
+
+#ifdef AL_USE_HWLOC
   /** Initialize progress engine binding (must be called before bind). */
   void bind_init();
   /**
@@ -156,6 +162,8 @@ class ProgressEngine {
    * If there are multiple ranks per NUMA node, they get the last-1, etc. core.
    */
   void bind();
+#endif
+
   /** This is the main progress engine loop. */
   void engine();
 };

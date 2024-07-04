@@ -25,16 +25,19 @@
 // permissions and limitations under the license.
 ////////////////////////////////////////////////////////////////////////////////
 
+#include <Al_config.hpp>
 #include "aluminum/progress.hpp"
 
 #include <iostream>
 #include <numeric>
 #include <string>
 
+#ifdef AL_USE_PROGRESS
 #include <hwloc.h>
+#endif
+
 #include <mpi.h>
 
-#include <Al_config.hpp>
 #include "aluminum/base.hpp"
 #include "aluminum/tuning_params.hpp"
 #include "aluminum/state.hpp"
@@ -58,6 +61,8 @@
 
 namespace Al {
 namespace internal {
+
+#ifdef AL_USE_HWLOC
 
 namespace {
 
@@ -225,6 +230,8 @@ bool get_hwloc_cpuset(hwloc_cpuset_t& cpuset, hwloc_topology_t& topo) {
 
 }  // anonymous namespace
 
+#endif  // AL_USE_HWLOC
+
 #ifdef AL_PE_STREAM_QUEUE_CACHE
 #ifdef AL_THREAD_MULTIPLE
 thread_local std::unordered_map<void*, ProgressEngine::InputQueue*> ProgressEngine::stream_to_queue;
@@ -251,7 +258,9 @@ ProgressEngine::ProgressEngine() {
   AL_CHECK_CUDA(AlGpuGetDevice(&device));
   cur_device = device;
 #endif
+#ifdef AL_USE_HWLOC
   bind_init();
+#endif
 }
 
 ProgressEngine::~ProgressEngine() {}
@@ -376,6 +385,8 @@ std::ostream& ProgressEngine::dump_state(std::ostream& ss) {
   return ss;
 }
 
+#ifdef AL_USE_HWLOC
+
 void ProgressEngine::bind_init() {
   check_hwloc_api_version();
   // Determine topology information.
@@ -479,12 +490,16 @@ void ProgressEngine::bind() {
   hwloc_topology_destroy(topo);
 }
 
+#endif  // AL_USE_HWLOC
+
 void ProgressEngine::engine() {
 #ifdef AL_HAS_CUDA
   // Set the current CUDA device for the thread.
   AL_CHECK_CUDA_NOSYNC(AlGpuSetDevice(cur_device.load()));
 #endif
+#ifdef AL_USE_HWLOC
   bind();
+#endif
   // Notify the main thread we're now running.
   {
     std::unique_lock<std::mutex> lock(startup_mutex);
