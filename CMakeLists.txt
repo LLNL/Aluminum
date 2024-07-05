@@ -137,6 +137,9 @@ option(ALUMINUM_ENABLE_THREAD_MULTIPLE
 option(ALUMINUM_ENABLE_TRACE
   "Enable runtime tracing."
   OFF)
+option(ALUMINUM_ENABLE_HWLOC
+  "Enable hwloc"
+  ON)
 
 option(ALUMINUM_MPI_SERIALIZE
   "Serialize MPI operations."
@@ -244,6 +247,9 @@ endif ()
 if (ALUMINUM_ENABLE_TRACE)
   set(AL_TRACE ON)
 endif ()
+if (ALUMINUM_ENABLE_HWLOC)
+  set(AL_USE_HWLOC ON)
+endif ()
 if (ALUMINUM_MPI_SERIALIZE)
   set(AL_MPI_SERIALIZE ON)
 endif ()
@@ -330,11 +336,13 @@ endforeach()
 set_property(TARGET MPI::MPI_CXX
   PROPERTY INTERFACE_LINK_LIBRARIES ${_MPI_LINK_LIBRARIES})
 
-if (ALUMINUM_ENABLE_ROCM)
-  set(AL_HWLOC_MINIMUM_VERSION "2.3.0")
-  find_package(HWLOC "${AL_HWLOC_MINIMUM_VERSION}" REQUIRED)
-else ()
-  find_package(HWLOC REQUIRED)
+if (ALUMINUM_ENABLE_HWLOC)
+  if (ALUMINUM_ENABLE_ROCM)
+    set(AL_HWLOC_MINIMUM_VERSION "2.3.0")
+    find_package(HWLOC "${AL_HWLOC_MINIMUM_VERSION}" REQUIRED)
+  else ()
+    find_package(HWLOC REQUIRED)
+  endif ()
 endif ()
 
 if (ALUMINUM_ENABLE_CUDA)

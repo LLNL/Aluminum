@@ -122,3 +122,5 @@
 #cmakedefine AL_MPI_SERIALIZE
 
 #cmakedefine AL_DISABLE_BACKGROUND_STREAMS
+
+#cmakedefine AL_USE_HWLOC
