@@ -97,12 +97,47 @@ using Al_mpi_displ_t = int;
 using Al_mpi_count_vector_t = std::vector<Al_mpi_count_t>;
 using Al_mpi_displ_vector_t = std::vector<Al_mpi_displ_t>;
 
+/** True if count elements can be sent by MPI. */
+inline bool check_count_fits_mpi(size_t count) {
+  return
+    count <= static_cast<size_t>(std::numeric_limits<Al_mpi_count_t>::max());
+}
+
+/** Throw an exception if count elements cannot be sent by MPI. */
+inline void assert_count_fits_mpi(size_t count) {
+  if (!check_count_fits_mpi(count)) {
+    throw_al_exception("Message count too large for MPI");
+  }
+}
+
+/** True if displ is a valid MPI displacement. */
+inline bool check_displ_fits_mpi(size_t displ) {
+  return
+    displ <= static_cast<size_t>(std::numeric_limits<Al_mpi_displ_t>::max());
+}
+
+/** Throw an exception if displ is not a valid MPI displacement. */
+inline void assert_displ_fits_mpi(size_t displ) {
+  if (!check_displ_fits_mpi(displ)) {
+    throw_al_exception("Message displacement too large for MPI");
+  }
+}
+
 /**
  * Convert a vector of size_ts to a vector of MPI counts.
  */
 inline Al_mpi_count_vector_t
 countify_size_t_vector(const std::vector<size_t>& v) {
+#ifdef AL_DEBUG
+  Al_mpi_count_vector_t count_v(v.size());
+  for (size_t i = 0; i < v.size(); ++i) {
+    assert_count_fits_mpi(v[i]);
+    count_v[i] = v[i];
+  }
+  return count_v;
+#else
   return Al_mpi_count_vector_t(v.begin(), v.end());
+#endif
 }
 
 /**
@@ -110,22 +145,16 @@ countify_size_t_vector(const std::vector<size_t>& v) {
  */
 inline Al_mpi_displ_vector_t
 displify_size_t_vector(const std::vector<size_t>& v) {
-  return Al_mpi_displ_vector_t(v.begin(), v.end());
-}
-
-/** True if count elements can be sent by MPI. */
-inline bool check_count_fits_mpi([[maybe_unused]] size_t count) {
-#ifdef AL_HAS_LARGE_COUNT_MPI
-  return true;
-#else
-  return count <= static_cast<size_t>(std::numeric_limits<int>::max());
-#endif
-}
-/** Throw an exception if count elements cannot be sent by MPI. */
-inline void assert_count_fits_mpi(size_t count) {
-  if (!check_count_fits_mpi(count)) {
-    throw_al_exception("Message count too large for MPI");
+#ifdef AL_DEBUG
+  Al_mpi_displ_vector_t displ_v(v.size());
+  for (size_t i = 0; i < v.size(); ++i) {
+    assert_displ_fits_mpi(v[i]);
+    displ_v[i] = v[i];
   }
+  return displ_v;
+#else
+  return Al_mpi_displ_vector_t(v.begin(), v.end());
+#endif
 }
 
 /**
