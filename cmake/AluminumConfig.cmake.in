@@ -26,6 +26,7 @@ set(MPI_CXX_COMPILER "@MPI_CXX_COMPILER@" CACHE FILEPATH
   "The MPI CXX compiler wrapper.")
 find_package(MPI 3.0 REQUIRED COMPONENTS CXX)
 
+set(AL_USE_HWLOC @AL_USE_HWLOC@)
 if (AL_USE_HWLOC)
   find_dependency(HWLOC)
 endif ()
