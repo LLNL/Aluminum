@@ -39,8 +39,9 @@ namespace mpi {
 template <typename T>
 void passthrough_allgather(const T* sendbuf, T* recvbuf, size_t count,
                            MPICommunicator& comm) {
-  MPI_Allgather(buf_or_inplace(sendbuf), count, TypeMap<T>(),
-                recvbuf, count, TypeMap<T>(), comm.get_comm());
+  AL_MPI_LARGE_COUNT_CALL(MPI_Allgather)(
+    buf_or_inplace(sendbuf), count, TypeMap<T>(),
+    recvbuf, count, TypeMap<T>(), comm.get_comm());
 }
 
 template <typename T>
@@ -58,8 +59,9 @@ public:
 
 protected:
   void start_mpi_op() override {
-    MPI_Iallgather(buf_or_inplace(sendbuf), count, TypeMap<T>(),
-                   recvbuf, count, TypeMap<T>(), comm, get_mpi_req());
+    AL_MPI_LARGE_COUNT_CALL(MPI_Iallgather)(
+      buf_or_inplace(sendbuf), count, TypeMap<T>(),
+      recvbuf, count, TypeMap<T>(), comm, get_mpi_req());
   }
 
 private:

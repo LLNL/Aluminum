@@ -41,11 +41,12 @@ void passthrough_allgatherv(const T* sendbuf, T* recvbuf,
                             std::vector<size_t> counts,
                             std::vector<size_t> displs,
                             MPICommunicator& comm) {
-  std::vector<int> counts_ = intify_size_t_vector(counts);
-  std::vector<int> displs_ = intify_size_t_vector(displs);
-  MPI_Allgatherv(buf_or_inplace(sendbuf), counts[comm.rank()], TypeMap<T>(),
-                 recvbuf, counts_.data(), displs_.data(), TypeMap<T>(),
-                 comm.get_comm());
+  auto counts_ = countify_size_t_vector(counts);
+  auto displs_ = displify_size_t_vector(displs);
+  AL_MPI_LARGE_COUNT_CALL(MPI_Allgatherv)(
+    buf_or_inplace(sendbuf), counts[comm.rank()], TypeMap<T>(),
+    recvbuf, counts_.data(), displs_.data(), TypeMap<T>(),
+    comm.get_comm());
 }
 
 template <typename T>
@@ -57,8 +58,8 @@ public:
                     MPICommunicator& comm_, AlMPIReq req_) :
     MPIState(req_),
     sendbuf(sendbuf_), recvbuf(recvbuf_),
-    counts(intify_size_t_vector(counts_)),
-    displs(intify_size_t_vector(displs_)),
+    counts(countify_size_t_vector(counts_)),
+    displs(displify_size_t_vector(displs_)),
     rank(comm_.rank()), comm(comm_.get_comm()) {}
 
   ~AllgathervAlState() override {}
@@ -67,16 +68,17 @@ public:
 
 protected:
   void start_mpi_op() override {
-    MPI_Iallgatherv(buf_or_inplace(sendbuf), counts[rank], TypeMap<T>(),
-                    recvbuf, counts.data(), displs.data(), TypeMap<T>(),
-                    comm, get_mpi_req());
+    AL_MPI_LARGE_COUNT_CALL(MPI_Iallgatherv)(
+      buf_or_inplace(sendbuf), counts[rank], TypeMap<T>(),
+      recvbuf, counts.data(), displs.data(), TypeMap<T>(),
+      comm, get_mpi_req());
   }
 
 private:
   const T* sendbuf;
   T* recvbuf;
-  std::vector<int> counts;
-  std::vector<int> displs;
+  Al_mpi_count_vector_t counts;
+  Al_mpi_displ_vector_t displs;
   int rank;
   MPI_Comm comm;
 };

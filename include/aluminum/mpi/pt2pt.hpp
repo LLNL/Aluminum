@@ -43,7 +43,8 @@ namespace mpi {
 template <typename T>
 void passthrough_send(const T* sendbuf, size_t count, int dest,
                       MPICommunicator& comm) {
-  MPI_Send(sendbuf, count, TypeMap<T>(), dest, pt2pt_tag, comm.get_comm());
+  AL_MPI_LARGE_COUNT_CALL(MPI_Send)(
+    sendbuf, count, TypeMap<T>(), dest, pt2pt_tag, comm.get_comm());
 }
 
 /** GPU point-to-point send operation. */
@@ -63,7 +64,8 @@ class SendAlState : public MPIState {
 
 protected:
   void start_mpi_op() override {
-    MPI_Isend(sendbuf, count, TypeMap<T>(), dest, pt2pt_tag, comm, get_mpi_req());
+    AL_MPI_LARGE_COUNT_CALL(MPI_Isend)(
+      sendbuf, count, TypeMap<T>(), dest, pt2pt_tag, comm, get_mpi_req());
   }
 
  private:
@@ -86,8 +88,9 @@ void passthrough_nb_send(const T* sendbuf, size_t count, int dest,
 template <typename T>
 void passthrough_recv(T* recvbuf, size_t count, int src,
                       MPICommunicator& comm) {
-  MPI_Recv(recvbuf, count, TypeMap<T>(), src, pt2pt_tag, comm.get_comm(),
-           MPI_STATUS_IGNORE);
+  AL_MPI_LARGE_COUNT_CALL(MPI_Recv)(
+    recvbuf, count, TypeMap<T>(), src, pt2pt_tag, comm.get_comm(),
+    MPI_STATUS_IGNORE);
 }
 
 template <typename T>
@@ -106,7 +109,8 @@ class RecvAlState : public MPIState {
 
 protected:
   void start_mpi_op() override {
-    MPI_Irecv(recvbuf, count, mpi::TypeMap<T>(), src, pt2pt_tag, comm, get_mpi_req());
+    AL_MPI_LARGE_COUNT_CALL(MPI_Irecv)(
+      recvbuf, count, mpi::TypeMap<T>(), src, pt2pt_tag, comm, get_mpi_req());
   }
 
  private:
@@ -131,12 +135,14 @@ void passthrough_sendrecv(const T* sendbuf, size_t send_count, int dest,
                           T* recvbuf, size_t recv_count, int src,
                           MPICommunicator& comm) {
   if (sendbuf == internal::IN_PLACE<T>()) {
-    MPI_Sendrecv_replace(recvbuf, recv_count, TypeMap<T>(), dest, pt2pt_tag,
-                         src, pt2pt_tag, comm.get_comm(), MPI_STATUS_IGNORE);
+    AL_MPI_LARGE_COUNT_CALL(MPI_Sendrecv_replace)(
+      recvbuf, recv_count, TypeMap<T>(), dest, pt2pt_tag,
+      src, pt2pt_tag, comm.get_comm(), MPI_STATUS_IGNORE);
   } else {
-    MPI_Sendrecv(sendbuf, send_count, TypeMap<T>(), dest, pt2pt_tag,
-                 recvbuf, recv_count, TypeMap<T>(), src, pt2pt_tag,
-                 comm.get_comm(), MPI_STATUS_IGNORE);
+    AL_MPI_LARGE_COUNT_CALL(MPI_Sendrecv)(
+      sendbuf, send_count, TypeMap<T>(), dest, pt2pt_tag,
+      recvbuf, recv_count, TypeMap<T>(), src, pt2pt_tag,
+      comm.get_comm(), MPI_STATUS_IGNORE);
   }
 }
 
@@ -173,15 +179,19 @@ protected:
     if (sendbuf == internal::IN_PLACE<T>()) {
       // Copy the send buffer to the temporary buffer.
       std::copy_n(recvbuf, recv_count, tmp_buf);
-      MPI_Irecv(recvbuf, recv_count, TypeMap<T>(), src, pt2pt_tag, comm,
-                &mpi_reqs[0]);
-      MPI_Isend(tmp_buf, recv_count, TypeMap<T>(), dest, pt2pt_tag, comm,
-                &mpi_reqs[1]);
+      AL_MPI_LARGE_COUNT_CALL(MPI_Irecv)(
+        recvbuf, recv_count, TypeMap<T>(), src, pt2pt_tag, comm,
+        &mpi_reqs[0]);
+      AL_MPI_LARGE_COUNT_CALL(MPI_Isend)(
+        tmp_buf, recv_count, TypeMap<T>(), dest, pt2pt_tag, comm,
+        &mpi_reqs[1]);
     } else {
-      MPI_Irecv(recvbuf, recv_count, TypeMap<T>(), src, pt2pt_tag, comm,
-                &mpi_reqs[0]);
-      MPI_Isend(sendbuf, send_count, TypeMap<T>(), dest, pt2pt_tag, comm,
-                &mpi_reqs[1]);
+      AL_MPI_LARGE_COUNT_CALL(MPI_Irecv)(
+        recvbuf, recv_count, TypeMap<T>(), src, pt2pt_tag, comm,
+        &mpi_reqs[0]);
+      AL_MPI_LARGE_COUNT_CALL(MPI_Isend)(
+        sendbuf, send_count, TypeMap<T>(), dest, pt2pt_tag, comm,
+        &mpi_reqs[1]);
     }
   }
 

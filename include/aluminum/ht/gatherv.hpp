@@ -47,8 +47,8 @@ public:
                                   (displs_.back() + counts_.back()) :
                                   counts_[comm_.rank()])),
     send_count(counts_[comm_.rank()]),
-    counts(mpi::intify_size_t_vector(counts_)),
-    displs(mpi::intify_size_t_vector(displs_)),
+    counts(mpi::countify_size_t_vector(counts_)),
+    displs(mpi::displify_size_t_vector(displs_)),
     root(root_),
     comm(comm_.get_comm()) {
     // Transfer data from device to host.
@@ -86,21 +86,23 @@ public:
 protected:
   void start_mpi_op() override {
     if (is_root) {
-      MPI_Igatherv(MPI_IN_PLACE, send_count, mpi::TypeMap<T>(),
-                   host_mem, counts.data(), displs.data(), mpi::TypeMap<T>(),
-                   root, comm, get_mpi_req());
+      AL_MPI_LARGE_COUNT_CALL(MPI_Igatherv)(
+        MPI_IN_PLACE, send_count, mpi::TypeMap<T>(),
+        host_mem, counts.data(), displs.data(), mpi::TypeMap<T>(),
+        root, comm, get_mpi_req());
     } else {
-      MPI_Igatherv(host_mem, send_count, mpi::TypeMap<T>(),
-                   host_mem, counts.data(), displs.data(), mpi::TypeMap<T>(),
-                   root, comm, get_mpi_req());
+      AL_MPI_LARGE_COUNT_CALL(MPI_Igatherv)(
+        host_mem, send_count, mpi::TypeMap<T>(),
+        host_mem, counts.data(), displs.data(), mpi::TypeMap<T>(),
+        root, comm, get_mpi_req());
     }
   }
 
 private:
   T* host_mem;
   size_t send_count;
-  std::vector<int> counts;
-  std::vector<int> displs;
+  mpi::Al_mpi_count_vector_t counts;
+  mpi::Al_mpi_displ_vector_t displs;
   int root;
   MPI_Comm comm;
 };

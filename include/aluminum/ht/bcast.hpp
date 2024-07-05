@@ -72,7 +72,8 @@ public:
 
 protected:
   void start_mpi_op() override {
-    MPI_Ibcast(host_mem, count, mpi::TypeMap<T>(), root, comm, get_mpi_req());
+    AL_MPI_LARGE_COUNT_CALL(MPI_Ibcast)(
+      host_mem, count, mpi::TypeMap<T>(), root, comm, get_mpi_req());
   }
 
 private:

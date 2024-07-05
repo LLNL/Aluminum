@@ -206,12 +206,13 @@ public:
   void run_mpi_impl(std::vector<T>& input,
                     std::vector<T>& output,
                     typename Backend::comm_type& comm) {
-    MPI_Allgather(this->buf_or_inplace(input.data()), input.size(),
-                  Al::internal::mpi::TypeMap<T>(),
-                  output.data(),
-                  this->get_options().inplace ? output.size() / comm.size() : input.size(),
-                  Al::internal::mpi::TypeMap<T>(),
-                  comm.get_comm());
+    AL_MPI_LARGE_COUNT_CALL(MPI_Allgather)(
+      this->buf_or_inplace(input.data()), input.size(),
+      Al::internal::mpi::TypeMap<T>(),
+      output.data(),
+      this->get_options().inplace ? output.size() / comm.size() : input.size(),
+      Al::internal::mpi::TypeMap<T>(),
+      comm.get_comm());
   }
 
   size_t get_input_size_impl(size_t base_size,
@@ -258,14 +259,15 @@ public:
   void run_mpi_impl(std::vector<T>& input,
                     std::vector<T>& output,
                     typename Backend::comm_type& comm) {
-    std::vector<int> counts = Al::internal::mpi::intify_size_t_vector(
+    auto counts = Al::internal::mpi::countify_size_t_vector(
       this->get_options().send_counts);
-    std::vector<int> displs = Al::internal::mpi::intify_size_t_vector(
+    auto displs = Al::internal::mpi::displify_size_t_vector(
       this->get_options().send_displs);
-    MPI_Allgatherv(this->buf_or_inplace(input.data()), counts[comm.rank()],
-                   Al::internal::mpi::TypeMap<T>(),
-                   output.data(), counts.data(), displs.data(),
-                   Al::internal::mpi::TypeMap<T>(), comm.get_comm());
+    AL_MPI_LARGE_COUNT_CALL(MPI_Allgatherv)(
+      this->buf_or_inplace(input.data()), counts[comm.rank()],
+      Al::internal::mpi::TypeMap<T>(),
+      output.data(), counts.data(), displs.data(),
+      Al::internal::mpi::TypeMap<T>(), comm.get_comm());
   }
 
   size_t get_input_size_impl(size_t /*base_size*/,
@@ -314,10 +316,11 @@ public:
                     typename Backend::comm_type& comm) {
     MPI_Op reduction_op = Al::internal::mpi::ReductionOperator2MPI_Op<T>(
       this->get_options().reduction_op);
-    MPI_Allreduce(this->buf_or_inplace(input.data()), output.data(),
-                  this->get_options().inplace ? output.size() : input.size(),
-                  Al::internal::mpi::TypeMap<T>(),
-                  reduction_op, comm.get_comm());
+    AL_MPI_LARGE_COUNT_CALL(MPI_Allreduce)(
+      this->buf_or_inplace(input.data()), output.data(),
+      this->get_options().inplace ? output.size() : input.size(),
+      Al::internal::mpi::TypeMap<T>(),
+      reduction_op, comm.get_comm());
   }
 
   size_t get_input_size_impl(size_t base_size,
@@ -368,11 +371,12 @@ public:
     size_t size = this->get_options().inplace
       ? output.size() / comm.size()
       : input.size() / comm.size();
-    MPI_Alltoall(this->buf_or_inplace(input.data()), size,
-                 Al::internal::mpi::TypeMap<T>(),
-                 output.data(), size,
-                 Al::internal::mpi::TypeMap<T>(),
-                 comm.get_comm());
+    AL_MPI_LARGE_COUNT_CALL(MPI_Alltoall)(
+      this->buf_or_inplace(input.data()), size,
+      Al::internal::mpi::TypeMap<T>(),
+      output.data(), size,
+      Al::internal::mpi::TypeMap<T>(),
+      comm.get_comm());
   }
 
   size_t get_input_size_impl(size_t base_size,
@@ -421,21 +425,22 @@ public:
   void run_mpi_impl(std::vector<T>& input,
                     std::vector<T>& output,
                     typename Backend::comm_type& comm) {
-    std::vector<int> send_counts =
-        Al::internal::mpi::intify_size_t_vector(this->get_options().send_counts);
-    std::vector<int> send_displs =
-        Al::internal::mpi::intify_size_t_vector(this->get_options().send_displs);
-    std::vector<int> recv_counts =
-        Al::internal::mpi::intify_size_t_vector(this->get_options().recv_counts);
-    std::vector<int> recv_displs =
-        Al::internal::mpi::intify_size_t_vector(this->get_options().recv_displs);
-    MPI_Alltoallv(this->buf_or_inplace(input.data()),
-                  send_counts.data(), send_displs.data(),
-                  Al::internal::mpi::TypeMap<T>(),
-                  output.data(),
-                  recv_counts.data(), recv_displs.data(),
-                  Al::internal::mpi::TypeMap<T>(),
-                  comm.get_comm());
+    auto send_counts =
+        Al::internal::mpi::countify_size_t_vector(this->get_options().send_counts);
+    auto send_displs =
+        Al::internal::mpi::displify_size_t_vector(this->get_options().send_displs);
+    auto recv_counts =
+        Al::internal::mpi::countify_size_t_vector(this->get_options().recv_counts);
+    auto recv_displs =
+        Al::internal::mpi::displify_size_t_vector(this->get_options().recv_displs);
+    AL_MPI_LARGE_COUNT_CALL(MPI_Alltoallv)(
+      this->buf_or_inplace(input.data()),
+      send_counts.data(), send_displs.data(),
+      Al::internal::mpi::TypeMap<T>(),
+      output.data(),
+      recv_counts.data(), recv_displs.data(),
+      Al::internal::mpi::TypeMap<T>(),
+      comm.get_comm());
   }
 
   size_t get_input_size_impl(size_t /*base_size*/,
@@ -532,9 +537,10 @@ public:
   void run_mpi_impl(std::vector<T>& /*input*/,
                     std::vector<T>& output,
                     typename Backend::comm_type& comm) {
-    MPI_Bcast(output.data(), output.size(),
-              Al::internal::mpi::TypeMap<T>(),
-              this->get_options().root, comm.get_comm());
+    AL_MPI_LARGE_COUNT_CALL(MPI_Bcast)(
+      output.data(), output.size(),
+      Al::internal::mpi::TypeMap<T>(),
+      this->get_options().root, comm.get_comm());
   }
 
   size_t get_input_size_impl(size_t base_size,
@@ -591,11 +597,12 @@ public:
     void* sendbuf = (comm.rank() == root)
       ? this->buf_or_inplace(input.data())
       : (this->get_options().inplace ? output.data() : input.data());
-    MPI_Gather(sendbuf, size,
-               Al::internal::mpi::TypeMap<T>(),
-               output.data(), size,
-               Al::internal::mpi::TypeMap<T>(),
-               root, comm.get_comm());
+    AL_MPI_LARGE_COUNT_CALL(MPI_Gather)(
+      sendbuf, size,
+      Al::internal::mpi::TypeMap<T>(),
+      output.data(), size,
+      Al::internal::mpi::TypeMap<T>(),
+      root, comm.get_comm());
   }
 
   size_t get_input_size_impl(size_t base_size,
@@ -652,20 +659,21 @@ public:
                     std::vector<T>& output,
                     typename Backend::comm_type& comm) {
     int root = this->get_options().root;
-    std::vector<int> send_counts =
-        Al::internal::mpi::intify_size_t_vector(this->get_options().send_counts);
-    std::vector<int> send_displs =
-        Al::internal::mpi::intify_size_t_vector(this->get_options().send_displs);
+    auto send_counts =
+        Al::internal::mpi::countify_size_t_vector(this->get_options().send_counts);
+    auto send_displs =
+        Al::internal::mpi::displify_size_t_vector(this->get_options().send_displs);
     // Account for in-place only being used at the root.
     void* sendbuf = (comm.rank() == root)
       ? this->buf_or_inplace(input.data())
       : (this->get_options().inplace ? output.data() : input.data());
-    MPI_Gatherv(sendbuf,
-                this->get_options().send_counts[comm.rank()],
-                Al::internal::mpi::TypeMap<T>(),
-                output.data(), send_counts.data(), send_displs.data(),
-                Al::internal::mpi::TypeMap<T>(),
-                root, comm.get_comm());
+    AL_MPI_LARGE_COUNT_CALL(MPI_Gatherv)(
+      sendbuf,
+      this->get_options().send_counts[comm.rank()],
+      Al::internal::mpi::TypeMap<T>(),
+      output.data(), send_counts.data(), send_displs.data(),
+      Al::internal::mpi::TypeMap<T>(),
+      root, comm.get_comm());
   }
 
   size_t get_input_size_impl(size_t /*base_size*/,
@@ -728,10 +736,11 @@ public:
     void* sendbuf = (comm.rank() == root)
       ? this->buf_or_inplace(input.data())
       : (this->get_options().inplace ? output.data() : input.data());
-    MPI_Reduce(sendbuf, output.data(),
-               this->get_options().inplace ? output.size() : input.size(),
-               Al::internal::mpi::TypeMap<T>(),
-               reduction_op, root, comm.get_comm());
+    AL_MPI_LARGE_COUNT_CALL(MPI_Reduce)(
+      sendbuf, output.data(),
+      this->get_options().inplace ? output.size() : input.size(),
+      Al::internal::mpi::TypeMap<T>(),
+      reduction_op, root, comm.get_comm());
   }
 
   size_t get_input_size_impl(size_t base_size,
@@ -790,10 +799,11 @@ public:
                     typename Backend::comm_type& comm) {
     MPI_Op reduction_op = Al::internal::mpi::ReductionOperator2MPI_Op<T>(
       this->get_options().reduction_op);
-    MPI_Reduce_scatter_block(this->buf_or_inplace(input.data()), output.data(),
-                             (this->get_options().inplace ? output.size() : input.size()) / comm.size(),
-                             Al::internal::mpi::TypeMap<T>(),
-                             reduction_op, comm.get_comm());
+    AL_MPI_LARGE_COUNT_CALL(MPI_Reduce_scatter_block)(
+      this->buf_or_inplace(input.data()), output.data(),
+      (this->get_options().inplace ? output.size() : input.size()) / comm.size(),
+      Al::internal::mpi::TypeMap<T>(),
+      reduction_op, comm.get_comm());
   }
 
   size_t get_input_size_impl(size_t base_size,
@@ -846,12 +856,13 @@ public:
                     typename Backend::comm_type& comm) {
     MPI_Op reduction_op = Al::internal::mpi::ReductionOperator2MPI_Op<T>(
       this->get_options().reduction_op);
-    std::vector<int> counts = Al::internal::mpi::intify_size_t_vector(
+    auto counts = Al::internal::mpi::countify_size_t_vector(
       this->get_options().recv_counts);
-    MPI_Reduce_scatter(this->buf_or_inplace(input.data()), output.data(),
-                       counts.data(),
-                       Al::internal::mpi::TypeMap<T>(),
-                       reduction_op, comm.get_comm());
+    AL_MPI_LARGE_COUNT_CALL(MPI_Reduce_scatter)(
+      this->buf_or_inplace(input.data()), output.data(),
+      counts.data(),
+      Al::internal::mpi::TypeMap<T>(),
+      reduction_op, comm.get_comm());
   }
 
   size_t get_input_size_impl(size_t /*base_size*/,
@@ -917,11 +928,12 @@ public:
     void* recvbuf = (comm.rank() == root)
       ? this->buf_or_inplace(output.data())
       : output.data();
-    MPI_Scatter(sendbuf, size,
-                Al::internal::mpi::TypeMap<T>(),
-                recvbuf, size,
-                Al::internal::mpi::TypeMap<T>(),
-                root, comm.get_comm());
+    AL_MPI_LARGE_COUNT_CALL(MPI_Scatter)(
+      sendbuf, size,
+      Al::internal::mpi::TypeMap<T>(),
+      recvbuf, size,
+      Al::internal::mpi::TypeMap<T>(),
+      root, comm.get_comm());
   }
 
   size_t get_input_size_impl(size_t base_size,
@@ -981,10 +993,10 @@ public:
                     std::vector<T>& output,
                     typename Backend::comm_type& comm) {
     int root = this->get_options().root;
-    std::vector<int> send_counts =
-        Al::internal::mpi::intify_size_t_vector(this->get_options().send_counts);
-    std::vector<int> send_displs =
-        Al::internal::mpi::intify_size_t_vector(this->get_options().send_displs);
+    auto send_counts =
+        Al::internal::mpi::countify_size_t_vector(this->get_options().send_counts);
+    auto send_displs =
+        Al::internal::mpi::displify_size_t_vector(this->get_options().send_displs);
     // Account for in-place needing to be passed as the recvbuf on the root.
     void* sendbuf = (comm.rank() == root)
       ? (this->get_options().inplace ? output.data() : input.data())
@@ -992,11 +1004,12 @@ public:
     void* recvbuf = (comm.rank() == root)
       ? this->buf_or_inplace(output.data())
       : output.data();
-    MPI_Scatterv(sendbuf, send_counts.data(), send_displs.data(),
-                 Al::internal::mpi::TypeMap<T>(),
-                 recvbuf, send_counts[comm.rank()],
-                 Al::internal::mpi::TypeMap<T>(),
-                 root, comm.get_comm());
+    AL_MPI_LARGE_COUNT_CALL(MPI_Scatterv)(
+      sendbuf, send_counts.data(), send_displs.data(),
+      Al::internal::mpi::TypeMap<T>(),
+      recvbuf, send_counts[comm.rank()],
+      Al::internal::mpi::TypeMap<T>(),
+      root, comm.get_comm());
   }
 
   size_t get_input_size_impl(size_t /*base_size*/,
@@ -1061,10 +1074,11 @@ public:
   void run_mpi_impl(std::vector<T>& input,
                     std::vector<T>& /*output*/,
                     typename Backend::comm_type& comm) {
-    MPI_Send(input.data(), input.size(),
-             Al::internal::mpi::TypeMap<T>(),
-             this->get_options().dst,
-             0, comm.get_comm());
+    AL_MPI_LARGE_COUNT_CALL(MPI_Send)(
+      input.data(), input.size(),
+      Al::internal::mpi::TypeMap<T>(),
+      this->get_options().dst,
+      0, comm.get_comm());
   }
 
   size_t get_input_size_impl(size_t base_size,
@@ -1109,10 +1123,11 @@ public:
   void run_mpi_impl(std::vector<T>& /*input*/,
                     std::vector<T>& output,
                     typename Backend::comm_type& comm) {
-    MPI_Recv(output.data(), output.size(),
-             Al::internal::mpi::TypeMap<T>(),
-             this->get_options().src,
-             0, comm.get_comm(), MPI_STATUS_IGNORE);
+    AL_MPI_LARGE_COUNT_CALL(MPI_Recv)(
+      output.data(), output.size(),
+      Al::internal::mpi::TypeMap<T>(),
+      this->get_options().src,
+      0, comm.get_comm(), MPI_STATUS_IGNORE);
   }
 
   size_t get_input_size_impl(size_t /*base_size*/,
@@ -1155,19 +1170,21 @@ public:
                     std::vector<T>& output,
                     typename Backend::comm_type& comm) {
     if (this->get_options().inplace) {
-      MPI_Sendrecv_replace(output.data(), output.size(),
-                           Al::internal::mpi::TypeMap<T>(),
-                           this->get_options().dst, 0,
-                           this->get_options().src, 0,
-                           comm.get_comm(), MPI_STATUS_IGNORE);
+      AL_MPI_LARGE_COUNT_CALL(MPI_Sendrecv_replace)(
+        output.data(), output.size(),
+        Al::internal::mpi::TypeMap<T>(),
+        this->get_options().dst, 0,
+        this->get_options().src, 0,
+        comm.get_comm(), MPI_STATUS_IGNORE);
     } else {
-      MPI_Sendrecv(input.data(), input.size(),
-                   Al::internal::mpi::TypeMap<T>(),
-                   this->get_options().dst, 0,
-                   output.data(), output.size(),
-                   Al::internal::mpi::TypeMap<T>(),
-                   this->get_options().src, 0,
-                   comm.get_comm(), MPI_STATUS_IGNORE);
+      AL_MPI_LARGE_COUNT_CALL(MPI_Sendrecv)(
+        input.data(), input.size(),
+        Al::internal::mpi::TypeMap<T>(),
+        this->get_options().dst, 0,
+        output.data(), output.size(),
+        Al::internal::mpi::TypeMap<T>(),
+        this->get_options().src, 0,
+        comm.get_comm(), MPI_STATUS_IGNORE);
     }
   }
 
@@ -1233,10 +1250,10 @@ public:
     if (srcs.empty() && dests.empty()) {
       return;
     }
-    std::vector<int> send_counts =
-      Al::internal::mpi::intify_size_t_vector(this->get_options().send_counts);
-    std::vector<int> recv_counts =
-        Al::internal::mpi::intify_size_t_vector(this->get_options().recv_counts);
+    auto send_counts =
+      Al::internal::mpi::countify_size_t_vector(this->get_options().send_counts);
+    auto recv_counts =
+      Al::internal::mpi::displify_size_t_vector(this->get_options().recv_counts);
     std::vector<MPI_Request> reqs(srcs.size() + dests.size());
     T* recv_buf = output.data();
     T* send_buf = nullptr;
@@ -1248,13 +1265,15 @@ public:
       send_buf = input.data();
     }
     for (size_t i = 0; i < srcs.size(); ++i) {
-      MPI_Irecv(recv_buf, recv_counts[i], Al::internal::mpi::TypeMap<T>(),
-                srcs[i], 0, comm.get_comm(), &reqs[i]);
+      AL_MPI_LARGE_COUNT_CALL(MPI_Irecv)(
+        recv_buf, recv_counts[i], Al::internal::mpi::TypeMap<T>(),
+        srcs[i], 0, comm.get_comm(), &reqs[i]);
       recv_buf += recv_counts[i];
     }
     for (size_t i = 0; i < dests.size(); ++i) {
-      MPI_Isend(send_buf, send_counts[i], Al::internal::mpi::TypeMap<T>(),
-                dests[i], 0, comm.get_comm(), &reqs[i + srcs.size()]);
+      AL_MPI_LARGE_COUNT_CALL(MPI_Isend)(
+        send_buf, send_counts[i], Al::internal::mpi::TypeMap<T>(),
+        dests[i], 0, comm.get_comm(), &reqs[i + srcs.size()]);
       send_buf += send_counts[i];
     }
     MPI_Waitall(reqs.size(), reqs.data(), MPI_STATUSES_IGNORE);

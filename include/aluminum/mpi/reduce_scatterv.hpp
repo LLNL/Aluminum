@@ -41,10 +41,11 @@ void passthrough_reduce_scatterv(const T* sendbuf, T* recvbuf,
                                  std::vector<size_t> counts,
                                  ReductionOperator op,
                                  MPICommunicator& comm) {
-  std::vector<int> counts_ = intify_size_t_vector(counts);
-  MPI_Reduce_scatter(buf_or_inplace(sendbuf), recvbuf,
-                     counts_.data(), TypeMap<T>(),
-                     ReductionOperator2MPI_Op<T>(op), comm.get_comm());
+  auto counts_ = countify_size_t_vector(counts);
+  AL_MPI_LARGE_COUNT_CALL(MPI_Reduce_scatter)(
+    buf_or_inplace(sendbuf), recvbuf,
+    counts_.data(), TypeMap<T>(),
+    ReductionOperator2MPI_Op<T>(op), comm.get_comm());
 }
 
 template <typename T>
@@ -56,7 +57,7 @@ public:
                         AlMPIReq req_) :
     MPIState(req_),
     sendbuf(sendbuf_), recvbuf(recvbuf_),
-    counts(intify_size_t_vector(counts_)),
+    counts(countify_size_t_vector(counts_)),
     op(ReductionOperator2MPI_Op<T>(op_)),
     comm(comm_.get_comm()) {}
 
@@ -66,15 +67,16 @@ public:
 
 protected:
   void start_mpi_op() override {
-    MPI_Ireduce_scatter(buf_or_inplace(sendbuf), recvbuf,
-                        counts.data(), TypeMap<T>(), op, comm,
-                        get_mpi_req());
+    AL_MPI_LARGE_COUNT_CALL(MPI_Ireduce_scatter)(
+      buf_or_inplace(sendbuf), recvbuf,
+      counts.data(), TypeMap<T>(), op, comm,
+      get_mpi_req());
   }
 
 private:
   const T* sendbuf;
   T* recvbuf;
-  std::vector<int> counts;
+  Al_mpi_count_vector_t counts;
   MPI_Op op;
   MPI_Comm comm;
 };

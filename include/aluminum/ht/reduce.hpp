@@ -71,11 +71,13 @@ public:
 protected:
   void start_mpi_op() override {
     if (is_root) {
-      MPI_Ireduce(MPI_IN_PLACE, host_mem, count, mpi::TypeMap<T>(),
-                  op, root, comm, get_mpi_req());
+      AL_MPI_LARGE_COUNT_CALL(MPI_Ireduce)(
+        MPI_IN_PLACE, host_mem, count, mpi::TypeMap<T>(),
+        op, root, comm, get_mpi_req());
     } else {
-      MPI_Ireduce(host_mem, host_mem, count, mpi::TypeMap<T>(),
-                  op, root, comm, get_mpi_req());
+      AL_MPI_LARGE_COUNT_CALL(MPI_Ireduce)(
+        host_mem, host_mem, count, mpi::TypeMap<T>(),
+        op, root, comm, get_mpi_req());
     }
   }
 

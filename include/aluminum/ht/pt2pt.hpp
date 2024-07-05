@@ -73,7 +73,8 @@ class SendAlState : public AlState {
 #ifdef AL_HAS_PROF
       prof_range = profiling::prof_start("HTSend MPI");
 #endif
-      MPI_Isend(mem, count, mpi::TypeMap<T>(), dest, pt2pt_tag, comm, &req);
+      AL_MPI_LARGE_COUNT_CALL(MPI_Isend)(
+        mem, count, mpi::TypeMap<T>(), dest, pt2pt_tag, comm, &req);
       send_started = true;
     }
     int flag;
@@ -127,7 +128,8 @@ class RecvAlState : public AlState {
 #ifdef AL_HAS_PROF
     prof_range = profiling::prof_start("HTRecv MPI");
 #endif
-    MPI_Irecv(mem, count, mpi::TypeMap<T>(), src, pt2pt_tag, comm, &req);
+    AL_MPI_LARGE_COUNT_CALL(MPI_Irecv)(
+      mem, count, mpi::TypeMap<T>(), src, pt2pt_tag, comm, &req);
   }
   PEAction step() override {
     if (!recv_done) {

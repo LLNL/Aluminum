@@ -39,8 +39,9 @@ namespace mpi {
 template <typename T>
 void passthrough_allreduce(const T* sendbuf, T* recvbuf, size_t count,
                            ReductionOperator op, MPICommunicator& comm) {
-  MPI_Allreduce(buf_or_inplace(sendbuf), recvbuf, count, TypeMap<T>(),
-                ReductionOperator2MPI_Op<T>(op), comm.get_comm());
+  AL_MPI_LARGE_COUNT_CALL(MPI_Allreduce)(
+    buf_or_inplace(sendbuf), recvbuf, count, TypeMap<T>(),
+    ReductionOperator2MPI_Op<T>(op), comm.get_comm());
 }
 
 template <typename T>
@@ -58,8 +59,9 @@ public:
 
 protected:
   void start_mpi_op() override {
-    MPI_Iallreduce(buf_or_inplace(sendbuf), recvbuf, count, TypeMap<T>(), op,
-                   comm, get_mpi_req());
+    AL_MPI_LARGE_COUNT_CALL(MPI_Iallreduce)(
+      buf_or_inplace(sendbuf), recvbuf, count, TypeMap<T>(), op,
+      comm, get_mpi_req());
   }
 
 private:
