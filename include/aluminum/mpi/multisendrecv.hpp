@@ -82,8 +82,11 @@ void passthrough_inplace_multisendrecv(std::vector<T*> buffers,
   // Cannot use Isendrecv_replace since MPI 4.0 is probably too new.
   std::vector<const T*> tmp_buffers(buffers.size(), nullptr);
   size_t total_size = std::accumulate(counts.begin(), counts.end(), size_t{0});
-  T* tmp_buf =
+  T* tmp_buf = nullptr;
+  if (total_size > 0) {
+    tmp_buf =
       internal::mempool.allocate<internal::MemoryType::HOST, T>(total_size);
+  }
   // Do the copy through the non-const pointer.
   T* cur_ptr = nullptr;
   for (size_t i = 0; i < buffers.size(); ++i) {
@@ -135,10 +138,16 @@ public:
     mpi_reqs(send_buffers.size() + recv_buffers.size()) {
     // Allocate space and set up pointers but do not copy.
     size_t total_size = std::accumulate(counts.begin(), counts.end(), size_t{0});
-    tmp_buf = internal::mempool.allocate<internal::MemoryType::HOST, T>(total_size);
-    send_buffers[0] = tmp_buf;
-    for (size_t i = 1; i < counts.size(); ++i) {
-      send_buffers[i] = send_buffers[i-1] + counts[i-1];
+    if (total_size > 0)
+    {
+      tmp_buf =
+        internal::mempool.allocate<internal::MemoryType::HOST, T>(total_size);
+    }
+    if (!send_buffers.empty()) {
+      send_buffers[0] = tmp_buf;
+      for (size_t i = 1; i < counts.size(); ++i) {
+        send_buffers[i] = send_buffers[i-1] + counts[i-1];
+      }
     }
   }
 

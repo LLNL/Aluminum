@@ -1037,14 +1037,18 @@ class NCCLBackend {
                                        comm_type& comm, AlGpuStream_t stream) {
     // Set up a temporary buffer to send from, since we receive to the original.
     size_t sendbuf_len = std::accumulate(counts.begin(), counts.end(), size_t{0});
-    T* tmp_sendbuf = internal::mempool.allocate<internal::MemoryType::CUDA, T>(
-      sendbuf_len, stream);
+    T* tmp_sendbuf = nullptr;
     std::vector<const T*> tmp_sendbufs(counts.size());
-    for (size_t i = 0, offset = 0; i < counts.size(); ++i, offset += counts[i]) {
-      AL_CHECK_CUDA(AlGpuMemcpyAsync((void*) (tmp_sendbuf + offset),
-                                     (const void*) buffers[i],
-                                     counts[i]*sizeof(T),
-                                     AlGpuMemcpyDeviceToDevice, stream));
+    if (sendbuf_len > 0) {
+      tmp_sendbuf = internal::mempool.allocate<internal::MemoryType::CUDA, T>(
+        sendbuf_len, stream);
+      for (size_t i = 0, offset = 0; i < counts.size(); ++i, offset += counts[i]) {
+        AL_CHECK_CUDA(AlGpuMemcpyAsync((void*) (tmp_sendbuf + offset),
+                                       (const void*) buffers[i],
+                                       counts[i]*sizeof(T),
+                                       AlGpuMemcpyDeviceToDevice, stream));
+        tmp_sendbufs[i] = tmp_sendbuf + offset;
+      }
     }
     internal::nccl::safe_nccl_group<2>(
       0, buffers.size(),
