@@ -368,18 +368,19 @@ template <typename Backend, typename F>
 void dispatch_to_backend_type_helper(cxxopts::ParseResult& parsed_opts,
                                      F functor) {
   const std::unordered_map<std::string, std::function<void()>> dispatch = {
+    {"int", [&]() { functor.template operator()<Backend, int>(parsed_opts); } },
+    {"float", [&]() { functor.template operator()<Backend, float>(parsed_opts); } },
+#ifndef AL_LIMIT_TEST_DATATYPES
     {"char", [&]() { functor.template operator()<Backend, char>(parsed_opts); } },
     {"schar", [&]() { functor.template operator()<Backend, signed char>(parsed_opts); } },
     {"uchar", [&]() { functor.template operator()<Backend, unsigned char>(parsed_opts); } },
     {"short", [&]() { functor.template operator()<Backend, short>(parsed_opts); } },
     {"ushort", [&]() { functor.template operator()<Backend, unsigned short>(parsed_opts); } },
-    {"int", [&]() { functor.template operator()<Backend, int>(parsed_opts); } },
     {"uint", [&]() { functor.template operator()<Backend, unsigned int>(parsed_opts); } },
     {"long", [&]() { functor.template operator()<Backend, long>(parsed_opts); } },
     {"ulong", [&]() { functor.template operator()<Backend, unsigned long>(parsed_opts); } },
     {"longlong", [&]() { functor.template operator()<Backend, long long>(parsed_opts); } },
     {"ulonglong", [&]() { functor.template operator()<Backend, unsigned long long>(parsed_opts); } },
-    {"float", [&]() { functor.template operator()<Backend, float>(parsed_opts); } },
     {"double", [&]() { functor.template operator()<Backend, double>(parsed_opts); } },
     {"longdouble", [&]() { functor.template operator()<Backend, long double>(parsed_opts); } },
 #ifdef AL_HAS_HALF
@@ -388,11 +389,15 @@ void dispatch_to_backend_type_helper(cxxopts::ParseResult& parsed_opts,
 #ifdef AL_HAS_BFLOAT
     {"bfloat16", [&]() { functor.template operator()<Backend, al_bfloat16>(parsed_opts); } },
 #endif
+#endif  // AL_LIMIT_TEST_DATATYPES
   };
   auto datatype = parsed_opts["datatype"].as<std::string>();
   auto i = dispatch.find(datatype);
   if (i == dispatch.end()) {
     std::cerr << "Unknown datatype " << datatype << std::endl;
+#ifdef AL_LIMIT_TEST_DATATYPES
+    std::cerr << "Note you have AL_LIMIT_TEST_DATATYPES on" << std::endl;
+#endif
     std::abort();
   }
   i->second();

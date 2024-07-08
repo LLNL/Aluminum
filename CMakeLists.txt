@@ -154,6 +154,9 @@ option(ALUMINUM_ENABLE_TESTS
 option(ALUMINUM_ENABLE_BENCHMARKS
   "Build benchmarks."
   OFF)
+option(ALUMINUM_LIMIT_TEST_DATATYPES
+  "Only support testing/benchmarking with a limited number of datatypes."
+  OFF)
 
 # Tuning parameters (in the order they appear in the file). Recall:
 # Cache values previously set are not modified. These only take effect
@@ -261,6 +264,9 @@ if (ALUMINUM_ENABLE_TESTS)
 endif ()
 if (ALUMINUM_ENABLE_BENCHMARKS)
   set(AL_ENABLE_BENCHMARKS ON)
+endif ()
+if (ALUMINUM_LIMIT_TEST_DATATYPES)
+  set(AL_LIMIT_TEST_DATATYPES ON)
 endif ()
 
 # Setup CXX requirements

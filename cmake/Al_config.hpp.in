@@ -105,6 +105,9 @@
 #cmakedefine AL_HAS_MPI_CUDA_RMA
 #endif
 
+/** Only build tests with a limited number of datatypes. */
+#cmakedefine AL_LIMIT_TEST_DATATYPES
+
 /** Enable various sanity checks, generally light-weight. */
 #cmakedefine AL_DEBUG
 #cmakedefine AL_DEBUG_HANG_CHECK
