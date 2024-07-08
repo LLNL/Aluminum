@@ -42,7 +42,7 @@
 
 
 /** Return true if str is a valid operator. */
-bool is_operator_name(const std::string str) {
+inline bool is_operator_name(const std::string str) {
   static const std::unordered_set<std::string> ops = {
     "allgather",
     "allgatherv",
@@ -67,7 +67,7 @@ bool is_operator_name(const std::string str) {
 }
 
 /** Return the reduction operator corresponding to a string. */
-Al::ReductionOperator get_reduction_op(const std::string redop_str) {
+inline Al::ReductionOperator get_reduction_op(const std::string redop_str) {
   static const std::unordered_map<std::string, Al::ReductionOperator> op_lookup = {
     {"sum", Al::ReductionOperator::sum},
     {"prod", Al::ReductionOperator::prod},
@@ -91,7 +91,7 @@ Al::ReductionOperator get_reduction_op(const std::string redop_str) {
 
 /** Helper to call a functor with the right op as a template parameter. */
 template <typename F>
-auto call_op_functor(Al::AlOperation op, F functor) {
+inline auto call_op_functor(Al::AlOperation op, F functor) {
   switch (op) {
   case Al::AlOperation::allgather:
     return functor.template operator()<Al::AlOperation::allgather>();
@@ -136,7 +136,7 @@ auto call_op_functor(Al::AlOperation op, F functor) {
 }
 
 /** Return the AlOperation enum corresponding to op_str. */
-Al::AlOperation op_str_to_op(const std::string op_str) {
+inline Al::AlOperation op_str_to_op(const std::string op_str) {
   static const std::unordered_map<std::string, Al::AlOperation> lookup = {
     {"allgather", Al::AlOperation::allgather},
     {"allgatherv", Al::AlOperation::allgatherv},
@@ -171,7 +171,7 @@ struct op_name_functor {
     return Al::AlOperationName<Op>;
   }
 };
-std::string op_name(Al::AlOperation op) {
+inline std::string op_name(Al::AlOperation op) {
   return call_op_functor(op, op_name_functor());
 }
 
@@ -184,7 +184,7 @@ struct op_supported_functor {
 };
 /** Return true if the operator is supported by the backend. */
 template <typename Backend>
-bool is_op_supported(Al::AlOperation op) {
+inline bool is_op_supported(Al::AlOperation op) {
   return call_op_functor(op, op_supported_functor<Backend>());
 }
 
@@ -195,7 +195,7 @@ struct reduction_op_functor {
   }
 };
 /** Return true if the operator takes a reduction operator. */
-bool requires_reduction_op(Al::AlOperation op) {
+inline bool requires_reduction_op(Al::AlOperation op) {
   return call_op_functor(op, reduction_op_functor());
 }
 
@@ -206,7 +206,7 @@ struct vector_op_functor {
   }
 };
 /** Return true if the operator is a vector operator. */
-bool is_vector_op(Al::AlOperation op) {
+inline bool is_vector_op(Al::AlOperation op) {
   return call_op_functor(op, vector_op_functor());
 }
 
@@ -217,7 +217,7 @@ struct collective_op_functor {
   }
 };
 /** Return true if the operator is a collective operation. */
-bool is_collective_op(Al::AlOperation op) {
+inline bool is_collective_op(Al::AlOperation op) {
   return call_op_functor(op, collective_op_functor());
 }
 
@@ -228,13 +228,13 @@ struct pt2pt_op_functor {
   }
 };
 /** Return true if the operator is a point-to-point operation. */
-bool is_pt2pt_op(Al::AlOperation op) {
+inline bool is_pt2pt_op(Al::AlOperation op) {
   return call_op_functor(op, pt2pt_op_functor());
 }
 
 /** Return true if the reduction operator is supported by the backend. */
 template <typename Backend>
-bool is_reduction_operator_supported(Al::ReductionOperator op) {
+inline bool is_reduction_operator_supported(Al::ReductionOperator op) {
   static const std::unordered_map<Al::ReductionOperator, bool> op_support = {
     {Al::ReductionOperator::sum,
      Al::IsReductionOpSupported<Backend, Al::ReductionOperator::sum>::value},
@@ -272,7 +272,7 @@ struct supports_algos_functor {
   }
 };
 /** Return true if the operator supports different algorithms. */
-bool op_supports_algos(Al::AlOperation op) {
+inline bool op_supports_algos(Al::AlOperation op) {
   return call_op_functor(op, supports_algos_functor());
 }
 
@@ -454,7 +454,7 @@ struct get_algorithms_functor {
  * If algo is an empty string, the automatic algorithm is returned.
  */
 template <typename Backend>
-std::vector<AlgorithmOptions<Backend>> get_algorithms(
+inline std::vector<AlgorithmOptions<Backend>> get_algorithms(
   Al::AlOperation op, std::string algo) {
   if (algo == "") {
     algo = "automatic";
