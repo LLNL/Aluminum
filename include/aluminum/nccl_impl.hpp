@@ -39,8 +39,11 @@
 
 #include <cstddef>
 #include <functional>
+#include <memory>
+#include <mutex>
 #include <numeric>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include <mpi.h>
@@ -82,7 +85,7 @@
 
 // Whether NCCL user buffer registration is supported.
 #if (NCCL_MAJOR >= 2) && (NCCL_MINOR >= 19)
-#define AL_HAS_NCCL_USER_BUFFER_REGISTATION
+#define AL_HAS_NCCL_USER_BUFFER_REGISTRATION
 #endif
 
 namespace Al {
@@ -132,6 +135,23 @@ class NCCLCommunicator : public internal::MPICommAndStreamWrapper<AlGpuStream_t>
  private:
   /** Raw NCCL communicator. */
   ncclComm_t m_nccl_comm = nullptr;
+
+#ifdef AL_HAS_NCCL_USER_BUFFER_REGISTRATION
+  /** Handles for registered user buffer memory. */
+  std::unordered_map<void*, void*> nccl_registration_handles;
+#ifdef AL_THREAD_MULTIPLE
+  /** Protect `nccl_registration_handles`. */
+  std::unique_ptr<std::mutex> nccl_registration_handles_lock;
+#endif
+
+  /** Register the memory at buf with NCCL. */
+  void register_memory(void* buf, size_t size);
+  /** Unregister the memory at buf with NCCL. */
+  void unregister_memory(void* buf);
+#else
+  void register_memory(void*, size_t) {}
+  void unregister_memory(void*) {}
+#endif  // AL_HAS_NCCL_USER_BUFFER_REGISTRATION
 };
 
 namespace internal {
@@ -267,12 +287,6 @@ void safe_nccl_group(size_t start, size_t limit,
     AL_CHECK_NCCL(ncclGroupEnd());
   }
 }
-
-/** Internal helper for registering memory with NCCL. */
-void register_memory(void* buf, size_t size, NCCLCommunicator& comm);
-
-/** Internal helper for unregistering memory with NCCL. */
-void unregister_memory(void* buf, NCCLCommunicator& comm);
 
 }  // namespace nccl
 }  // namespace internal
@@ -866,12 +880,12 @@ class NCCLBackend {
 
   template <typename T>
   static void RegisterMemory(T* buf, size_t count, comm_type& comm) {
-    internal::nccl::register_memory((void*) buf, count*sizeof(T), comm);
+    comm.register_memory((void*) buf, count*sizeof(T));
   }
 
   template <typename T>
   static void UnregisterMemory(T* buf, comm_type& comm) {
-    internal::nccl::unregister_memory((void*) buf, comm);
+    comm.unregister_memory((void*) buf);
   }
 
   static std::string Name() { return "NCCLBackend"; }
