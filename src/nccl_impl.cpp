@@ -43,8 +43,12 @@ AlGpuEvent_t NCCLBackend::sync_event = (AlGpuEvent_t) 0;
 NCCLCommunicator::NCCLCommunicator() :
   NCCLCommunicator(internal::mpi::get_world_comm().get_comm(), 0) {}
 
-NCCLCommunicator::NCCLCommunicator(MPI_Comm comm_, AlGpuStream_t stream_) :
-  MPICommAndStreamWrapper(comm_, stream_) {
+NCCLCommunicator::NCCLCommunicator(MPI_Comm comm_, AlGpuStream_t stream_)
+    : MPICommAndStreamWrapper(comm_, stream_)
+#if defined(AL_HAS_NCCL_USER_BUFFER_REGISTRATION) && defined(AL_THREAD_MULTIPLE)
+      , nccl_registration_handles_lock(std::make_unique<std::mutex>())
+#endif
+{
   // Get a unique ID for this communicator from NCCL and distribute it.
   ncclUniqueId nccl_id;
   if (rank() == 0) {
@@ -74,6 +78,38 @@ NCCLCommunicator::~NCCLCommunicator() {
   }
 }
 
+#ifdef AL_HAS_NCCL_USER_BUFFER_REGISTRATION
+
+void NCCLCommunicator::register_memory(void* buf, size_t size) {
+  void* handle;
+  AL_CHECK_NCCL(ncclCommRegister(m_nccl_comm, buf, size, &handle));
+
+#ifdef AL_THREAD_MULTIPLE
+  std::lock_guard<std::mutex> lock(*nccl_registration_handles_lock);
+#endif
+
+  nccl_registration_handles[buf] = handle;
+}
+
+void NCCLCommunicator::unregister_memory(void* buf) {
+  void* handle;
+  {
+#ifdef AL_THREAD_MULTIPLE
+    std::lock_guard<std::mutex> lock(*nccl_registration_handles_lock);
+#endif
+#ifdef AL_DEBUG
+    if (nccl_registration_handles.count(buf) != 1) {
+      throw_al_exception(
+          "Attempt to unregister memory that was not registered");
+    }
+#endif
+    handle = nccl_registration_handles[buf];
+  }
+  AL_CHECK_NCCL(ncclCommDeregister(m_nccl_comm, handle));
+}
+
+#endif  // AL_HAS_NCCL_USER_BUFFER_REGISTRATION
+
 namespace internal {
 namespace nccl {
 
@@ -88,52 +124,6 @@ void init(int&, char**&) {
 
 void finalize() {
   AL_CHECK_CUDA(AlGpuEventDestroy(NCCLBackend::sync_event));
-}
-
-#ifdef AL_HAS_NCCL_USER_BUFFER_REGISTATION
-namespace {
-#ifdef AL_THREAD_MULTIPLE
-std::mutex nccl_registration_cache_lock;  // Protects access to the map.
-#endif
-std::unordered_map<void*, void*> nccl_registration_handles;
-}
-#endif
-
-void register_memory(void* buf, size_t size, NCCLCommunicator& comm) {
-#ifdef AL_HAS_NCCL_USER_BUFFER_REGISTATION
-  void* handle;
-  AL_CHECK_NCCL(ncclCommRegister(comm.get_nccl_comm(), buf, size, &handle));
-#ifdef AL_THREAD_MULTIPLE
-  std::lock_guard<std::mutex> guard(nccl_registration_cache_lock);
-#endif
-  nccl_registration_handles[buf] = handle;
-#else  // AL_HAS_NCCL_USER_BUFFER_REGISTATION
-  (void) buf;
-  (void) size;
-  (void) comm;
-#endif  // AL_HAS_NCCL_USER_BUFFER_REGISTATION
-}
-
-void unregister_memory(void* buf, NCCLCommunicator& comm) {
-#ifdef AL_HAS_NCCL_USER_BUFFER_REGISTATION
-  void* handle;
-  {
-#ifdef AL_THREAD_MULTIPLE
-    std::lock_guard<std::mutex> guard(nccl_registration_cache_lock);
-#endif
-#ifdef AL_DEBUG
-    if (nccl_registration_handles.count(buf) != 1) {
-      throw_al_exception(
-        "Attempt to unregister memory that was not registered");
-    }
-#endif
-    handle = nccl_registration_handles[buf];
-  }
-  AL_CHECK_NCCL(ncclCommDeregister(comm.get_nccl_comm(), handle));
-#else  // AL_HAS_NCCL_USER_BUFFER_REGISTATION
-  (void) buf;
-  (void) comm;
-#endif  // AL_HAS_NCCL_USER_BUFFER_REGISTATION
 }
 
 }  // namespace nccl
