@@ -32,7 +32,7 @@
 #include <numeric>
 #include <string>
 
-#ifdef AL_USE_PROGRESS
+#ifdef AL_USE_HWLOC
 #include <hwloc.h>
 #endif
 
@@ -53,10 +53,14 @@
 #if defined AL_HAS_ROCM
 #include <hip/hip_runtime.h>
 #include <rocm_smi/rocm_smi.h>
+#ifdef AL_USE_HWLOC
 #include <hwloc/rsmi.h>
+#endif
 #elif defined AL_HAS_CUDA
 #include <cuda_runtime.h>
+#ifdef AL_USE_HWLOC
 #include <hwloc/cudart.h>
+#endif
 #endif
 
 namespace Al {
