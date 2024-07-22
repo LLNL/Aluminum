@@ -30,6 +30,7 @@
 #include "Al.hpp"
 
 #include <unistd.h>
+#include <limits.h>
 
 #include <iostream>
 #include <vector>
