@@ -41,6 +41,7 @@ add_library(Al
   "${ALUMINUM_CXX_SOURCES}"
   "${ALUMINUM_CUDA_SOURCES}"
   "${ALUMINUM_HEADERS}")
+add_library(AL::Al ALIAS Al)
 target_include_directories(Al PUBLIC
   $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
 
