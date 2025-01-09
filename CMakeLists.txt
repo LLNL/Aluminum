@@ -410,13 +410,7 @@ if (ALUMINUM_ENABLE_ROCM)
   # AMDDeviceLibsConfig.cmake will block future calls from finding the
   # correct AMD_DEVICE_LIBS_PREFIX, which will cause the command line
   # to have an invalid argument.
-  find_package(hip 6.0 CONFIG QUIET)
-  if (NOT hip_FOUND)
-    find_package(hip 5.7 CONFIG QUIET)
-  endif ()
-  if (NOT hip_FOUND)
-    message(FATAL_ERROR "Failed to find a compatible HIP version (>= 5.7).")
-  endif ()
+  find_package(hip 6.2 CONFIG REQUIRED)
 
   # Now that that's handled, we can enable HIP as a language.
   enable_language(HIP)
