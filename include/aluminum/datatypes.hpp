@@ -45,17 +45,10 @@
 // Brain floating point 16 (bfloat16).
 
 #if defined AL_HAS_ROCM
-#include <hip/hip_bfloat16.h>
+#include <hip/hip_bf16.h>
 #define AL_HAS_BFLOAT 1
-using al_bfloat16 = hip_bfloat16;
+using al_bfloat16 = __hip_bfloat16;
 
-// Provide these for compatibility with CUDA.
-inline al_bfloat16 __float2bfloat16(const float a) {
-  return al_bfloat16(a);
-}
-inline float __bfloat162float(const al_bfloat16 a) {
-  return static_cast<float>(a);
-}
 #elif defined AL_HAS_CUDA
 #include <cuda_bf16.h>
 #define AL_HAS_BFLOAT 1

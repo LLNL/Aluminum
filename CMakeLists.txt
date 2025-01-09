@@ -412,10 +412,10 @@ if (ALUMINUM_ENABLE_ROCM)
   # to have an invalid argument.
   find_package(hip 6.0 CONFIG QUIET)
   if (NOT hip_FOUND)
-    find_package(hip 5.0 CONFIG QUIET)
+    find_package(hip 5.7 CONFIG QUIET)
   endif ()
   if (NOT hip_FOUND)
-    message(FATAL_ERROR "Failed to find a compatible HIP version (5 or 6).")
+    message(FATAL_ERROR "Failed to find a compatible HIP version (>= 5.7).")
   endif ()
 
   # Now that that's handled, we can enable HIP as a language.
