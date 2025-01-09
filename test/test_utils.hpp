@@ -132,7 +132,7 @@ inline std::ostream& operator<<(std::ostream& os, __half const& x) {
   return os << static_cast<float>(x);
 }
 #endif
-#if defined(AL_HAS_BFLOAT) && !defined(AL_HAS_ROCM)
+#if defined(AL_HAS_BFLOAT)
 inline std::ostream& operator<<(std::ostream& os, al_bfloat16 const& x) {
   return os << static_cast<float>(x);
 }
